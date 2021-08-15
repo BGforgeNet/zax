@@ -48,9 +48,13 @@ def add_key(settings_list, item):
     else:
       max = item['max']
     if not 'interval' in item:
-      interval = 10
+      interval = (max - min)/10
     else:
       interval = item['interval']
+    if 'data_type' in item and item['data_type'] == 'float':
+      min = min * item['float_base']
+      max = max * item['float_base']
+      interval = interval * item['float_base']
     settings_list.append([sg.T(name), sg.Slider(range=(min, max+1), orientation='horizontal', key=item['key'], size=(200, None), tick_interval=interval, enable_events=True)])
   elif item['type'] == 'spin':
     if not 'min' in item:

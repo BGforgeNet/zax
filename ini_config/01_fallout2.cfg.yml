@@ -21,10 +21,11 @@ tabs:
     items:
       - key: brightness
         type: slider
-        min: 1000000
-        max: 1179993
+        min: 1
+        max: 1.179993
         data_type: float
         float_base: 1000000
+        # interval: 10000
       - key: combat_difficulty
       - key: combat_looks
       - key: combat_messages
@@ -35,28 +36,31 @@ tabs:
       - key: language_filter
       - key: mouse_sensitivity
         type: slider
-        min: 1000000
-        max: 2500000
+        min: 1
+        max: 2.5
         data_type: float
         float_base: 1000000
+        # interval: 100000
       - key: player_speedup
       - key: running
       - key: subtitles
       - key: target_highlight
       - key: text_base_delay
         type: slider
-        min: 1000000
-        max: 6000000
+        min: 1
+        max: 6
         data_type: float
         float_base: 1000000
         inverted: true
+        # interval: 500000
       - key: text_line_delay
         type: slider
         min: 0
-        max: 2000000
+        max: 2
         data_type: float
         float_base: 1000000
         inverted: true
+        # interval: 200000
       - key: violence_level
 
   # - tab: sound

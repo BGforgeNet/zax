@@ -86,6 +86,7 @@ def handle_event(window, event, values, game_path):
   return True
 
 def ini_value_to_window(ini_config, key, value):
+  print(key)
   result = None
   vtype = 'bool'
   for t in ini_config['tabs']:
@@ -99,6 +100,7 @@ def ini_value_to_window(ini_config, key, value):
       except:
         pass
   value = int(value)
+  print(value)
   if vtype == 'bool':
     if value == 1:
       result = True
@@ -128,8 +130,6 @@ def disable_element(key, window, values, new_value = None):
 
 while True:  # Event Loop
   event, values = window.read()
-  print(event)
-  print(type(event))
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":
