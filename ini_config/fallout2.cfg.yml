@@ -1,0 +1,357 @@
+path: fallout2.cfg
+
+tabs:
+  - tab: debug
+    items:
+      - key: mode
+      - key: output_map_data_info
+      - key: show_load_info
+      - key: show_script_messages
+      - key: show_tile_num
+
+  - tab: preferences
+    items:
+      - key: brightness
+      - key: combat_difficulty
+      - key: combat_looks
+      - key: combat_messages
+      - key: combat_speed
+      - key: combat_taunts
+      - key: game_difficulty
+      - key: item_highlight
+      - key: language_filter
+      - key: mouse_sensitivity
+      - key: player_speedup
+      - key: running
+      - key: subtitles
+      - key: target_highlight
+      - key: text_base_delay
+      - key: text_line_delay
+      - key: violence_level
+
+  - tab: sound
+    items:
+      - key: cache_size
+      - key: device
+      - key: dma
+      - key: initialize
+      - key: irq
+      - key: master_volume
+      - key: music
+      - key: music_path1
+      - key: music_path2
+      - key: music_volume
+      - key: port
+      - key: sndfx_volume
+      - key: sounds
+      - key: speech
+      - key: speech_volume
+
+  - tab: system
+    items:
+      - key: art_cache_size
+      - key: color_cycling
+      - key: critter_dat
+      - key: critter_patches
+      - key: cycle_speed_factor
+      - key: executable
+      - key: free_space
+      - key: hashing
+      - key: interrupt_walk
+      - key: language
+      - key: master_dat
+      - key: master_patches
+      - key: scroll_lock
+      - key: splash
+
+
+
+
+# - tab: Video
+#   items:
+#     # - key: Display Frequency
+#     - key: Resolution
+#       type: dropdown
+#       options:
+#         - 640x480
+#         - 800x600
+#         - 1024x768
+#         - 1280x960
+#         - 1600x1200
+#         - 2048x1536
+#     - key: BitsPerPixel
+#       display_name: Color depth, bits
+#       type: dropdown
+#       options:
+#         - 16
+#         - 24
+#         - 32
+#     - key: Full Screen
+#     - key: Gamma Correction
+#       type: slider
+#       max: 5
+#       interval: 1
+#     - key: Brightness Correction
+#       type: slider
+#       max: 40
+#       interval: 10
+
+# - tab: Graphics
+#   items:
+#     - key: 16Bit Textures
+#       description: Use ff you are running a 3dfx board.
+
+#     - frame: 3D
+#       items:
+#         - key: 3D Acceleration
+#         - key: Backwards Compatible 3d
+#         - key: Disable Vertex Padding
+#           display_name: Vertex Padding
+#           inverted: true
+
+#     - frame: 2D
+#       items:
+#         - key: Use 3d Animations
+
+#     - frame: 2D, 16 BPP
+#       description: Software Graphics functions are used only in 2D mode with 16bit color depth and are useful for older video cards that cannot support these  functions in hardware.
+#       items:
+#         - key: SoftBlt
+#         - key: SoftBltFast
+#         - key: SoftMirrorBlt
+#         - key: SoftSrcKeyBlt
+#         - key: SoftSrcKeyBltFast
+
+# - tab: Audio
+#   items:
+#     - key: Environmental Audio
+#     - frame: Volume
+#       items:
+#         - key: Volume Movie
+#           display_name: Movie
+#           type: slider
+#         - key: Volume Music
+#           display_name: Music
+#           type: slider
+#         - key: Volume Voices
+#           display_name: Voices
+#           type: slider
+#         - key: Volume Ambients
+#           display_name: Ambients
+#           type: slider
+#         - key: Volume SFX
+#           display_name: SFX
+#           type: slider
+#     - frame: Sound
+#       items:
+#         - key: Footsteps
+#         - key: Attack Sounds
+#         - key: Disable VVC Sounds
+#           display_name: VVC Sounds
+#           inverted: true
+
+# - tab: Gameplay
+#   items:
+#     - key: Maximum Frame Rate
+#       display_name: Game speed, fps
+#       type: spin
+#       min: 10
+#       max: 90
+#       interval: 10
+
+#     - key: Difficulty Level
+#       display_name: Difficulty
+#       type: slider
+#       min: 1
+#       max: 5
+#       interval: 1
+
+#     - key: Display Subtitles
+#       display_name: Movie Subtitles
+#     - key: All Learn Spell Info
+#     - key: Critical Hit Screen Shake
+#     - key: Weather
+#     - key: Quick Item Mapping
+
+#     - frame: Pause
+#       items:
+#         - key: Pausing Map
+#           display_name: Force pause on Map screen
+#         - key: Force Dialog Pause
+#         - key: Auto Pause State
+#         - key: Auto Pause Center
+
+#     - frame: GUI
+#       items:
+#         - key: GUI Feedback Level
+#           display_name: Foot circles
+#           type: slider
+#           min: 1
+#           max: 6
+#           interval: 1
+
+#         - key: Locator Feedback Level
+#           display_name: Arrows to offscreen characters
+#           type: slider
+#           min: 1
+#           max: 6
+#           interval: 1
+#         - key: Effect Text Level
+#         - key: Tooltips
+#           display_name: Tooltips delay
+#           type: slider
+#         - key: Hotkeys On Tooltips
+
+#     - frame: Fonts
+#       items:
+#         - key: Font Name
+#           type: string
+#         - key: Drop Capitals
+#         - key: Double Byte Character Support
+
+#     - frame: Party
+#       items:
+#         - key: Heal Party on Rest
+#         - key: Infravision
+#         - key: HP Over Head
+
+#     - frame: Pathfinding
+#       items:
+#       - key: Path Search Nodes
+#         type: spin
+#         min: 4000
+#         max: 400000
+#       - key: Enhanced Path Finding
+
+#     - frame: Dialog window
+#       items:
+#         - key: Subtitles
+#           display_name: Dialog subtitles
+#         - key: Duplicate Floating Text
+#         - key: Extra Combat Info
+#         - key: Extra Feedback
+
+#     - frame: Sounds
+#       items:
+#         - key: Command Sounds Frequency
+#           type: slider
+#           min: 1
+#           max: 3
+#           interval: 1
+#         - key: Selection Sounds Frequency
+#           type: slider
+#           min: 1
+#           max: 3
+#           interval: 1
+#         - key: Bored Timeout
+#           type: slider
+#           min: 1
+#           max: 65000
+#           interval: 5000
+
+#     - frame: Scroll speed
+#       items:
+#         - key: Mouse Scroll Speed
+#           display_name: Mouse
+#           type: slider
+#           min: 6
+#           max: 50
+#           interval: 15
+#         - key: Keyboard Scroll Speed
+#           display_name: Keyboard
+#           type: slider
+#           min: 18
+#           max: 150
+#           interval: 10
+
+# - tab: Performance
+#   items:
+#     - key: Tiles Precache Percent
+#       type: slider
+#       min: 1
+
+#     - key: Faster Blur
+#     - key: Low End Machine
+#     - key: Low End Machine 2
+
+#     - key: Translucent Shadows
+#     - key: Force 50 Percent Transparent
+#     - key: Disable Brighten
+#     - key: Automated Speed Adjustment
+
+#     - frame: Disable During Combat
+#       items:
+#         - key: Disable Statics During Combat
+#           display_name: Statics
+#         - key: Disable Footsteps During Combat
+#           display_name: Footsteps
+#         - key: Disable Placed Sounds During Combat
+#           display_name: Placed Sounds
+
+
+#     - frame: "Automated Speed Adjustment: if fps drops below, %"
+#       items:
+#         - key: Automated Translucent Shadows
+#           display_name: Translucent Shadows
+#           type: spin
+#         - key: Automated Very Low Performance
+#           display_name: Very Low Performance
+#           type: spin
+#         - key: Automated Low Performance
+#           display_name: Low Performance
+#           type: spin
+#         - key: Automated Disable Brightest
+#           display_name: Brightest
+#           type: spin
+#         - key: Automated Limit Transparency
+#           display_name: Limit Transparency
+#           type: spin
+#         - key: Automated Disable Casting Glows
+#           display_name: Casting Glows
+#           type: spin
+#         - key: Automated Disable VEFVidCells
+#           display_name: VEFVidCells
+#           type: spin
+#         - key: Automated Mid Level Brighten
+#           display_name: Mid Level Brighten
+#           type: spin
+#         - key: Automated High Level Brighten
+#           display_name: High Level Brighten
+#           type: spin
+#         - key: Automated Foot Steps
+#           display_name: Footsteps
+#           type: spin
+#         - key: Automated Attack Sounds
+#           display_name: Attack Sounds
+#           type: spin
+#         - key: Automated 3D Animations
+#           display_name: 3D Animations
+#           type: spin
+#         - key: Automated Disable VVC Sounds
+#           display_name: VVC Sounds
+#           type: spin
+#         - key: Automated Faster Blur
+#           display_name: Faster Blur
+#           type: spin
+
+# - tab: Debug
+#   items:
+#     - key: Debug Mode
+#     - key: Cheats
+#     - key: Strref On
+#       display_name: Display strref numbers
+#     - key: Logging On
+#       display_name: Enable game log
+#     - key: Over Confirm Everything
+#     - key: Filter Games
+
+#     - key: Super Atomic Speed Fighting Action
+
+#     - key: Tutorial State
+
+#     - key: First Run
+#     - frame: Popups
+#       items:
+#         - key: One Time Popup
+#         - key: Never Show Nuisance
+#         - key: Never Show Nuisance SOA
