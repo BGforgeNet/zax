@@ -26,25 +26,28 @@ tabs:
         data_type: float
         float_base: 1000000
         # interval: 10000
-      - key: combat_difficulty
-      - key: combat_looks
-      - key: combat_messages
-      - key: combat_speed
-      - key: combat_taunts
       - key: game_difficulty
+        name: Difficulty
+        type: radio
+        options:
+          - Easy
+          - Normal
+          - Hard
       - key: item_highlight
+        name: Highlight items
       - key: language_filter
+        name: Language filter
       - key: mouse_sensitivity
+        name: Mouse sensitivity
         type: slider
         min: 1
         max: 2.5
         data_type: float
         float_base: 1000000
         # interval: 100000
-      - key: player_speedup
       - key: running
+        name: Always run
       - key: subtitles
-      - key: target_highlight
       - key: text_base_delay
         type: slider
         min: 1
@@ -61,7 +64,43 @@ tabs:
         float_base: 1000000
         inverted: true
         # interval: 200000
-      - key: violence_level
+
+      - frame: Combat
+        items:
+        - key: combat_difficulty
+          name: Difficulty
+          type: radio
+          options:
+            - Wimpy
+            - Normal
+            - Rough
+        - key: combat_speed
+          name: Speed
+          type: slider
+          min: 0
+          max: 50
+        - key: player_speedup
+          name: Affect player speed
+        - key: combat_looks
+          name: Looks
+        - key: combat_messages
+          name: Messages
+          type: radio
+          options:
+            - Verbose
+            - Brief
+        - key: combat_taunts
+          name: Taunts
+        - key: target_highlight
+          name: Highlight target
+        - key: violence_level
+          name: Violence level
+          type: dropdown
+          options:
+            - None
+            - Minimal
+            - Normal
+            - Maximum blood
 
   # - tab: sound
   #   items:
