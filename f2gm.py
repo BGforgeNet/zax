@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 
 import PySimpleGUIQt as sg
-import os
+import os, io
 import json
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
-import configparser
+import iniparse
 import ini_layouts
 
 sg.theme('Dark Brown')
 # sg.theme('material 2')
 
 
-game_config = configparser.ConfigParser()
 f2gm_yml = "f2gm.yml"
 config = {}
 games = []
@@ -37,7 +36,7 @@ left_col = [
   [sg.Button('Add game')],
   [sg.Button('Remove game from list')],
 ]
-print(settings_layout)
+
 right_col = [[
   sg.TabGroup([
     [sg.Tab('Settings', settings_layout, tooltip='Game settings'), sg.Tab('Mods', mods_layout, tooltip='mods')]
@@ -65,16 +64,47 @@ def is_f2_game(path):
   return False
 
 def game_type(path):
-  return "bg2"
+  return "f2"
 
-def game_ini(path):
-  if game_type(path) == "bg2":
-    ini = 'baldur.ini'
-  return os.path.join(path, ini)
+def config_path(game_path):
+  if game_type(game_path) == "f2":
+    cfg = 'fallout2.cfg'
+  return os.path.join(game_path, cfg)
 
 
-def handle_event(window, event, values):
+def handle_event(window, event, values, game_path):
+  if event != '-LIST-':
+    return False
+  ini_configs = ini_layouts.get_ini_configs()
+  for f in ini_configs:
+    if os.path.isfile(os.path.join(game_path, f)):
+      cfg = iniparse.INIConfig(io.open(config_path(game_path)))
+      for s in cfg:
+        for k in cfg[s]:
+          if k in values:
+            window[k](value=ini_value_to_window(ini_configs[f], k, cfg[s][k]))
   return True
+
+def ini_value_to_window(ini_config, key, value):
+  result = None
+  vtype = 'bool'
+  for t in ini_config['tabs']:
+    for i in t['items']:
+      try:
+        if 'key' in i and i['key'] == key:
+          if i['type'] == 'slider':
+            if 'data_type' in i and i['data_type'] == 'float':
+              value = int(float(value) * i['float_base'])
+            vtype = 'int'
+      except:
+        pass
+  value = int(value)
+  if vtype == 'bool':
+    if value == 1:
+      result = True
+    if value == 0:
+      result = False
+  return result
 
 
 def enable_element(key, window, values, new_value = None):
@@ -99,6 +129,7 @@ def disable_element(key, window, values, new_value = None):
 while True:  # Event Loop
   event, values = window.read()
   print(event)
+  print(type(event))
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":
@@ -112,8 +143,7 @@ while True:  # Event Loop
       sg.popup("fallout2.exe not found in directory {}".format(dname))
   if values['-LIST-']:
     game_path = values['-LIST-'][0]
-    ini = game_config.read(game_ini(game_path))
-  handle_event(window, event, values)
+    handle_event(window, event, values, game_path)
 
 
 config['games'] = games
