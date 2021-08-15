@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from typing import OrderedDict
 import PySimpleGUIQt as sg
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -12,7 +13,8 @@ ini_yml = "ini.yml"
 def get_ini_configs():
   ini_config_dir = 'ini_config'
   ini_config_files = [os.path.join(ini_config_dir, f) for f in os.listdir(ini_config_dir) if os.path.isfile(os.path.join(ini_config_dir, f)) and f.lower().endswith('.yml')]
-  ini_configs = {}
+  ini_config_files.sort()
+  ini_configs = OrderedDict()
   for f in ini_config_files:
     with open(f) as yf:
       data = yaml.load(yf)
@@ -99,7 +101,7 @@ def settings_element():
   for ic in ini_configs:
     print(ic)
     tab_layout = ini_config_to_layout(ini_configs[ic])
-    tab_list.append(sg.Tab(ic, tab_layout))
+    tab_list.append(sg.Tab(ini_configs[ic]['name'], tab_layout))
   layout = [sg.TabGroup([tab_list], tooltip="Settings")]
   # print(layout)
   # window = sg.Window('f2gm', layout, finalize=True)
