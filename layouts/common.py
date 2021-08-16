@@ -57,7 +57,7 @@ def radio(cfg_data, section, key):
   options = [str(o['name']) for o in item['options']]
   return [sg.T("       " + name), sg.Stretch()] + [sg.Radio(str(o), wkey, enable_events=True) for o in  options]
 
-def slider(cfg_data, section, key):
+def slider(cfg_data, section, key, visible=True):
   item = cfg_data[section][key]
   name, wkey= name_wkey(cfg_data, section, key)
   if not 'min' in item:
@@ -76,7 +76,9 @@ def slider(cfg_data, section, key):
     min = min * item['float_base']
     max = max * item['float_base']
     interval = interval * item['float_base']
-  return [sg.T("       " + name), sg.Slider(range=(min, max+1), orientation='horizontal', key=wkey, size=(200, None), tick_interval=interval, enable_events=True)]
+  return [
+    sg.T("       " + name, visible=visible),
+    sg.Slider(range=(min, max+1), orientation='horizontal', key=wkey, size=(200, None), tick_interval=interval, enable_events=True, visible=visible)]
 
 def spin(cfg_data, section, key):
   item = cfg_data[section][key]

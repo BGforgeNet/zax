@@ -75,6 +75,7 @@ preferences:
     min: 1
     max: 6
     float_base: 1000000
+    name: Floating text delay
   text_line_delay:
     type: float
     min: 0
