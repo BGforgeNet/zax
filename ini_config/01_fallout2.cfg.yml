@@ -25,7 +25,6 @@ tabs:
         max: 1.179993
         data_type: float
         float_base: 1000000
-        # interval: 10000
       - key: game_difficulty
         name: Difficulty
         type: radio
@@ -44,7 +43,6 @@ tabs:
         max: 2.5
         data_type: float
         float_base: 1000000
-        # interval: 100000
       - key: running
         name: Always run
       - key: subtitles
@@ -55,7 +53,6 @@ tabs:
         data_type: float
         float_base: 1000000
         inverted: true
-        # interval: 500000
       - key: text_line_delay
         type: slider
         min: 0
@@ -63,7 +60,6 @@ tabs:
         data_type: float
         float_base: 1000000
         inverted: true
-        # interval: 200000
 
       - frame: Combat
         items:

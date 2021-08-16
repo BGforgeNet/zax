@@ -105,7 +105,7 @@ def settings_element():
   for ic in ini_configs:
     print(ic)
     tab_layout = ini_config_to_layout(ini_configs[ic])
-    tab_list.append(sg.Tab(ini_configs[ic]['name'], tab_layout))
+    tab_list.append(sg.Tab(ini_configs[ic]['name'], tab_layout, key=ini_configs[ic]['path']))
   layout = [sg.TabGroup([tab_list], tooltip="Settings")]
   # print(layout)
   # window = sg.Window('f2gm', layout, finalize=True)
