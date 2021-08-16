@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import PySimpleGUIQt as sg
+from typing import OrderedDict
 import os, io
 import json
 import ruamel.yaml
@@ -72,18 +73,32 @@ def config_path(game_path):
     cfg = 'fallout2.cfg'
   return os.path.join(game_path, cfg)
 
+def get_ini_configs():
+  config_dir = 'configs'
+  config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if os.path.isfile(os.path.join(config_dir, f)) and f.lower().endswith('.yml')]
+  config_files.sort()
+  configs = OrderedDict()
+  for f in config_files:
+    with open(f) as yf:
+      data = yaml.load(yf)
+    path = data['f2gm']['path']
+    configs[path] = data
+  return configs
 
 def handle_event(window, event, values, game_path):
   if event != '-LIST-':
     return False
-  # ini_configs = ini_layouts.get_ini_configs()
-  # for f in ini_configs:
-  #   if os.path.isfile(os.path.join(game_path, f)):
-  #     cfg = iniparse.INIConfig(io.open(config_path(game_path)))
-  #     for s in cfg:
-  #       for k in cfg[s]:
-  #         if k in values:
-  #           window[k](value=ini_value_to_window(ini_configs[f], k, cfg[s][k]))
+  configs = get_ini_configs()
+  for f in configs:
+    if os.path.isfile(os.path.join(game_path, f)):
+      cfg = iniparse.INIConfig(io.open(config_path(game_path)))
+      for s in cfg:
+        print(s)
+        for k in cfg[s]:
+          print(k)
+          print(cfg[s][k])
+          if k in values:
+            window[k](value=ini_value_to_window(configs[f], k, cfg[s][k]))
   return True
 
 def ini_value_to_window(ini_config, key, value):
@@ -95,7 +110,7 @@ def ini_value_to_window(ini_config, key, value):
       try:
         if 'key' in i and i['key'] == key:
           if i['type'] == 'slider':
-            if 'data_type' in i and i['data_type'] == 'float':
+            if 'type' in i and i['type'] == 'float':
               value = int(float(value) * i['float_base'])
             vtype = 'int'
       except:
@@ -130,7 +145,9 @@ def disable_element(key, window, values, new_value = None):
 
 
 while True:  # Event Loop
+
   event, values = window.read()
+  print(event)
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":

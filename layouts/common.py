@@ -54,8 +54,8 @@ def dropdown(cfg_data, section, key):
 def radio(cfg_data, section, key):
   item = cfg_data[section][key]
   name, wkey= name_wkey(cfg_data, section, key)
-  options = [str(o['name']) for o in item['options']]
-  return [sg.T("       " + name), sg.Stretch()] + [sg.Radio(str(o), wkey, enable_events=True) for o in  options]
+  options = {o['name']: o['value'] for o in item['options']}
+  return [sg.T("       " + name), sg.Stretch()] + [sg.Radio(o, wkey, key='{}-{}'.format(wkey, options[o]), enable_events=True) for o in options]
 
 def slider(cfg_data, section, key, visible=True):
   item = cfg_data[section][key]
