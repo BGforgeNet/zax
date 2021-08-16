@@ -10,14 +10,14 @@ debug:
 
 preferences:
   brightness:
-    type: slider
-    value_type: float
+    type: float
     float_base: 1000000
     min: 1
     max: 1.179993
+    name: Brightness
   combat_difficulty:
     name: Difficulty
-    type: dropdown
+    type: int
     options:
       - value: 0
         name: Wimpy
@@ -29,7 +29,7 @@ preferences:
     name: Looks
   combat_messages:
     name: Messages
-    type: radio
+    type: int
     options:
       - value: 0
         name: Verbose
@@ -37,14 +37,14 @@ preferences:
         name: Brief
   combat_speed:
     name: Speed
-    type: slider
+    type: int
     min: 0
     max: 50
   combat_taunts:
     name: Taunts
   game_difficulty:
     name: Difficulty
-    type: radio
+    type: int
     options:
       - value: 0
         name: Easy
@@ -58,33 +58,31 @@ preferences:
     name: Language filter
   mouse_sensitivity:
     name: Mouse sensitivity
-    type: slider
+    type: float
     min: 1
     max: 2.5
-    data_type: float
     float_base: 1000000
   player_speedup:
     name: Affect player speed
   running:
     name: Always run
   subtitles:
+    name: Movie subtitles
   target_highlight:
     name: Highlight target
   text_base_delay:
-    type: slider
+    type: float
     min: 1
     max: 6
-    data_type: float
     float_base: 1000000
   text_line_delay:
-    type: slider
+    type: float
     min: 0
     max: 2
-    data_type: float
     float_base: 1000000
   violence_level:
     name: Violence level
-    type: dropdown
+    type: int
     options:
       - value: 0
         name: None
@@ -115,19 +113,19 @@ sound:
   music_path2:
     type: string
   music_volume:
-    type: slider
+    type: int
     min: 1
     max: 22281
   port:
     type: int
   sndfx_volume:
-    type: slider
+    type: int
     min: 1
     max: 22281
   sounds:
   speech:
   speech_volume:
-    type: slider
+    type: int
     min: 1
     max: 22281
   debug:
@@ -135,7 +133,7 @@ sound:
 
 system:
   art_cache_size:
-    type: spin
+    type: int
   color_cycling:
   critter_dat:
     type: string

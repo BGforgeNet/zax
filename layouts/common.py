@@ -72,7 +72,7 @@ def slider(cfg_data, section, key):
     interval = (max - min)/10
   else:
     interval = item['interval']
-  if 'data_type' in item and item['data_type'] == 'float':
+  if 'type' in item and item['type'] == 'float':
     min = min * item['float_base']
     max = max * item['float_base']
     interval = interval * item['float_base']
