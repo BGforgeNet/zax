@@ -14,42 +14,58 @@ c = get_ini_data('fallout2.cfg')
 tabs = OrderedDict()
 
 tabs['Preferences'] = [
-  frame("Combat", [
-    radio   (c, 'preferences', 'combat_difficulty'),
-    # dropdown(c, 'preferences', 'combat_difficulty'),
-    checkbox(c, 'preferences', 'combat_looks'),
-    radio   (c, 'preferences', 'combat_messages'),
+  slider  (c, 'preferences', 'brightness'),
+  radio   (c, 'preferences', 'game_difficulty'),
+  checkbox(c, 'preferences', 'item_highlight'),
+  checkbox(c, 'preferences', 'language_filter'),
+  slider  (c, 'preferences', 'mouse_sensitivity'),
+  checkbox(c, 'preferences', 'running'),
+  checkbox(c, 'preferences', 'subtitles'),
+  slider  (c, 'preferences', 'text_base_delay'),
+  slider  (c, 'preferences', 'text_line_delay'),
+]
+tabs['Combat'] = [
+  radio   (c, 'preferences', 'combat_difficulty'),
+  frame("Speed", [
     slider  (c, 'preferences', 'combat_speed'),
-    checkbox(c, 'preferences', 'combat_taunts'),
+    checkbox(c, 'preferences', 'player_speedup'),
+  ]),
+  checkbox(c, 'preferences', 'combat_looks'),
+  radio   (c, 'preferences', 'combat_messages'),
+  checkbox(c, 'preferences', 'combat_taunts'),
+  checkbox(c, 'preferences', 'target_highlight'),
+  dropdown(c, 'preferences', 'violence_level'),
+]
 
-  #   :
-  #   name: Difficulty
-  #   type: dropdown
-  #   options:
-  #     - value: 0
-  #       name: Wimpy
-  #     - value: 1
-  #       name: Normal
-  #     - value: 2
-  #       name: Rough
-  # combat_looks:
-  #   name: Looks
-  # combat_messages:
-  #   name: Messages
-  #   type: radio
-  #   options:
-  #     - value: 0
-  #       name: Verbose
-  #     - value: 1
-  #       name: Brief
-  # combat_speed:
-  #   name: Speed
-  #   type: slider
-  #   min: 0
-  #   max: 50
-  # combat_taunts:
-  #   name: Taunts
-
+tabs['Advanced'] = [
+  frame("System", [
+    spin(c, 'system', 'art_cache_size'),
+    checkbox(c, 'system', 'color_cycling'),
+    qinput(c, 'system', 'critter_dat'),
+    qinput(c, 'system', 'critter_patches'),
+    spin(c, 'system', 'cycle_speed_factor'),
+    qinput(c, 'system', 'executable'),
+    spin(c, 'system', 'free_space'),
+    checkbox(c, 'system', 'hashing'),
+    checkbox(c, 'system', 'interrupt_walk'),
+    qinput(c, 'system', 'language'),
+    qinput(c, 'system', 'master_dat'),
+    qinput(c, 'system', 'master_patches'),
+    checkbox(c, 'system', 'scroll_lock'),
+    spin(c, 'system', 'splash'),
+  ]),
+  frame("Sound", [
+    checkbox(c, 'sound', 'music'),
+    checkbox(c, 'sound', 'sounds'),
+    checkbox(c, 'sound', 'speech'),
+    qinput(c, 'sound', 'music_path1', size=(200, None)),
+    qinput(c, 'sound', 'music_path2', size=(200, None)),
+    spin(c, 'sound', 'cache_size'),
+    qinput(c, 'sound', 'device'),
+    qinput(c, 'sound', 'dma'),
+    checkbox(c, 'sound', 'initialize'),
+    qinput(c, 'sound', 'irq'),
+    qinput(c, 'sound', 'port'),
   ])
 ]
 
@@ -66,13 +82,8 @@ tabs['Debug'] = [
   ])
 ]
 
+
 tab_list = [tab(t, tabs[t]) for t in tabs]
 
 layout = sg.TabGroup([tab_list])
 
-# window = sg.Window('test1', layout=[[layout]], finalize=True)
-
-# while True:
-#   event, values = window.read()
-#   if event == sg.WIN_CLOSED:
-#     break

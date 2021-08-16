@@ -42,72 +42,119 @@ preferences:
     max: 50
   combat_taunts:
     name: Taunts
+  game_difficulty:
+    name: Difficulty
+    type: radio
+    options:
+      - value: 0
+        name: Easy
+      - value: 1
+        name: Normal
+      - value: 2
+        name: Hard
+  item_highlight:
+    name: Highlight items
+  language_filter:
+    name: Language filter
+  mouse_sensitivity:
+    name: Mouse sensitivity
+    type: slider
+    min: 1
+    max: 2.5
+    data_type: float
+    float_base: 1000000
+  player_speedup:
+    name: Affect player speed
+  running:
+    name: Always run
+  subtitles:
+  target_highlight:
+    name: Highlight target
+  text_base_delay:
+    type: slider
+    min: 1
+    max: 6
+    data_type: float
+    float_base: 1000000
+  text_line_delay:
+    type: slider
+    min: 0
+    max: 2
+    data_type: float
+    float_base: 1000000
+  violence_level:
+    name: Violence level
+    type: dropdown
+    options:
+      - value: 0
+        name: None
+      - value: 1
+        name: Minimal
+      - value: 2
+        name: Normal
+      - value: 3
+        name: Maximum blood
 
 sound:
   cache_size:
     type: int
   device:
+    type: int
+  dma:
+    type: int
+  initialize:
+  irq:
+    type: int
+  master_volume:
+    type: slider
+    min: 1
+    max: 22281
+  music:
+  music_path1:
+    type: string
+  music_path2:
+    type: string
+  music_volume:
+    type: slider
+    min: 1
+    max: 22281
+  port:
+    type: int
+  sndfx_volume:
+    type: slider
+    min: 1
+    max: 22281
+  sounds:
+  speech:
+  speech_volume:
+    type: slider
+    min: 1
+    max: 22281
   debug:
   debug_sfxc:
 
-  # - name: preferences
-  #   keys:
-  #     - key: brightness
-  #       type: slider
-  #       value_type: float
-  #       float_base: 1000000
-  #       min: 1
-  #       max: 1.179993
-  #     - key: game_difficulty
-  #       name: Difficulty
-  #       type: radio
-  #       options:
-  #         - value: 0
-  #           name: Easy
-  #         - value: 1
-  #           name: Normal
-  #         - value: 2
-  #           name: Hard
-  #     - key: item_highlight
-  #       name: Highlight items
-  #     - key: language_filter
-  #       name: Language filter
-  #     - key: mouse_sensitivity
-  #       name: Mouse sensitivity
-  #       type: slider
-  #       min: 1
-  #       max: 2.5
-  #       data_type: float
-  #       float_base: 1000000
-  #     - key: player_speedup
-  #       name: Affect player speed
-  #     - key: running
-  #       name: Always run
-  #     - key: subtitles
-  #     - key: target_highlight
-  #       name: Highlight target
-  #     - key: text_base_delay
-  #       type: slider
-  #       min: 1
-  #       max: 6
-  #       data_type: float
-  #       float_base: 1000000
-  #     - key: text_line_delay
-  #       type: slider
-  #       min: 0
-  #       max: 2
-  #       data_type: float
-  #       float_base: 1000000
-  #       inverted: true
-  #     - key: violence_level
-  #       name: Violence level
-  #       type: dropdown
-  #       options:
-  #         - value: 0
-  #           name: None
-  #         - value: 1
-  #           name: Minimal
-  #         - value: 2
-  #           name: Normal
-  #         - value: 3
-  #           name: Maximum blood
+system:
+  art_cache_size:
+    type: spin
+  color_cycling:
+  critter_dat:
+    type: string
+  critter_patches:
+    type: string
+  cycle_speed_factor:
+    type: int
+  executable:
+    type: string
+  free_space:
+    type: spin
+  hashing:
+  interrupt_walk:
+  language:
+    type: string
+  master_dat:
+    type: string
+  master_patches:
+    type: string
+  scroll_lock:
+  splash:
+    type: spin

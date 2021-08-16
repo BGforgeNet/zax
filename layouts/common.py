@@ -23,8 +23,6 @@ def checkbox(cfg_data, section, key):
 
 def tab(tab_name, items):
   return sg.Tab(tab_name, [[sg.Column(items, scrollable=True, size=(500,500))]])
-  return sg.Tab(tab_name, items)
-  # return sg.Tab(tab_name, [[]])
 
 def frame(name, items):
   # frame title is broken https://github.com/PySimpleGUI/PySimpleGUI/issues/2733
@@ -80,6 +78,26 @@ def slider(cfg_data, section, key):
     interval = interval * item['float_base']
   return [sg.T("       " + name), sg.Slider(range=(min, max+1), orientation='horizontal', key=wkey, size=(200, None), tick_interval=interval, enable_events=True)]
 
+def spin(cfg_data, section, key):
+  item = cfg_data[section][key]
+  name, wkey= name_wkey(cfg_data, section, key)
+  if not 'min' in item:
+    min = 0
+  else:
+    min = item['min']
+  if not 'max' in item:
+    max = 100
+  else:
+    max = item['max']
+  return [sg.Text(name), sg.Spin([i for i in range(min,max+1)], initial_value=0, size=(100, None), key=wkey)]
+
+def qinput(cfg_data, section, key, size=(100, None)):
+  name, wkey= name_wkey(cfg_data, section, key)
+  return [sg.Text(name), sg.InputText("", key=wkey, size=size)]
+
+  #   settings_list.append([sg.Text(name), sg.Spin([i for i in range(min,max+1)], initial_value=0, size=(100, None), key=item['key'])])
+  # elif item['type'] == 'string':
+  #   settings_list.append()
 
 
 #   elif item['type'] == 'radio':
