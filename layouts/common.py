@@ -91,9 +91,9 @@ def spin(cfg_data, section, key):
     max = 100
   else:
     max = item['max']
-  return [sg.Text("       " + name), sg.Spin([i for i in range(min,max+1)], initial_value=0, size=(100, None), key=wkey)]
+  return [sg.Text("       " + name), sg.Spin([i for i in range(min,max+1)], initial_value=0, size=(100, None), key=wkey, enable_events=True)]
 
 # todo: validate input for ints (including negative in some cases)
 def qinput(cfg_data, section, key, size=(100, None)):
   name, wkey= name_wkey(cfg_data, section, key)
-  return [sg.Text("       " + name), sg.InputText("", key=wkey, size=size)]
+  return [sg.Text("       " + name), sg.InputText("", key=wkey, size=size, enable_events=True)]

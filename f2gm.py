@@ -2,12 +2,15 @@
 
 import PySimpleGUIQt as sg
 from typing import OrderedDict
-import os, io
+import os, io, sys
 import json
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
+
+import pprint
+pp = pprint.PrettyPrinter(indent=2)
 
 sg.theme('Dark Brown')
 # sg.theme('material 2')
@@ -86,43 +89,110 @@ def get_ini_configs():
   return configs
 
 def handle_event(window, event, values, game_path):
+  # print(yaml.dump(values, sys.stdout))
+  # print("VALUES")
+  # pp.pprint(values)
+  # print("/VALUES")
   if event != '-LIST-':
     return False
+  # window_values = values['-LIST-']
   configs = get_ini_configs()
   for f in configs:
     if os.path.isfile(os.path.join(game_path, f)):
-      cfg = iniparse.INIConfig(io.open(config_path(game_path)))
-      for s in cfg:
-        print(s)
-        for k in cfg[s]:
-          print(k)
-          print(cfg[s][k])
-          if k in values:
-            window[k](value=ini_value_to_window(configs[f], k, cfg[s][k]))
+      ini_map = load_ini(game_path, f)
+      # print("INI")
+      # pp.pprint(ini_map)
+      # print("/INI")
+      for wkey in ini_map:
+        if wkey in values:
+          value = ini_value_to_window(f, configs[f], wkey, ini_map[wkey])
+          window[wkey](value=value)
+        else:
+          print("wkey not found: {}".format(wkey))
+        #   print(values[wkey])
+          # for k in ini_map:
+          #   # if v == wkey:
+          #     print("{} | {}".format(wkey, k))
+          #     # print("found !")
   return True
 
-def ini_value_to_window(ini_config, key, value):
-  print(key)
-  result = None
-  vtype = 'bool'
-  for t in ini_config['tabs']:
-    for i in t['items']:
-      try:
-        if 'key' in i and i['key'] == key:
-          if i['type'] == 'slider':
-            if 'type' in i and i['type'] == 'float':
-              value = int(float(value) * i['float_base'])
-            vtype = 'int'
-      except:
-        pass
-  value = int(value)
-  print(value)
-  if vtype == 'bool':
-    if value == 1:
+def load_ini(game_path, ini):
+  cfg = iniparse.INIConfig(io.open(os.path.join(game_path, ini)))
+  kvmap = {}
+  for s in cfg:
+    for k in cfg[s]:
+      wkey = "{}-{}-{}".format(ini, s, k)
+      kvmap[wkey] = cfg[s][k]
+  return kvmap
+
+def ini_value_to_window(f, ini_config, wkey, value):
+  config_map = {}
+  for s in ini_config:
+    # print(s)
+    for k in ini_config[s]:
+      # print(k)
+      config_map["{}-{}-{}".format(f, s, k)] = ini_config[s][k]
+      # print("{}-{}-{}".format(f, s, k))
+      # print(ini_config[s][k])
+  if config_map[wkey] is None:
+    vtype = 'bool'
+    if int(value) == 1:
       result = True
-    if value == 0:
+    if int(value) == 0:
       result = False
+    # print("wkey={}".format(wkey))
+    # print("value= {}".format(value))
+    # print("result={}".format(result))
+  else:
+    if 'type' in config_map[wkey]:
+      if config_map[wkey]['type'] == 'float':
+        value = int(float(value) * config_map[wkey]['float_base'])
+        vtype = 'int'
+      if config_map[wkey]['type'] == 'string':
+        vtype = 'string'
+    else:
+      value = int(value)
+      vtype = 'int'
+    result = value
+  # pp.pprint(config_map)
+  # print("Fail: {}".format(wkey))
   return result
+
+
+
+# def ini_value_to_window(f, ini_config, wkey, value):
+#   result = None
+#   vtype = 'bool'
+#   for s in ini_config:
+#     for k in ini_config[s]:
+#       if wkey == "{}-{}-{}".format(f, s, k):
+#         if ini_config[s][k] is not None:
+#           if 'type' in ini_config[s][k]:
+#             if ini_config[s][k]['type'] == 'float':
+#               value = int(float(value) * ini_config[s][k]['float_base'])
+#               vtype = 'int'
+#             if ini_config[s][k]['type'] == 'string':
+#               vtype = 'string'
+#           else:
+#             value = int(value)
+#             vtype = 'int'
+#         else:
+#           value = int(value)
+#           vtype = 'bool'
+
+#   if vtype == 'bool':
+#     if value == 1:
+#       result = True
+#     if value == 0:
+#       result = False
+#   else:
+#     result = value
+
+#   if result is None:
+#     print("NOT FOUND {}".format(wkey))
+#   # print("value = {}".format(value))
+#   # print("result = {}".format(result))
+#   return result
 
 
 def enable_element(key, window, values, new_value = None):

@@ -23,6 +23,12 @@ tabs['Preferences'] = [
   checkbox(c, 'preferences', 'subtitles'),
   slider  (c, 'preferences', 'text_base_delay'),
   slider  (c, 'preferences', 'text_line_delay', visible=False), # todo: tie to text_base_delay with hook
+  frame("Sound volume", [
+    slider  (c, 'sound', 'master_volume'),
+    slider  (c, 'sound', 'music_volume'),
+    slider  (c, 'sound', 'sndfx_volume'),
+    slider  (c, 'sound', 'speech_volume'),
+  ]),
 ]
 tabs['Combat'] = [
   radio   (c, 'preferences', 'combat_difficulty'),

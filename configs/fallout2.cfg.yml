@@ -108,6 +108,7 @@ sound:
     type: slider
     min: 1
     max: 22281
+    name: Master
   music:
   music_path1:
     type: string
@@ -117,18 +118,21 @@ sound:
     type: int
     min: 1
     max: 22281
+    name: Music
   port:
     type: int
   sndfx_volume:
     type: int
     min: 1
     max: 22281
+    name: Effects
   sounds:
   speech:
   speech_volume:
     type: int
     min: 1
     max: 22281
+    name: Speech
   debug:
   debug_sfxc:
 
