@@ -6,7 +6,7 @@ import json
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
-import ini_layouts
+import layout
 
 sg.theme('Dark Brown')
 # sg.theme('material 2')
@@ -23,7 +23,8 @@ if os.path.isfile(f2gm_yml):
   except:
     pass
 settings_layout = [
-  ini_layouts.settings_element(),
+  # ini_layouts.settings_element(),
+  [layout.layout['fallout2.cfg']],
   [sg.Button('Save')]
 ]
 
@@ -75,14 +76,14 @@ def config_path(game_path):
 def handle_event(window, event, values, game_path):
   if event != '-LIST-':
     return False
-  ini_configs = ini_layouts.get_ini_configs()
-  for f in ini_configs:
-    if os.path.isfile(os.path.join(game_path, f)):
-      cfg = iniparse.INIConfig(io.open(config_path(game_path)))
-      for s in cfg:
-        for k in cfg[s]:
-          if k in values:
-            window[k](value=ini_value_to_window(ini_configs[f], k, cfg[s][k]))
+  # ini_configs = ini_layouts.get_ini_configs()
+  # for f in ini_configs:
+  #   if os.path.isfile(os.path.join(game_path, f)):
+  #     cfg = iniparse.INIConfig(io.open(config_path(game_path)))
+  #     for s in cfg:
+  #       for k in cfg[s]:
+  #         if k in values:
+  #           window[k](value=ini_value_to_window(ini_configs[f], k, cfg[s][k]))
   return True
 
 def ini_value_to_window(ini_config, key, value):
