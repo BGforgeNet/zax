@@ -16,9 +16,7 @@ class CfgState:
     self.ini_format = self.load_ini_format(config_path)
     self.config_path = config_path
     self.game_path = game_path
-  # ini_data = {}
-  # ini_format = {}
-  # window_data = {}
+
   def load_ini(self, game_path, config_path):
     cfg = iniparse.INIConfig(io.open(os.path.join(game_path, config_path)))
     return cfg
@@ -48,6 +46,7 @@ class CfgState:
             radio_value = ini_data[section][key]
             for o in options:
               # # Doesn't work. Qt automatically disables all radio in group after one of them is disabled
+              # # https://github.com/PySimpleGUI/PySimpleGUI/issues/4639
               # o_value = False
               # if int(o['value']) == int(radio_value):
               #   o_value = True
@@ -74,7 +73,7 @@ class CfgState:
               win_data[win_key] = ini_data[section][key]
             elif dtype == 'int':
               win_data[win_key] = int(ini_data[section][key])
-            else: # bool
+            else: # unknown type
               print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
           except:
             try: # bool
@@ -83,7 +82,7 @@ class CfgState:
               elif int(ini_data[section][key]) == 0:
                 win_data[win_key] = False
               else:
-                print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
+                print("Error: can't converted untyped value {}:{} to bool in {}".format(section, key, self.config_path))
             except: # keys are missing from ini
               print("Warning: can't find {}:{} in {}".format(section, key, self.config_path))
 
