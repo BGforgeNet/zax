@@ -27,9 +27,12 @@ if os.path.isfile(f2gm_yml):
     games = config["games"]
   except:
     pass
+
 settings_layout = [
-  # ini_layouts.settings_element(),
-  [layout.layout['fallout2.cfg']],
+  [sg.TabGroup([[
+    sg.Tab('Game', [[layout.layout['fallout2.cfg']]]),
+    sg.Tab('HiRes', [[ layout.layout['f2_res.ini'] ]])
+  ]])],
   [sg.Button('Save')]
 ]
 
