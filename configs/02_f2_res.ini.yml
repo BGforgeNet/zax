@@ -1,0 +1,119 @@
+f2gm:
+  path: f2_res.ini
+  name: HiRes
+
+MAIN:
+  UAC_AWARE:
+    name: UAC aware
+  GRAPHICS_MODE:
+    name: Graphics mode
+    type: dropdown
+    options:
+      - value: 0
+        name: Resolution only
+        desc: Required for sfall's Graphic modes
+      - value: 1
+        name: Direct Draw 7
+      - value: 2
+        name: DirectX9
+  SCALE_2X:
+    name: Scale x2 # todo: increase min res x2
+  SCR_WIDTH: # todo: full screen only
+    name: Resolution X
+    type: int
+    min: 640
+  SCR_HEIGHT:
+    name: Resolution Y
+    type: int
+    min: 480
+  COLOUR_BITS:
+    name: Color depth
+    type: dropdown
+    options:
+      - value: 8
+        name: 8
+      - value: 16
+        name: 16
+      - value: 32
+        name: 32
+  REFRESH_RATE:
+    name: Monitor refresh rate
+    type: int
+    min: 60
+  WINDOWED:
+    name: Window mode
+    type: radio
+    options:
+      - Fullscreen
+      - Windowed
+      # - Windowed fullscreen
+  WIN_DATA:
+  f2_res_dat:
+  f2_res_patches:
+  WINDOWED_FULLSCREEN: # merge into windowed
+
+INPUT:
+  ALT_MOUSE_INPUT:
+    name: Alternative mouse input
+  EXTRA_WIN_MSG_CHECKS:
+    name: Extra Windows msg checks
+  SCROLLWHEEL_FOCUS_PRIMARY_MENU:
+
+EFFECTS:
+  IS_GRAY_SCALE:
+    name: Grayscale
+
+HI_RES_PANEL:
+  DISPLAY_LIST_DESCENDING:
+
+MOVIES:
+  MOVIE_SIZE:
+    name: Movie size
+
+MAPS:
+  EDGE_CLIPPING_ON:
+  IGNORE_MAP_EDGES:
+  IGNORE_PLAYER_SCROLL_LIMITS:
+  SCROLL_DIST_X:
+  SCROLL_DIST_Y:
+  NumPathNodes:
+  FOG_OF_WAR:
+    name: Fog of war
+  FOG_LIGHT_LEVEL:
+  ZOOM_LEVEL:
+  IS_ZOOM_BOUND_BY_EDGES:
+
+IFACE:
+  IFACE_BAR_MODE:
+  IFACE_BAR_SIDE_ART:
+  IFACE_BAR_SIDES_ORI:
+  IFACE_BAR_WIDTH:
+  ALTERNATE_AMMO_METRE:
+  ALTERNATE_AMMO_LIGHT:
+  ALTERNATE_AMMO_DARK:
+
+MAINMENU:
+  MAIN_MENU_SIZE:
+    name: Size
+  USE_HIRES_IMAGES:
+    name: High resolution images
+  SCALE_BUTTONS_AND_TEXT_MENU:
+    name: Scale Buttons and text menu
+  MENU_BG_OFFSET_X:
+  MENU_BG_OFFSET_Y:
+
+STATIC_SCREENS:
+  DEATH_SCRN_SIZE:
+  END_SLIDE_SIZE:
+  HELP_SCRN_SIZE:
+  SPLASH_SCRN_SIZE:
+
+OTHER_SETTINGS:
+  CD_CHECK:
+  DIALOG_SCRN_BACKGROUND:
+  DIALOG_SCRN_ART_FIX:
+  SPLASH_SCRN_TIME:
+  CPU_USAGE_FIX:
+  BARTER_PC_INV_DROP_FIX:
+  FADE_TIME_MODIFIER:
+  FADE_TIME_RECALCULATE_ON_FADE:
