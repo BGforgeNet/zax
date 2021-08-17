@@ -98,6 +98,8 @@ sound:
   cache_size:
     type: int
     desc: Presumably, the buffer size for DirectX audio output
+    min: 0
+    max: 32767 # no idea if this is rignt, but need to set something
   device:
     display_type: dropdown
     options:
