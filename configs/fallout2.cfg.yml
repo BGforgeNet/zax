@@ -17,7 +17,7 @@ preferences:
     name: Brightness
   combat_difficulty:
     name: Difficulty
-    type: int
+    type: radio
     options:
       - value: 0
         name: Wimpy
@@ -29,7 +29,7 @@ preferences:
     name: Looks
   combat_messages:
     name: Messages
-    type: int
+    type: radio
     options:
       - value: 0
         name: Verbose
@@ -44,7 +44,7 @@ preferences:
     name: Taunts
   game_difficulty:
     name: Difficulty
-    type: int
+    type: radio
     options:
       - value: 0
         name: Easy
@@ -83,7 +83,7 @@ preferences:
     float_base: 1000000
   violence_level:
     name: Violence level
-    type: int
+    type: dropdown
     options:
       - value: 0
         name: None
@@ -105,7 +105,7 @@ sound:
   irq:
     type: int
   master_volume:
-    type: slider
+    type: int
     min: 1
     max: 22281
     name: Master
@@ -149,7 +149,7 @@ system:
   executable:
     type: string
   free_space:
-    type: spin
+    type: int
   hashing:
   interrupt_walk:
   language:
@@ -160,4 +160,4 @@ system:
     type: string
   scroll_lock:
   splash:
-    type: spin
+    type: int

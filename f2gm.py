@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import time
 import PySimpleGUIQt as sg
 from typing import OrderedDict
 import os, io, sys
@@ -8,7 +9,7 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
-
+from cfgstate import CfgState
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -97,23 +98,54 @@ def handle_event(window, event, values, game_path):
     return False
   # window_values = values['-LIST-']
   configs = get_ini_configs()
-  for f in configs:
-    if os.path.isfile(os.path.join(game_path, f)):
-      ini_map = load_ini(game_path, f)
-      # print("INI")
-      # pp.pprint(ini_map)
-      # print("/INI")
-      for wkey in ini_map:
-        if wkey in values:
-          value = ini_value_to_window(f, configs[f], wkey, ini_map[wkey])
-          window[wkey](value=value)
-        else:
-          print("wkey not found: {}".format(wkey))
-        #   print(values[wkey])
-          # for k in ini_map:
-          #   # if v == wkey:
-          #     print("{} | {}".format(wkey, k))
-          #     # print("found !")
+  fallout2_cfg = CfgState(game_path, 'fallout2.cfg')
+  new_values = fallout2_cfg.window_data()
+  key2 = 'fallout2.cfg-preferences-game_difficulty-1'
+  for key in new_values:
+    # if key == key2:
+      # print("{}: {} -> {}".format(key, values[key], new_values[key]))
+    window[key].update(value=new_values[key])
+    # print(window[key].Type)
+  # for key in new_values:
+  #   if window[key].Type == 'radio' and new_values[key] == True:
+  #     window[key].update(value=new_values[key])
+  #     print("{}: {} -> {}".format(key, values[key], new_values[key]))
+      # print(window[key].Type)
+  # for key in values:
+  #   if window[key] != 
+    
+    # window['fallout2.cfg-preferences-game_difficulty-1'](value=new_values['fallout2.cfg-preferences-game_difficulty-1'])
+
+    # if True:
+      # window[key](value=new_values[key])
+      # window[key].update(value=new_values[key])
+  # for key in new_values:
+  #   window[key].update(value=new_values[key])
+
+  # window[key2].update(value=new_values[key2])
+  # window['fallout2.cfg-preferences-game_difficulty-1'](value=True)
+  # pp.pprint(values)
+  # for f in configs:
+  #   if os.path.isfile(os.path.join(game_path, f)):
+  #     ini_map = load_ini(game_path, f)
+  #     # print("INI")
+  #     # pp.pprint(ini_map)
+  #     # print("/INI")
+  #     # for wkey in ini_map:
+  #     #   if wkey in values:
+  #     #     value = ini_value_to_window(f, configs[f], wkey, ini_map[wkey])
+  #     #     window[wkey](value=value)
+  #     #   else:
+  #     #     print("wkey not found: {}".format(wkey))
+  #     for wkey in values:
+  #       value = ini_value_to_window(f, configs[f], wkey, ini_map)
+  #       if value is not None:
+  #         window[wkey](value=value)
+  #       #   print(values[wkey])
+  #         # for k in ini_map:
+  #         #   # if v == wkey:
+  #         #     print("{} | {}".format(wkey, k))
+  #         #     # print("found !")
   return True
 
 def load_ini(game_path, ini):
@@ -125,15 +157,35 @@ def load_ini(game_path, ini):
       kvmap[wkey] = cfg[s][k]
   return kvmap
 
-def ini_value_to_window(f, ini_config, wkey, value):
+def ini_value_to_window(f, ini_config, wkey, ini_map):
+  result = None
   config_map = {}
   for s in ini_config:
-    # print(s)
     for k in ini_config[s]:
-      # print(k)
-      config_map["{}-{}-{}".format(f, s, k)] = ini_config[s][k]
+      if ini_config[s][k] is not None and 'type' in ini_config[s][k] and ini_config[s][k]['type'] == 'choice':
+        options = ini_config[s][k]['options']
+        choice_value = ini_map["{}-{}-{}".format(f, s, k)]
+        for o in options:
+          # print("{}-{}-{}-{}".format(f, s, k, o['value']))
+          # print(o['value'])
+          if int(o['value']) == int(choice_value):
+            config_map["{}-{}-{}-{}".format(f, s, k, o['value'])] = True
+          else:
+            config_map["{}-{}-{}-{}".format(f, s, k, o['value'])] = False
+      else:
+        config_map["{}-{}-{}".format(f, s, k)] = ini_config[s][k]
+        # if 'type' in ini_config[s][k] and ini_config[s][k]['type'] == 
       # print("{}-{}-{}".format(f, s, k))
       # print(ini_config[s][k])
+
+  # pp.pprint(config_map)
+  # sys.exit(0)
+  try:
+    value = config_map[wkey]
+  except:
+    print("{} not found in ini_map".format(wkey))
+    return None
+
   if config_map[wkey] is None:
     vtype = 'bool'
     if int(value) == 1:
@@ -221,7 +273,7 @@ while True:  # Event Loop
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":
-    print(values)
+    pp.pprint(values)
   if event == "Add game":
     dname = sg.popup_get_folder('Enter game path')
     if is_f2_game(dname):
