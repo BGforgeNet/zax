@@ -17,7 +17,7 @@ preferences:
     name: Brightness
   combat_difficulty:
     name: Difficulty
-    type: radio
+    display_type: radio
     options:
       - value: 0
         name: Wimpy
@@ -29,7 +29,7 @@ preferences:
     name: Looks
   combat_messages:
     name: Messages
-    type: radio
+    display_type: radio
     options:
       - value: 0
         name: Verbose
@@ -44,7 +44,7 @@ preferences:
     name: Taunts
   game_difficulty:
     name: Difficulty
-    type: radio
+    display_type: radio
     options:
       - value: 0
         name: Easy
@@ -83,7 +83,7 @@ preferences:
     float_base: 1000000
   violence_level:
     name: Violence level
-    type: dropdown
+    display_type: dropdown
     options:
       - value: 0
         name: None

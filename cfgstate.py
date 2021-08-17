@@ -44,7 +44,7 @@ class CfgState:
         try: # choice: radio / dropdown
           options = ini_format[section][key]['options']
 
-          if ini_format[section][key]['type'] == 'radio':
+          if ini_format[section][key]['display_type'] == 'radio':
             radio_value = ini_data[section][key]
             for o in options:
               # # Doesn't work. Qt automatically disables all radio in group after one of them is disabled
@@ -56,7 +56,7 @@ class CfgState:
               if int(o['value']) == int(radio_value):
                 win_data["{}-{}-{}-{}".format(self.config_path, section, key, o['value'])] = True
 
-          elif ini_format[section][key]['type'] == 'dropdown':
+          elif ini_format[section][key]['display_type'] == 'dropdown':
             dd_value = int(ini_data[section][key])
             dd_win_value = [x['name'] for x in options if x['value'] == dd_value][0]
             win_data[win_key] = dd_win_value
