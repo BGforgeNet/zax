@@ -52,7 +52,7 @@ class CfgState:
               # if int(o['value']) == int(radio_value):
               #   o_value = True
               # win_data["{}-{}-{}-{}".format(self.config_path, section, key, o['value'])] = o_value
-              # # So we are adding only enabled option to data map
+              # # So we are adding only one, enabled option to data map
               if int(o['value']) == int(radio_value):
                 win_data["{}-{}-{}-{}".format(self.config_path, section, key, o['value'])] = True
 
@@ -62,7 +62,7 @@ class CfgState:
             win_data[win_key] = dd_win_value
 
           else:
-            print("strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, self.config_path))
+            print("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, self.config_path))
         except:
           try: # typed: float, string, int
             dtype = ini_format[section][key]['type']
@@ -75,7 +75,7 @@ class CfgState:
             elif dtype == 'int':
               win_data[win_key] = int(ini_data[section][key])
             else: # bool
-              print("can't find value type for {}:{} in {}".format(section, key, self.config_path))
+              print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
           except:
             try: # bool
               if int(ini_data[section][key]) == 1:
@@ -83,17 +83,8 @@ class CfgState:
               elif int(ini_data[section][key]) == 0:
                 win_data[win_key] = False
               else:
-                print("can't find value type for {}:{} in {}".format(section, key, self.config_path))
+                print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
             except: # keys are missing from ini
-              print("can't find {}:{} in {}".format(section, key, self.config_path))
+              print("Warning: can't find {}:{} in {}".format(section, key, self.config_path))
 
-    pp.pprint(win_data)
     return(win_data)
-    # sys.exit(0)
-    # kvmap = {}
-    # for s in cfg:
-    #   for k in cfg[s]:
-    #     wkey = "{}-{}-{}".format(ini, s, k)
-    #     kvmap[wkey] = cfg[s][k]
-    # return kvmap
-    # self.window_data = {}
