@@ -19,7 +19,11 @@ def checkbox(cfg_data, section, key):
     name = item['name']
   except:
     name = key
-  return [sg.Checkbox(name, key="{}-{}-{}".format(cfg_data['f2gm']['path'], section, key), enable_events=True)]
+  try:
+    tooltip = item['desc']
+  except:
+    tooltip = None
+  return [sg.Checkbox(name, key="{}-{}-{}".format(cfg_data['f2gm']['path'], section, key), enable_events=True, tooltip=tooltip)]
 
 def tab(tab_name, items):
   return sg.Tab(tab_name, [[sg.Column(items, scrollable=True, size=(500,500))]])
@@ -91,7 +95,11 @@ def spin(cfg_data, section, key):
     max = 100
   else:
     max = item['max']
-  return [sg.Text("       " + name), sg.Spin([i for i in range(min,max+1)], initial_value=0, size=(100, None), key=wkey, enable_events=True)]
+  try:
+    tooltip = item['desc']
+  except:
+    tooltip = None
+  return [sg.Text("       " + name), sg.Spin([i for i in range(min,max+1)], initial_value=0, size=(100, None), key=wkey, enable_events=True, tooltip=tooltip)]
 
 # todo: validate input for ints (including negative in some cases)
 def qinput(cfg_data, section, key, size=(100, None)):

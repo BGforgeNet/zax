@@ -67,7 +67,7 @@ tabs['Advanced'] = [
     qinput(c, 'sound', 'music_path1', size=(200, None)),
     qinput(c, 'sound', 'music_path2', size=(200, None)),
     spin(c, 'sound', 'cache_size'),
-    qinput(c, 'sound', 'device'),
+    dropdown(c, 'sound', 'device'),
     qinput(c, 'sound', 'dma'),
     checkbox(c, 'sound', 'initialize'),
     qinput(c, 'sound', 'irq'),

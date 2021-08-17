@@ -97,8 +97,37 @@ preferences:
 sound:
   cache_size:
     type: int
+    desc: Presumably, the buffer size for DirectX audio output
   device:
-    type: int
+    display_type: dropdown
+    options:
+      - value: -1
+        name: Default
+      - value: 0
+        name: No sound
+      - value: 57368
+        name: Sound Blaster 16/AWE32
+        desc: Choose this for best sound quality in DOSBox and QEMU, if your hardware is good enough
+      - value: 57345
+        name: Sound Blaster Pro
+      - value: 57344
+        name: Sound Blaster 1
+        desc: Choose this for best mileage in DOSBox and QEMU
+      - value: 57376
+        name: Esoniq Soundscape
+        desc: Has no IRQ
+      - value: 57372
+        name: ESS Audiodrive
+        desc: Has no IRQ
+      - value: 57357
+        name: Microsoft Sound System
+        desc: Has no IRQ and never heard of this sound card
+      - value: 57386
+        name: Gravis Ultrasound Max
+        desc: Do not confuse with Gravis Ultrasound. This is not supported by DOSBox.
+      - value: 57382
+        name: Gravis Ultrasound
+        desc: Works in DOSBox, but with much stutter
   dma:
     type: int
   initialize:
@@ -107,7 +136,7 @@ sound:
   master_volume:
     type: int
     min: 1
-    max: 22281
+    max: 32767
     name: Master
   music:
   music_path1:
@@ -117,21 +146,21 @@ sound:
   music_volume:
     type: int
     min: 1
-    max: 22281
+    max: 32767
     name: Music
   port:
     type: int
   sndfx_volume:
     type: int
     min: 1
-    max: 22281
+    max: 32767
     name: Effects
   sounds:
   speech:
   speech_volume:
     type: int
     min: 1
-    max: 22281
+    max: 32767
     name: Speech
   debug:
   debug_sfxc:
@@ -152,6 +181,7 @@ system:
     type: int
   hashing:
   interrupt_walk:
+    desc: If unset, once you click to walk, you won't be able to cancel the movement or double click for running until the movement is finished.
   language:
     type: string
   master_dat:
@@ -161,3 +191,5 @@ system:
   scroll_lock:
   splash:
     type: int
+    min: 0
+    max: 5

@@ -45,7 +45,7 @@ left_col = [
 
 right_col = [[
   sg.TabGroup([
-    [sg.Tab('Settings', settings_layout, tooltip='Game settings'), sg.Tab('Mods', mods_layout, tooltip='mods')]
+    [sg.Tab('Settings', settings_layout), sg.Tab('Mods', mods_layout, tooltip='mods')]
   ])
 ]]
 
