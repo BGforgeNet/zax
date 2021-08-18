@@ -29,25 +29,8 @@ tabs['Main'] = [
     checkbox(c, 'MAIN', 'WINDOWED_FULLSCREEN'),
     checkbox(c, 'EFFECTS', 'IS_GRAY_SCALE'),
   ]),
-  checkbox(c, 'INPUT', 'SCROLLWHEEL_FOCUS_PRIMARY_MENU'),
-
 
   # checkbox(c, 'HI_RES_PANEL', 'DISPLAY_LIST_DESCENDING'), # useless
-  frame("Scaling", [
-    radio(c, 'MOVIES', 'MOVIE_SIZE'),
-    radio(c, 'MAINMENU', 'MAIN_MENU_SIZE'),
-    frame("HiRes menu backgronud", [
-      checkbox(c, 'MAINMENU', 'USE_HIRES_IMAGES'),
-      spin(c, 'MAINMENU', 'MENU_BG_OFFSET_X'),
-      spin(c, 'MAINMENU', 'MENU_BG_OFFSET_Y'),
-    ]),
-    checkbox(c, 'MAINMENU', 'SCALE_BUTTONS_AND_TEXT_MENU'),
-    radio(c, 'STATIC_SCREENS', 'DEATH_SCRN_SIZE'),
-    radio(c, 'STATIC_SCREENS', 'END_SLIDE_SIZE'),
-    radio(c, 'STATIC_SCREENS', 'HELP_SCRN_SIZE'),
-    radio(c, 'STATIC_SCREENS', 'SPLASH_SCRN_SIZE'),
-  ]),
-
   frame("Maps", [
     checkbox(c, 'MAPS', 'EDGE_CLIPPING_ON'),
     checkbox(c, 'MAPS', 'IGNORE_MAP_EDGES'),
@@ -69,6 +52,21 @@ tabs['Main'] = [
   ]),
 ]
 
+tabs["Scaling"] = [
+  radio(c, 'MOVIES', 'MOVIE_SIZE'),
+  radio(c, 'MAINMENU', 'MAIN_MENU_SIZE'),
+  frame("HiRes menu backgronud", [
+    checkbox(c, 'MAINMENU', 'USE_HIRES_IMAGES'),
+    spin(c, 'MAINMENU', 'MENU_BG_OFFSET_X'),
+    spin(c, 'MAINMENU', 'MENU_BG_OFFSET_Y'),
+  ]),
+  checkbox(c, 'MAINMENU', 'SCALE_BUTTONS_AND_TEXT_MENU'),
+  radio(c, 'STATIC_SCREENS', 'DEATH_SCRN_SIZE'),
+  radio(c, 'STATIC_SCREENS', 'END_SLIDE_SIZE'),
+  radio(c, 'STATIC_SCREENS', 'HELP_SCRN_SIZE'),
+  radio(c, 'STATIC_SCREENS', 'SPLASH_SCRN_SIZE'),
+]
+
 tabs['Interface'] = [
   frame("Interface bar", [
     radio(c, 'IFACE', 'IFACE_BAR_MODE'),
@@ -80,6 +78,7 @@ tabs['Interface'] = [
     checkbox(c, 'OTHER_SETTINGS', 'DIALOG_SCRN_BACKGROUND'),
     checkbox(c, 'OTHER_SETTINGS', 'DIALOG_SCRN_ART_FIX'),
     checkbox(c, 'OTHER_SETTINGS', 'BARTER_PC_INV_DROP_FIX'),
+    checkbox(c, 'INPUT', 'SCROLLWHEEL_FOCUS_PRIMARY_MENU'),
   ]),
   frame("Alternate ammo metre", [
     dropdown(c, 'IFACE', 'ALTERNATE_AMMO_METRE'),

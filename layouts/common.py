@@ -93,7 +93,7 @@ def spin(cfg_data, section, key):
     min = item['min']
   if not 'max' in item:
     if 'min' in item:
-      max = min +1
+      max = min * 2 # just a guess
     else:
       max = 100
   else:

@@ -177,6 +177,7 @@ IFACE:
     name: Width
     type: int
     min: 640
+    max: 1920
   ALTERNATE_AMMO_METRE:
     name: Mode
     desc: The following settings set the palette offsets of particular colours used when this is set to Single colour.
@@ -215,8 +216,12 @@ MAINMENU:
   MENU_BG_OFFSET_X: # todo: only when USE_HIRES_IMAGES=1
     name: Offset X
     type: int
+    min: -1024
+    max: 1024
   MENU_BG_OFFSET_Y:
     name: Offset Y
+    min: -1024
+    max: 1024
     type: int
 
 STATIC_SCREENS:
