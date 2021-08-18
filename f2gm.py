@@ -96,10 +96,14 @@ def handle_event(window, event, values, game_path):
   if event != '-LIST-':
     return False
   configs = get_ini_configs()
-  fallout2_cfg = CfgState(game_path, 'fallout2.cfg')
-  new_values = fallout2_cfg.window_data()
-  for key in new_values:
-    window[key].update(value=new_values[key])
+  for c in configs:
+    cfg = CfgState(game_path, configs[c]['f2gm']['path'])
+    new_values = cfg.window_data()
+    for key in new_values:
+      if key in values:
+        window[key].update(value=new_values[key])
+      else:
+        print("Error: can't find key {} to update with value {}".format(key, new_values[key]))
   return True
 
 def enable_element(key, window, values, new_value = None):

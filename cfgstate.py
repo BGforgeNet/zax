@@ -82,7 +82,7 @@ class CfgState:
               elif int(ini_data[section][key]) == 0:
                 win_data[win_key] = False
               else:
-                print("Error: can't converted untyped value {}:{} to bool in {}".format(section, key, self.config_path))
+                print("Error: can't convert untyped value {}:{} to bool in {}".format(section, key, self.config_path))
             except: # keys are missing from ini
               print("Warning: can't find {}:{} in {}".format(section, key, self.config_path))
 
