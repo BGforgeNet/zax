@@ -5,6 +5,8 @@ import PySimpleGUIQt as sg
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import os, sys
+import pprint
+pp = pprint.PrettyPrinter(indent=2)
 
 
 def get_ini_data(filename):

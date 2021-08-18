@@ -62,8 +62,6 @@ layout = [[
   sg.Column(right_col, size=(500,500))
 ]]
 
-window = sg.Window('f2gm', layout, finalize=True)
-
 def is_f2_game(path):
   if path is not None:
     if os.path.isdir(dname):
@@ -93,17 +91,23 @@ def get_ini_configs():
   return configs
 
 def handle_event(window, event, values, game_path):
-  if event != '-LIST-':
-    return False
-  configs = get_ini_configs()
-  for c in configs:
-    cfg = CfgState(game_path, configs[c]['f2gm']['path'])
-    new_values = cfg.window_data()
-    for key in new_values:
-      if key in values:
-        window[key].update(value=new_values[key])
-      else:
-        print("Error: can't find key {} to update with value {}".format(key, new_values[key]))
+  print('event = ' + event)
+  if event == '-LIST-':
+    configs = get_ini_configs()
+    for c in configs:
+      cfg = CfgState(game_path, configs[c]['f2gm']['path'])
+      new_values = cfg.window_data()
+      for key in new_values:
+        if key in values:
+          window[key].update(value=new_values[key])
+        else:
+          print("Error: can't find key {} to update with value {}".format(key, new_values[key]))
+  # else:
+  #   configs = get_ini_configs()
+  #   for c in configs:
+  #     print(c)
+  #     config_path = configs[c]['f2gm']['path']
+  #     layout.handle_custom_event(config_path, window, event, values)
   return True
 
 def enable_element(key, window, values, new_value = None):
@@ -124,10 +128,20 @@ def disable_element(key, window, values, new_value = None):
   else:
     window[key](value=old_value)
 
+
+window = sg.Window('f2gm', layout, finalize=True)
+
+try:
+  game_list = window['-LIST-']
+  game_list.update(set_to_index=0)
+except:
+  print("no games in list found")
+
+
 while True:  # Event Loop
 
   event, values = window.read()
-  print(event)
+  # print(event)
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":
@@ -136,12 +150,15 @@ while True:  # Event Loop
     dname = sg.popup_get_folder('Enter game path')
     if is_f2_game(dname):
       games = sorted(list(set(games + [dname])))
-      window.Element('-LIST-').Update(values=games)
+      # window.Element('-LIST-').update(values=games)
+      window['-LIST-'].update(values=games)
+      new_game_index = games.index(dname)
+      game_list.update(set_to_index=new_game_index)
     else:
       sg.popup("fallout2.exe not found in directory {}".format(dname))
   if values['-LIST-']:
     game_path = values['-LIST-'][0]
-    handle_event(window, event, values, game_path)
+  handle_event(window, event, values, game_path)
 
 
 config['games'] = games

@@ -79,7 +79,7 @@ EFFECTS:
 
 MOVIES:
   MOVIE_SIZE:
-    name: Movie size
+    name: Movies
     display_type: radio
     options:
       - value: 0
@@ -173,7 +173,7 @@ IFACE:
 
 MAINMENU:
   MAIN_MENU_SIZE:
-    name: Size
+    name: Main menu
     display_type: radio
     options:
       - value: 0

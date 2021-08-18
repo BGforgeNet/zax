@@ -135,3 +135,10 @@ tabs['Advanced'] = [
 tab_list = [tab(t, tabs[t]) for t in tabs]
 
 layout = sg.TabGroup([tab_list])
+
+
+def handle_event(event, values):
+  print("custom 3")
+  pp.pprint(event)
+  pp.pprint(values)
+

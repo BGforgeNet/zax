@@ -39,7 +39,7 @@ tabs['Combat'] = [
   checkbox(c, 'preferences', 'combat_looks'),
   radio   (c, 'preferences', 'combat_messages'),
   checkbox(c, 'preferences', 'combat_taunts'),
-  checkbox(c, 'preferences', 'target_highlight'),
+  radio(c, 'preferences', 'target_highlight'),
   dropdown(c, 'preferences', 'violence_level'),
 ]
 

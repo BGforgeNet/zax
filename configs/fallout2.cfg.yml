@@ -70,6 +70,14 @@ preferences:
     name: Movie subtitles
   target_highlight:
     name: Highlight target
+    display_type: radio
+    options:
+      - value: 0
+        name: Off
+      - value: 1
+        name: On
+      - value: 2
+        name: Targeting only
   text_base_delay:
     type: float
     min: 1
