@@ -18,43 +18,16 @@ MAIN:
         name: DirectX9
   SCALE_2X:
     name: Scale x2 # todo: increase min res x2
-  # SCR_WIDTH: # todo: full screen only
-  #   name: Resolution X
-  #   type: int
-  #   min: 640
-  # SCR_HEIGHT:
-  #   name: Resolution Y
-  #   type: int
-  #   min: 480
-  resolution:
-    type: dropdown
-    options:
-      - value: 1920x1080
-        name: '1920x1080'
-      - value: 1366×768
-        name: '1366×768'
-      - value: 1280x1024
-        name: '1280x1024'
-      - value: 1280x800
-        name: '1280x800'
-      - value: 1280x720
-        name: '1280x720'
-      - value: 1152x864
-        name: '1152x864'
-      - value: 1024x768
-        name: '1024x768'
-      - value: 1024x576
-        name: '1024x576'
-      - value: 960x720
-        name: '960x720'
-      - value: 960x600
-        name: '960x600'
-      - value: 960x540
-        name: '960x540'
-      - value: 800x600
-        name: '800x600'
-      - value: 640x480
-        name: '640x480'
+  SCR_WIDTH: # todo: full screen only
+    name: Resolution X
+    type: int
+    min: 640
+    max: 3840
+  SCR_HEIGHT:
+    name: Resolution Y
+    type: int
+    min: 480
+    max: 2160
   COLOUR_BITS:
     name: Color depth
     display_type: dropdown

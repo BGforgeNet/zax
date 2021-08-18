@@ -13,21 +13,53 @@ c = get_ini_data('f2_res.ini')
 
 tabs = OrderedDict()
 
+resolution_options = [
+  '1920x1080',
+  '1366×768',
+  '1280x1024',
+  '1280x800',
+  '1280x720',
+  '1152x864',
+  '1024x768',
+  '1024x576',
+  '960x720',
+  '960x600',
+  '960x540',
+  '800x600',
+  '640x480',
+]
+
+resolution = frame("Resolution", [
+  # dropdown(c, 'MAIN', 'resolution', readonly=False),
+  [
+    sg.Text(text="Common options"),
+    sg.Combo(resolution_options, readonly=True, size=(155, None), key='resolution', enable_events=True, pad=(50,50))
+  ],
+  [
+    sg.Text(text="Custom"),
+    sg.Stretch(),
+    sg.Spin([i for i in range(640, 3840)], initial_value=640, size=(70, None), key='f2_res.ini-MAIN-SCR_WIDTH', enable_events=True),
+    sg.Text("x"),
+    sg.Spin([i for i in range(480, 2160)], initial_value=480, size=(70, None), key='f2_res.ini-MAIN-SCR_HEIGHT', enable_events=True),
+  ]
+])
+
+
 tabs['Main'] = [
   # checkbox(c, 'MAIN', 'UAC_AWARE'), # set to 0 always to avoid ini searching
   frame("Graphics", [
     dropdown(c, 'MAIN', 'GRAPHICS_MODE'),
     checkbox(c, 'MAIN', 'SCALE_2X'),
-    # qinput(c, 'MAIN', 'SCR_WIDTH'),
-    # qinput(c, 'MAIN', 'SCR_HEIGHT'),
-    dropdown(c, 'MAIN', 'resolution', readonly=False),
+    checkbox(c, 'EFFECTS', 'IS_GRAY_SCALE'),
     radio(c, 'MAIN', 'WINDOWED'),
+    # qinput(c, 'MAIN', 'SCR_WIDTH'), # added manually
+    # qinput(c, 'MAIN', 'SCR_HEIGHT'),
     frame("Fullscreen", [
       dropdown(c, 'MAIN', 'COLOUR_BITS', size=(100, None)),
       spin(c, 'MAIN', 'REFRESH_RATE'),
     ]),
+    resolution,
     checkbox(c, 'MAIN', 'WINDOWED_FULLSCREEN'),
-    checkbox(c, 'EFFECTS', 'IS_GRAY_SCALE'),
   ]),
 
   # checkbox(c, 'HI_RES_PANEL', 'DISPLAY_LIST_DESCENDING'), # useless
