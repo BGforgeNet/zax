@@ -124,7 +124,6 @@ def disable_element(key, window, values, new_value = None):
   else:
     window[key](value=old_value)
 
-
 while True:  # Event Loop
 
   event, values = window.read()

@@ -17,8 +17,9 @@ tabs['Main'] = [
   checkbox(c, 'MAIN', 'UAC_AWARE'), # set to 0 always to avoid ini searching
   dropdown(c, 'MAIN', 'GRAPHICS_MODE'),
   checkbox(c, 'MAIN', 'SCALE_2X'),
-  qinput(c, 'MAIN', 'SCR_WIDTH'),
-  qinput(c, 'MAIN', 'SCR_HEIGHT'),
+  # qinput(c, 'MAIN', 'SCR_WIDTH'),
+  # qinput(c, 'MAIN', 'SCR_HEIGHT'),
+  dropdown(c, 'MAIN', 'resolution', readonly=False),
   dropdown(c, 'MAIN', 'COLOUR_BITS', size=(100, None)),
   spin(c, 'MAIN', 'REFRESH_RATE'),
   radio(c, 'MAIN', 'WINDOWED'),

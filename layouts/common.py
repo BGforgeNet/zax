@@ -46,14 +46,14 @@ def name_wkey(cfg_data, section, key):
   wkey = "{}-{}-{}".format(cfg_data['f2gm']['path'], section, key)
   return name, wkey
 
-def dropdown(cfg_data, section, key, size=(150, None)):
+def dropdown(cfg_data, section, key, size=(150, None), readonly=True):
   item = cfg_data[section][key]
   name, wkey= name_wkey(cfg_data, section, key)
   options = [str(o['name']) for o in item['options']]
   return [
     sg.T("       " + name),
-    sg.Combo(options, readonly=True, size=size, key=wkey, enable_events=True)
-  ]
+    sg.Combo(options, readonly=readonly, size=size, key=wkey, enable_events=True, pad=(50,50))
+  ] # combo size/justification is broken https://github.com/PySimpleGUI/PySimpleGUI/issues/4474
 
 def radio(cfg_data, section, key):
   item = cfg_data[section][key]
