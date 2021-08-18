@@ -46,13 +46,13 @@ def name_wkey(cfg_data, section, key):
   wkey = "{}-{}-{}".format(cfg_data['f2gm']['path'], section, key)
   return name, wkey
 
-def dropdown(cfg_data, section, key):
+def dropdown(cfg_data, section, key, size=(150, None)):
   item = cfg_data[section][key]
   name, wkey= name_wkey(cfg_data, section, key)
   options = [str(o['name']) for o in item['options']]
   return [
     sg.T("       " + name),
-    sg.Combo(options, readonly=True, size=(125, None), key=wkey, enable_events=True)
+    sg.Combo(options, readonly=True, size=size, key=wkey, enable_events=True)
   ]
 
 def radio(cfg_data, section, key):
@@ -92,7 +92,10 @@ def spin(cfg_data, section, key):
   else:
     min = item['min']
   if not 'max' in item:
-    max = 100
+    if 'min' in item:
+      max = min +1
+    else:
+      max = 100
   else:
     max = item['max']
   try:

@@ -7,7 +7,7 @@ MAIN:
     name: UAC aware
   GRAPHICS_MODE:
     name: Graphics mode
-    type: dropdown
+    display_type: dropdown
     options:
       - value: 0
         name: Resolution only
@@ -28,29 +28,33 @@ MAIN:
     min: 480
   COLOUR_BITS:
     name: Color depth
-    type: dropdown
+    display_type: dropdown
     options:
       - value: 8
-        name: 8
+        name: '8'
       - value: 16
-        name: 16
+        name: '16'
       - value: 32
-        name: 32
+        name: '32'
   REFRESH_RATE:
     name: Monitor refresh rate
     type: int
     min: 60
   WINDOWED:
     name: Window mode
-    type: radio
+    display_type: radio
     options:
-      - Fullscreen
-      - Windowed
+      - value: 0
+        name: Fullscreen
+      - value: 1
+        name: Windowed
       # - Windowed fullscreen
-  WIN_DATA:
+  # WIN_DATA: # some voodoo
   f2_res_dat:
+    type: string
   f2_res_patches:
-  WINDOWED_FULLSCREEN: # merge into windowed
+    type: string
+  WINDOWED_FULLSCREEN: # todo: merge into windowed
 
 INPUT:
   ALT_MOUSE_INPUT:
@@ -69,51 +73,121 @@ HI_RES_PANEL:
 MOVIES:
   MOVIE_SIZE:
     name: Movie size
+    display_type: radio
+    options:
+      - value: 0
+        name: Original
+      - value: 1
+        name: Stretched maintaining ratio
+      - value: 2
+        name: Stretched
 
 MAPS:
   EDGE_CLIPPING_ON:
   IGNORE_MAP_EDGES:
   IGNORE_PLAYER_SCROLL_LIMITS:
   SCROLL_DIST_X:
+    type: string
+    min: 480
   SCROLL_DIST_Y:
+    type: string
+    min: 400
   NumPathNodes:
+    type: int
+    min: 1
+    max: 20
   FOG_OF_WAR:
     name: Fog of war
   FOG_LIGHT_LEVEL:
-  ZOOM_LEVEL:
-  IS_ZOOM_BOUND_BY_EDGES:
+    type: int
+    min: 0
+    max: 10
+
+  # ZOOM_LEVEL: # these are from dev build?
+  # IS_ZOOM_BOUND_BY_EDGES:
 
 IFACE:
   IFACE_BAR_MODE:
+    name: Map window position from interface bar
+    display_type: radio
+    options:
+      - value: 0
+        name: On top
+      - value: 1
+        name: Overlaps
   IFACE_BAR_SIDE_ART:
+    display_type: radio
+    options:
+      - value: 0
+        name: None (black)
+      - value: 1
+        name: Metal
+      - value: 2
+        name: Leather
   IFACE_BAR_SIDES_ORI:
+    name: Interface bar art orientation
+    display_type: radio
+    options:
+      - value: 0
+        name: Bar > Edge
+      - value: 1
+        name: Edge > Bar
   IFACE_BAR_WIDTH:
+    name: Interface bar width
+    type: int
+    min: 640
   ALTERNATE_AMMO_METRE:
-  ALTERNATE_AMMO_LIGHT:
+    name: Alternate ammo metre
+    desc: The following settings set the palette offsets of particular colours used when this is set to Single colour.
+    display_type: dropdown
+    options:
+      - value: 0
+        name: Disabled
+      - value: 1
+        name: Single colour
+      - value: 2
+        name: Changing colour
+      - value: 3
+        name: Coloured sections
+  ALTERNATE_AMMO_LIGHT: # todo: enable only when ALTERNATE_AMMO_METRE==1?
+    name: Main color
+    type: int
   ALTERNATE_AMMO_DARK:
+    name: Dark color
+    type: int
 
 MAINMENU:
   MAIN_MENU_SIZE:
     name: Size
+    display_type: radio
+    options:
+      - value: 0
+        name: Original
+      - value: 1
+        name: Stretch maintaining ratio
+      - value: 2
+        name: Stretch
   USE_HIRES_IMAGES:
     name: High resolution images
   SCALE_BUTTONS_AND_TEXT_MENU:
     name: Scale Buttons and text menu
   MENU_BG_OFFSET_X:
+    type: string
   MENU_BG_OFFSET_Y:
+    type: string
 
-STATIC_SCREENS:
-  DEATH_SCRN_SIZE:
-  END_SLIDE_SIZE:
-  HELP_SCRN_SIZE:
-  SPLASH_SCRN_SIZE:
+# STATIC_SCREENS:
+#   DEATH_SCRN_SIZE:
+#   END_SLIDE_SIZE:
+#   HELP_SCRN_SIZE:
+#   SPLASH_SCRN_SIZE:
 
-OTHER_SETTINGS:
-  CD_CHECK:
-  DIALOG_SCRN_BACKGROUND:
-  DIALOG_SCRN_ART_FIX:
-  SPLASH_SCRN_TIME:
-  CPU_USAGE_FIX:
-  BARTER_PC_INV_DROP_FIX:
-  FADE_TIME_MODIFIER:
-  FADE_TIME_RECALCULATE_ON_FADE:
+# OTHER_SETTINGS:
+#   CD_CHECK:
+#   DIALOG_SCRN_BACKGROUND:
+#   DIALOG_SCRN_ART_FIX:
+#   SPLASH_SCRN_TIME:
+#   CPU_USAGE_FIX:
+#   BARTER_PC_INV_DROP_FIX:
+#   FADE_TIME_MODIFIER:
+#   FADE_TIME_RECALCULATE_ON_FADE:
