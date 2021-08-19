@@ -88,8 +88,5 @@ tabs['Debug'] = [
   ])
 ]
 
-
 tab_list = [tab(t, tabs[t]) for t in tabs]
-
 layout = sg.TabGroup([tab_list])
-

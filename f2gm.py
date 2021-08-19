@@ -30,8 +30,8 @@ if os.path.isfile(f2gm_yml):
 
 settings_layout = [
   [sg.TabGroup([[
-    sg.Tab('Game', [[layout.layout['fallout2.cfg']]]),
-    sg.Tab('HiRes', [[ layout.layout['f2_res.ini'] ]])
+    sg.Tab('Game',  [ [layout.layout['fallout2.cfg'] ]]),
+    sg.Tab('HiRes', [ [layout.layout['f2_res.ini']   ]])
   ]])],
   [sg.Button('Save')]
 ]
@@ -55,7 +55,7 @@ right_col = [[
 menu_def = [['Settings']]
 menu_def = [['File', ['Settings', 'Exit']]]
 
-layout = [[
+main_layout = [[
   sg.Menu(menu_def, tearoff=True),
   sg.Column(left_col, element_justification='c'),
   sg.VSeperator(),
@@ -99,15 +99,18 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str):
       new_values = cfg.window_data()
       for key in new_values:
         if key in values:
-          window[key].update(value=new_values[key])
+          window[key](new_values[key])
         else:
           print("Error: can't find key {} to update with value {}".format(key, new_values[key]))
-  # else:
-  #   configs = get_ini_configs()
-  #   for c in configs:
-  #     print(c)
-  #     config_path = configs[c]['f2gm']['path']
-  #     layout.handle_custom_event(config_path, window, event, values)
+  else:
+    configs = get_ini_configs()
+    for c in configs:
+      print(c)
+      config_path = configs[c]['f2gm']['path']
+      # print(type(layout))
+      # print(layout)
+      # layout.handle_custom_event('est')
+      layout.handle_custom_event(config_path, window, event, values)
   return True
 
 def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
@@ -129,7 +132,7 @@ def disable_element(key: str, window: sg.Window, values: dict, new_value = None)
     window[key](value=old_value)
 
 
-window = sg.Window('f2gm', layout, finalize=True)
+window = sg.Window('f2gm', main_layout, finalize=True)
 
 try:
   game_list = window['-LIST-']

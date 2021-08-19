@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from posixpath import split
 from typing import OrderedDict
 import PySimpleGUIQt as sg
 import ruamel.yaml
@@ -16,7 +17,7 @@ tabs = OrderedDict()
 resolution_options = [
   '1920x1080',
   '1600x900',
-  '1366×768',
+  '1366x768',
   '1280x1024',
   '1280x800',
   '1280x720',
@@ -34,7 +35,7 @@ resolution = frame("Resolution", [
   # dropdown(c, 'MAIN', 'resolution', readonly=False),
   [
     sg.Text(text="Common options"),
-    sg.Combo(resolution_options, readonly=True, size=(155, None), key='resolution', enable_events=True, pad=(50,50))
+    sg.Combo(resolution_options, readonly=True, size=(155, None), key='f2_res.ini-resolution', enable_events=True, pad=(50,50))
   ],
   [
     sg.Text(text="Custom"),
@@ -138,7 +139,13 @@ tab_list = [tab(t, tabs[t]) for t in tabs]
 layout = sg.TabGroup([tab_list])
 
 
-def handle_event(event, values):
-  print("custom 3")
-  pp.pprint(event)
-  pp.pprint(values)
+def handle_event(window: sg.Window, event, values):
+  res_key = 'f2_res.ini-resolution'
+  if event == res_key:
+    res_x_key = 'f2_res.ini-MAIN-SCR_WIDTH'
+    res_y_key = 'f2_res.ini-MAIN-SCR_HEIGHT'
+    new_res = values[res_key]
+    new_x = int(new_res.split('x')[0])
+    new_y = int(new_res.split('x')[1])
+    window[res_x_key](new_x)
+    window[res_y_key](new_y)
