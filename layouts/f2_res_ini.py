@@ -32,7 +32,6 @@ resolution_options = [
 ]
 
 resolution = frame("Resolution", [
-  # dropdown(c, 'MAIN', 'resolution', readonly=False),
   [
     sg.Text(text="Common options"),
     sg.Combo(resolution_options, readonly=True, size=(155, None), key='f2_res.ini-resolution', enable_events=True, pad=(50,50))

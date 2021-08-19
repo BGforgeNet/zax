@@ -115,8 +115,8 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str):
 
 def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
   old_value = values[key]
-  window[key].update(text_color=sg.theme_element_text_color()) # must go before disabled state change, or checkbox will flip state
-  window[key].update(disabled=False)
+  window[key](text_color=sg.theme_element_text_color()) # must go before disabled state change, or checkbox will flip state
+  window[key](disabled=False)
   if new_value is not None:
     window[key](value=new_value)
   else:
@@ -124,8 +124,8 @@ def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
 
 def disable_element(key: str, window: sg.Window, values: dict, new_value = None):
   old_value = values[key]
-  window[key].update(text_color='gray')
-  window[key].update(disabled=True)
+  window[key](text_color='gray')
+  window[key](disabled=True)
   if new_value is not None:
     window[key](value=new_value)
   else:
@@ -136,7 +136,7 @@ window = sg.Window('f2gm', main_layout, finalize=True)
 
 try:
   game_list = window['-LIST-']
-  game_list.update(set_to_index=0)
+  game_list(set_to_index=0)
 except:
   print("no games in list found")
 
@@ -153,10 +153,9 @@ while True:  # Event Loop
     dname = sg.popup_get_folder('Enter game path')
     if is_f2_game(dname):
       games = sorted(list(set(games + [dname])))
-      # window.Element('-LIST-').update(values=games)
-      window['-LIST-'].update(values=games)
+      window['-LIST-'](values=games)
       new_game_index = games.index(dname)
-      game_list.update(set_to_index=new_game_index)
+      game_list(set_to_index=new_game_index)
     else:
       sg.popup("fallout2.exe not found in directory {}".format(dname))
   if values['-LIST-']:
