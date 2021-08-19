@@ -15,6 +15,7 @@ tabs = OrderedDict()
 
 resolution_options = [
   '1920x1080',
+  '1600x900',
   '1366×768',
   '1280x1024',
   '1280x800',
@@ -38,15 +39,15 @@ resolution = frame("Resolution", [
   [
     sg.Text(text="Custom"),
     sg.Stretch(),
-    sg.Spin([i for i in range(640, 3840)], initial_value=640, size=(70, None), key='f2_res.ini-MAIN-SCR_WIDTH', enable_events=True),
+    sg.Spin([i for i in range(640, 3840+1)], initial_value=640, size=(70, None), key='f2_res.ini-MAIN-SCR_WIDTH', enable_events=True),
     sg.Text("x"),
-    sg.Spin([i for i in range(480, 2160)], initial_value=480, size=(70, None), key='f2_res.ini-MAIN-SCR_HEIGHT', enable_events=True),
+    sg.Spin([i for i in range(480, 2160+1)], initial_value=480, size=(70, None), key='f2_res.ini-MAIN-SCR_HEIGHT', enable_events=True),
   ]
 ])
 
 
 tabs['Main'] = [
-  # checkbox(c, 'MAIN', 'UAC_AWARE'), # set to 0 always to avoid ini searching
+  # checkbox(c, 'MAIN', 'UAC_AWARE'), # todo: set to 0 always to avoid ini searching
   frame("Graphics", [
     dropdown(c, 'MAIN', 'GRAPHICS_MODE'),
     checkbox(c, 'MAIN', 'SCALE_2X'),
@@ -141,4 +142,3 @@ def handle_event(event, values):
   print("custom 3")
   pp.pprint(event)
   pp.pprint(values)
-
