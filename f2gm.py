@@ -62,7 +62,7 @@ layout = [[
   sg.Column(right_col, size=(500,500))
 ]]
 
-def is_f2_game(path):
+def is_f2_game(path: str):
   if path is not None:
     if os.path.isdir(dname):
       files = [f.lower() for f in os.listdir(dname) if os.path.isfile(os.path.join(dname, f))]
@@ -90,7 +90,7 @@ def get_ini_configs():
     configs[path] = data
   return configs
 
-def handle_event(window, event, values, game_path):
+def handle_event(window: sg.Window, event, values: dict, game_path: str):
   print('event = ' + event)
   if event == '-LIST-':
     configs = get_ini_configs()
@@ -110,7 +110,7 @@ def handle_event(window, event, values, game_path):
   #     layout.handle_custom_event(config_path, window, event, values)
   return True
 
-def enable_element(key, window, values, new_value = None):
+def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
   old_value = values[key]
   window[key].update(text_color=sg.theme_element_text_color()) # must go before disabled state change, or checkbox will flip state
   window[key].update(disabled=False)
@@ -119,7 +119,7 @@ def enable_element(key, window, values, new_value = None):
   else:
     window[key](value=old_value)
 
-def disable_element(key, window, values, new_value = None):
+def disable_element(key: str, window: sg.Window, values: dict, new_value = None):
   old_value = values[key]
   window[key].update(text_color='gray')
   window[key].update(disabled=True)
