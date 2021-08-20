@@ -96,22 +96,14 @@ def load_config_values(window: sg.Window, game_path: str):
     cfg = Config(game_path, configs[c]['f2gm']['path'])
     new_values = cfg.window_data()
     for key in new_values:
+      print(key)
+      print(new_values[key])
       window[key](new_values[key])
 
 def handle_event(window: sg.Window, event, values: dict, game_path: str):
   print('event = ' + event)
   if event == '-LIST-':
     load_config_values(window, game_path)
-  # else:
-  #   configs = get_ini_configs()
-  #   for c in configs:
-  #     print(c)
-  #     config_path = configs[c]['f2gm']['path']
-  #     # print(type(layout))
-  #     # print(layout)
-  #     # layout.handle_custom_event('est')
-  #     layout.handle_custom_event(config_path, window, event, values)
-  # pp.pprint(values)
 
 def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
   old_value = values[key]
@@ -140,7 +132,7 @@ try:
 except:
   print("no games in list found")
 
-value_map = ValueMap().valuemap
+value_map = ValueMap().map
 
 while True:  # Event Loop
 

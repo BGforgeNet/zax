@@ -31,7 +31,7 @@ class ValueMap:
     valuemap = {}
     for ini_path in ini_formats:
       valuemap = {**valuemap, **self.generate_ini2window(ini_formats[ini_path])}
-    self.valuemap = valuemap
+    self.map = valuemap
 
   def generate_ini2window(self, ini_format):
     ini2window = {}
@@ -49,49 +49,22 @@ class ValueMap:
               # # Qt automatically disables all radio in group after one of them is disabled
               # # https://github.com/PySimpleGUI/PySimpleGUI/issues/4639
               # # So we are adding only one, enabled option to data map
-              win_key = "{}-{}-{}-{}".format(path, section, key, o['name'])
-              ini2window[win_key] = True
+              win_key = "{}-{}-{}-{}".format(path, section, key, o['value'])
+              ini2window[win_key] = {}
+              ini2window[win_key][str(o['value'])] = True
           elif ini_format[section][key]['display_type'] == 'dropdown':
             ini2window[win_key] = {}
             for o in options:
-              ini2window[win_key][o['value']] = o['name']
+              ini2window[win_key][str(o['value'])] = o['name']
           else:
             print("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, path))
         except:
           ini2window[win_key] = {}
-          ini2window[win_key][0] = False
-          ini2window[win_key][1] = True
+          ini2window[win_key]['0'] = False
+          ini2window[win_key]['1'] = True
     return ini2window
-    # pp.pprint(ini2window)
-
-
-        # except:
-        #   pass
-        # print(win_key)
-    #       try: # typed: float, string, int
-    #         dtype = ini_format[section][key]['type']
-    #         if dtype == 'float':
-    #           value = ini_data[section][key]
-    #           value = int(float(value) * ini_format[section][key]['float_base'])
-    #           win_data[win_key] = value
-    #         elif dtype == 'string':
-    #           win_data[win_key] = ini_data[section][key]
-    #         elif dtype == 'int':
-    #           win_data[win_key] = int(ini_data[section][key])
-    #         else: # unknown type
-    #           print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
-    #       except:
-    #         try: # bool
-    #           if int(ini_data[section][key]) == 1:
-    #             win_data[win_key] = True
-    #           elif int(ini_data[section][key]) == 0:
-    #             win_data[win_key] = False
-    #           else:
-    #             print("Error: can't convert untyped value {}:{} to bool in {}".format(section, key, self.config_path))
-    #         except: # keys are missing from ini
-    #           print("Warning: can't find {}:{} in {}".format(section, key, self.config_path))
-
-    # return(win_data)
+value_map = ValueMap().map
+pp.pprint(value_map)
 
 
 class Config:
@@ -105,63 +78,48 @@ class Config:
     cfg = iniparse.INIConfig(io.open(os.path.join(game_path, config_path)))
     return cfg
 
+  def get_win_key(self, section, key, value):
+    win_key = "{}-{}-{}".format(self.config_path, section, key)
+    try: # choice: radio
+      options = self.ini_format[section][key]['options']
+      if self.ini_format[section][key]['display_type'] == 'radio':
+        for o in options:
+          if str(o['value']) == value:
+            win_key = "{}-{}-{}-{}".format(self.config_path, section, key, o['value'])
+            print("FOUND {}".format(win_key))
+    except:
+      pass
+    return win_key
+
   def window_data(self):
     win_data = {}
     ini_format = self.ini_format
     ini_data = self.ini_data
-
-    for section in ini_format:
-
+    for section in self.ini_format:
       if section == 'f2gm':
         continue
 
       for key in ini_format[section]:
-        win_key = "{}-{}-{}".format(self.config_path, section, key)
-        try: # choice: radio / dropdown
-          options = ini_format[section][key]['options']
-
-          if ini_format[section][key]['display_type'] == 'radio':
-            radio_value = ini_data[section][key]
-            for o in options:
-              # # Doesn't work. Qt automatically disables all radio in group after one of them is disabled
-              # # https://github.com/PySimpleGUI/PySimpleGUI/issues/4639
-              # o_value = False
-              # if int(o['value']) == int(radio_value):
-              #   o_value = True
-              # win_data["{}-{}-{}-{}".format(self.config_path, section, key, o['value'])] = o_value
-              # # So we are adding only one, enabled option to data map
-              if int(o['value']) == int(radio_value):
-                win_data["{}-{}-{}-{}".format(self.config_path, section, key, o['value'])] = True
-
-          elif ini_format[section][key]['display_type'] == 'dropdown':
-            dd_value = int(ini_data[section][key])
-            dd_win_value = [x['name'] for x in options if x['value'] == dd_value][0]
-            win_data[win_key] = dd_win_value
-
-          else:
-            print("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, self.config_path))
+        ini_value = ini_data[section][key]
+        win_key = self.get_win_key(section, key, ini_value)
+        print("win_key = " + win_key)
+        try:
+          print(value_map[win_key][ini_value])
+          win_data[win_key] = value_map[win_key][ini_value]
         except:
-          try: # typed: float, string, int
-            dtype = ini_format[section][key]['type']
-            if dtype == 'float':
-              value = ini_data[section][key]
-              value = int(float(value) * ini_format[section][key]['float_base'])
-              win_data[win_key] = value
-            elif dtype == 'string':
-              win_data[win_key] = ini_data[section][key]
-            elif dtype == 'int':
-              win_data[win_key] = int(ini_data[section][key])
-            else: # unknown type
+          print(ini_value)
+          if type(ini_value)  == iniparse.config.Undefined:
+            print("key {} not found in {}".format(key, self.config_path))
+          else:
+            try: # typed: float, string, int
+              data_type = ini_format[section][key]['type']
+              if data_type == 'float':
+                value = int(float(ini_value) * ini_format[section][key]['float_base'])
+                win_data[win_key] = value
+              elif data_type == 'string':
+                win_data[win_key] = ini_value
+              elif data_type == 'int':
+                win_data[win_key] = int(ini_value)
+            except:
               print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
-          except:
-            try: # bool
-              if int(ini_data[section][key]) == 1:
-                win_data[win_key] = True
-              elif int(ini_data[section][key]) == 0:
-                win_data[win_key] = False
-              else:
-                print("Error: can't convert untyped value {}:{} to bool in {}".format(section, key, self.config_path))
-            except: # keys are missing from ini
-              print("Warning: can't find {}:{} in {}".format(section, key, self.config_path))
-
-    return(win_data)
+    return win_data
