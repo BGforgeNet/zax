@@ -59,9 +59,12 @@ class ValueMap:
           else:
             print("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, path))
         except:
-          ini2window[win_key] = {}
-          ini2window[win_key]['0'] = False
-          ini2window[win_key]['1'] = True
+          try:
+            data_type = ini_format[section][key]['type']
+          except:
+            ini2window[win_key] = {}
+            ini2window[win_key]['0'] = False
+            ini2window[win_key]['1'] = True
     return ini2window
 value_map = ValueMap().map
 pp.pprint(value_map)
