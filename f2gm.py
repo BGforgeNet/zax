@@ -9,7 +9,7 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
-from config import CfgState, ValueMap
+from config import Config, ValueMap
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -90,21 +90,18 @@ def get_ini_configs():
     configs[path] = data
   return configs
 
+def load_config_values(window: sg.Window, game_path: str):
+  configs = get_ini_configs()
+  for c in configs:
+    cfg = Config(game_path, configs[c]['f2gm']['path'])
+    new_values = cfg.window_data()
+    for key in new_values:
+      window[key](new_values[key])
+
 def handle_event(window: sg.Window, event, values: dict, game_path: str):
   print('event = ' + event)
   if event == '-LIST-':
-
-    configs = get_ini_configs()
-    for c in configs:
-      cfg = CfgState(game_path, configs[c]['f2gm']['path'])
-      new_values = cfg.window_data()
-      # pp.pprint(values)
-      for key in new_values:
-        # if key in value_map:
-          # print(key, values[key])
-        window[key](new_values[key])
-        # else:
-        #   print("Error: can't find key {} to update with value {}".format(key, new_values[key]))
+    load_config_values(window, game_path)
   # else:
   #   configs = get_ini_configs()
   #   for c in configs:
@@ -115,7 +112,6 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str):
   #     # layout.handle_custom_event('est')
   #     layout.handle_custom_event(config_path, window, event, values)
   # pp.pprint(values)
-  return True
 
 def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
   old_value = values[key]
@@ -149,7 +145,6 @@ value_map = ValueMap().valuemap
 while True:  # Event Loop
 
   event, values = window.read()
-  # print(event)
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":

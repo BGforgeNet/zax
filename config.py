@@ -7,27 +7,31 @@ import layout
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 
+def get_ini_format(f):
+  with open(f) as yf:
+    data = yaml.load(yf)
+  return data
+
+def get_ini_formats():
+  format_dir = 'formats'
+  format_files = [os.path.join(format_dir, f) for f in os.listdir(format_dir) if os.path.isfile(os.path.join(format_dir, f)) and f.lower().endswith('.yml')]
+  format_files.sort()
+  formats = OrderedDict()
+  for f in format_files:
+    data = get_ini_format(f)
+    path = data['f2gm']['path']
+    formats[path] = data
+  return formats
+ini_formats = get_ini_formats()
 
 class ValueMap:
 
   def __init__(self) -> None:
-    ini_formats = self.get_ini_formats()
+    ini_formats = get_ini_formats()
     valuemap = {}
     for ini_path in ini_formats:
       valuemap = {**valuemap, **self.generate_ini2window(ini_formats[ini_path])}
     self.valuemap = valuemap
-
-  def get_ini_formats(self):
-    format_dir = 'formats'
-    format_files = [os.path.join(format_dir, f) for f in os.listdir(format_dir) if os.path.isfile(os.path.join(format_dir, f)) and f.lower().endswith('.yml')]
-    format_files.sort()
-    formats = OrderedDict()
-    for f in format_files:
-      with open(f) as yf:
-        data = yaml.load(yf)
-      path = data['f2gm']['path']
-      formats[path] = data
-    return formats
 
   def generate_ini2window(self, ini_format):
     ini2window = {}
@@ -90,22 +94,16 @@ class ValueMap:
     # return(win_data)
 
 
-class CfgState:
+class Config:
   def __init__(self, game_path, config_path):
     self.ini_data = self.load_ini(game_path, config_path)
-    self.ini_format = self.load_ini_format(config_path)
+    self.ini_format = ini_formats[config_path]
     self.config_path = config_path
     self.game_path = game_path
 
   def load_ini(self, game_path, config_path):
     cfg = iniparse.INIConfig(io.open(os.path.join(game_path, config_path)))
     return cfg
-
-  def load_ini_format(self, config_path):
-    config = os.path.join('formats', config_path) + '.yml'
-    with open(config) as yf:
-      data = yaml.load(yf)
-    return data
 
   def window_data(self):
     win_data = {}
