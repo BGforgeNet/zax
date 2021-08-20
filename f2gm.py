@@ -9,7 +9,7 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
-from cfgstate import CfgState
+from config import CfgState, ValueMap
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -79,7 +79,7 @@ def config_path(game_path):
   return os.path.join(game_path, cfg)
 
 def get_ini_configs():
-  config_dir = 'configs'
+  config_dir = 'formats'
   config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if os.path.isfile(os.path.join(config_dir, f)) and f.lower().endswith('.yml')]
   config_files.sort()
   configs = OrderedDict()
@@ -93,24 +93,28 @@ def get_ini_configs():
 def handle_event(window: sg.Window, event, values: dict, game_path: str):
   print('event = ' + event)
   if event == '-LIST-':
+
     configs = get_ini_configs()
     for c in configs:
       cfg = CfgState(game_path, configs[c]['f2gm']['path'])
       new_values = cfg.window_data()
+      # pp.pprint(values)
       for key in new_values:
-        if key in values:
-          window[key](new_values[key])
-        else:
-          print("Error: can't find key {} to update with value {}".format(key, new_values[key]))
-  else:
-    configs = get_ini_configs()
-    for c in configs:
-      print(c)
-      config_path = configs[c]['f2gm']['path']
-      # print(type(layout))
-      # print(layout)
-      # layout.handle_custom_event('est')
-      layout.handle_custom_event(config_path, window, event, values)
+        # if key in value_map:
+          # print(key, values[key])
+        window[key](new_values[key])
+        # else:
+        #   print("Error: can't find key {} to update with value {}".format(key, new_values[key]))
+  # else:
+  #   configs = get_ini_configs()
+  #   for c in configs:
+  #     print(c)
+  #     config_path = configs[c]['f2gm']['path']
+  #     # print(type(layout))
+  #     # print(layout)
+  #     # layout.handle_custom_event('est')
+  #     layout.handle_custom_event(config_path, window, event, values)
+  # pp.pprint(values)
   return True
 
 def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
@@ -140,6 +144,7 @@ try:
 except:
   print("no games in list found")
 
+value_map = ValueMap().valuemap
 
 while True:  # Event Loop
 

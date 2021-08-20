@@ -11,7 +11,7 @@ pp = pprint.PrettyPrinter(indent=2)
 
 def get_ini_data(filename):
   # with open( os.path.join( os.path.realpath('..'), "configs", filename + '.yml') ) as yf:
-  with open( os.path.join( "configs", filename + '.yml') ) as yf:
+  with open( os.path.join( "formats", filename + '.yml') ) as yf:
     data = yaml.load(yf)
   return data
 
