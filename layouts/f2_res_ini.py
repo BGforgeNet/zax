@@ -225,13 +225,13 @@ def handle_event(window: sg.Window, event: str, values: dict):
     if values['f2_res.ini-MAINMENU-USE_HIRES_IMAGES']:
       enable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', window, values)
       enable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y', window, values)
-      enable_element('f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values)
+      enable_element('f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values, event=event)
     else:
       disable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', window, values)
       disable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y', window, values)
-      disable_element('f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values)
+      disable_element('f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values, event=event)
 
-  trigger_events = ['f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS', '-LIST-', 'configs_loaded']
+  trigger_events = ['f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS', '-LIST-' 'configs_loaded']
   if event in trigger_events:
     if values['f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS']:
       disable_element('f2_res.ini-MAPS-SCROLL_DIST_X', window, values)
