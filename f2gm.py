@@ -133,7 +133,7 @@ while True:  # Event Loop
 
   event, values = window.read()
 
-  # print("event = {}".format(event))
+  print("event = {}".format(event))
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":

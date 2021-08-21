@@ -200,3 +200,12 @@ def handle_event(window: sg.Window, event: str, values: dict):
     disable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values, new_value=True)
   if (event in enable_events) and not values['f2_res.ini-INPUT-ALT_MOUSE_INPUT']:
     enable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values)
+
+  triggers_events = ['f2_res.ini-IFACE-ALTERNATE_AMMO_METRE', '-LIST-', 'configs_loaded']
+  if event in triggers_events:
+    if values['f2_res.ini-IFACE-ALTERNATE_AMMO_METRE'] == 'Single colour':
+      enable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_LIGHT', window, values)
+      enable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_DARK', window, values)
+    else:
+      disable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_LIGHT', window, values)
+      disable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_DARK', window, values)
