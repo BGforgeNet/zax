@@ -5,6 +5,7 @@ import PySimpleGUIQt as sg
 from typing import OrderedDict
 import os, io, sys
 import json
+from PySimpleGUIQt.PySimpleGUIQt import SELECT_MODE_SINGLE
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
@@ -30,9 +31,9 @@ if os.path.isfile(f2gm_yml):
 
 settings_layout = [
   [sg.TabGroup([[
-    sg.Tab('Game',  [ [layout.layout['fallout2.cfg'] ]]),
-    sg.Tab('HiRes', [ [layout.layout['f2_res.ini']   ]])
-  ]])],
+    sg.Tab('Game', [ [layout.layout['fallout2.cfg']] ], key='tab-fallout2.cfg'),
+    sg.Tab('HiRes', [ [layout.layout['f2_res.ini']] ], key='tab-f2_res.ini')
+  ]], enable_events=True, key='tab-subsettings')],
   [sg.Button('Save')]
 ]
 
@@ -41,7 +42,7 @@ mods_layout = [[sg.T('This is inside mods')], [sg.In(key='in')]]
 left_col = [
   [sg.Text('Game list')],
   [sg.Text('Click a game to manage it')],
-  [sg.Listbox(values=games, size=(20, 12), key='-LIST-', enable_events=True)],
+  [sg.Listbox(values=games, size=(20, 12), key='-LIST-', enable_events=True, select_mode=SELECT_MODE_SINGLE)],
   [sg.Button('Add game')],
   [sg.Button('Remove game from list')],
 ]
@@ -97,11 +98,16 @@ def load_config_values(window: sg.Window, game_path: str):
     new_values = cfg.window_data()
     for key in new_values:
       window[key](new_values[key])
+  return configs
 
-def handle_event(window: sg.Window, event, values: dict, game_path: str):
+def handle_event(window: sg.Window, event, values: dict, game_path: str, open_config_paths = []):
   print('event = ' + event)
   if event == '-LIST-':
-    load_config_values(window, game_path)
+    configs = load_config_values(window, game_path)
+    open_config_paths = [configs[x]['f2gm']['path'] for x in configs]
+  for p in open_config_paths:
+    layout.handle_custom_event(p, window, event, values)
+  return open_config_paths
 
 def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
   old_value = values[key]
@@ -130,8 +136,8 @@ try:
 except:
   print("no games in list found")
 
-value_map = ValueMap().map
-
+# value_map = ValueMap().map
+open_config_paths = []
 while True:  # Event Loop
 
   event, values = window.read()
@@ -150,7 +156,8 @@ while True:  # Event Loop
       sg.popup("fallout2.exe not found in directory {}".format(dname))
   if values['-LIST-']:
     game_path = values['-LIST-'][0]
-  handle_event(window, event, values, game_path)
+  open_config_paths = handle_event(window, event, values, game_path, open_config_paths)
+
 
 
 config['games'] = games

@@ -15,6 +15,7 @@ c = get_ini_data('f2_res.ini')
 tabs = OrderedDict()
 
 resolution_options = [
+  '...',
   '1920x1080',
   '1600x900',
   '1366x768',
@@ -33,11 +34,11 @@ resolution_options = [
 
 resolution = frame("Resolution", [
   [
-    sg.Text(text="Common options"),
+    sg.Text(text="Select from common options"),
     sg.Combo(resolution_options, readonly=True, size=(155, None), key='f2_res.ini-resolution', enable_events=True, pad=(50,50))
   ],
   [
-    sg.Text(text="Custom"),
+    sg.Text(text="Or enter manually"),
     sg.Stretch(),
     sg.Spin([i for i in range(640, 3840+1)], initial_value=640, size=(70, None), key='f2_res.ini-MAIN-SCR_WIDTH', enable_events=True),
     sg.Text("x"),
@@ -138,13 +139,18 @@ tab_list = [tab(t, tabs[t]) for t in tabs]
 layout = sg.TabGroup([tab_list])
 
 
+
 def handle_event(window: sg.Window, event, values):
   res_key = 'f2_res.ini-resolution'
-  if event == res_key:
-    res_x_key = 'f2_res.ini-MAIN-SCR_WIDTH'
-    res_y_key = 'f2_res.ini-MAIN-SCR_HEIGHT'
+  dummy_choice = '...' # setting dropdown based on x/y values is too hard due to lack of proper event
+  res_x_key = 'f2_res.ini-MAIN-SCR_WIDTH'
+  res_y_key = 'f2_res.ini-MAIN-SCR_HEIGHT'
+  print("custom 1")
+  if (event == res_key) and (values[res_key] != dummy_choice):
+    print("custom 2")
     new_res = values[res_key]
     new_x = int(new_res.split('x')[0])
     new_y = int(new_res.split('x')[1])
     window[res_x_key](new_x)
     window[res_y_key](new_y)
+    window[res_key](dummy_choice)
