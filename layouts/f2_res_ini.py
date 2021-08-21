@@ -185,6 +185,7 @@ def handle_event(window: sg.Window, event: str, values: dict):
   windowed_key = 'f2_res.ini-MAIN-WINDOWED-1'
   colour_bits_key = 'f2_res.ini-MAIN-COLOUR_BITS'
   refresh_rate_key = 'f2_res.ini-MAIN-REFRESH_RATE'
+
   enable_events = [fullscreen_key, '-LIST-', 'configs_loaded']
   disable_events = [windowed_key, '-LIST-', 'configs_loaded']
   if (event in enable_events) and values[fullscreen_key]:
@@ -194,12 +195,12 @@ def handle_event(window: sg.Window, event: str, values: dict):
     disable_element(colour_bits_key, window, values)
     disable_element(refresh_rate_key, window, values)
 
-  disable_events = ['f2_res.ini-INPUT-ALT_MOUSE_INPUT', '-LIST-', 'configs_loaded']
-  enable_events = disable_events
-  if (event in disable_events) and values['f2_res.ini-INPUT-ALT_MOUSE_INPUT']:
-    disable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values, new_value=True)
-  if (event in enable_events) and not values['f2_res.ini-INPUT-ALT_MOUSE_INPUT']:
-    enable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values)
+  trigger_events = ['f2_res.ini-INPUT-ALT_MOUSE_INPUT', '-LIST-', 'configs_loaded']
+  if event in trigger_events:
+    if values['f2_res.ini-INPUT-ALT_MOUSE_INPUT']:
+      disable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values, new_value=True)
+    else:
+      enable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values)
 
   triggers_events = ['f2_res.ini-IFACE-ALTERNATE_AMMO_METRE', '-LIST-', 'configs_loaded']
   if event in triggers_events:
