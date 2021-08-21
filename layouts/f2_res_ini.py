@@ -196,7 +196,7 @@ def handle_event(window: sg.Window, event: str, values: dict):
     disable_element(refresh_rate_key, window, values)
     enable_element(windowed_fullscreen_key, window, values)
 
-  disable_if('f2_res.ini-INPUT-ALT_MOUSE_INPUT', True, 'f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values, event, new_value=True)
+  disable_if('f2_res.ini-INPUT-ALT_MOUSE_INPUT', True, 'f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values, event, disabled_value=True)
 
   for k in ['f2_res.ini-IFACE-ALTERNATE_AMMO_LIGHT', 'f2_res.ini-IFACE-ALTERNATE_AMMO_DARK']:
     enable_if('f2_res.ini-IFACE-ALTERNATE_AMMO_METRE', 'Single colour', k, window, values, event)
@@ -205,23 +205,23 @@ def handle_event(window: sg.Window, event: str, values: dict):
 
   for k in [ 'f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', 'f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y']:
     enable_if('f2_res.ini-MAINMENU-USE_HIRES_IMAGES', True, k, window, values, event)
-  enable_if('f2_res.ini-MAINMENU-USE_HIRES_IMAGES', True, 'f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values, event, new_value=False)
+  enable_if('f2_res.ini-MAINMENU-USE_HIRES_IMAGES', True, 'f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values, event, disabled_value=False)
 
   for k in ['f2_res.ini-MAPS-SCROLL_DIST_X', 'f2_res.ini-MAPS-SCROLL_DIST_Y']:
     enable_if('f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS', False, k, window, values, event)
 
 
-def enable_if(trigger_key, trigger_key_value, element_key, window, values, event, new_value=None):
+def enable_if(trigger_key, trigger_key_value, element_key, window, values, event, disabled_value=None):
   trigger_events = ['-LIST-', 'configs_loaded'] + [trigger_key]
   if event in trigger_events:
     if values[trigger_key] == trigger_key_value:
       enable_element(element_key, window, values, event=event)
     else:
-      disable_element(element_key, window, values, event=event, new_value=new_value)
-def disable_if(trigger_key, trigger_key_value, element_key, window, values, event, new_value=None):
+      disable_element(element_key, window, values, event=event, new_value=disabled_value)
+def disable_if(trigger_key, trigger_key_value, element_key, window, values, event, disabled_value=None):
   trigger_events = ['-LIST-', 'configs_loaded'] + [trigger_key]
   if event in trigger_events:
     if values[trigger_key] == trigger_key_value:
-      disable_element(element_key, window, values, event=event, new_value=new_value)
+      disable_element(element_key, window, values, event=event, new_value=disabled_value)
     else:
       enable_element(element_key, window, values, event=event)
