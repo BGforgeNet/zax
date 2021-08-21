@@ -147,9 +147,10 @@ while True:  # Event Loop
       game_list(set_to_index=new_game_index)
     else:
       sg.popup("fallout2.exe not found in directory {}".format(dname))
-  if values['-LIST-'] and cpaths == []:
+  if values['-LIST-']:
     game_path = values['-LIST-'][0]
-    cpaths = config_paths()
+    if cpaths == []:
+      cpaths = config_paths()
   cpaths = handle_event(window, event, values, game_path, cpaths)
 
 
