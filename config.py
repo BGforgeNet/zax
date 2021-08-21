@@ -37,7 +37,6 @@ class ValueMap:
     ini2window = {}
     path = ini_format['f2gm']['path']
     for section in ini_format:
-      print(section)
       if section == 'f2gm':
         continue
       for key in ini_format[section]:
@@ -67,7 +66,6 @@ class ValueMap:
             ini2window[win_key]['1'] = True
     return ini2window
 value_map = ValueMap().map
-pp.pprint(value_map)
 
 
 class Config:
@@ -89,7 +87,6 @@ class Config:
         for o in options:
           if str(o['value']) == value:
             win_key = "{}-{}-{}-{}".format(self.config_path, section, key, o['value'])
-            print("FOUND {}".format(win_key))
     except:
       pass
     return win_key
@@ -105,12 +102,9 @@ class Config:
       for key in ini_format[section]:
         ini_value = ini_data[section][key]
         win_key = self.get_win_key(section, key, ini_value)
-        print("win_key = " + win_key)
         try:
-          print(value_map[win_key][ini_value])
           win_data[win_key] = value_map[win_key][ini_value]
         except:
-          print(ini_value)
           if type(ini_value)  == iniparse.config.Undefined:
             print("key {} not found in {}".format(key, self.config_path))
           else:

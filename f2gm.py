@@ -96,8 +96,6 @@ def load_config_values(window: sg.Window, game_path: str):
     cfg = Config(game_path, configs[c]['f2gm']['path'])
     new_values = cfg.window_data()
     for key in new_values:
-      print(key)
-      print(new_values[key])
       window[key](new_values[key])
 
 def handle_event(window: sg.Window, event, values: dict, game_path: str):
