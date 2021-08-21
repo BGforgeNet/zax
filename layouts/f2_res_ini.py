@@ -185,7 +185,6 @@ def handle_event(window: sg.Window, event: str, values: dict):
   colour_bits_key = 'f2_res.ini-MAIN-COLOUR_BITS'
   refresh_rate_key = 'f2_res.ini-MAIN-REFRESH_RATE'
   windowed_fullscreen_key = 'f2_res.ini-MAIN-WINDOWED_FULLSCREEN'
-
   enable_events = [fullscreen_key, '-LIST-', 'configs_loaded']
   disable_events = [windowed_key, '-LIST-', 'configs_loaded']
   if (event in enable_events) and values[fullscreen_key]:
@@ -197,45 +196,32 @@ def handle_event(window: sg.Window, event: str, values: dict):
     disable_element(refresh_rate_key, window, values)
     enable_element(windowed_fullscreen_key, window, values)
 
-  trigger_events = ['f2_res.ini-INPUT-ALT_MOUSE_INPUT', '-LIST-', 'configs_loaded']
-  if event in trigger_events:
-    if values['f2_res.ini-INPUT-ALT_MOUSE_INPUT']:
-      disable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values, new_value=True)
-    else:
-      enable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values)
+  disable_if('f2_res.ini-INPUT-ALT_MOUSE_INPUT', True, 'f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values, event, new_value=True)
 
-  trigger_events = ['f2_res.ini-IFACE-ALTERNATE_AMMO_METRE', '-LIST-', 'configs_loaded']
-  if event in trigger_events:
-    if values['f2_res.ini-IFACE-ALTERNATE_AMMO_METRE'] == 'Single colour':
-      enable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_LIGHT', window, values)
-      enable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_DARK', window, values)
-    else:
-      disable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_LIGHT', window, values)
-      disable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_DARK', window, values)
+  for k in ['f2_res.ini-IFACE-ALTERNATE_AMMO_LIGHT', 'f2_res.ini-IFACE-ALTERNATE_AMMO_DARK']:
+    enable_if('f2_res.ini-IFACE-ALTERNATE_AMMO_METRE', 'Single colour', k, window, values, event)
 
-  trigger_events = ['f2_res.ini-MAPS-FOG_OF_WAR', '-LIST-', 'configs_loaded']
-  if event in trigger_events:
-    if values['f2_res.ini-MAPS-FOG_OF_WAR']:
-      enable_element('f2_res.ini-MAPS-FOG_LIGHT_LEVEL', window, values)
-    else:
-      disable_element('f2_res.ini-MAPS-FOG_LIGHT_LEVEL', window, values)
+  enable_if('f2_res.ini-MAPS-FOG_OF_WAR', True, 'f2_res.ini-MAPS-FOG_LIGHT_LEVEL', window, values, event)
 
-  trigger_events = ['f2_res.ini-MAINMENU-USE_HIRES_IMAGES', '-LIST-', 'configs_loaded']
-  if event in trigger_events:
-    if values['f2_res.ini-MAINMENU-USE_HIRES_IMAGES']:
-      enable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', window, values)
-      enable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y', window, values)
-      enable_element('f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values, event=event)
-    else:
-      disable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', window, values)
-      disable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y', window, values)
-      disable_element('f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values, event=event)
+  for k in [ 'f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', 'f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y']:
+    enable_if('f2_res.ini-MAINMENU-USE_HIRES_IMAGES', True, k, window, values, event)
+  enable_if('f2_res.ini-MAINMENU-USE_HIRES_IMAGES', True, 'f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values, event, new_value=False)
 
-  trigger_events = ['f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS', '-LIST-' 'configs_loaded']
+  for k in ['f2_res.ini-MAPS-SCROLL_DIST_X', 'f2_res.ini-MAPS-SCROLL_DIST_Y']:
+    enable_if('f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS', False, k, window, values, event)
+
+
+def enable_if(trigger_key, trigger_key_value, element_key, window, values, event, new_value=None):
+  trigger_events = ['-LIST-', 'configs_loaded'] + [trigger_key]
   if event in trigger_events:
-    if values['f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS']:
-      disable_element('f2_res.ini-MAPS-SCROLL_DIST_X', window, values)
-      disable_element('f2_res.ini-MAPS-SCROLL_DIST_Y', window, values)
+    if values[trigger_key] == trigger_key_value:
+      enable_element(element_key, window, values, event=event)
     else:
-      enable_element('f2_res.ini-MAPS-SCROLL_DIST_X', window, values)
-      enable_element('f2_res.ini-MAPS-SCROLL_DIST_Y', window, values)
+      disable_element(element_key, window, values, event=event, new_value=new_value)
+def disable_if(trigger_key, trigger_key_value, element_key, window, values, event, new_value=None):
+  trigger_events = ['-LIST-', 'configs_loaded'] + [trigger_key]
+  if event in trigger_events:
+    if values[trigger_key] == trigger_key_value:
+      disable_element(element_key, window, values, event=event, new_value=new_value)
+    else:
+      enable_element(element_key, window, values, event=event)
