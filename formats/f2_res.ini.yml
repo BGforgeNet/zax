@@ -166,10 +166,10 @@ IFACE:
         name: Coloured sections
   ALTERNATE_AMMO_LIGHT: # todo: enable only when ALTERNATE_AMMO_METRE==1?
     name: Main color
-    type: int
+    type: string
   ALTERNATE_AMMO_DARK:
     name: Dark color
-    type: int
+    type: string
 
 MAINMENU:
   MAIN_MENU_SIZE:
