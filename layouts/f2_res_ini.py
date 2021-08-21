@@ -57,7 +57,6 @@ resolution = frame("Resolution", [
 
 
 tabs['Main'] = [
-  # checkbox(c, 'MAIN', 'UAC_AWARE'), # todo: set to 0 always to avoid ini searching
   frame("Graphics", [
     dropdown(c, 'MAIN', 'GRAPHICS_MODE'),
     checkbox(c, 'MAIN', 'SCALE_2X'),
@@ -202,8 +201,8 @@ def handle_event(window: sg.Window, event: str, values: dict):
     else:
       enable_element('f2_res.ini-INPUT-EXTRA_WIN_MSG_CHECKS', window, values)
 
-  triggers_events = ['f2_res.ini-IFACE-ALTERNATE_AMMO_METRE', '-LIST-', 'configs_loaded']
-  if event in triggers_events:
+  trigger_events = ['f2_res.ini-IFACE-ALTERNATE_AMMO_METRE', '-LIST-', 'configs_loaded']
+  if event in trigger_events:
     if values['f2_res.ini-IFACE-ALTERNATE_AMMO_METRE'] == 'Single colour':
       enable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_LIGHT', window, values)
       enable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_DARK', window, values)
@@ -211,9 +210,18 @@ def handle_event(window: sg.Window, event: str, values: dict):
       disable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_LIGHT', window, values)
       disable_element('f2_res.ini-IFACE-ALTERNATE_AMMO_DARK', window, values)
 
-  triggers_events = ['f2_res.ini-MAPS-FOG_OF_WAR', '-LIST-', 'configs_loaded']
-  if event in triggers_events:
+  trigger_events = ['f2_res.ini-MAPS-FOG_OF_WAR', '-LIST-', 'configs_loaded']
+  if event in trigger_events:
     if values['f2_res.ini-MAPS-FOG_OF_WAR']:
       enable_element('f2_res.ini-MAPS-FOG_LIGHT_LEVEL', window, values)
     else:
       disable_element('f2_res.ini-MAPS-FOG_LIGHT_LEVEL', window, values)
+
+  trigger_events = ['f2_res.ini-MAINMENU-USE_HIRES_IMAGES', '-LIST-', 'configs_loaded']
+  if event in trigger_events:
+    if values['f2_res.ini-MAINMENU-USE_HIRES_IMAGES']:
+      enable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', window, values)
+      enable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y', window, values)
+    else:
+      disable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', window, values)
+      disable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y', window, values)

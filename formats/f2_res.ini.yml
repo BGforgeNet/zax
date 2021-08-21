@@ -3,7 +3,7 @@ f2gm:
   name: HiRes
 
 MAIN:
-  UAC_AWARE: # always disable UAC aware, to avoid searching for ini
+  UAC_AWARE: # UAC aware always disabled, to avoid searching for ini
   GRAPHICS_MODE:
     name: Mode
     display_type: dropdown
@@ -165,7 +165,7 @@ IFACE:
         name: Changing colour
       - value: 3
         name: Coloured sections
-  ALTERNATE_AMMO_LIGHT: # todo: enable only when ALTERNATE_AMMO_METRE==1?
+  ALTERNATE_AMMO_LIGHT:
     name: Main color
     type: string
   ALTERNATE_AMMO_DARK:
@@ -187,13 +187,15 @@ MAINMENU:
     name: Enable
   SCALE_BUTTONS_AND_TEXT_MENU:
     name: Scale buttons and text menu
-  MENU_BG_OFFSET_X: # todo: only when USE_HIRES_IMAGES=1
+  MENU_BG_OFFSET_X:
     name: Offset X
+    desc: Distance in pixels from the top button to Menu Background Graphic edge.
     type: int
     min: -1024
     max: 1024
   MENU_BG_OFFSET_Y:
     name: Offset Y
+    desc: Distance in pixels from the top button to Menu Background Graphic edge.
     min: -1024
     max: 1024
     type: int
