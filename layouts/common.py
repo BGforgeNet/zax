@@ -110,3 +110,21 @@ def spin(cfg_data, section, key):
 def qinput(cfg_data, section, key, size=(100, None)):
   name, wkey= name_wkey(cfg_data, section, key)
   return [sg.Text("       " + name), sg.InputText("", key=wkey, size=size, enable_events=True)]
+
+def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
+  old_value = values[key]
+  window[key](text_color=sg.theme_element_text_color()) # must go before disabled state change, or checkbox will flip state
+  window[key](disabled=False)
+  if new_value is not None:
+    window[key](value=new_value)
+  else:
+    window[key](value=old_value)
+
+def disable_element(key: str, window: sg.Window, values: dict, new_value = None):
+  old_value = values[key]
+  window[key](text_color='gray') # doesn't work in some themes?
+  window[key](disabled=True)
+  if new_value is not None:
+    window[key](value=new_value)
+  else:
+    window[key](value=old_value)

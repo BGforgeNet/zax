@@ -33,8 +33,10 @@ settings_layout = [
   [sg.TabGroup([[
     sg.Tab('Game', [ [layout.layout['fallout2.cfg']] ], key='tab-fallout2.cfg'),
     sg.Tab('HiRes', [ [layout.layout['f2_res.ini']] ], key='tab-f2_res.ini')
-  ]], enable_events=True, key='tab-subsettings')],
-  [sg.Button('Save')]
+  ]], enable_events=True, key='tab-settings-sub')],
+  [sg.Button('Save')],
+  # checkbox is a hack for triggering event to disable elements after config loading
+  [sg.Checkbox('configs_loaded', key='configs_loaded', enable_events=True, visible=False)]
 ]
 
 mods_layout = [[sg.T('This is inside mods')], [sg.In(key='in')]]
@@ -91,6 +93,11 @@ def get_ini_configs():
     configs[path] = data
   return configs
 
+def config_paths():
+  configs = get_ini_configs()
+  paths = [x for x in configs]
+  return paths
+
 def load_config_values(window: sg.Window, game_path: str):
   configs = get_ini_configs()
   for c in configs:
@@ -101,46 +108,32 @@ def load_config_values(window: sg.Window, game_path: str):
   return configs
 
 def handle_event(window: sg.Window, event, values: dict, game_path: str, open_config_paths = []):
-  print('event = ' + event)
   if event == '-LIST-':
+    window['configs_loaded'](False)
     configs = load_config_values(window, game_path)
     open_config_paths = [configs[x]['f2gm']['path'] for x in configs]
   for p in open_config_paths:
     layout.handle_custom_event(p, window, event, values)
+  if event == '-LIST-':
+    window['configs_loaded'](True)
   return open_config_paths
-
-def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
-  old_value = values[key]
-  window[key](text_color=sg.theme_element_text_color()) # must go before disabled state change, or checkbox will flip state
-  window[key](disabled=False)
-  if new_value is not None:
-    window[key](value=new_value)
-  else:
-    window[key](value=old_value)
-
-def disable_element(key: str, window: sg.Window, values: dict, new_value = None):
-  old_value = values[key]
-  window[key](text_color='gray')
-  window[key](disabled=True)
-  if new_value is not None:
-    window[key](value=new_value)
-  else:
-    window[key](value=old_value)
-
 
 window = sg.Window('f2gm', main_layout, finalize=True)
 
 try:
   game_list = window['-LIST-']
   game_list(set_to_index=0)
+  print('found games!')
 except:
   print("no games in list found")
+window['configs_loaded'](False)
 
-# value_map = ValueMap().map
-open_config_paths = []
+cpaths = []
 while True:  # Event Loop
 
   event, values = window.read()
+
+  print("event = {}".format(event))
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":
@@ -156,8 +149,8 @@ while True:  # Event Loop
       sg.popup("fallout2.exe not found in directory {}".format(dname))
   if values['-LIST-']:
     game_path = values['-LIST-'][0]
-  open_config_paths = handle_event(window, event, values, game_path, open_config_paths)
-
+    cpaths = config_paths()
+  cpaths = handle_event(window, event, values, game_path, cpaths)
 
 
 config['games'] = games

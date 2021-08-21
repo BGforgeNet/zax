@@ -3,7 +3,7 @@ f2gm:
   name: HiRes
 
 MAIN:
-  UAC_AWARE: always disable UAC aware, to avoid searching for ini
+  UAC_AWARE: # always disable UAC aware, to avoid searching for ini
   GRAPHICS_MODE:
     name: Mode
     display_type: dropdown
@@ -16,8 +16,8 @@ MAIN:
       - value: 2
         name: DirectX9
   SCALE_2X:
-    name: Scale x2 # todo: increase min res x2
-  SCR_WIDTH: # todo: full screen only
+    name: Scale x2
+  SCR_WIDTH:
     name: Resolution X
     type: int
     min: 640
@@ -27,7 +27,7 @@ MAIN:
     type: int
     min: 480
     max: 2160
-  COLOUR_BITS:
+  COLOUR_BITS:  # todo: full screen only
     name: Color depth
     display_type: dropdown
     options:

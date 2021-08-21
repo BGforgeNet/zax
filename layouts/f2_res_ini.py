@@ -150,7 +150,7 @@ layout = sg.TabGroup([tab_list])
 
 
 
-def handle_event(window: sg.Window, event, values):
+def handle_event(window: sg.Window, event: str, values: dict):
   res_key = 'f2_res.ini-resolution'
   res_x_key = 'f2_res.ini-MAIN-SCR_WIDTH'
   res_y_key = 'f2_res.ini-MAIN-SCR_HEIGHT'
@@ -179,3 +179,12 @@ def handle_event(window: sg.Window, event, values):
         window[res_y_key](960)
     else:
       window[res_key](values=resolution_options)
+
+  # full screen only options
+  fullscreen_key = 'f2_res.ini-MAIN-WINDOWED-0'
+  windowed_key = 'f2_res.ini-MAIN-WINDOWED-1'
+  colour_bits_key = 'f2_res.ini-MAIN-COLOUR_BITS'
+  if (event == fullscreen_key or event == '-LIST-' or event == 'configs_loaded') and values[fullscreen_key]:
+    enable_element(colour_bits_key, window, values)
+  if (event == windowed_key or event == '-LIST-' or event == 'configs_loaded') and values[windowed_key]:
+    disable_element(colour_bits_key, window, values)
