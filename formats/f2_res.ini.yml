@@ -92,9 +92,9 @@ MOVIES:
 
 MAPS:
   EDGE_CLIPPING_ON:
-    name: Edge clipping
+    name: Hide area beyond map edges
   IGNORE_MAP_EDGES:
-    name: Ignore map edges
+    name: Ignore Hi-Res map scroll edges
   IGNORE_PLAYER_SCROLL_LIMITS:
     name: Ignore scroll limits
   SCROLL_DIST_X:
@@ -107,6 +107,7 @@ MAPS:
     min: 400
   NumPathNodes:
     name: Path finding range
+    desc: Relative to original (=1)
     type: int
     min: 1
     max: 20

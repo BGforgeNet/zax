@@ -101,8 +101,8 @@ tabs["Scaling"] = [
     checkbox(c, 'MAINMENU', 'USE_HIRES_IMAGES'),
     spin(c, 'MAINMENU', 'MENU_BG_OFFSET_X'),
     spin(c, 'MAINMENU', 'MENU_BG_OFFSET_Y'),
+    checkbox(c, 'MAINMENU', 'SCALE_BUTTONS_AND_TEXT_MENU'),
   ]),
-  checkbox(c, 'MAINMENU', 'SCALE_BUTTONS_AND_TEXT_MENU'),
   radio(c, 'STATIC_SCREENS', 'DEATH_SCRN_SIZE'),
   radio(c, 'STATIC_SCREENS', 'END_SLIDE_SIZE'),
   radio(c, 'STATIC_SCREENS', 'HELP_SCRN_SIZE'),
@@ -225,6 +225,17 @@ def handle_event(window: sg.Window, event: str, values: dict):
     if values['f2_res.ini-MAINMENU-USE_HIRES_IMAGES']:
       enable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', window, values)
       enable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y', window, values)
+      enable_element('f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values)
     else:
       disable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_X', window, values)
       disable_element('f2_res.ini-MAINMENU-MENU_BG_OFFSET_Y', window, values)
+      disable_element('f2_res.ini-MAINMENU-SCALE_BUTTONS_AND_TEXT_MENU', window, values)
+
+  trigger_events = ['f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS', '-LIST-', 'configs_loaded']
+  if event in trigger_events:
+    if values['f2_res.ini-MAPS-IGNORE_PLAYER_SCROLL_LIMITS']:
+      disable_element('f2_res.ini-MAPS-SCROLL_DIST_X', window, values)
+      disable_element('f2_res.ini-MAPS-SCROLL_DIST_Y', window, values)
+    else:
+      enable_element('f2_res.ini-MAPS-SCROLL_DIST_X', window, values)
+      enable_element('f2_res.ini-MAPS-SCROLL_DIST_Y', window, values)
