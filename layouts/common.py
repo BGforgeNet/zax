@@ -117,11 +117,11 @@ def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
   window[key](disabled=False)
   if new_value is not None:
     window[key](value=new_value)
-  else:
-    window[key](value=old_value) # without this, checkbox auto unchecks on enabling
+  elif type(window[key]) is sg.Checkbox:
+    window[key](value=old_value) # without this, checkbox auto unchecks on enabling. With it, but without type check, disabled values don't update on game switch
 
 def disable_element(key: str, window: sg.Window, values: dict, new_value = None):
-  # old_value = values[key]
+  old_value = values[key]
   window[key](text_color='grey') # doesn't work in some items, for example dropdown. Works for spin.
   window[key](disabled=True)
   if new_value is not None:

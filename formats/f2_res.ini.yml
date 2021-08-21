@@ -39,8 +39,10 @@ MAIN:
         name: '32'
   REFRESH_RATE:
     name: Monitor refresh rate
+    desc: Set 0 for driver default
     type: int
-    min: 60
+    min: 0
+    max: 240
   WINDOWED:
     name: Window mode
     display_type: radio
@@ -63,8 +65,8 @@ INPUT:
     name: Alternative mouse input
     desc: Alternate mouse input control built into the hi-res patch. Disable to allow Sfall's mouse input functions to work.
   EXTRA_WIN_MSG_CHECKS:
-    name: Extra Windows msg checks
-    desc: Prevent the "NOT RESPONDING" error that may occur in windowed mode
+    name: Fix for "NOT RESPONDING" error
+    desc: Enables extra Windows msg checks. Prevents the "NOT RESPONDING" error that may occur in windowed mode.
   SCROLLWHEEL_FOCUS_PRIMARY_MENU:
     name: Mouse wheel controls PC's item list by default
     desc: On Inventory, Barter, Loot screens etc., mouse wheel control default to the PC's item list unless the cursor is hovering over another list.
