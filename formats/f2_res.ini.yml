@@ -51,14 +51,14 @@ MAIN:
         name: Fullscreen
       - value: 1
         name: Windowed
-      # - Windowed fullscreen
-  # WIN_DATA: # some voodoo
+  # WIN_DATA: # some voodoo, not touching
   f2_res_dat:
     type: string
   f2_res_patches:
     type: string
-  WINDOWED_FULLSCREEN: # todo: merge into windowed
+  WINDOWED_FULLSCREEN:
     name: Windowed fullscreen
+    desc: Borderless window
 
 INPUT:
   ALT_MOUSE_INPUT:

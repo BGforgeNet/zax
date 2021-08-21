@@ -64,12 +64,12 @@ tabs['Main'] = [
     radio(c, 'MAIN', 'WINDOWED'),
     # qinput(c, 'MAIN', 'SCR_WIDTH'), # added manually
     # qinput(c, 'MAIN', 'SCR_HEIGHT'),
+    checkbox(c, 'MAIN', 'WINDOWED_FULLSCREEN'),
     frame("Fullscreen", [
       dropdown(c, 'MAIN', 'COLOUR_BITS', size=(100, None)),
       spin(c, 'MAIN', 'REFRESH_RATE'),
     ]),
     resolution,
-    checkbox(c, 'MAIN', 'WINDOWED_FULLSCREEN'),
   ]),
 
   # checkbox(c, 'HI_RES_PANEL', 'DISPLAY_LIST_DESCENDING'), # useless
@@ -184,15 +184,18 @@ def handle_event(window: sg.Window, event: str, values: dict):
   windowed_key = 'f2_res.ini-MAIN-WINDOWED-1'
   colour_bits_key = 'f2_res.ini-MAIN-COLOUR_BITS'
   refresh_rate_key = 'f2_res.ini-MAIN-REFRESH_RATE'
+  windowed_fullscreen_key = 'f2_res.ini-MAIN-WINDOWED_FULLSCREEN'
 
   enable_events = [fullscreen_key, '-LIST-', 'configs_loaded']
   disable_events = [windowed_key, '-LIST-', 'configs_loaded']
   if (event in enable_events) and values[fullscreen_key]:
     enable_element(colour_bits_key, window, values)
     enable_element(refresh_rate_key, window, values)
+    disable_element(windowed_fullscreen_key, window, values)
   if (event in disable_events) and values[windowed_key]:
     disable_element(colour_bits_key, window, values)
     disable_element(refresh_rate_key, window, values)
+    enable_element(windowed_fullscreen_key, window, values)
 
   trigger_events = ['f2_res.ini-INPUT-ALT_MOUSE_INPUT', '-LIST-', 'configs_loaded']
   if event in trigger_events:
