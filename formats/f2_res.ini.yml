@@ -27,7 +27,7 @@ MAIN:
     type: int
     min: 480
     max: 2160
-  COLOUR_BITS:  # todo: full screen only
+  COLOUR_BITS:
     name: Color depth
     display_type: dropdown
     options:
@@ -62,7 +62,7 @@ INPUT:
   ALT_MOUSE_INPUT:
     name: Alternative mouse input
     desc: Alternate mouse input control built into the hi-res patch. Disable to allow Sfall's mouse input functions to work.
-  EXTRA_WIN_MSG_CHECKS: # todo: This setting is always enabled if ALT_MOUSE_INPUT=1.
+  EXTRA_WIN_MSG_CHECKS:
     name: Extra Windows msg checks
     desc: Prevent the "NOT RESPONDING" error that may occur in windowed mode
   SCROLLWHEEL_FOCUS_PRIMARY_MENU:

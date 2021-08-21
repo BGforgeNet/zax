@@ -122,7 +122,7 @@ def enable_element(key: str, window: sg.Window, values: dict, new_value = None):
 
 def disable_element(key: str, window: sg.Window, values: dict, new_value = None):
   old_value = values[key]
-  window[key](text_color='gray') # doesn't work in some themes?
+  window[key](text_color='gray') # doesn't work in some items, for example dropdown. Works for spin.
   window[key](disabled=True)
   if new_value is not None:
     window[key](value=new_value)
