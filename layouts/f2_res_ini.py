@@ -20,6 +20,7 @@ resolution_options = [
   '1600x900',
   '1366x768',
   '1280x1024',
+  '1280x960',
   '1280x800',
   '1280x720',
   '1152x864',
@@ -30,6 +31,14 @@ resolution_options = [
   '960x540',
   '800x600',
   '640x480',
+]
+resolution_options_x2 = [
+  '...',
+  '1920x1080',
+  '1600x900',
+  '1366x768',
+  '1280x1024',
+  '1280x960',
 ]
 
 resolution = frame("Resolution", [
@@ -132,6 +141,7 @@ tabs['Advanced'] = [
   frame("System", [
     qinput(c, 'MAIN', 'f2_res_dat', size=(200, None)),
     qinput(c, 'MAIN', 'f2_res_patches', size=(200, None)),
+    checkbox(c, 'MAIN', 'UAC_AWARE', visible=False, disabled=True),
   ]),
 ]
 tab_list = [tab(t, tabs[t]) for t in tabs]
@@ -142,15 +152,30 @@ layout = sg.TabGroup([tab_list])
 
 def handle_event(window: sg.Window, event, values):
   res_key = 'f2_res.ini-resolution'
-  dummy_choice = '...' # setting dropdown based on x/y values is too hard due to lack of proper event
   res_x_key = 'f2_res.ini-MAIN-SCR_WIDTH'
   res_y_key = 'f2_res.ini-MAIN-SCR_HEIGHT'
-  print("custom 1")
+
+  dummy_choice = '...' # setting dropdown based on x/y values is too hard due to lack of proper event
   if (event == res_key) and (values[res_key] != dummy_choice):
-    print("custom 2")
     new_res = values[res_key]
     new_x = int(new_res.split('x')[0])
     new_y = int(new_res.split('x')[1])
     window[res_x_key](new_x)
     window[res_y_key](new_y)
     window[res_key](dummy_choice)
+
+  # always disable UAC aware
+  if event == '-LIST-':
+    window['f2_res.ini-MAIN-UAC_AWARE'](False)
+
+  # double min resolution on scale2x
+  scale_2x_key = 'f2_res.ini-MAIN-SCALE_2X'
+  if (event == scale_2x_key):
+    if values[scale_2x_key] == True:
+      window[res_key](values=resolution_options_x2)
+      if int(values[res_x_key]) < 1280:
+        window[res_x_key](1280)
+      if int(values[res_y_key]) < 960:
+        window[res_y_key](960)
+    else:
+      window[res_key](values=resolution_options)

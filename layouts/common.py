@@ -15,7 +15,7 @@ def get_ini_data(filename):
     data = yaml.load(yf)
   return data
 
-def checkbox(cfg_data, section, key):
+def checkbox(cfg_data, section, key, visible=True, disabled=False):
   item = cfg_data[section][key]
   try:
     name = item['name']
@@ -25,7 +25,7 @@ def checkbox(cfg_data, section, key):
     tooltip = item['desc']
   except:
     tooltip = None
-  return [sg.Checkbox(name, key="{}-{}-{}".format(cfg_data['f2gm']['path'], section, key), enable_events=True, tooltip=tooltip)]
+  return [sg.Checkbox(name, key="{}-{}-{}".format(cfg_data['f2gm']['path'], section, key), enable_events=True, tooltip=tooltip, visible=visible, disabled=disabled)]
 
 def tab(tab_name, items):
   return sg.Tab(tab_name, [[sg.Column(items, scrollable=True, size=(500,500))]])

@@ -3,8 +3,7 @@ f2gm:
   name: HiRes
 
 MAIN:
-  # UAC_AWARE: # todo: always disable UAC aware, to avoid searching for ini
-  #   name: UAC aware
+  UAC_AWARE: always disable UAC aware, to avoid searching for ini
   GRAPHICS_MODE:
     name: Mode
     display_type: dropdown
