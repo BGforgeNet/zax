@@ -10,7 +10,7 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
-from config import Config, winkey2ini
+from config import Config, GameConfig, winkey2ini
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -73,50 +73,17 @@ def is_f2_game(path: str):
         return True
   return False
 
-def game_type(path):
-  return "f2"
-
-def config_path(game_path):
-  if game_type(game_path) == "f2":
-    cfg = 'fallout2.cfg'
-  return os.path.join(game_path, cfg)
-
-def get_ini_configs():
-  config_dir = 'formats'
-  config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if os.path.isfile(os.path.join(config_dir, f)) and f.lower().endswith('.yml')]
-  config_files.sort()
-  configs = OrderedDict()
-  for f in config_files:
-    with open(f) as yf:
-      data = yaml.load(yf)
-    path = data['f2gm']['path']
-    configs[path] = data
-  return configs
-
-def config_paths():
-  configs = get_ini_configs()
-  paths = [x for x in configs]
-  return paths
-
-def load_config_values(window: sg.Window, game_path: str):
-  configs = get_ini_configs()
-  for c in configs:
-    cfg = Config(game_path, configs[c]['f2gm']['path'])
-    new_values = cfg.window_data()
-    for key in new_values:
-      window[key](new_values[key])
-  return configs
-
-def handle_event(window: sg.Window, event, values: dict, game_path: str, open_config_paths = []):
+def handle_event(window: sg.Window, event, values: dict, game_path: str, game_config):
   if event == '-LIST-':
     window['configs_loaded'](False)
-    configs = load_config_values(window, game_path)
-    open_config_paths = [configs[x]['f2gm']['path'] for x in configs]
-  for p in open_config_paths:
+    game_config = GameConfig(game_path)
+    game_config.load_config_values(window)
+  config_paths = game_config.config_paths
+  for p in config_paths:
     layout.handle_custom_event(p, window, event, values)
   if event == '-LIST-':
     window['configs_loaded'](True)
-  return open_config_paths
+  return game_config
 
 window = sg.Window('f2gm', main_layout, finalize=True)
 
@@ -128,7 +95,7 @@ except:
   print("no games in list found")
 window['configs_loaded'](False)
 
-cpaths = []
+game_config = None
 while True:  # Event Loop
 
   event, values = window.read()
@@ -157,9 +124,7 @@ while True:  # Event Loop
       sg.popup("fallout2.exe not found in directory {}".format(dname))
   if values['-LIST-']:
     game_path = values['-LIST-'][0]
-    if cpaths == []:
-      cpaths = config_paths()
-  cpaths = handle_event(window, event, values, game_path, cpaths)
+  game_config = handle_event(window, event, values, game_path, game_config)
 
 
 config['games'] = games

@@ -179,3 +179,35 @@ def winkey2ini(win_key, win_value):
   value = str(value)
   ini_key['value'] = value
   return ini_key
+
+class GameConfig():
+  def __init__(self, game_path):
+    self.game_path = game_path
+    self.ini_configs = self.get_ini_configs()
+    self.config_paths = self.get_config_paths()
+
+  def get_ini_configs(self):
+    config_dir = 'formats'
+    config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if os.path.isfile(os.path.join(config_dir, f)) and f.lower().endswith('.yml')]
+    config_files.sort()
+    configs = OrderedDict()
+    for f in config_files:
+      with open(f) as yf:
+        data = yaml.load(yf)
+      path = data['f2gm']['path']
+      configs[path] = data
+    return configs
+
+  def load_config_values(self, window):
+    configs = self.ini_configs
+    for c in configs:
+      cfg = Config(self.game_path, configs[c]['f2gm']['path'])
+      new_values = cfg.window_data()
+      for key in new_values:
+        window[key](new_values[key])
+    return configs
+
+  def get_config_paths(self):
+    configs = self.ini_configs
+    paths = [x for x in configs]
+    return paths
