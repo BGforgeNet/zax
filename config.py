@@ -107,7 +107,8 @@ class Config:
     self.game_path = game_path
 
   def load_ini(self, game_path, config_path):
-    cfg = iniparse.INIConfig(io.open(os.path.join(game_path, config_path)))
+    with open(os.path.join(game_path, config_path)) as fh:
+      cfg = iniparse.INIConfig(fh)
     return cfg
 
   def get_win_key(self, section, key, value):
@@ -151,6 +152,19 @@ class Config:
             except:
               print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
     return win_data
+
+  def save(self, new_data):
+    path = os.path.join(self.game_path, self.config_path)
+    with io.open(path, 'w') as fh:
+      cfg = self.ini_data
+      for section in new_data:
+        for key in new_data[section]:
+          if cfg[section][key] != new_data[section][key]:
+            print("{} change from {} to {}".format(key, cfg[section][key], new_data[section][key]))
+          cfg[section][key] = new_data[section][key]
+      content = str(cfg)
+      content = content.replace('\n', '\r\n')
+      fh.write(content)
 
 def winkey2ini(win_key, win_value):
   ini_key = {'path': w2i[win_key]['path'], 'section': w2i[win_key]['section'], 'key': w2i[win_key]['key']}
@@ -200,15 +214,16 @@ class GameConfig():
 
   def init_configs(self):
     formats = self.config_formats
-    configs = []
+    configs = {}
     for c in formats:
+      path = formats[c]['f2gm']['path']
       cfg = Config(self.game_path, formats[c]['f2gm']['path'])
-      configs.append(cfg)
+      configs[path] = cfg
     return configs
 
   def load_from_disk(self, window):
     for c in self.configs:
-      new_values = c.window_data()
+      new_values = self.configs[c].window_data()
       for key in new_values:
         window[key](new_values[key])
 
@@ -218,10 +233,20 @@ class GameConfig():
     return paths
 
   def save(self, values):
+    new_ini_data = {}
     for wk in values:
       try:
         ik = winkey2ini(wk, values[wk])
-        print("{}: {} -> {}".format(ik['key'], values[wk], ik['value']))
+        path = ik['path']
+        section = ik['section']
+        key = ik['key']
+        if not path in new_ini_data:
+          new_ini_data[path] = {}
+        if not section in new_ini_data[path]:
+          new_ini_data[path][section] = {}
+        new_ini_data[path][section][key] = ik['value']
       except:
+        print("can't get ini key for {}".format(wk))
         pass
-        # print("can't find ini value for {}".format(wk))
+    for c in new_ini_data:
+      self.configs[c].save(new_ini_data[c])
