@@ -188,10 +188,13 @@ system:
   executable:
     type: string
   free_space:
+    desc: Minimal disk space that Fallout
     type: int
+    min: 0
+    max: 2048000
   hashing:
   interrupt_walk:
-    desc: If unset, once you click to walk, you won't be able to cancel the movement or double click for running until the movement is finished.
+    desc: Allow to interrupt PC walking by issuing another command.
   language:
     type: string
   master_dat:
