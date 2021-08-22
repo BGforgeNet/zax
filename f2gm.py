@@ -104,14 +104,7 @@ while True:  # Event Loop
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":
-    pp.pprint(values)
-    for wk in values:
-      # print(wk)
-      try:
-        ik = winkey2ini(wk, values[wk])
-        print("{}: {} -> {}".format(ik['key'], values[wk], ik['value']))
-      except:
-        print("can't find ini value for {}".format(wk))
+    game_config.save(values)
 
   if event == "Add game":
     dname = sg.popup_get_folder('Enter game path')

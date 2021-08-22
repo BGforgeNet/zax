@@ -157,25 +157,24 @@ def winkey2ini(win_key, win_value):
   try:
     value = w2i[win_key]['values'][win_value] # radio, dropdown
   except:
-    try:
-      display_type = w2i[win_key]['display_type']
-      if display_type == 'radio' and win_value == False:
-        return None
-    except:
-      pass
+    # print("can't find {} in map".format(win_key))
+    # radio off options
+    if 'display_type' in w2i[win_key] and  w2i[win_key]['display_type'] == 'radio' and win_value == False:
+      return None
 
-    try:
+    try: # float
       float_base = w2i[win_key]['float_base'] # float
       value = win_value / float_base
       precision = len(str(float_base)) - len(str(float_base).rstrip('0'))
       value = '{:.{precision}f}'.format(value, precision=precision)
     except:
-      if win_value == True: # bool/radio
+      if win_value is True: # bool/radio
         value = 1
-      if win_value == False:
+      elif win_value is False:
         value = 0
       else:
         value = win_value
+    # print("{} = {}".format(win_key, win_value))
   value = str(value)
   ini_key['value'] = value
   return ini_key
@@ -217,3 +216,12 @@ class GameConfig():
     configs = self.config_formats
     paths = [x for x in configs]
     return paths
+
+  def save(self, values):
+    for wk in values:
+      try:
+        ik = winkey2ini(wk, values[wk])
+        print("{}: {} -> {}".format(ik['key'], values[wk], ik['value']))
+      except:
+        pass
+        # print("can't find ini value for {}".format(wk))
