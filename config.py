@@ -183,10 +183,11 @@ def winkey2ini(win_key, win_value):
 class GameConfig():
   def __init__(self, game_path):
     self.game_path = game_path
-    self.ini_configs = self.get_ini_configs()
+    self.config_formats = self.get_config_formats()
     self.config_paths = self.get_config_paths()
+    self.configs = self.init_configs()
 
-  def get_ini_configs(self):
+  def get_config_formats(self):
     config_dir = 'formats'
     config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if os.path.isfile(os.path.join(config_dir, f)) and f.lower().endswith('.yml')]
     config_files.sort()
@@ -198,16 +199,21 @@ class GameConfig():
       configs[path] = data
     return configs
 
-  def load_config_values(self, window):
-    configs = self.ini_configs
-    for c in configs:
-      cfg = Config(self.game_path, configs[c]['f2gm']['path'])
-      new_values = cfg.window_data()
-      for key in new_values:
-        window[key](new_values[key])
+  def init_configs(self):
+    formats = self.config_formats
+    configs = []
+    for c in formats:
+      cfg = Config(self.game_path, formats[c]['f2gm']['path'])
+      configs.append(cfg)
     return configs
 
+  def load_from_disk(self, window):
+    for c in self.configs:
+      new_values = c.window_data()
+      for key in new_values:
+        window[key](new_values[key])
+
   def get_config_paths(self):
-    configs = self.ini_configs
+    configs = self.config_formats
     paths = [x for x in configs]
     return paths
