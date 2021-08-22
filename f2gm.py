@@ -10,7 +10,7 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
-from config import Config, ValueMap
+from config import Config, winkey2ini
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -138,6 +138,14 @@ while True:  # Event Loop
     break
   if event == "Save":
     pp.pprint(values)
+    for wk in values:
+      # print(wk)
+      try:
+        ik = winkey2ini(wk, values[wk])
+        print("{}: {} -> {}".format(ik['key'], values[wk], ik['value']))
+      except:
+        print("can't find ini value for {}".format(wk))
+
   if event == "Add game":
     dname = sg.popup_get_folder('Enter game path')
     if is_f2_game(dname):

@@ -29,9 +29,12 @@ class ValueMap:
   def __init__(self) -> None:
     ini_formats = get_ini_formats()
     valuemap = {}
+    winmap = {}
     for ini_path in ini_formats:
       valuemap = {**valuemap, **self.generate_ini2window(ini_formats[ini_path])}
-    self.map = valuemap
+      winmap = {**winmap, **self.generate_window2ini(ini_formats[ini_path])}
+    self.i2w = valuemap
+    self.w2i = winmap
 
   def generate_ini2window(self, ini_format):
     ini2window = {}
@@ -65,8 +68,36 @@ class ValueMap:
             ini2window[win_key]['0'] = False
             ini2window[win_key]['1'] = True
     return ini2window
-value_map = ValueMap().map
 
+  def generate_window2ini(self, ini_format):
+    window2ini = {}
+    path = ini_format['f2gm']['path']
+    for section in ini_format:
+      if section == 'f2gm':
+        continue
+      for key in ini_format[section]:
+        win_key = "{}-{}-{}".format(path, section, key)
+        try: # choice: radio / dropdown
+          options = ini_format[section][key]['options']
+          if ini_format[section][key]['display_type'] == 'radio':
+            for o in options:
+              win_key = "{}-{}-{}-{}".format(path, section, key, o['value'])
+              window2ini[win_key] = { 'path': path, 'section': section, 'key': key, 'values': {True: o['value']}, 'display_type': 'radio'}
+          elif ini_format[section][key]['display_type'] == 'dropdown':
+            values = {o['name']: o['value'] for o in options}
+            window2ini[win_key] = {'path': path, 'section': section, 'key': key, 'values': values}
+          else:
+            print("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, path))
+        except:
+          try:
+            window2ini[win_key] = {'path': path, 'section': section, 'key': key, 'type': 'float', 'float_base': ini_format[section][key]['float_base']}
+          except:
+            window2ini[win_key] = {'path': path, 'section': section, 'key': key}
+    return window2ini
+
+vmap = ValueMap()
+i2w = vmap.i2w
+w2i = vmap.w2i
 
 class Config:
   def __init__(self, game_path, config_path):
@@ -103,7 +134,7 @@ class Config:
         ini_value = ini_data[section][key]
         win_key = self.get_win_key(section, key, ini_value)
         try:
-          win_data[win_key] = value_map[win_key][ini_value]
+          win_data[win_key] = i2w[win_key][ini_value]
         except:
           if type(ini_value)  == iniparse.config.Undefined:
             print("key {} not found in {}".format(key, self.config_path))
@@ -120,3 +151,31 @@ class Config:
             except:
               print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
     return win_data
+
+def winkey2ini(win_key, win_value):
+  ini_key = {'path': w2i[win_key]['path'], 'section': w2i[win_key]['section'], 'key': w2i[win_key]['key']}
+  try:
+    value = w2i[win_key]['values'][win_value] # radio, dropdown
+  except:
+    try:
+      display_type = w2i[win_key]['display_type']
+      if display_type == 'radio' and win_value == False:
+        return None
+    except:
+      pass
+
+    try:
+      float_base = w2i[win_key]['float_base'] # float
+      value = win_value / float_base
+      precision = len(str(float_base)) - len(str(float_base).rstrip('0'))
+      value = '{:.{precision}f}'.format(value, precision=precision)
+    except:
+      if win_value == True: # bool/radio
+        value = 1
+      if win_value == False:
+        value = 0
+      else:
+        value = win_value
+  value = str(value)
+  ini_key['value'] = value
+  return ini_key
