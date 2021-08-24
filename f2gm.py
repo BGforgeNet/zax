@@ -10,7 +10,7 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
-from config import Config, GameConfig, winkey2ini
+from config import GameConfig
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -77,7 +77,7 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
   if event == '-LIST-':
     window['configs_loaded'](False)
     game_config = GameConfig(game_path)
-    game_config.load_from_disk(window)
+    game_config.load_from_disk(window, values)
   config_paths = game_config.config_paths
   for p in config_paths:
     layout.handle_custom_event(p, window, event, values)

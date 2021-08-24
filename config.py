@@ -132,9 +132,9 @@ class Config:
         continue
 
       for key in ini_format[section]:
-        ini_value = ini_data[section][key]
-        win_key = self.get_win_key(section, key, ini_value)
         try:
+          ini_value = ini_data[section][key]
+          win_key = self.get_win_key(section, key, ini_value)
           win_data[win_key] = i2w[win_key][ini_value]
         except:
           if type(ini_value)  == iniparse.config.Undefined:
@@ -221,11 +221,14 @@ class GameConfig():
       configs[path] = cfg
     return configs
 
-  def load_from_disk(self, window):
+  def load_from_disk(self, window, values):
     for c in self.configs:
       new_values = self.configs[c].window_data()
       for key in new_values:
-        window[key](new_values[key])
+        if key in values:
+          window[key](new_values[key])
+        else:
+          print("warning: key {} not found in window".format(key))
 
   def get_config_paths(self):
     configs = self.config_formats
