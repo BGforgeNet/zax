@@ -1,2 +1,7 @@
 __pycache__/
 f2gm.yml
+build/
+dist/
+f2gm.build/
+f2gm.dist/
+f2gm.spec
