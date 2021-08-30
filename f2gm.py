@@ -32,7 +32,8 @@ if os.path.isfile(f2gm_yml):
 settings_layout = [
   [sg.TabGroup([[
     sg.Tab('Game', [ [layout.layout['fallout2.cfg']] ], key='tab-fallout2.cfg'),
-    sg.Tab('HiRes', [ [layout.layout['f2_res.ini']] ], key='tab-f2_res.ini')
+    sg.Tab('HiRes', [ [layout.layout['f2_res.ini']] ], key='tab-f2_res.ini'),
+    sg.Tab('Sfall', [ [layout.layout['ddraw.ini']] ], key='tab-ddraw.ini')
   ]], enable_events=True, key='tab-settings-sub')],
   [sg.Button('Save')],
   # checkbox is a hack for triggering event to disable elements after config loading

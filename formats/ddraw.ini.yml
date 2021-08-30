@@ -8,7 +8,7 @@ Speed:
     name: The initial speed at game startup
     type: int
     min: 1
-    max: 10000
+    max: 10000 # local limit
 
 Graphics:
   Mode:
@@ -91,12 +91,15 @@ Input:
     name: Enable the mouse scroll wheel to scroll through the inventory, barter, and loot screens
   MiddleMouse:
     name: Bind middle mouse button to keypress
+    type: dx_key
   ReverseMouseButtons:
     name: Reverse the left and right mouse buttons
   ReloadWeaponKey:
     name: A key to press to reload your currently equipped weapon or use the active item
+    type: dx_key
   ItemFastMoveKey:
     name: A key to hold down to let you move/drop a whole stack of items at once without the 'Move Items' window
+    type: dx_key
   FastMoveFromContainer:
     name: Set to 1 to skip the 'Move Items' window when taking items from containers or corpses and not holding down ItemFastMoveKey
     desc: Requires ItemFastMoveKey to be enabled
@@ -104,16 +107,25 @@ Input:
 Misc:
   WorldMapTimeMod:
     name: World map travel time percentage modifier
-    desc: How fast in game time passes while you're moving around the map screen without affecting encounter rate. 100 is normal speed, 0 stops time from passing. 
+    desc: How fast in game time passes while you're moving around the map screen without affecting encounter rate. 100 is normal speed, 0 stops time from passing.
+    type: int
+    min: 0
+    max: 1000 # local limit
   WorldMapFPSPatch:
     name: Use the Fallout 1 code to control world map speed
   WorldMapDelay2:
     name: Controls the world map speed if WorldMapFPSPatch is 1. Higher values cause slower movement
     desc: Default is 66 milliseconds
+    type: int
+    min: 0
+    max: 1000 # local limit
   WorldMapEncounterFix:
     name: Make world map encounter rate independent of your travel speed
   WorldMapEncounterRate:
     name: Higher values of WorldMapEncounterRate cause a slower encounter rate
+    type: int
+    min: 0 # local limit
+    max: 100 # local limit
 
   UseFileSystemOverride:
     name: Enable functions relating to overriding the file system
@@ -235,12 +247,12 @@ Misc:
     name: AP cost for accessing inventory in combat
     type: int
     min: 0
-    max: 20
+    max: 20 # local limit
   QuickPocketsApCostReduction:
     name: Quick Pockets perk AP reduction
     type: int
     min: 0
-    max: 20
+    max: 20 # local limit
 
   ExplosionsEmitLight:
     name: Explosions and projectiles emit light
@@ -266,13 +278,17 @@ Misc:
     name: Stack empty identical weapons
     desc: (no matter what type of ammo was loaded before)
 
-# ;Changes the way weapon reloading works when you drag ammo onto a weapon in the inventory
-# ;Set to -1 to disable (vanilla behavior with the 'Move Items' window)
-# ;Set to 0 to use all the ammo boxes to reload
-# ;Set to 1 or more to reserve the specified amount of ammo boxes and use all the rest to reload
-# ;If the amount of ammo boxes in the inventory is less than or equal to the reserve, only one box will be used
-#   ReloadReserve:
-#     name: Inventory reload behaviour
+  ReloadReserve:
+    name: Inventory reload behaviour
+    type: int
+    min: -1
+    max: 1000
+    desc: |
+      Changes the way weapon reloading works when you drag ammo onto a weapon in the inventory
+      -1: disable (vanilla behavior with the 'Move Items' window)
+       0: use all the ammo boxes to reload
+       1 or more: reserve the specified amount of ammo boxes and use all the rest to reload
+      If the amount of ammo boxes in the inventory is less than or equal to the reserve, only one box will be used
   ItemCounterDefaultMax:
     name: Start the counter in the 'Move Items' window with maximum number, except in the barter screen
 
