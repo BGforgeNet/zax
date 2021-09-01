@@ -22,7 +22,7 @@ Graphics:
         name: DX9 windowed
       - value: 6
         name: DX9 fullscreen windowed
-        desc: Resolution in f2_res.ini should be set to the same aspect ratio as your desktop resolution
+        desc: Resolution in HiRes config should be set to the same aspect ratio as your desktop resolution
 
   GraphicsWidth:
     desc: If set to 0, use Fallout's native resolution
@@ -59,8 +59,8 @@ Graphics:
         name: force AVI to fit the screen width
 
   FadeMultiplier:
-    name: Fade effect time modifier, %
-    desc: Default is 100. Decrease/increase this value to speed up/slow down fade effects
+    name: Fade time modifier, %
+    desc: Default is 100. Decrease/increase this value to speed up/slow down fade effects.
     type: int
     min: 20
     max: 1000
@@ -147,9 +147,9 @@ Misc:
       - value: 1 
         name: Glovz
       - value: 2
-        name: Glovz with Damage Multiplier tweak
+        name: Glovz + Damage Multiplier tweak
       - value: 5
-        name: YAAM
+        name: Haenlomal's YAAM
 
   NPCAutoLevel:
     name: NPC auto level
@@ -165,11 +165,11 @@ Misc:
     display_type: dropdown
     options:
       - value: 0
-        name: Allowed
+        name: Allowed (unsafe)
       - value: 1
-        name: Only at the start of your turn
+        name: Only at the start of your turn (safer)
       - value: 2
-        name: Disabled
+        name: Forbidden (safest)
 
   DisplayKarmaChanges:
     name: Show karma changes
@@ -183,8 +183,8 @@ Misc:
     type: int
     min: 0
     max: 13
-    desc: Delay before deleting corpses on a map after you leave (days)
-    name: Corpse delete time
+    desc: Delay in days before deleting corpses on a map after you leave
+    name: Corpse delete time, days
 
   ProcessorIdle:
     type: int
@@ -346,16 +346,16 @@ Misc:
     desc: Display party member's current level/AC/addict flag on the combat control panel
 
   SkipLoadingGameSettings:
-    name: Skip loading game settings
-    desc: Skip loading game settings from saved games (use global ones from fallout2.cfg instead)
+    name: Global game settings
+    desc: Fallout 2 stores some game preferences in savegames. This allows to skip loading game settings from saved games and use the same settings from fallout2.cfg always.
     display_type: dropdown
     options:
       - value: 0
-        name: don't skip
+        name: Load from saves
       - value: 1
-        name: all except difficulty
+        name: Load only difficulty from saves
       - value: 2
-        name: all settings
+        name: Use global (preferred)
 
 Debugging:
   DebugMode:
