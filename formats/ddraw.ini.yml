@@ -5,10 +5,10 @@ f2gm:
 Speed:
   Enable:
   SpeedMultiInitial:
-    name: The initial speed at game startup
+    name: Game speed, %
     type: int
-    min: 1
-    max: 10000 # local limit
+    min: 1 # arbitrary
+    max: 10000 # arbitrary
 
 Graphics:
   Mode:
@@ -27,26 +27,28 @@ Graphics:
   GraphicsWidth:
     desc: If set to 0, use Fallout's native resolution
     type: int
-    min: 640
-    max: 1920
+    min: 0
+    max: 3840
   GraphicsHeight:
     desc: If set to 0, use Fallout's native resolution
     type: int
-    min: 480
-    max: 1080
+    min: 0
+    max: 2160
 
   GPUBlt:
+    name: Palette conversion
     display_type: dropdown
     options:
       - value: 0
-        name: pick automatically
+        name: Automatic
       - value: 1
-        name: palette conversion on the GPU
+        name: GPU
       - value: 2
-        name: palette conversion on the CPU
+        name: CPU
 
   AllowDShowMovies:
     display_type: dropdown
+    name: Allow alternative movie formats
     desc: Requires DX9 graphics mode
     options:
       - value: 0
@@ -57,7 +59,7 @@ Graphics:
         name: force AVI to fit the screen width
 
   FadeMultiplier:
-    name: Fade effect time percentage modifier
+    name: Fade effect time modifier, %
     desc: Default is 100. Decrease/increase this value to speed up/slow down fade effects
     type: int
     min: 20
@@ -83,72 +85,79 @@ Interface:
     name: Draw a dotted line while traveling on the world map (similar to Fallout 1)
 
   WorldMapTerrainInfo:
-    name: Display terrain types when hovering the cursor over the player's marker on the world map
+    name: Display terrain type
+    desc: Display terrain types when hovering the cursor over the player's marker on the world map
 
 
 Input:
   UseScrollWheel:
-    name: Enable the mouse scroll wheel to scroll through the inventory, barter, and loot screens
+    name: Mouse scroll on inventory, barter, and loot screens
   MiddleMouse:
     name: Bind middle mouse button to keypress
     type: dx_key
   ReverseMouseButtons:
-    name: Reverse the left and right mouse buttons
+    name: Reverse mouse buttons
   ReloadWeaponKey:
-    name: A key to press to reload your currently equipped weapon or use the active item
+    name: Reload weapon key
+    desc: A key to press to reload your currently equipped weapon or use the active item
     type: dx_key
   ItemFastMoveKey:
-    name: A key to hold down to let you move/drop a whole stack of items at once without the 'Move Items' window
+    name: Item fast move key
+    desc: A key to hold down to let you move/drop a whole stack of items at once without the 'Move Items' window
     type: dx_key
   FastMoveFromContainer:
-    name: Set to 1 to skip the 'Move Items' window when taking items from containers or corpses and not holding down ItemFastMoveKey
+    name: Skip "Move Items" window when loooting items and not holding down "Item fast move key"
     desc: Requires ItemFastMoveKey to be enabled
 
 Misc:
   WorldMapTimeMod:
-    name: World map travel time percentage modifier
+    name: Travel time modifier, %
     desc: How fast in game time passes while you're moving around the map screen without affecting encounter rate. 100 is normal speed, 0 stops time from passing.
     type: int
     min: 0
-    max: 1000 # local limit
+    max: 1000 # arbitrary
   WorldMapFPSPatch:
-    name: Use the Fallout 1 code to control world map speed
+    name: Enable speed control
+    desc: Use the Fallout 1 code to control world map speed
   WorldMapDelay2:
-    name: Controls the world map speed if WorldMapFPSPatch is 1. Higher values cause slower movement
-    desc: Default is 66 milliseconds
+    name: Move speed (delay), ms
+    desc: Higher values cause slower movement. Default is 66 milliseconds.
     type: int
     min: 0
-    max: 1000 # local limit
+    max: 1000 # arbitrary
   WorldMapEncounterFix:
-    name: Make world map encounter rate independent of your travel speed
+    name: Make encounter rate independent of travel speed
   WorldMapEncounterRate:
-    name: Higher values of WorldMapEncounterRate cause a slower encounter rate
+    name: Encounter rate (delay)
+    desc: Higher values cause slower encounter rate
     type: int
-    min: 0 # local limit
-    max: 100 # local limit
+    min: 0 # arbitrary
+    max: 100 # arbitrary
 
   UseFileSystemOverride:
-    name: Enable functions relating to overriding the file system
-    desc: Required by some mods
+    name: Enable filesystem override functions
+    desc: Required by some mods. Don't change if you don't know what's this for.
 
   DamageFormula:
     name: Combat damage formula
     display_type: dropdown
     options:
       - value: 0
-        name: Fallout default
+        name: Vanilla
       - value: 1 
-        name: Glovz's Damage Fix
+        name: Glovz
       - value: 2
-        name: Glovz's Damage Fix with Damage Multiplier tweak
+        name: Glovz with Damage Multiplier tweak
       - value: 5
-        name: Haenlomal's Yet Another Ammo Mod
+        name: YAAM
 
   NPCAutoLevel:
-    name: All NPC party members automatically level up as soon as the player reaches the requirements
+    name: NPC auto level
+    desc: All NPC party members automatically level up as soon as the player reaches the requirements
 
   SingleCore:
-    name: Force Fallout not to use multiple processor cores even if they are available
+    name: Single CPU core
+    desc: Force Fallout not to use multiple processor cores even if they are available
 
   SaveInCombatFix:
     name: Saving in combat
@@ -163,26 +172,30 @@ Misc:
         name: Disabled
 
   DisplayKarmaChanges:
-    name: Get notification of karma changes in the notification window
+    name: Show karma changes
+    desc: Get notification of karma changes in the notification window
 
   PlayIdleAnimOnReload:
-    name: Force the PC to play the idle animation when reloading their weapon
+    name: Play "idle" animation on reload
+    desc: Force the PC to play the idle animation when reloading their weapon
 
   CorpseDeleteTime:
     type: int
     min: 0
     max: 13
-    name: Delay before deleting corpses on a map after you leave (days)
+    desc: Delay before deleting corpses on a map after you leave (days)
+    name: Corpse delete time
 
   ProcessorIdle:
     type: int
     min: -1
     max: 30
-    name: Number of milliseconds to idle each input loop to prevent 100% CPU use
+    name: CPU idle, ms
     desc: |
-      -1 = disable
-      0 = idle only if other processes are waiting for processor time
-      Other value = milliseconds
+      Number of milliseconds to idle each input loop to prevent 100% CPU use
+      -1: disable
+       0: idle only if other processes are waiting for processor time
+       Other value: milliseconds
 
   SkipOpeningMovies:
     name: Skip opening movies and splash screen
@@ -225,34 +238,35 @@ Misc:
         name: instant even when switching to other controlled critters in combat
  
   DisplayBonusDamage:
-    name: Display additional points of damage from Bonus HtH/Ranged Damage perks in the inventory
+    name: Display extra damage from Bonus HtH/Ranged Damage perks
 
   FastShotFix:
     name: Fast Shot behaviour
     display_type: dropdown
     options:
       - value: 0
-        name: -1 AP cost for ranged weapons. Aimed attacks are disabled
+        name: -1 AP cost for ranged weapons, aimed attacks are disabled
       - value: 1
         name: Aimed attacks are enabled for melee/unarmed weapons and HtH attacks
       - value: 2
         name: -1 AP cost to melee/unarmed weapons and HtH attacks
       - value: 3
-        name: -1 AP cost for all weapons. Aimed attacks are disabled
+        name: -1 AP cost for all weapons, aimed attacks are disabled
 
   SuperStimExploitFix:
-    name: Prevents exploit with using super stims on a critter who is at full health
+    name: Prevent super stim exploit
+    desc: Prevents exploit with using super stims on a critter who is at full health
 
   InventoryApCost:
     name: AP cost for accessing inventory in combat
     type: int
     min: 0
-    max: 20 # local limit
+    max: 20 # arbitrary
   QuickPocketsApCostReduction:
     name: Quick Pockets perk AP reduction
     type: int
     min: 0
-    max: 20 # local limit
+    max: 20 # arbitrary
 
   ExplosionsEmitLight:
     name: Explosions and projectiles emit light
@@ -290,16 +304,19 @@ Misc:
        1 or more: reserve the specified amount of ammo boxes and use all the rest to reload
       If the amount of ammo boxes in the inventory is less than or equal to the reserve, only one box will be used
   ItemCounterDefaultMax:
-    name: Start the counter in the 'Move Items' window with maximum number, except in the barter screen
+    name: Default item counter to maximum
+    desc: Start the counter in the 'Move Items' window with maximum number, except in the barter screen
 
   EnableMusicInDialogue:
     name: Leave the music playing in dialogue with talking heads
 
   DontTurnOffSneakIfYouRun:
-    name: Prevent the player from running while sneaking without Silent Running perk
+    name: Don't turn of sneak if you run
+    desc: Prevent the player from running while sneaking without Silent Running perk
 
   UseWalkDistance:
-    name: Max distance at which the player will switch to walking when trying to use objects
+    name: Max "use" walk distance
+    desc: Max distance at which the player will switch from running to walking when trying to use objects
     type: int
     min: 0
     max: 3
@@ -308,7 +325,7 @@ Misc:
     name: Display messages about radiation for the active geiger counter
 
   InstantWeaponEquip:
-    name: Skip weapon equip/unequip animations when performing various actions
+    name: Skip weapon equip/unequip animations
 
   NumbersInDialogue:
     name: Display numbered dialogue options
@@ -317,16 +334,20 @@ Misc:
     name: Use Fallout's normal text font instead of DOS-like font on the world map
 
   FullItemDescInBarter:
-    name: Display full item description for weapon/ammo in the barter screen
+    name: Full item description in barter
+    desc: Display full item description for weapon/ammo in the barter screen
 
   DisplaySwiftLearnerExp:
-    name: Display experience points with the bonus from Swift Learner perk when gained from non-scripted situations
+    name: Display Swift Learner XP
+    desc: Display experience points with the bonus from Swift Learner perk when gained from non-scripted situations
 
   PartyMemberExtraInfo:
-    name: Display party member's current level/AC/addict flag on the combat control panel
+    name: Extra info about party members
+    desc: Display party member's current level/AC/addict flag on the combat control panel
 
   SkipLoadingGameSettings:
-    name: Skip loading all game settings from saved games (use global)
+    name: Skip loading game settings
+    desc: Skip loading game settings from saved games (use global ones from fallout2.cfg instead)
     display_type: dropdown
     options:
       - value: 0
@@ -347,7 +368,7 @@ Debugging:
       - value: 2
         name: Output to the debug.log
       - value: 3
-        name: Output to both screen and debug.log
+        name: Both screen and debug.log
 
   Init:
     name: Sfall initialization

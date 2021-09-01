@@ -27,38 +27,22 @@ tabs['Main'] = [
     dropdown(c, 'Graphics', 'AllowDShowMovies'),
     spin(c, 'Graphics', 'FadeMultiplier'),
   ]),
-  frame("Interface", [
-    checkbox(c, 'Interface', 'ActionPointsBar'),
-    dropdown(c, 'Interface', 'ExpandWorldMap'),
-    checkbox(c, 'Interface', 'WorldMapTravelMarkers'),
-    checkbox(c, 'Interface', 'WorldMapTerrainInfo'),
-  ]),
-  frame("Input", [
-    checkbox(c, 'Input', 'UseScrollWheel'),
-    qinput(c, 'Input', 'MiddleMouse'),
-    checkbox(c, 'Input', 'ReverseMouseButtons'),
-    qinput(c, 'Input', 'ReloadWeaponKey'),
-    qinput(c, 'Input', 'ItemFastMoveKey'),
+
+  frame("Combat", [
+    dropdown(c, 'Misc', 'DamageFormula'),
+    dropdown(c, 'Misc', 'SaveInCombatFix'),
+    dropdown(c, 'Misc', 'FastShotFix'),
+    spin(c, 'Misc', 'InventoryApCost'),
+    spin(c, 'Misc', 'QuickPocketsApCostReduction'),
   ]),
 
   frame("Misc", [
-    spin(c, 'Misc', 'WorldMapTimeMod'),
-    checkbox(c, 'Misc', 'WorldMapFPSPatch'),
-    spin(c, 'Misc', 'WorldMapDelay2'),
-    checkbox(c, 'Misc', 'WorldMapEncounterFix'),
-    spin(c, 'Misc', 'WorldMapEncounterRate'),
 
     checkbox(c, 'Misc', 'UseFileSystemOverride'),
-
-    dropdown(c, 'Misc', 'DamageFormula'),
 
     checkbox(c, 'Misc', 'NPCAutoLevel'),
 
     checkbox(c, 'Misc', 'SingleCore'),
-
-    dropdown(c, 'Misc', 'SaveInCombatFix'),
-
-    checkbox(c, 'Misc', 'DisplayKarmaChanges'),
 
     checkbox(c, 'Misc', 'PlayIdleAnimOnReload'),
 
@@ -68,61 +52,79 @@ tabs['Main'] = [
 
     dropdown(c, 'Misc', 'SkipOpeningMovies'),
 
-    checkbox(c, 'Misc', 'ExtraSaveSlots'),
-    spin(c, 'Misc', 'AutoQuickSave'),
-    spin(c, 'Misc', 'AutoQuickSavePage'),
-
-    dropdown(c, 'Misc', 'SpeedInterfaceCounterAnims'),
-
-    checkbox(c, 'Misc', 'DisplayBonusDamage'),
-    dropdown(c, 'Misc', 'FastShotFix'),
-
     checkbox(c, 'Misc', 'SuperStimExploitFix'),
 
-    spin(c, 'Misc', 'InventoryApCost'),
-    spin(c, 'Misc', 'QuickPocketsApCostReduction'),
-
     checkbox(c, 'Misc', 'ExplosionsEmitLight'),
-
-    spin(c, 'Misc', 'CombatPanelAnimDelay'),
-    spin(c, 'Misc', 'DialogPanelAnimDelay'),
-    spin(c, 'Misc', 'PipboyTimeAnimDelay'),
-
-    checkbox(c, 'Misc', 'StackEmptyWeapons'),
-    spin(c, 'Misc', 'ReloadReserve'),
-    checkbox(c, 'Misc', 'ItemCounterDefaultMax'),
-
-    checkbox(c, 'Misc', 'EnableMusicInDialogue'),
 
     checkbox(c, 'Misc', 'DontTurnOffSneakIfYouRun'),
 
     spin(c, 'Misc', 'UseWalkDistance'),
 
-    checkbox(c, 'Misc', 'ActiveGeigerMsgs'),
-
-    checkbox(c, 'Misc', 'InstantWeaponEquip'),
-
-    checkbox(c, 'Misc', 'NumbersInDialogue'),
-
-    checkbox(c, 'Misc', 'WorldMapFontPatch'),
-
-    checkbox(c, 'Misc', 'FullItemDescInBarter'),
-
-    checkbox(c, 'Misc', 'DisplaySwiftLearnerExp'),
-
-    checkbox(c, 'Misc', 'PartyMemberExtraInfo'),
-
     dropdown(c, 'Misc', 'SkipLoadingGameSettings'),
   ]),
+]
 
-  frame("Debugging", [
-    dropdown(c, 'Debugging', 'DebugMode'),
-    checkbox(c, 'Debugging', 'Init'),
-    checkbox(c, 'Debugging', 'Hook'),
-    checkbox(c, 'Debugging', 'Script'),
-    checkbox(c, 'Debugging', 'Criticals'),
-    checkbox(c, 'Debugging', 'Fixes'),
+tabs['Interface'] = [
+  checkbox(c, 'Interface', 'ActionPointsBar'),
+  frame("Input", [
+    checkbox(c, 'Input', 'UseScrollWheel'),
+    qinput(c, 'Input', 'MiddleMouse'),
+    checkbox(c, 'Input', 'ReverseMouseButtons'),
+    qinput(c, 'Input', 'ReloadWeaponKey'),
+    qinput(c, 'Input', 'ItemFastMoveKey'),
   ]),
+  frame("Animation speed", [
+    spin(c, 'Misc', 'CombatPanelAnimDelay'),
+    spin(c, 'Misc', 'DialogPanelAnimDelay'),
+    spin(c, 'Misc', 'PipboyTimeAnimDelay'),
+    dropdown(c, 'Misc', 'SpeedInterfaceCounterAnims'),
+    checkbox(c, 'Misc', 'InstantWeaponEquip'),
+  ]),
+  frame("Dialog", [
+    checkbox(c, 'Misc', 'NumbersInDialogue'),
+    checkbox(c, 'Misc', 'EnableMusicInDialogue'),
+    checkbox(c, 'Misc', 'PartyMemberExtraInfo'),
+  ]),
+  frame("Inventory", [
+    checkbox(c, 'Misc', 'StackEmptyWeapons'),
+    spin(c, 'Misc', 'ReloadReserve'),
+    checkbox(c, 'Misc', 'ItemCounterDefaultMax'),
+    checkbox(c, 'Misc', 'DisplayBonusDamage'),
+  ]),
+  frame("Barter", [
+    checkbox(c, 'Misc', 'FullItemDescInBarter'),
+  ]),
+  frame("Saves", [
+    checkbox(c, 'Misc', 'ExtraSaveSlots'),
+    spin(c, 'Misc', 'AutoQuickSave'),
+    spin(c, 'Misc', 'AutoQuickSavePage'),
+  ]),
+  frame("PDA", [
+    checkbox(c, 'Misc', 'DisplaySwiftLearnerExp'),
+    checkbox(c, 'Misc', 'ActiveGeigerMsgs'),
+    checkbox(c, 'Misc', 'DisplayKarmaChanges'),
+  ]),
+]
+
+tabs['Worldmap'] = [
+  dropdown(c, 'Interface', 'ExpandWorldMap'),
+  checkbox(c, 'Interface', 'WorldMapTravelMarkers'),
+  checkbox(c, 'Interface', 'WorldMapTerrainInfo'),
+  spin(c, 'Misc', 'WorldMapTimeMod'),
+  checkbox(c, 'Misc', 'WorldMapFPSPatch'),
+  spin(c, 'Misc', 'WorldMapDelay2'),
+  checkbox(c, 'Misc', 'WorldMapEncounterFix'),
+  spin(c, 'Misc', 'WorldMapEncounterRate'),
+  checkbox(c, 'Misc', 'WorldMapFontPatch'),
+]
+
+tabs['Debug'] = [
+  dropdown(c, 'Debugging', 'DebugMode'),
+  checkbox(c, 'Debugging', 'Init'),
+  checkbox(c, 'Debugging', 'Hook'),
+  checkbox(c, 'Debugging', 'Script'),
+  checkbox(c, 'Debugging', 'Criticals'),
+  checkbox(c, 'Debugging', 'Fixes'),
 ]
 
 tab_list = [tab(t, tabs[t]) for t in tabs]
