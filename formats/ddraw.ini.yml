@@ -48,15 +48,15 @@ Graphics:
 
   AllowDShowMovies:
     display_type: dropdown
-    name: Allow alternative movie formats
+    name: Alternative movie formats
     desc: Requires DX9 graphics mode
     options:
       - value: 0
-        name: disabled
+        name: Disabled
       - value: 1
-        name: search for AVI
+        name: Search for AVI
       - value: 2
-        name: force AVI to fit the screen width
+        name: Force AVI to fit the screen width
 
   FadeMultiplier:
     name: Fade time modifier, %
@@ -75,11 +75,11 @@ Interface:
     desc: Requires High Resolution Patch v4.1.8 and a new WORLDMAP.frm file in art\intrface\ (included in sfall.dat), The resolution of hi-res patch must be set to at least 890x720
     options:
       - value: 0
-        name: disabled
+        name: Disabled
       - value: 1
-        name: use the expanded world map interface
+        name: Expanded world map interface
       - value: 2
-        name: skip correcting the position of entrance markers on town maps
+        name: Skip correcting the position of entrance markers on town maps
 
   WorldMapTravelMarkers:
     name: Draw a dotted line while traveling on the world map (similar to Fallout 1)

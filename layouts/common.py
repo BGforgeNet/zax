@@ -140,3 +140,18 @@ def disable_element(key: str, window: sg.Window, values: dict, new_value = None,
   # see enable_elemnt comment
   elif (type(window[key]) is sg.Checkbox) and (event not in ['-LIST-', 'configs_loaded']):
     window[key](value=old_value)
+
+def enable_if(trigger_key, trigger_key_value, element_key, window, values, event, disabled_value=None):
+  trigger_events = ['-LIST-', 'configs_loaded'] + [trigger_key]
+  if event in trigger_events:
+    if values[trigger_key] == trigger_key_value:
+      enable_element(element_key, window, values, event=event)
+    else:
+      disable_element(element_key, window, values, event=event, new_value=disabled_value)
+def disable_if(trigger_key, trigger_key_value, element_key, window, values, event, disabled_value=None):
+  trigger_events = ['-LIST-', 'configs_loaded'] + [trigger_key]
+  if event in trigger_events:
+    if values[trigger_key] == trigger_key_value:
+      disable_element(element_key, window, values, event=event, new_value=disabled_value)
+    else:
+      enable_element(element_key, window, values, event=event)

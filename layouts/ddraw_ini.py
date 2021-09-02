@@ -140,3 +140,12 @@ def handle_event(window: sg.Window, event: str, values: dict):
       new_value = new_value[1]
     if new_value.isascii() and new_value.isprintable():
       window[event](new_value.upper())
+
+  disable_if('ddraw.ini-Speed-Enable', False, 'ddraw.ini-Speed-SpeedMultiInitial', window, values, event)
+
+  disable_if('ddraw.ini-Graphics-Mode', '8 bit fullscreen', 'ddraw.ini-Graphics-GraphicsWidth', window, values, event)
+  disable_if('ddraw.ini-Graphics-Mode', '8 bit fullscreen', 'ddraw.ini-Graphics-GraphicsHeight', window, values, event)
+
+  disable_if('ddraw.ini-Misc-WorldMapFPSPatch', False, 'ddraw.ini-Misc-WorldMapDelay2', window, values, event)
+
+  disable_if('ddraw.ini-Misc-WorldMapEncounterFix', False, 'ddraw.ini-Misc-WorldMapEncounterRate', window, values, event)
