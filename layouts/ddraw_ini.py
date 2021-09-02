@@ -72,6 +72,7 @@ tabs['Interface'] = [
     checkbox(c, 'Input', 'ReverseMouseButtons'),
     qinput(c, 'Input', 'ReloadWeaponKey'),
     qinput(c, 'Input', 'ItemFastMoveKey'),
+    checkbox(c, 'Input', 'FastMoveFromContainer'),
   ]),
   frame("Animation speed", [
     spin(c, 'Misc', 'CombatPanelAnimDelay'),

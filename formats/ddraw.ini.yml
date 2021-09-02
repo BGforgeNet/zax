@@ -106,8 +106,8 @@ Input:
     desc: A key to hold down to let you move/drop a whole stack of items at once without the 'Move Items' window
     type: dx_key
   FastMoveFromContainer:
-    name: Skip "Move Items" window when loooting items and not holding down "Item fast move key"
-    desc: Requires ItemFastMoveKey to be enabled
+    name: Skip "Move Items" window
+    desc: When loooting items and not holding down "Item fast move key". Requires ItemFastMoveKey to be enabled.
 
 Misc:
   WorldMapTimeMod:
