@@ -110,7 +110,7 @@ def spin(cfg_data, section, key):
 def qinput(cfg_data, section, key, size=(100, None)):
   name, wkey= name_wkey(cfg_data, section, key)
   try:
-    data_type = cfg_data[section][key]['data_type']
+    data_type = cfg_data[section][key]['type']
     if data_type == 'dx_key':
       return [sg.Text("       " + name), sg.InputText("", key=wkey, size=(50, None), enable_events=True, metadata='dx_key')]
     else:

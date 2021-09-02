@@ -145,10 +145,13 @@ class ValueMap:
           else:
             print("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, path))
         except:
-          try:
+          try: # float
             window2ini[win_key] = {'path': path, 'section': section, 'key': key, 'type': 'float', 'float_base': ini_format[section][key]['float_base']}
           except:
-            window2ini[win_key] = {'path': path, 'section': section, 'key': key}
+            try: # dx_key
+              window2ini[win_key] = {'path': path, 'section': section, 'key': key, 'type': ini_format[section][key]['type']}
+            except: # default
+              window2ini[win_key] = {'path': path, 'section': section, 'key': key}
     return window2ini
 
 vmap = ValueMap()
@@ -229,8 +232,12 @@ def winkey2ini(win_key, win_value):
   except:
     # print("can't find {} in map".format(win_key))
     # radio off options
-    if 'display_type' in w2i[win_key] and  w2i[win_key]['display_type'] == 'radio' and win_value == False:
+    if 'display_type' in w2i[win_key] and w2i[win_key]['display_type'] == 'radio' and win_value == False:
       return None
+
+    if 'type' in w2i[win_key] and w2i[win_key]['type'] == 'dx_key':
+      ini_key['value'] = key2dx[win_value]
+      return ini_key
 
     try: # float
       float_base = w2i[win_key]['float_base'] # float
