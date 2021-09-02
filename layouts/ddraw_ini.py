@@ -131,3 +131,12 @@ tabs['Debug'] = [
 tab_list = [tab(t, tabs[t]) for t in tabs]
 
 layout = sg.TabGroup([tab_list])
+
+
+def handle_event(window: sg.Window, event: str, values: dict):
+  if window[event].metadata == 'dx_key':
+    new_value = values[event]
+    if len(new_value) > 1:
+      new_value = new_value[1]
+    if new_value.isascii() and new_value.isprintable():
+      window[event](new_value.upper())

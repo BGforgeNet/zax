@@ -24,6 +24,57 @@ def get_ini_formats():
   return formats
 ini_formats = get_ini_formats()
 
+key2dx = {
+  "1": '2',
+  "2": '3',
+  "3": '4',
+  "4": '5',
+  "5": '6',
+  "6": '7',
+  "7": '8',
+  "8": '9',
+  "9": '10',
+  # "0": 11, # 0 means disabled key
+  "-": '12', # on main keyboard
+  "=": '13',
+  "Q": '16',
+  "W": '17',
+  "E": '18',
+  "R": '19',
+  "T": '20',
+  "Y": '21',
+  "U": '22',
+  "I": '23',
+  "O": '24',
+  "P": '25',
+  "A": '30',
+  "S": '31',
+  "D": '32',
+  "F": '33',
+  "G": '34',
+  "H": '35',
+  "J": '36',
+  "K": '37',
+  "L": '38',
+  ";": '39',
+  "'": '40',
+  "`": '41', # accent grave
+  "\\": '43',
+  "Z": '44',
+  "X": '45',
+  "C": '46',
+  "V": '47',
+  "B": '48',
+  "N": '49',
+  "M": '50',
+  ",": '51',
+  ".": '52', # on main keyboard
+  "/": '53', # on main keyboard
+}
+dx2key = {}
+for k in key2dx:
+  dx2key[key2dx[k]] = k
+
 class ValueMap:
 
   def __init__(self) -> None:
@@ -63,6 +114,11 @@ class ValueMap:
         except:
           try:
             data_type = ini_format[section][key]['type']
+            if data_type == 'dx_key':
+              ini2window[win_key] = {}
+              for dx in dx2key:
+                ini2window[win_key][str(dx)] = dx2key[dx]
+              ini2window[win_key]['0'] = '0'
           except:
             ini2window[win_key] = {}
             ini2window[win_key]['0'] = False

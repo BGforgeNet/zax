@@ -109,7 +109,14 @@ def spin(cfg_data, section, key):
 # todo: validate input for ints (including negative in some cases)
 def qinput(cfg_data, section, key, size=(100, None)):
   name, wkey= name_wkey(cfg_data, section, key)
-  return [sg.Text("       " + name), sg.InputText("", key=wkey, size=size, enable_events=True)]
+  try:
+    data_type = cfg_data[section][key]['data_type']
+    if data_type == 'dx_key':
+      return [sg.Text("       " + name), sg.InputText("", key=wkey, size=(50, None), enable_events=True, metadata='dx_key')]
+    else:
+      return [sg.Text("       " + name), sg.InputText("", key=wkey, size=size, enable_events=True)]
+  except:
+    return [sg.Text("       " + name), sg.InputText("", key=wkey, size=size, enable_events=True)]
 
 def enable_element(key: str, window: sg.Window, values: dict, new_value = None, event = None):
   old_value = values[key]
