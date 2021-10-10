@@ -6,3 +6,4 @@ f2gm.build/
 f2gm.dist/
 f2gm.spec
 pyoxidizer.bzl
+f2gm.bin
