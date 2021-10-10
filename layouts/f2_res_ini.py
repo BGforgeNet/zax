@@ -189,7 +189,7 @@ def handle_event(window: sg.Window, event: str, values: dict):
   if (event in enable_events) and values[fullscreen_key]:
     enable_element(colour_bits_key, window, values)
     enable_element(refresh_rate_key, window, values)
-    disable_element(windowed_fullscreen_key, window, values)
+    disable_element(windowed_fullscreen_key, window, values, new_value=0)
   if (event in disable_events) and values[windowed_key]:
     disable_element(colour_bits_key, window, values)
     disable_element(refresh_rate_key, window, values)
