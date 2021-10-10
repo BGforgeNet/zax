@@ -197,7 +197,7 @@ class Config:
           win_data[win_key] = i2w[win_key][ini_value]
         except:
           if type(ini_value)  == iniparse.config.Undefined:
-            print("key {} not found in {}".format(key, self.config_path))
+            print("key {}:{} not found in {}".format(section, key, self.config_path))
           else:
             try: # typed: float, string, int
               data_type = ini_format[section][key]['type']

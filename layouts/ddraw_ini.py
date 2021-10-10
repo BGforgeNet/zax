@@ -15,6 +15,10 @@ tabs = OrderedDict()
 
 
 tabs['Main'] = [
+  frame("Manage", [
+    [sg.Text("Current version: "), sg.InputText("", key='sfall_current', size=(70, None), disabled=True, text_color='grey')],
+    [sg.Text("Latest version: "), sg.InputText("", key='sfall_latest', size=(70, None), disabled=True, text_color='grey')]
+  ]),
   frame("Speed", [
     checkbox(c, 'Speed', 'Enable'),
     spin(c, 'Speed', 'SpeedMultiInitial'),

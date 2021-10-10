@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import requests
+import subprocess
 import time
 import PySimpleGUIQt as sg
 from typing import OrderedDict
@@ -86,6 +88,24 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
     window['configs_loaded'](True)
   return game_config
 
+def get_sfall_version(path):
+  proc1 = subprocess.Popen(['strings', os.path.join(game_path, 'ddraw.dll')], stdout=subprocess.PIPE)
+  proc2 = subprocess.Popen(['grep', '#SFALL'], stdin=proc1.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  proc1.stdout.close() # Allow proc1 to receive a SIGPIPE if proc2 exits.
+  out, err = proc2.communicate()
+  ver = out.split()[1].decode('utf-8')
+  return ver
+
+def get_sfall_latest():
+  resp = requests.get('https://sourceforge.net/projects/sfall/best_release.json')
+  release = resp.json()['release']
+  latest = {}
+  latest['ver'] = release['filename'].split('_')[-1].rsplit('.',1)[0]
+  latest['url'] = release['url']
+  return latest
+
+sfall_latest = get_sfall_latest()
+
 window = sg.Window('f2gm', main_layout, finalize=True)
 
 try:
@@ -118,6 +138,10 @@ while True:  # Event Loop
       sg.popup("fallout2.exe not found in directory {}".format(dname))
   if values['-LIST-']:
     game_path = values['-LIST-'][0]
+    sfall_ver = get_sfall_version(game_path)
+    window['sfall_current'](value=sfall_ver)
+    window['sfall_latest'](value=sfall_latest['ver'])
+
   game_config = handle_event(window, event, values, game_path, game_config)
 
 
