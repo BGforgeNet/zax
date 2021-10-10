@@ -43,14 +43,17 @@ settings_layout = [
 ]
 
 mods_layout = [[sg.T('This is inside mods')], [sg.In(key='in')]]
-
-left_col = [
-  [sg.Text('Game list')],
+games_layout = [
   [sg.Text('Click a game to manage it')],
-  [sg.Listbox(values=games, size=(20, 12), key='-LIST-', enable_events=True, select_mode=SELECT_MODE_SINGLE)],
+  [sg.Listbox(values=games, size=(21, 15), key='-LIST-', enable_events=True, select_mode=SELECT_MODE_SINGLE)],
   [sg.Button('Add game')],
   [sg.Button('Remove game from list')],
 ]
+left_col = [[
+  sg.TabGroup([
+    [sg.Tab('Games', games_layout)]
+  ])
+]]
 
 right_col = [[
   sg.TabGroup([
