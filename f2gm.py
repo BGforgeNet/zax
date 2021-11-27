@@ -16,10 +16,12 @@ from config import GameConfig, winkey2ini
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 import sfall
+import threading
+import queue
 
 sg.theme('Dark Brown')
+gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
 # sg.theme('material 2')
-
 
 f2gm_yml = "f2gm.yml"
 config = {}
@@ -92,7 +94,10 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
     window['configs_loaded'](True)
   return game_config
 
-sfall_latest = sfall.get_latest()
+
+sfall_latest = None
+def sfall_get_latest(gui_queue):
+  gui_queue.put({'type': 'sfall_latest', 'value': sfall.get_latest()})
 
 window = sg.Window('f2gm', main_layout, finalize=True)
 
@@ -124,13 +129,32 @@ while True:  # Event Loop
       game_list(set_to_index=new_game_index)
     else:
       sg.popup("fallout2.exe not found in directory {}".format(dname))
+
   if values['-LIST-']:
     game_path = values['-LIST-'][0]
     sfall_ver = sfall.get_current(game_path)
-    window['sfall_current'](value=sfall_ver)
-    window['sfall_latest'](value=sfall_latest['ver'])
-    if sfall_ver != sfall_latest['ver']:
-      window['sfall_update'](disabled=False)
+    window['txt_sfall_current'](value=sfall_ver)
+
+  if sfall_latest is None:
+    if event == 'configs_loaded': # after window is drawn
+      try:
+        threading.Thread(target=sfall_get_latest, args=(gui_queue,), daemon=True).start()
+      except:
+        print("failed to start thread!")
+
+    try:
+      message = gui_queue.get_nowait()
+    except queue.Empty:     # get_nowait() will get exception when Queue is empty
+      message = None        # break from the loop if no more messages are queued up
+    if message:             # if message received from queue, display the message in the Window
+      print('Got a message back from the thread: ', message)
+      if message['type'] == 'sfall_latest':
+        sfall_latest = message['value']
+        window['txt_sfall_latest'](value=sfall_latest['ver'])
+        window['btn_sfall_check'](visible=False)
+        window['txt_sfall_check_placeholder'](visible=True)
+        if sfall_ver != sfall_latest['ver']:
+          window['btn_sfall_update'](disabled=False)
 
   game_config = handle_event(window, event, values, game_path, game_config)
 
