@@ -12,7 +12,7 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
-from config import GameConfig
+from config import GameConfig, winkey2ini
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 import sfall
@@ -129,6 +129,8 @@ while True:  # Event Loop
     sfall_ver = sfall.get_current(game_path)
     window['sfall_current'](value=sfall_ver)
     window['sfall_latest'](value=sfall_latest['ver'])
+    if sfall_ver != sfall_latest['ver']:
+      window['sfall_update'](disabled=False)
 
   game_config = handle_event(window, event, values, game_path, game_config)
 
