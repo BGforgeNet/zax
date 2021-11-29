@@ -72,7 +72,7 @@ def get_current(path):
 def download(url, game_path):
   print("update start")
 
-  with tempfile.TemporaryDirectory(prefix='f2gm-') as tmpdir:
+  with tempfile.TemporaryDirectory(prefix='zax-') as tmpdir:
     dst = os.path.join(tmpdir, 'sfall.7z')
     urlretrieve(url, dst)
     with cd(tmpdir):

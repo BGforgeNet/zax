@@ -19,7 +19,7 @@ def get_ini_formats():
   formats = OrderedDict()
   for f in format_files:
     data = get_ini_format(f)
-    path = data['f2gm']['path']
+    path = data['zax']['path']
     formats[path] = data
   return formats
 ini_formats = get_ini_formats()
@@ -89,9 +89,9 @@ class ValueMap:
 
   def generate_ini2window(self, ini_format):
     ini2window = {}
-    path = ini_format['f2gm']['path']
+    path = ini_format['zax']['path']
     for section in ini_format:
-      if section == 'f2gm':
+      if section == 'zax':
         continue
       for key in ini_format[section]:
         win_key = "{}-{}-{}".format(path, section, key)
@@ -127,9 +127,9 @@ class ValueMap:
 
   def generate_window2ini(self, ini_format):
     window2ini = {}
-    path = ini_format['f2gm']['path']
+    path = ini_format['zax']['path']
     for section in ini_format:
-      if section == 'f2gm':
+      if section == 'zax':
         continue
       for key in ini_format[section]:
         win_key = "{}-{}-{}".format(path, section, key)
@@ -187,7 +187,7 @@ class Config:
     ini_format = self.ini_format
     ini_data = self.ini_data
     for section in self.ini_format:
-      if section == 'f2gm':
+      if section == 'zax':
         continue
 
       for key in ini_format[section]:
@@ -271,7 +271,7 @@ class GameConfig():
     for f in config_files:
       with open(f) as yf:
         data = yaml.load(yf)
-      path = data['f2gm']['path']
+      path = data['zax']['path']
       configs[path] = data
     return configs
 
@@ -279,8 +279,8 @@ class GameConfig():
     formats = self.config_formats
     configs = {}
     for c in formats:
-      path = formats[c]['f2gm']['path']
-      cfg = Config(self.game_path, formats[c]['f2gm']['path'])
+      path = formats[c]['zax']['path']
+      cfg = Config(self.game_path, formats[c]['zax']['path'])
       configs[path] = cfg
     return configs
 

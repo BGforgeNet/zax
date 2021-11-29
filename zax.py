@@ -25,13 +25,13 @@ sg.theme('Dark Brown')
 gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
 # sg.theme('material 2')
 
-appname = 'f2gm'
-f2gm_yml = os.path.join(config_dir, "f2gm.yml")
+appname = 'zax'
+zax_yml = os.path.join(config_dir, "zax.yml")
 config = {}
 games = []
-if os.path.isfile(f2gm_yml):
+if os.path.isfile(zax_yml):
   try:
-    with open(f2gm_yml) as yf:
+    with open(zax_yml) as yf:
       config = yaml.load(yf)
     games = config["games"]
   except:
@@ -98,7 +98,7 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
   return game_config
 
 
-window = sg.Window('f2gm', main_layout, finalize=True)
+window = sg.Window('zax', main_layout, finalize=True)
 
 try:
   game_list = window['-LIST-']
@@ -156,6 +156,6 @@ while True:  # Event Loop
 
 
 config['games'] = games
-with open(f2gm_yml, 'w') as yf:
+with open(zax_yml, 'w') as yf:
   yaml.dump(config, yf)
 window.close()

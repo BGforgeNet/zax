@@ -25,7 +25,7 @@ def checkbox(cfg_data, section, key, visible=True, disabled=False):
     tooltip = item['desc']
   except:
     tooltip = None
-  return [sg.Checkbox(name, key="{}-{}-{}".format(cfg_data['f2gm']['path'], section, key), enable_events=True, tooltip=tooltip, visible=visible, disabled=disabled)]
+  return [sg.Checkbox(name, key="{}-{}-{}".format(cfg_data['zax']['path'], section, key), enable_events=True, tooltip=tooltip, visible=visible, disabled=disabled)]
 
 def tab(tab_name, items):
   return sg.Tab(tab_name, [[sg.Column(items, scrollable=True, size=(500,500))]])
@@ -45,7 +45,7 @@ def name_wkey(cfg_data, section, key):
     name = item['name']
   except:
     name = key
-  wkey = "{}-{}-{}".format(cfg_data['f2gm']['path'], section, key)
+  wkey = "{}-{}-{}".format(cfg_data['zax']['path'], section, key)
   return name, wkey
 
 def dropdown(cfg_data, section, key, size=(150, None), readonly=True):

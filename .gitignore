@@ -1,9 +1,9 @@
 __pycache__/
-f2gm.yml
+zax.yml
 build/
 dist/
-f2gm.build/
-f2gm.dist/
-f2gm.spec
+zax.build/
+zax.dist/
+zax.spec
 pyoxidizer.bzl
-f2gm.bin
+zax.bin
