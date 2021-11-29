@@ -103,14 +103,13 @@ def launch_latest_check(gui_queue):
   print("started background thread")
 
 def handle_callback_latest(window, sfall_current, message):
-  if message['type'] == 'sfall_latest':
-    sfall_latest = message['value']
-    window['txt_sfall_latest'](value=sfall_latest['ver'])
-    window['btn_sfall_check'](visible=False)
-    window['txt_sfall_check_placeholder'](visible=True)
-    if sfall_current != sfall_latest['ver']:
-      window['txt_sfall_update_placeholder'](visible=False)
-      window['btn_sfall_update'](visible=True, disabled=False)
+  sfall_latest = message['value']
+  window['txt_sfall_latest'](value=sfall_latest['ver'])
+  window['btn_sfall_check'](visible=False)
+  window['txt_sfall_check_placeholder'](visible=True)
+  if sfall_current != sfall_latest['ver']:
+    window['txt_sfall_update_placeholder'](visible=False)
+    window['btn_sfall_update'](visible=True, disabled=False)
   return sfall_latest
 
 def update(window, event, sfall_latest, game_path):
