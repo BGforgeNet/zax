@@ -10,7 +10,7 @@ import py7zr
 import os
 import iniparse
 import shutil
-import io
+import pefile
 
 class cd:
   """Context manager for changing the current working directory"""
@@ -60,11 +60,9 @@ def get_latest():
     return {'ver': 'unknown', 'url': ''}
 
 def get_current(path):
-  proc1 = subprocess.Popen(['strings', os.path.join(path, 'ddraw.dll')], stdout=subprocess.PIPE)
-  proc2 = subprocess.Popen(['grep', '#SFALL'], stdin=proc1.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  proc1.stdout.close() # Allow proc1 to receive a SIGPIPE if proc2 exits.
-  out, err = proc2.communicate()
-  ver = out.split()[1].decode('utf-8')
+  pe = pefile.PE(os.path.join(path, 'ddraw.dll'))
+  ver = pe.FileInfo[0][0].StringTable[0].entries[b"FileVersion"]
+  ver = ver.decode('ascii')
   return ver
 
 def download(url, game_path):

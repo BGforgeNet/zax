@@ -3,3 +3,4 @@ py7zr>=0.16.3
 beautifulsoup4>=4.9.3
 PySimpleGUIQt>=0.35.0
 appdirs>=1.4.3
+pefile>=2021.9.3
