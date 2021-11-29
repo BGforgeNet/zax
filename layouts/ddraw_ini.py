@@ -18,7 +18,8 @@ tabs['Main'] = [
   frame("Manage", [
     [ sg.Text("Current version: "),
       sg.InputText("", key='txt_sfall_current', size=(70, None), disabled=True, text_color='grey'),
-      sg.Button('Update', key='btn_sfall_update', size=(100, None), disabled=True)
+      sg.Button('Update', key='btn_sfall_update', size=(100, None), disabled=True, visible=False),
+      sg.Text('', key='txt_sfall_update_placeholder', size=(100, None)) # to prevent versions from jumping when buttons disappear
     ],
     [
       sg.Text("Latest version: "),

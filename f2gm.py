@@ -156,10 +156,14 @@ while True:  # Event Loop
         window['btn_sfall_check'](visible=False)
         window['txt_sfall_check_placeholder'](visible=True)
         if sfall_ver != sfall_latest['ver']:
-          window['btn_sfall_update'](disabled=False)
+          window['txt_sfall_update_placeholder'](visible=False)
+          window['btn_sfall_update'](visible=True, disabled=False)
 
   if event == 'btn_sfall_update':
     sfall.download(sfall_latest['url'], game_path)
+    game_config = handle_event(window, '-LIST-', values, game_path, game_config) # reload config
+    window['txt_sfall_update_placeholder'](visible=True)
+    window['btn_sfall_update'](visible=False, disabled=True)
 
   game_config = handle_event(window, event, values, game_path, game_config)
 

@@ -68,14 +68,13 @@ def get_current(path):
   return ver
 
 def download(url, game_path):
-  print("download start")
+  print("update start")
   with tempfile.TemporaryDirectory(prefix='f2gm-') as tmpdir:
     dst = os.path.join(tmpdir, 'sfall.7z')
     urlretrieve(url, dst)
     with cd(tmpdir):
       with py7zr.SevenZipFile('sfall.7z', mode='r') as z:
         z.extractall()
-      shutil.copy2('ddraw.ini', '/tmp/ddraw.ini.0')
       with open(os.path.join(game_path, 'ddraw.ini')) as fh:
         old_ini = iniparse.INIConfig(fh, optionxformvalue=None) # iniparse keep case for new keys
       with open('ddraw.ini') as fh:
@@ -88,6 +87,6 @@ def download(url, game_path):
       content = content.replace(' = ', '=') # iniparse adds spaces around new keys
       with open('ddraw.ini', 'w') as fh:
         fh.write(content)
-      shutil.copy2('ddraw.ini', '/tmp/ddraw.ini.1')
-
-  print("download finish")
+      os.remove('sfall.7z')
+      shutil.copytree(tmpdir, game_path, dirs_exist_ok=True)
+  print("update finished")
