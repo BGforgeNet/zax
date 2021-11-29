@@ -21,10 +21,16 @@ import queue
 import tempfile
 from variables import *
 import platform
+import wine
 
 sg.theme('Dark Brown')
 gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
 # sg.theme('material 2')
+
+def get_game_paths(games):
+  game_paths = [g['path'] for g in games]
+  game_paths = sorted(list(set(game_paths)))
+  return game_paths
 
 appname = 'zax'
 zax_yml = os.path.join(config_dir, "zax.yml")
@@ -35,6 +41,7 @@ if os.path.isfile(zax_yml):
     with open(zax_yml) as yf:
       config = yaml.load(yf)
     games = config["games"]
+    game_paths = get_game_paths(games)
   except:
     os.makedirs(config_dir, exist_ok=True)
 
@@ -58,7 +65,7 @@ settings_layout = [
 mods_layout = [[sg.T('This is inside mods')], [sg.In(key='in')]]
 games_layout = [
   [sg.Text('Click a game to manage it')],
-  [sg.Listbox(values=games, size=(21, 15), key='-LIST-', enable_events=True, select_mode=SELECT_MODE_SINGLE)],
+  [sg.Listbox(values=game_paths, size=(21, 15), key='-LIST-', enable_events=True, select_mode=SELECT_MODE_SINGLE)],
   [sg.Button('Add game')],
   [sg.Button('Remove from list')],
 ]
@@ -126,13 +133,15 @@ while True:  # Event Loop
     break
   if event == "Save":
     game_config.save(values)
+    wine.save(zax_yml, config, games, game_path, values)
 
   if event == "Add game":
     dname = sg.popup_get_folder('Enter game path')
     if is_f2_game(dname):
-      games = sorted(list(set(games + [dname])))
-      window['-LIST-'](values=games)
-      new_game_index = games.index(dname)
+      games.append({'path': dname})
+      game_paths = get_game_paths(games)
+      window['-LIST-'](values=game_paths)
+      new_game_index = game_paths.index(dname)
       game_list(set_to_index=new_game_index)
     else:
       sg.popup("fallout2.exe not found in directory {}".format(dname))
@@ -145,6 +154,7 @@ while True:  # Event Loop
       sfall.launch_latest_check(gui_queue)
     else:
       sfall_latest = sfall.handle_update_ui(window, sfall_current, sfall_latest=sfall_latest)
+    wine.load(games, game_path, window)
 
   # background process handling
   try:
