@@ -18,6 +18,8 @@ pp = pprint.PrettyPrinter(indent=2)
 import sfall
 import threading
 import queue
+import tempfile
+
 
 sg.theme('Dark Brown')
 gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
@@ -155,6 +157,9 @@ while True:  # Event Loop
         window['txt_sfall_check_placeholder'](visible=True)
         if sfall_ver != sfall_latest['ver']:
           window['btn_sfall_update'](disabled=False)
+
+  if event == 'btn_sfall_update':
+    sfall.download(sfall_latest['url'], game_path)
 
   game_config = handle_event(window, event, values, game_path, game_config)
 

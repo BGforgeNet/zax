@@ -1,9 +1,26 @@
+import tempfile
 from bs4 import BeautifulSoup
 import requests
 import json
 import re
 import subprocess
 import os
+from urllib.request import urlretrieve
+import py7zr
+import os
+import iniparse
+import shutil
+import io
+
+class cd:
+  """Context manager for changing the current working directory"""
+  def __init__(self, newPath):
+    self.newPath = os.path.expanduser(newPath)
+  def __enter__(self):
+    self.savedPath = os.getcwd()
+    os.chdir(self.newPath)
+  def __exit__(self, etype, value, traceback):
+    os.chdir(self.savedPath)
 
 def file_list():
   try:
@@ -49,3 +66,28 @@ def get_current(path):
   out, err = proc2.communicate()
   ver = out.split()[1].decode('utf-8')
   return ver
+
+def download(url, game_path):
+  print("download start")
+  with tempfile.TemporaryDirectory(prefix='f2gm-') as tmpdir:
+    dst = os.path.join(tmpdir, 'sfall.7z')
+    urlretrieve(url, dst)
+    with cd(tmpdir):
+      with py7zr.SevenZipFile('sfall.7z', mode='r') as z:
+        z.extractall()
+      shutil.copy2('ddraw.ini', '/tmp/ddraw.ini.0')
+      with open(os.path.join(game_path, 'ddraw.ini')) as fh:
+        old_ini = iniparse.INIConfig(fh, optionxformvalue=None) # iniparse keep case for new keys
+      with open('ddraw.ini') as fh:
+        new_ini = iniparse.INIConfig(fh, optionxformvalue=None)
+      for s in old_ini:
+        for k in old_ini[s]:
+          new_ini[s][k] = old_ini[s][k]
+      content = str(new_ini)
+      content = content.replace('\n', '\r\n') # for old windows users
+      content = content.replace(' = ', '=') # iniparse adds spaces around new keys
+      with open('ddraw.ini', 'w') as fh:
+        fh.write(content)
+      shutil.copy2('ddraw.ini', '/tmp/ddraw.ini.1')
+
+  print("download finish")

@@ -126,7 +126,7 @@ def enable_element(key: str, window: sg.Window, values: dict, new_value = None, 
     window[key](value=new_value)
 
   # without this, checkbox auto unchecks on enabling. With it, but without type check, disabled values don't update on game switch
-  # without event check, value gets stuck non game switch too
+  # without event check, value gets stuck on game switch too
   elif (type(window[key]) is sg.Checkbox) and (event not in ['-LIST-', 'configs_loaded']):
     window[key](value=old_value)
 
