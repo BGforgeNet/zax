@@ -5,5 +5,5 @@ sg.theme('Dark Brown')
 
 layout = [
   [sg.Text("Prefix"), sg.InputText("", key='wine_prefix', size=(350, None))],
-  [sg.Text("Args"), sg.InputText("", key='wine_args', size=(350, None))]
+  [sg.Text("Debug"), sg.InputText("", key='wine_debug', size=(350, None))]
 ]

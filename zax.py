@@ -22,6 +22,8 @@ import tempfile
 from variables import *
 import platform
 import wine
+from common import cd
+from packaging import version
 
 sg.theme('Dark Brown')
 gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
@@ -57,7 +59,7 @@ settings_tabs = [
 settings_layout = [
   [sg.TabGroup([settings_tabs], enable_events=True, key='tab-settings-sub')],
   [sg.Button('Save')],
-  [sg.Button('Play')],
+  [sg.Button('Play', key='play')],
   # checkbox is a hack for triggering event to disable elements after config loading
   [sg.Checkbox('configs_loaded', key='configs_loaded', enable_events=True, visible=False)]
 ]
@@ -112,6 +114,27 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
   return game_config
 
 
+def launch_game(path, wine_prefix=None, wine_debug=None, sfall_version=None):
+  try:
+    subprocess.CREATE_NEW_PROCESS_GROUP
+  except AttributeError:
+    my_env = os.environ.copy()
+    if wine_prefix and wine_prefix != '':
+      my_env["WINEPREFIX"] = wine_prefix
+    if wine_debug and wine_debug != '':
+      my_env["WINEDEBUG"] = wine_debug
+    if version.parse(sfall_version) < version.parse("4.1.2"):
+      my_env["WINEDLLOVERRIDES"] = "ddraw.dll=n"
+    else:
+      my_env["WINEDLLOVERRIDES"] = "ddraw.dll=n,b"
+    # not Windows, so assume POSIX; if not, we'll get a usable exception
+    args = ['wine', 'fallout2.exe']
+    p = subprocess.Popen(args, cwd=path, start_new_session=True, env=my_env)
+  else:
+    # Windows
+    args = 'fallout2.exe'
+    p = subprocess.Popen(args, cwd=path, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+
 window = sg.Window('zax', main_layout, finalize=True)
 
 try:
@@ -134,6 +157,8 @@ while True:  # Event Loop
   if event == "Save":
     game_config.save(values)
     wine.save(zax_yml, config, games, game_path, values)
+  if event == "play":
+    launch_game(game_path, wine_prefix=values['wine_prefix'], wine_debug=values['wine_debug'], sfall_version=sfall_current)
 
   if event == "Add game":
     dname = sg.popup_get_folder('Enter game path')
