@@ -20,6 +20,7 @@ import threading
 import queue
 import tempfile
 from variables import *
+import platform
 
 sg.theme('Dark Brown')
 gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
@@ -37,13 +38,19 @@ if os.path.isfile(zax_yml):
   except:
     os.makedirs(config_dir, exist_ok=True)
 
+if platform.system() != "Windows":
+  wine_visible = True
+settings_tabs = [
+  sg.Tab('Game',  [ [layout.layout['fallout2.cfg']] ],  key='tab-fallout2.cfg'),
+  sg.Tab('HiRes', [ [layout.layout['f2_res.ini']] ],    key='tab-f2_res.ini'),
+  sg.Tab('Sfall', [ [layout.layout['ddraw.ini']] ],     key='tab-ddraw.ini'),
+  sg.Tab('Wine',  layout.layout['wine'],          key='tab-wine', visible=wine_visible)
+]
+
 settings_layout = [
-  [sg.TabGroup([[
-    sg.Tab('Game', [ [layout.layout['fallout2.cfg']] ], key='tab-fallout2.cfg'),
-    sg.Tab('HiRes', [ [layout.layout['f2_res.ini']] ], key='tab-f2_res.ini'),
-    sg.Tab('Sfall', [ [layout.layout['ddraw.ini']] ], key='tab-ddraw.ini')
-  ]], enable_events=True, key='tab-settings-sub')],
+  [sg.TabGroup([settings_tabs], enable_events=True, key='tab-settings-sub')],
   [sg.Button('Save')],
+  [sg.Button('Play')],
   # checkbox is a hack for triggering event to disable elements after config loading
   [sg.Checkbox('configs_loaded', key='configs_loaded', enable_events=True, visible=False)]
 ]
@@ -53,7 +60,7 @@ games_layout = [
   [sg.Text('Click a game to manage it')],
   [sg.Listbox(values=games, size=(21, 15), key='-LIST-', enable_events=True, select_mode=SELECT_MODE_SINGLE)],
   [sg.Button('Add game')],
-  [sg.Button('Remove game from list')],
+  [sg.Button('Remove from list')],
 ]
 left_col = [[
   sg.TabGroup([
