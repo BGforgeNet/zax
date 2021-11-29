@@ -136,6 +136,8 @@ while True:  # Event Loop
     window['txt_sfall_current'](value=sfall_current)
     if sfall_latest is None:
       sfall.launch_latest_check(gui_queue)
+    else:
+      sfall_latest = sfall.handle_update_ui(window, sfall_current, sfall_latest=sfall_latest)
 
   # background process handling
   try:
@@ -145,10 +147,10 @@ while True:  # Event Loop
   if message:             # if message received from queue, display the message in the Window
     print('Got a message back from the thread: ', message)
     if message['type'] == 'sfall_latest':
-      sfall_latest = sfall.handle_callback_latest(window, sfall_current, message)
+      sfall_latest = sfall.handle_update_ui(window, sfall_current, message=message)
 
   if event == 'btn_sfall_update':
-    sfall.update(window, event, sfall_latest, game_path)
+    sfall.update(window, sfall_latest, game_path)
 
   game_config = handle_event(window, event, values, game_path, game_config)
 

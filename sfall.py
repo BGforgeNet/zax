@@ -118,17 +118,22 @@ def launch_latest_check(gui_queue):
     print("failed to start sfall latest check thread!")
   print("started background thread")
 
-def handle_callback_latest(window, sfall_current, message):
-  sfall_latest = message['value']
+def handle_update_ui(window, sfall_current, message=None, sfall_latest = None):
+  if not sfall_latest:
+    sfall_latest = message['value']
   window['txt_sfall_latest'](value=sfall_latest['ver'])
   window['btn_sfall_check'](visible=False)
   window['txt_sfall_check_placeholder'](visible=True)
   if sfall_current != sfall_latest['ver']:
     window['txt_sfall_update_placeholder'](visible=False)
     window['btn_sfall_update'](visible=True, disabled=False)
+  else:
+    window['txt_sfall_update_placeholder'](visible=True)
+    window['btn_sfall_update'](visible=False, disabled=True)
+    window['txt_sfall_current'](value=sfall_latest['ver'])
   return sfall_latest
 
-def update(window, event, sfall_latest, game_path):
+def update(window, sfall_latest, game_path):
   download(sfall_latest['url'], game_path)
   window['txt_sfall_update_placeholder'](visible=True)
   window['btn_sfall_update'](visible=False, disabled=True)
