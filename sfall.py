@@ -13,6 +13,8 @@ import shutil
 import pefile
 import threading
 import queue
+import datetime
+from variables import *
 
 class cd:
   """Context manager for changing the current working directory"""
@@ -69,6 +71,7 @@ def get_current(path):
 
 def download(url, game_path):
   print("update start")
+
   with tempfile.TemporaryDirectory(prefix='f2gm-') as tmpdir:
     dst = os.path.join(tmpdir, 'sfall.7z')
     urlretrieve(url, dst)
@@ -88,9 +91,22 @@ def download(url, game_path):
       with open('ddraw.ini', 'w') as fh:
         fh.write(content)
       os.remove('sfall.7z')
+      backup(game_path, tmpdir)
       shutil.copytree(tmpdir, game_path, dirs_exist_ok=True)
   print("update finished")
 
+def backup(game_dir, tmp_dir, backup_dir = backup_dir):
+  backup_dir = os.path.join(backup_dir, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+  with cd(tmp_dir):
+    for root, dirs, files in os.walk(os.curdir):
+      for f in files:
+        f_relpath = os.path.join(root, f)
+        f_gamepath = os.path.join(game_dir, f_relpath)
+        if os.path.isfile(f_gamepath):
+          f_backpath = os.path.join(backup_dir, f_relpath)
+          os.makedirs(os.path.dirname(f_backpath), exist_ok=True)
+          shutil.copy(f_gamepath, f_backpath)
+  print("backed up to {}".format(backup_dir))
 
 def launch_latest_check(gui_queue):
   print("start background thread")
@@ -113,8 +129,7 @@ def handle_callback_latest(window, sfall_current, message):
   return sfall_latest
 
 def update(window, event, sfall_latest, game_path):
-  if event == 'btn_sfall_update':
-    download(sfall_latest['url'], game_path)
-    window['txt_sfall_update_placeholder'](visible=True)
-    window['btn_sfall_update'](visible=False, disabled=True)
-    window['txt_sfall_current'](value=sfall_latest['ver'])
+  download(sfall_latest['url'], game_path)
+  window['txt_sfall_update_placeholder'](visible=True)
+  window['btn_sfall_update'](visible=False, disabled=True)
+  window['txt_sfall_current'](value=sfall_latest['ver'])

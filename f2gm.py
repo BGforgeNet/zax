@@ -19,13 +19,14 @@ import sfall
 import threading
 import queue
 import tempfile
-
+from variables import *
 
 sg.theme('Dark Brown')
 gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
 # sg.theme('material 2')
 
-f2gm_yml = "f2gm.yml"
+appname = 'f2gm'
+f2gm_yml = os.path.join(config_dir, "f2gm.yml")
 config = {}
 games = []
 if os.path.isfile(f2gm_yml):
@@ -34,7 +35,7 @@ if os.path.isfile(f2gm_yml):
       config = yaml.load(yf)
     games = config["games"]
   except:
-    pass
+    os.makedirs(config_dir, exist_ok=True)
 
 settings_layout = [
   [sg.TabGroup([[
