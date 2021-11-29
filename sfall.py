@@ -91,36 +91,31 @@ def download(url, game_path):
       shutil.copytree(tmpdir, game_path, dirs_exist_ok=True)
   print("update finished")
 
-def launch_get_latest(gui_queue):
-  gui_queue.put({'type': 'sfall_latest', 'value': get_latest()})
 
+def launch_latest_check(gui_queue):
+  print("start background thread")
+  def launch_latest_check2(gui_queue):
+    gui_queue.put({'type': 'sfall_latest', 'value': get_latest()})
+  try:
+    threading.Thread(target=launch_latest_check2, args=(gui_queue,), daemon=True).start()
+  except:
+    print("failed to start sfall latest check thread!")
+  print("started background thread")
 
-def handle_update_interface(window, event, values, gui_queue, sfall_latest, sfall_current, game_path):
-  print("sfall version interface")
+def handle_callback_latest(window, sfall_current, message):
+  if message['type'] == 'sfall_latest':
+    sfall_latest = message['value']
+    window['txt_sfall_latest'](value=sfall_latest['ver'])
+    window['btn_sfall_check'](visible=False)
+    window['txt_sfall_check_placeholder'](visible=True)
+    if sfall_current != sfall_latest['ver']:
+      window['txt_sfall_update_placeholder'](visible=False)
+      window['btn_sfall_update'](visible=True, disabled=False)
+  return sfall_latest
 
-  if sfall_latest is None:
-    if event == 'configs_loaded': # after window is drawn
-      try:
-        threading.Thread(target=launch_get_latest, args=(gui_queue,), daemon=True).start()
-      except:
-        print("failed to start thread!")
-
-    try:
-      message = gui_queue.get_nowait()
-    except queue.Empty:     # get_nowait() will get exception when Queue is empty
-      message = None        # break from the loop if no more messages are queued up
-    if message:             # if message received from queue, display the message in the Window
-      print('Got a message back from the thread: ', message)
-      if message['type'] == 'sfall_latest':
-        sfall_latest = message['value']
-        window['txt_sfall_latest'](value=sfall_latest['ver'])
-        window['btn_sfall_check'](visible=False)
-        window['txt_sfall_check_placeholder'](visible=True)
-        if sfall_current != sfall_latest['ver']:
-          window['txt_sfall_update_placeholder'](visible=False)
-          window['btn_sfall_update'](visible=True, disabled=False)
-
+def update(window, event, sfall_latest, game_path):
   if event == 'btn_sfall_update':
     download(sfall_latest['url'], game_path)
     window['txt_sfall_update_placeholder'](visible=True)
     window['btn_sfall_update'](visible=False, disabled=True)
+    window['txt_sfall_current'](value=sfall_latest['ver'])

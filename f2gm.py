@@ -97,7 +97,6 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
   return game_config
 
 
-sfall_latest = None
 window = sg.Window('f2gm', main_layout, finalize=True)
 
 try:
@@ -108,6 +107,7 @@ except:
   print("no games in list found")
 window['configs_loaded'](False)
 
+sfall_latest = None
 game_config = None
 while True:  # Event Loop
 
@@ -133,7 +133,21 @@ while True:  # Event Loop
     game_path = values['-LIST-'][0]
     sfall_current = sfall.get_current(game_path)
     window['txt_sfall_current'](value=sfall_current)
-  sfall.handle_update_interface(window, event, values, gui_queue, sfall_latest, sfall_current, game_path)
+    if sfall_latest is None:
+      sfall.launch_latest_check(gui_queue)
+
+  # background process handling
+  try:
+    message = gui_queue.get_nowait()
+  except queue.Empty:     # get_nowait() will get exception when Queue is empty
+    message = None        # break from the loop if no more messages are queued up
+  if message:             # if message received from queue, display the message in the Window
+    print('Got a message back from the thread: ', message)
+    if message['type'] == 'sfall_latest':
+      sfall_latest = sfall.handle_callback_latest(window, sfall_current, message)
+
+  if event == 'btn_sfall_update':
+    sfall.update(window, event, sfall_latest, game_path)
 
   game_config = handle_event(window, event, values, game_path, game_config)
 
