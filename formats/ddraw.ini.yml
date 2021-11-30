@@ -88,7 +88,6 @@ Interface:
     name: Display terrain type
     desc: Display terrain types when hovering the cursor over the player's marker on the world map
 
-
 Input:
   UseScrollWheel:
     name: Mouse scroll on inventory, barter, and loot screens
@@ -144,7 +143,7 @@ Misc:
     options:
       - value: 0
         name: Vanilla
-      - value: 1 
+      - value: 1
         name: Glovz
       - value: 2
         name: Glovz + Damage Multiplier tweak
@@ -223,7 +222,6 @@ Misc:
     min: 0
     max: 1000
 
-
   SpeedInterfaceCounterAnims:
     name: Speed up the HP/AC counter animations
     display_type: dropdown
@@ -236,7 +234,7 @@ Misc:
         name: instant
       - value: 3
         name: instant even when switching to other controlled critters in combat
- 
+
   DisplayBonusDamage:
     name: Display extra damage from Bonus HtH/Ranged Damage perks
 
@@ -270,7 +268,6 @@ Misc:
 
   ExplosionsEmitLight:
     name: Explosions and projectiles emit light
-
 
   CombatPanelAnimDelay:
     name: Combat panel animation time
