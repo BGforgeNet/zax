@@ -1,7 +1,5 @@
 import tempfile
-from bs4 import BeautifulSoup
 import requests
-import json
 import os
 from urllib.request import urlretrieve
 import py7zr
@@ -15,41 +13,20 @@ from zax_log import log
 from variables import backup_dir
 
 
-def file_list():
-    try:
-        files = {}
-        found = False
-        resp = requests.get("https://sourceforge.net/projects/sfall/files/sfall/")
-        soup = BeautifulSoup(resp.content, "lxml")
-        for tag in soup.find_all("script"):
-            for tc in tag.contents:
-                if "net.sf.files" in tc:
-                    m = tc.split("net.sf.staging_days")[0].strip()
-                    m = m.replace("net.sf.files = ", "").rstrip(";")
-                    jfiles = json.loads(m)
-                    found = True
-                    break
-            if found:
-                break
-
-        for jf in jfiles:
-            if "sfall_" in jf:
-                files[jf] = jfiles[jf]["download_url"]
-        return files
-    except:
-        return {}
-
-
 def get_latest():
     try:
-        resp = requests.get("https://sourceforge.net/projects/sfall/best_release.json")
+        resp = requests.get("https://sourceforge.net/projects/sfall/best_release.json", timeout=10)
         release = resp.json()["release"]
         latest = {}
         latest["ver"] = release["filename"].split("_")[-1].rsplit(".", 1)[0]
         latest["url"] = release["url"]
-        file_list()
         return latest
     except:
+        log("failed to get latest sfall version")
+        try:
+            log(resp)
+        except:
+            log("couldn't log http response")
         return {"ver": "unknown", "url": ""}
 
 
