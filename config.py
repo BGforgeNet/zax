@@ -254,8 +254,19 @@ class Config:
             cfg = self.ini_data
             for section in new_data:
                 for key in new_data[section]:
-                    if cfg[section][key] != new_data[section][key]:
-                        log("{} change from {} to {}".format(key, cfg[section][key], new_data[section][key]))
+                    try:
+                        if cfg[section][key] != new_data[section][key]:
+                            log(
+                                "key {}:{} change from {} to {}".format(
+                                    section, key, cfg[section][key], new_data[section][key]
+                                )
+                            )
+                    except:
+                        log(
+                            "key {}:{} not found in old config, created with value {}".format(
+                                section, key, new_data[section][key]
+                            )
+                        )
                     cfg[section][key] = new_data[section][key]
             content = str(cfg)
             content = content.replace("\n", "\r\n")
