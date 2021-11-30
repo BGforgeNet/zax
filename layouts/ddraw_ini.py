@@ -2,7 +2,7 @@
 
 from typing import OrderedDict
 import PySimpleGUIQt as sg
-from .common import *
+from .common import frame, checkbox, spin, dropdown, qinput, tab, disable_if, get_ini_data
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
