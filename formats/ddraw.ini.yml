@@ -356,7 +356,7 @@ Misc:
 
 Debugging:
   DebugMode:
-    type: dropdown
+    display_type: dropdown
     options:
       - value: 0
         name: Disable
