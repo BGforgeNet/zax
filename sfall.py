@@ -16,6 +16,7 @@ import queue
 import datetime
 from variables import *
 from common import cd
+from zax_log import log
 
 def file_list():
   try:
@@ -37,7 +38,6 @@ def file_list():
     for jf in jfiles:
       if 'sfall_' in jf:
         files[jf] = jfiles[jf]['download_url']
-    print(files)
     return files
   except:
     return {}
@@ -61,7 +61,7 @@ def get_current(path):
   return ver
 
 def download(url, game_path):
-  print("update start")
+  log("update start")
 
   with tempfile.TemporaryDirectory(prefix='zax-') as tmpdir:
     dst = os.path.join(tmpdir, 'sfall.7z')
@@ -84,7 +84,7 @@ def download(url, game_path):
       os.remove('sfall.7z')
       backup(game_path, tmpdir)
       shutil.copytree(tmpdir, game_path, dirs_exist_ok=True)
-  print("update finished")
+  log("update finished")
 
 def backup(game_dir, tmp_dir, backup_dir = backup_dir):
   backup_dir = os.path.join(backup_dir, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -97,17 +97,17 @@ def backup(game_dir, tmp_dir, backup_dir = backup_dir):
           f_backpath = os.path.join(backup_dir, f_relpath)
           os.makedirs(os.path.dirname(f_backpath), exist_ok=True)
           shutil.copy(f_gamepath, f_backpath)
-  print("backed up to {}".format(backup_dir))
+  log("backed up to {}".format(backup_dir))
 
 def launch_latest_check(gui_queue):
-  print("start background thread")
+  log("start background thread")
   def launch_latest_check2(gui_queue):
     gui_queue.put({'type': 'sfall_latest', 'value': get_latest()})
   try:
     threading.Thread(target=launch_latest_check2, args=(gui_queue,), daemon=True).start()
   except:
-    print("failed to start sfall latest check thread!")
-  print("started background thread")
+    log("failed to start sfall latest check thread!")
+  log("started background thread")
 
 def handle_update_ui(window, sfall_current, message=None, sfall_latest = None):
   if not sfall_latest:

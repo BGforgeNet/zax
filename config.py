@@ -4,8 +4,7 @@ yaml = ruamel.yaml.YAML(typ="rt")
 import os, sys, io
 import iniparse
 import layout
-import pprint
-pp = pprint.PrettyPrinter(indent=2)
+from zax_log import log
 
 def get_ini_format(f):
   with open(f) as yf:
@@ -110,7 +109,7 @@ class ValueMap:
             for o in options:
               ini2window[win_key][str(o['value'])] = o['name']
           else:
-            print("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, path))
+            log("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, path))
         except:
           try:
             data_type = ini_format[section][key]['type']
@@ -143,7 +142,7 @@ class ValueMap:
             values = {o['name']: o['value'] for o in options}
             window2ini[win_key] = {'path': path, 'section': section, 'key': key, 'values': values}
           else:
-            print("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, path))
+            log("Error: strange choice {}:{} in {} - not dropdown, nor radio".format(section, key, path))
         except:
           try: # float
             window2ini[win_key] = {'path': path, 'section': section, 'key': key, 'type': 'float', 'float_base': ini_format[section][key]['float_base']}
@@ -197,7 +196,7 @@ class Config:
           win_data[win_key] = i2w[win_key][ini_value]
         except:
           if type(ini_value)  == iniparse.config.Undefined:
-            print("key {}:{} not found in {}".format(section, key, self.config_path))
+            log("key {}:{} not found in {}".format(section, key, self.config_path))
           else:
             try: # typed: float, string, int
               data_type = ini_format[section][key]['type']
@@ -209,7 +208,7 @@ class Config:
               elif data_type == 'int':
                 win_data[win_key] = int(ini_value)
             except:
-              print("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
+              log("Error: can't find value type for {}:{} in {}".format(section, key, self.config_path))
     return win_data
 
   def save(self, new_data):
@@ -219,7 +218,7 @@ class Config:
       for section in new_data:
         for key in new_data[section]:
           if cfg[section][key] != new_data[section][key]:
-            print("{} change from {} to {}".format(key, cfg[section][key], new_data[section][key]))
+            log("{} change from {} to {}".format(key, cfg[section][key], new_data[section][key]))
           cfg[section][key] = new_data[section][key]
       content = str(cfg)
       content = content.replace('\n', '\r\n')
@@ -230,7 +229,6 @@ def winkey2ini(win_key, win_value):
   try:
     value = w2i[win_key]['values'][win_value] # radio, dropdown
   except:
-    # print("can't find {} in map".format(win_key))
     # radio off options
     if 'display_type' in w2i[win_key] and w2i[win_key]['display_type'] == 'radio' and win_value == False:
       return None
@@ -251,7 +249,6 @@ def winkey2ini(win_key, win_value):
         value = 0
       else:
         value = win_value
-    # print("{} = {}".format(win_key, win_value))
   value = str(value)
   ini_key['value'] = value
   return ini_key
@@ -291,7 +288,7 @@ class GameConfig():
         if key in values:
           window[key](new_values[key])
         else:
-          print("warning: key {} not found in window".format(key))
+          log("warning: key {} not found in window".format(key))
 
   def get_config_paths(self):
     configs = self.config_formats
@@ -312,7 +309,7 @@ class GameConfig():
           new_ini_data[path][section] = {}
         new_ini_data[path][section][key] = ik['value']
       except:
-        print("can't get ini key for {}".format(wk))
+        log("can't get ini key for {}".format(wk))
         pass
     for c in new_ini_data:
       self.configs[c].save(new_ini_data[c])

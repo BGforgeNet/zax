@@ -13,8 +13,6 @@ yaml = ruamel.yaml.YAML(typ="rt")
 import iniparse
 import layout
 from config import GameConfig, winkey2ini
-import pprint
-pp = pprint.PrettyPrinter(indent=2)
 import sfall
 import threading
 import queue
@@ -24,6 +22,7 @@ import platform
 import wine
 from common import cd
 from packaging import version
+from zax_log import log
 
 sg.theme('Dark Brown')
 gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
@@ -140,9 +139,9 @@ window = sg.Window('zax', main_layout, finalize=True)
 try:
   game_list = window['-LIST-']
   game_list(set_to_index=0)
-  print('found games!')
+  log('found games!')
 except:
-  print("no games in list found")
+  log("no games in list found")
 window['configs_loaded'](False)
 
 sfall_latest = None
@@ -151,7 +150,7 @@ while True:  # Event Loop
 
   event, values = window.read()
 
-  print("event = {}".format(event))
+  log("event = {}".format(event))
   if event == sg.WIN_CLOSED:
     break
   if event == "Save":
@@ -187,7 +186,7 @@ while True:  # Event Loop
   except queue.Empty:     # get_nowait() will get exception when Queue is empty
     message = None        # break from the loop if no more messages are queued up
   if message:             # if message received from queue, display the message in the Window
-    print('Got a message back from the thread: ', message)
+    log('Got a message back from the thread: ', message)
     if message['type'] == 'sfall_latest':
       sfall_latest = sfall.handle_update_ui(window, sfall_current, message=message)
 

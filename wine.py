@@ -1,5 +1,6 @@
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
+from zax_log import log
 
 def save(zax_yml, config, games, game_path, values):
   new_games = []
@@ -13,7 +14,7 @@ def save(zax_yml, config, games, game_path, values):
     yaml.dump(config, yf)
 
 def load(games, game_path, window):
-  print('loading wine')
+  log('loading wine')
   for g in games:
     if g['path'] == game_path:
       try:
