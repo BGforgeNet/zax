@@ -2,8 +2,6 @@ import tempfile
 from bs4 import BeautifulSoup
 import requests
 import json
-import re
-import subprocess
 import os
 from urllib.request import urlretrieve
 import py7zr
@@ -12,7 +10,6 @@ import iniparse
 import shutil
 import pefile
 import threading
-import queue
 import datetime
 from variables import *
 from common import cd

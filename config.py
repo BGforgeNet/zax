@@ -1,9 +1,8 @@
 from typing import OrderedDict
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
-import os, sys, io
+import os, io
 import iniparse
-import layout
 from zax_log import log
 
 def get_ini_format(f):

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from posixpath import split
 from typing import OrderedDict
 import PySimpleGUIQt as sg
 import ruamel.yaml

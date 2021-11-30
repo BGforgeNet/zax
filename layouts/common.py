@@ -4,7 +4,7 @@ from typing import OrderedDict
 import PySimpleGUIQt as sg
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
-import os, sys
+import os
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
 

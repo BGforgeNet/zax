@@ -1,29 +1,21 @@
 #!/usr/bin/env python3
 
-import requests
 import subprocess
-import time
 import PySimpleGUIQt as sg
 from typing import OrderedDict
-import os, io, sys
-import json
+import os
 from PySimpleGUIQt.PySimpleGUIQt import SELECT_MODE_SINGLE
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
-import iniparse
 import layout
-from config import GameConfig, winkey2ini
+from config import GameConfig
 import sfall
-import threading
 import queue
-import tempfile
 from variables import *
 import platform
 import wine
-from common import cd
 from packaging import version
 from zax_log import log, logger
-
 
 def get_game_paths(games):
   game_paths = [g['path'] for g in games]

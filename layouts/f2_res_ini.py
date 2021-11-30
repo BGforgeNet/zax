@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
-from posixpath import split
 from typing import OrderedDict
 import PySimpleGUIQt as sg
 import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="rt")
-import os, sys
 from .common import *
 
 sg.theme('Dark Brown')
