@@ -16,9 +16,8 @@ jobs:
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          pip cache dir
-          ls $(pip cache dir)
-          python -c 'import site; print(site.getsitepackages())'
+          ls $(python -c 'import site; print(site.getsitepackages()[0])')
+          ls $(python -c 'import site; print(site.getsitepackages()[1])')
           python setup.py py2exe
         shell: bash
 
