@@ -1,0 +1,21 @@
+name: build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+          # - os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build and package
+        run: |
+          set -xeu -o pipefail
+          pip install -r requirements.txt
+          python setup.py py2exe
+        shell: bash
