@@ -77,6 +77,8 @@ def __main__():
     sfall_latest = None
     sfall_current = None
     game_config = None
+    game_paths = []
+    wine_visible = False
 
     zax_yml = os.path.join(config_dir, "zax.yml")
     config = {}
@@ -90,7 +92,6 @@ def __main__():
         except:
             os.makedirs(config_dir, exist_ok=True)
 
-    wine_visible = False
     if platform.system() != "Windows":
         wine_visible = True
     settings_tabs = [
