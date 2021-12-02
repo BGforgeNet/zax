@@ -17,6 +17,8 @@ jobs:
           set -xeu -o pipefail
           pip install -r requirements.txt
           env
+          pip cache dir
+          ls $(pip cache dir)
           python setup.py py2exe
         shell: bash
 
