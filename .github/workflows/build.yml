@@ -16,6 +16,7 @@ jobs:
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
+          env
           python setup.py py2exe
         shell: bash
 
