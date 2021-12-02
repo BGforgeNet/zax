@@ -5,6 +5,6 @@ import sys
 sys.argv.append("py2exe")
 
 setup(
-    options={"py2exe": {"bundle_files": 3, "compressed": True, "includes": ["ruamel.yaml"]}},
+    options={"py2exe": {"bundle_files": 3, "compressed": True}},
     windows=[{"script": "zax.py"}],
 )
