@@ -90,6 +90,7 @@ def __main__():
         except:
             os.makedirs(config_dir, exist_ok=True)
 
+    wine_visible = False
     if platform.system() != "Windows":
         wine_visible = True
     settings_tabs = [
