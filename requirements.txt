@@ -1,6 +1,6 @@
 appdirs>=1.4.3
 iniparse>=0.5
-loguru=>0.5.3
+loguru>=0.5.3
 packaging>=20.4
 pefile>=2021.9.3
 py2exe=>0.11.0.1; platform_system=="Windows"
