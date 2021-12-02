@@ -1,8 +1,8 @@
+appdirs>=1.4.3
 iniparse>=0.5
+loguru=>0.5.3
+packaging>=20.4
+pefile>=2021.9.3
+py2exe=>0.11.0.1; platform_system=="Windows"
 py7zr>=0.16.3
 PySimpleGUIQt>=0.35.0
-appdirs>=1.4.3
-pefile>=2021.9.3
-packaging>=20.4
-loguru=>0.5.3
-py2exe=>0.11.0.1; platform_system=="Windows"
