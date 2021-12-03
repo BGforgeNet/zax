@@ -17,7 +17,7 @@ qwindows_dll = os.path.join(platforms_dir, "qwindows.dll")
 data_files.append(("platforms", [qwindows_dll]))
 
 setup(
-    options={"py2exe": {"bundle_files": 3, "compressed": True}},
+    options={"py2exe": {"bundle_files": 0, "compressed": True}},
     data_files=data_files,
     windows=[{"script": "zax.py"}],
 )
