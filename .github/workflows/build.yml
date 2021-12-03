@@ -16,11 +16,7 @@ jobs:
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          find $(python -c 'import site; print(site.getsitepackages()[0])') -name platforms
-          ls C:/hostedtoolcache/windows/Python/3.7.9/x64/lib/site-packages/PySide2
-          ls C:/hostedtoolcache/windows/Python/3.7.9/x64/lib/site-packages/PySide2/Qt
-          ls C:/hostedtoolcache/windows/Python/3.7.9/x64/lib/site-packages/PySide2/Qt/plugins
-          ls C:/hostedtoolcache/windows/Python/3.7.9/x64/lib/site-packages/PySide2/Qt/plugins/platforms
+          ls C:/hostedtoolcache/windows/Python/3.7.9/x64/lib/site-packages/PySide2/plugins/platforms
           python setup.py py2exe
         shell: bash
 
