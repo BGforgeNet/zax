@@ -11,6 +11,9 @@ jobs:
           - os: windows-latest
           # - os: ubuntu-latest
     steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
       - uses: actions/checkout@v2
       - name: Build and package
         run: |
