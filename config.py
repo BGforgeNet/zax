@@ -3,6 +3,7 @@ import os
 import io
 import iniparse
 from zax_log import log
+import sys
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -14,8 +15,15 @@ def get_ini_format(f):
     return data
 
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    base_path = getattr(sys, "_MEIPASS", '')
+    rpath = os.path.join(base_path, relative_path)
+    return rpath
+
+
 def get_ini_formats():
-    format_dir = "formats"
+    format_dir = resource_path("formats")
     format_files = [
         os.path.join(format_dir, f)
         for f in os.listdir(format_dir)
@@ -315,7 +323,7 @@ class GameConfig:
         self.configs = self.init_configs()
 
     def get_config_formats(self):
-        config_dir = "formats"
+        config_dir = resource_path("formats")
         config_files = [
             os.path.join(config_dir, f)
             for f in os.listdir(config_dir)

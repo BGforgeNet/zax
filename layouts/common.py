@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
-
 import PySimpleGUIQt as sg
 import os
 import pprint
+import sys
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -10,9 +9,18 @@ yaml = ruamel.yaml.YAML(typ="rt")
 pp = pprint.PrettyPrinter(indent=2)
 
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    base_path = getattr(sys, "_MEIPASS", '')
+    rpath = os.path.join(base_path, relative_path)
+    print(rpath)
+    return rpath
+
+
 def get_ini_data(filename):
     # with open( os.path.join( os.path.realpath('..'), "configs", filename + '.yml') ) as yf:
-    with open(os.path.join("formats", filename + ".yml")) as yf:
+    yml_path = resource_path(os.path.join("formats", filename + ".yml"))
+    with open(yml_path) as yf:
         data = yaml.load(yf)
     return data
 

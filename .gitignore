@@ -3,6 +3,8 @@ __pycache__/
 zax.yml
 build/
 dist/
+dist-dir/
+dist-file/
 zax.build/
 zax.dist/
 zax.spec

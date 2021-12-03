@@ -19,12 +19,20 @@ jobs:
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          python setup.py py2exe
+          pyinstaller -D zax.py --distpath dist-dir --clean --add-data "formats/*.yml;formats"
+          pyinstaller -F zax.py --distpath dist-file --clean --add-data "formats/*.yml;formats"
         shell: bash
 
-      - name: Upload artifacts
+      - name: Upload dir
         uses: actions/upload-artifact@v2
         if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
         with:
-          name: dist
-          path: dist/*
+          name: zax-dir
+          path: dist-dir/*
+
+      - name: Upload file
+        uses: actions/upload-artifact@v2
+        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
+        with:
+          name: zax-file
+          path: dist-file/*
