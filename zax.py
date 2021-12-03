@@ -78,6 +78,7 @@ def __main__():
     sfall_current = None
     game_config = None
     game_paths = []
+    game_path = None
     wine_visible = False
 
     zax_yml = os.path.join(config_dir, "zax.yml")
@@ -186,16 +187,6 @@ def __main__():
 
         if event == sg.WIN_CLOSED:
             break
-        if event == "Save":
-            game_config.save(values)
-            wine.save(zax_yml, config, games, game_path, values)
-        if event == "play":
-            launch_game(
-                game_path,
-                wine_prefix=values["wine_prefix"],
-                wine_debug=values["wine_debug"],
-                sfall_version=sfall_current,
-            )
 
         if event == "Add game":
             dname = sg.popup_get_folder("Enter game path")
@@ -208,20 +199,32 @@ def __main__():
             else:
                 sg.popup("fallout2.exe not found in directory {}".format(dname))
 
-        # background process handling
-        try:
-            message = gui_queue.get_nowait()
-        except queue.Empty:  # get_nowait() will get exception when Queue is empty
-            message = None  # break from the loop if no more messages are queued up
-        if message:  # if message received from queue, display the message in the Window
-            log("Got a message back from the thread: {}".format(message))
-            if message["type"] == "sfall_latest":
-                sfall_latest = sfall.handle_update_ui(window, sfall_current, message=message)
+        if game_path is not None:
+            if event == "Save":
+                game_config.save(values)
+                wine.save(zax_yml, config, games, game_path, values)
+            if event == "play":
+                launch_game(
+                    game_path,
+                    wine_prefix=values["wine_prefix"],
+                    wine_debug=values["wine_debug"],
+                    sfall_version=sfall_current,
+                )
 
-        if event == "btn_sfall_update":
-            sfall.update(window, sfall_latest, game_path)
+            # background process handling
+            try:
+                message = gui_queue.get_nowait()
+            except queue.Empty:  # get_nowait() will get exception when Queue is empty
+                message = None  # break from the loop if no more messages are queued up
+            if message:  # if message received from queue, display the message in the Window
+                log("Got a message back from the thread: {}".format(message))
+                if message["type"] == "sfall_latest":
+                    sfall_latest = sfall.handle_update_ui(window, sfall_current, message=message)
 
-        game_config = handle_event(window, event, values, game_path, game_config)
+            if event == "btn_sfall_update":
+                sfall.update(window, sfall_latest, game_path)
+
+            game_config = handle_event(window, event, values, game_path, game_config)
 
     config["games"] = games
     with open(zax_yml, "w") as yf:
