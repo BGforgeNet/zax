@@ -16,7 +16,6 @@ jobs:
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          ls C:/hostedtoolcache/windows/Python/3.7.9/x64/lib/site-packages/PySide2/plugins/platforms
           python setup.py py2exe
         shell: bash
 
