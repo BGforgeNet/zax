@@ -13,6 +13,7 @@ import wine
 from packaging import version
 from zax_log import log, logger
 from variables import config_dir
+import pyi_splash
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -70,6 +71,7 @@ def launch_game(path, wine_prefix=None, wine_debug=None, sfall_version=None):
 
 @logger.catch
 def __main__():
+    pyi_splash.update_text("Furiously loading...")
     sg.theme("Dark Brown")
     gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
     # sg.theme('material 2')
@@ -159,6 +161,7 @@ def __main__():
         ]
     ]
 
+    pyi_splash.close()
     window = sg.Window("zax", main_layout, finalize=True)
 
     try:

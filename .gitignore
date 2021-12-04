@@ -7,6 +7,5 @@ dist-dir/
 dist-file/
 zax.build/
 zax.dist/
-zax.spec
 pyoxidizer.bzl
 zax.bin
