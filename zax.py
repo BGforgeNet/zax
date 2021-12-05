@@ -54,7 +54,7 @@ def handle_zax_tab(event):
         os.makedirs(backup_dir, exist_ok=True)
     if event == "zax-log-view":
         if platform.system() == "Windows":
-            subprocess.Popen(["explorer", '/select', log_file])
+            subprocess.Popen(["explorer", "/select", log_file])
         else:
             subprocess.Popen(["xdg-open", log_file])
 
@@ -186,12 +186,8 @@ def __main__(splash=False):
         ]
     ]
 
-    menu_def = [["Settings"]]
-    menu_def = [["File", ["Settings", "Exit"]]]
-
     main_layout = [
         [
-            sg.Menu(menu_def, tearoff=True),
             sg.Column(left_col, element_justification="c"),
             sg.VSeperator(),
             sg.Column(right_col, size=(500, 500)),
