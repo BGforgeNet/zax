@@ -4,7 +4,7 @@ import subprocess
 import PySimpleGUIQt as sg
 import os
 from PySimpleGUIQt.PySimpleGUIQt import SELECT_MODE_SINGLE
-import zax_layout
+import layout
 from config import GameConfig
 import sfall
 import queue
@@ -49,7 +49,7 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
         game_config.load_from_disk(window, values)
     config_paths = game_config.config_paths
     for p in config_paths:
-        zax_layout.handle_custom_event(p, window, event, values)
+        layout.handle_custom_event(p, window, event, values)
     if event == "-LIST-":
         window["configs_loaded"](True)
     return game_config
@@ -107,10 +107,10 @@ def __main__(splash=False):
     if platform.system() != "Windows":
         wine_visible = True
     settings_tabs = [
-        sg.Tab("Game", [[zax_layout.layout["fallout2.cfg"]]], key="tab-fallout2.cfg"),
-        sg.Tab("HiRes", [[zax_layout.layout["f2_res.ini"]]], key="tab-f2_res.ini"),
-        sg.Tab("Sfall", [[zax_layout.layout["ddraw.ini"]]], key="tab-ddraw.ini"),
-        sg.Tab("Wine", zax_layout.layout["wine"], key="tab-wine", visible=wine_visible),
+        sg.Tab("Game", [[layout.layout["fallout2.cfg"]]], key="tab-fallout2.cfg"),
+        sg.Tab("HiRes", [[layout.layout["f2_res.ini"]]], key="tab-f2_res.ini"),
+        sg.Tab("Sfall", [[layout.layout["ddraw.ini"]]], key="tab-ddraw.ini"),
+        sg.Tab("Wine", layout.layout["wine"], key="tab-wine", visible=wine_visible),
     ]
 
     settings_layout = [
