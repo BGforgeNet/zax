@@ -15,24 +15,33 @@ jobs:
         with:
           python-version: '3.8'
       - uses: actions/checkout@v2
-      - name: Build and package
+
+      - name: Build | win
+        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          pyinstaller -D zax.py --distpath dist-dir --clean --add-data "formats/*.yml;formats"
           pyinstaller -F zax.py --distpath dist-file --clean --add-data "formats/*.yml;formats"
         shell: bash
 
-      - name: Upload dir
+      - name: Build | lin
+        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'ubuntu-latest')"
+        run: |
+          set -xeu -o pipefail
+          pip install -r requirements.txt
+          pyinstaller -F zax.py --distpath dist-file --clean --add-data "formats/*.yml:formats"
+        shell: bash
+
+      - name: Upload win
         uses: actions/upload-artifact@v2
         if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
         with:
-          name: zax-dir
-          path: dist-dir/*
+          name: zax-file
+          path: dist-file/*
 
-      - name: Upload file
+      - name: Upload | lin
         uses: actions/upload-artifact@v2
-        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
+        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'ubuntu-latest')"
         with:
           name: zax-file
           path: dist-file/*
