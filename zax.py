@@ -10,9 +10,10 @@ import sfall
 import queue
 import platform
 import wine
+import shutil
 from packaging import version
 from zax_log import log, logger
-from variables import config_dir
+from variables import config_dir, backup_dir, log_file
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -42,7 +43,25 @@ def is_f2_game(path: str):
     return False
 
 
+def handle_zax_tab(event):
+    if event == "zax-backup-open":
+        if platform.system() == "Windows":
+            subprocess.Popen(["explorer", backup_dir])
+        else:
+            subprocess.Popen(["xdg-open", backup_dir])
+    if event == "zax-backup-wipe":
+        shutil.rmtree(backup_dir)
+        os.makedirs(backup_dir, exist_ok=True)
+    if event == "zax-log-view":
+        if platform.system() == "Windows":
+            subprocess.Popen(["explorer", '/select', log_file])
+        else:
+            subprocess.Popen(["xdg-open", log_file])
+
+
 def handle_event(window: sg.Window, event, values: dict, game_path: str, game_config):
+    if event.startswith("zax-"):
+        handle_zax_tab(event)
     if event == "-LIST-" or event == "btn_sfall_update":
         window["configs_loaded"](False)
         game_config = GameConfig(game_path)
@@ -143,7 +162,16 @@ def __main__(splash=False):
         [sg.Button("Add game")],
         [sg.Button("Remove from list")],
     ]
-    left_col = [[sg.TabGroup([[sg.Tab("Games", games_layout)]])]]
+    zax_layout = [
+        [sg.HSeperator()],
+        [sg.Text("Backup directory", justification="c")],
+        [sg.Button("Open", key="zax-backup-open", enable_events=True)],
+        [sg.Button("Wipe", key="zax-backup-wipe", enable_events=True)],
+        [sg.HSeperator()],
+        [sg.Text("Log file", justification="c")],
+        [sg.Button("View", key="zax-log-view", enable_events=True)],
+    ]
+    left_col = [[sg.TabGroup([[sg.Tab("Games", games_layout), sg.Tab("Zax", zax_layout)]])]]
 
     right_col = [
         [
