@@ -235,7 +235,7 @@ def __main__(splash=False):
                 window["-LIST-"](values=game_paths)
                 new_game_index = game_paths.index(dname)
                 game_list(set_to_index=new_game_index)
-            else:
+            elif dname is not None:
                 sg.popup("fallout2.exe not found in directory {}".format(dname))
 
         if game_path is not None:
