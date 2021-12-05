@@ -17,6 +17,15 @@ import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
+# splash only working when compiled
+splash = False
+try:
+    import pyi_splash
+
+    splash = True
+except:
+    print("can't import pyi_splash, not compiled by pyinstaller")
+
 
 def get_game_paths(games):
     game_paths = [g["path"] for g in games]
