@@ -21,7 +21,7 @@ jobs:
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          pyinstaller -F zax.py --clean --add-data "formats/*.yml:formats"
+          pyinstaller -F zax.py --clean --add-data "formats/*.yml:formats" --splash images/splash.png
         shell: bash
 
       - name: Build | win
@@ -29,7 +29,7 @@ jobs:
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          pyinstaller -F zax.py --clean --add-data "formats/*.yml;formats"
+          pyinstaller -F zax.py --clean --add-data "formats/*.yml;formats" --splash images/splash.png
         shell: bash
 
       - name: Upload linux bin
