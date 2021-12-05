@@ -78,7 +78,7 @@ def launch_game(path, wine_prefix=None, wine_debug=None, sfall_version=None):
 
 
 @logger.catch
-def __main__():
+def __main__(splash=False):
     sg.theme("Dark Brown")
     gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
     # sg.theme('material 2')
@@ -241,4 +241,4 @@ def __main__():
     window.close()
 
 
-__main__()
+__main__(splash=splash)
