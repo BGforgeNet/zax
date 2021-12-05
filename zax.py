@@ -14,6 +14,7 @@ import shutil
 from packaging import version
 from zax_log import log, logger
 from variables import config_dir, backup_dir, log_file
+from version import VERSION
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -163,6 +164,8 @@ def __main__(splash=False):
         [sg.Button("Remove from list")],
     ]
     zax_layout = [
+        [sg.HSeperator()],
+        [sg.Text("Version:  {}".format(VERSION), justification="c")],
         [sg.HSeperator()],
         [sg.Text("Backup directory", justification="c")],
         [
