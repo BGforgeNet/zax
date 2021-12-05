@@ -134,7 +134,7 @@ def __main__(splash=False):
 
     settings_layout = [
         [sg.TabGroup([settings_tabs], enable_events=True, key="tab-settings-sub")],
-        [sg.Button("Save")],
+        [sg.Button("Save", key="save")],
         [sg.Button("Play", key="play")],
         # checkbox is a hack for triggering event to disable elements after config loading
         [
@@ -149,14 +149,14 @@ def __main__(splash=False):
 
     mods_layout = [[sg.T("This is inside mods")], [sg.In(key="in")]]
     games_layout = [
-        [sg.Text("Click a game to manage it")],
         [
             sg.Listbox(
                 values=game_paths,
-                size=(21, 15),
+                size=(23, 17),
                 key="-LIST-",
                 enable_events=True,
                 select_mode=SELECT_MODE_SINGLE,
+                pad=((12, 5), (10, 10)),  # ((left, right), (top, bottom)) - for some reason it's skewed to the left
             )
         ],
         [sg.Button("Add game")],
@@ -165,13 +165,15 @@ def __main__(splash=False):
     zax_layout = [
         [sg.HSeperator()],
         [sg.Text("Backup directory", justification="c")],
-        [sg.Button("Open", key="zax-backup-open", enable_events=True)],
-        [sg.Button("Wipe", key="zax-backup-wipe", enable_events=True)],
+        [
+            sg.Button("Open", key="zax-backup-open", enable_events=True),
+            sg.Button("Wipe", key="zax-backup-wipe", enable_events=True),
+        ],
         [sg.HSeperator()],
         [sg.Text("Log file", justification="c")],
         [sg.Button("View", key="zax-log-view", enable_events=True)],
     ]
-    left_col = [[sg.TabGroup([[sg.Tab("Games", games_layout), sg.Tab("Zax", zax_layout)]])]]
+    left_col = [[sg.TabGroup([[sg.Tab("Games", games_layout), sg.Tab("ZAX", zax_layout)]])]]
 
     right_col = [
         [
@@ -196,7 +198,7 @@ def __main__(splash=False):
 
     if splash:
         pyi_splash.close()
-    window = sg.Window("zax", main_layout, finalize=True)
+    window = sg.Window("ZAX", main_layout, finalize=True)
 
     try:
         game_list = window["-LIST-"]
@@ -237,7 +239,7 @@ def __main__(splash=False):
                 sg.popup("fallout2.exe not found in directory {}".format(dname))
 
         if game_path is not None:
-            if event == "Save":
+            if event == "save":
                 game_config.save(values)
                 wine.save(zax_yml, config, games, game_path, values)
             if event == "play":
