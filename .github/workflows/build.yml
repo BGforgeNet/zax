@@ -16,12 +16,20 @@ jobs:
           python-version: '3.8'
       - uses: actions/checkout@v2
 
-      - name: Build
-        if: "!startsWith(github.ref, 'refs/tags/')"
+      - name: Build | lin
+        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'ubuntu-latest')"
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          pyinstaller -F zax.py zax.spec
+          pyinstaller -F zax.py --clean --add-data "formats/*.yml:formats"
+        shell: bash
+
+      - name: Build | win
+        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
+        run: |
+          set -xeu -o pipefail
+          pip install -r requirements.txt
+          pyinstaller -F zax.py --clean --add-data "formats/*.yml;formats"
         shell: bash
 
       - name: Upload linux bin
