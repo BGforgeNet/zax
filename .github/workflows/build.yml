@@ -16,16 +16,7 @@ jobs:
           python-version: '3.8'
       - uses: actions/checkout@v2
 
-      - name: Build | lin
-        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'ubuntu-latest')"
-        run: |
-          set -xeu -o pipefail
-          pip install -r requirements.txt
-          pyinstaller zax.spec
-        shell: bash
-
-      - name: Build | win
-        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
+      - name: Build
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
