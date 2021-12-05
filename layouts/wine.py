@@ -1,6 +1,8 @@
 import PySimpleGUIQt as sg
 
-sg.theme("Dark Brown")
+from variables import THEME
+
+sg.theme(THEME)
 
 layout = [
     [sg.Text("Prefix"), sg.InputText("", key="wine_prefix", size=(350, None))],
