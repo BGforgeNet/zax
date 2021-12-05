@@ -148,7 +148,20 @@ def __main__(splash=False):
         ],
     ]
 
-    mods_layout = [[sg.T("This is inside mods")], [sg.In(key="in")]]
+    trouble_layout = [
+        [sg.Text("This tab contains shortcuts for resolving various common issues,", justification="c")],
+        [sg.Text(" and allows you to prepare an archive with information needed in bug reports.", justification="c")],
+        [sg.HSeperator()],
+        [sg.Text("Bug reports", justification="l")],
+        [
+            sg.Button("Enable debug", tooltip="Enable sfall and game debug", key="trouble-enable-debug"),
+            sg.Button(
+                "Prepare debug package",
+                tooltip="Create an archive with all relevant configs and versions",
+                key="trouble-debug-package",
+            ),
+        ],
+    ]
     games_layout = [
         [
             sg.Listbox(
@@ -184,7 +197,7 @@ def __main__(splash=False):
                 [
                     [
                         sg.Tab("Settings", settings_layout),
-                        sg.Tab("Mods", mods_layout, tooltip="mods"),
+                        sg.Tab("Troubleshooting", trouble_layout),
                     ]
                 ]
             )
