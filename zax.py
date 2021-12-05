@@ -25,7 +25,7 @@ try:
 
     splash = True
 except:
-    print("can't import pyi_splash, not compiled by pyinstaller")
+    log("can't import pyi_splash, not compiled by pyinstaller")
 
 
 def get_game_paths(games):
