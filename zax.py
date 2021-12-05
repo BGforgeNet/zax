@@ -13,7 +13,7 @@ import wine
 import shutil
 from packaging import version
 from zax_log import log, logger
-from variables import THEME, config_dir, backup_dir, log_file
+from variables import set_theme, config_dir, backup_dir, log_file
 from version import VERSION
 import ruamel.yaml
 
@@ -101,7 +101,7 @@ def launch_game(path, wine_prefix=None, wine_debug=None, sfall_version=None):
 def __main__(splash=False):
     if splash:
         pyi_splash.update_text("Furiously loading...")
-    sg.theme(THEME)
+    set_theme(sg)
     gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
 
     sfall_latest = None

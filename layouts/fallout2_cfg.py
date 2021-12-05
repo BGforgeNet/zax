@@ -3,13 +3,13 @@
 from typing import OrderedDict
 import PySimpleGUIQt as sg
 
-from variables import THEME
+from variables import set_theme
 from .common import frame, checkbox, spin, dropdown, qinput, tab, get_ini_data, slider, radio
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
-sg.theme(THEME)
+set_theme(sg)
 
 c = get_ini_data("fallout2.cfg")
 
