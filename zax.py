@@ -168,6 +168,8 @@ def __main__(splash=False):
         ]
     ]
 
+    if splash:
+        pyi_splash.close()
     window = sg.Window("zax", main_layout, finalize=True)
 
     try:
