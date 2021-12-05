@@ -2,12 +2,14 @@
 
 from typing import OrderedDict
 import PySimpleGUIQt as sg
+
+from variables import THEME
 from .common import frame, checkbox, spin, dropdown, qinput, tab, disable_if, get_ini_data
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
-sg.theme("Dark Brown")
+sg.theme(THEME)
 
 c = get_ini_data("ddraw.ini")
 
