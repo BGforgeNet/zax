@@ -9,39 +9,30 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-          - os: ubuntu-latest
+          # - os: ubuntu-latest
     steps:
       - uses: actions/setup-python@v2
         with:
           python-version: '3.8'
       - uses: actions/checkout@v2
-
-      - name: Build | lin
-        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'ubuntu-latest')"
+      - name: Build and package
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          pyinstaller -F zax.py --clean --add-data "formats/*.yml:formats" --splash images/splash.png
+          pyinstaller -D zax.py --distpath dist-dir --clean --add-data "formats/*.yml;formats"
+          pyinstaller -F zax.py --distpath dist-file --clean --add-data "formats/*.yml;formats"
         shell: bash
 
-      - name: Build | win
-        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
-        run: |
-          set -xeu -o pipefail
-          pip install -r requirements.txt
-          pyinstaller -F zax.py --clean --add-data "formats/*.yml;formats" --splash images/splash.png
-        shell: bash
-
-      - name: Upload linux bin
+      - name: Upload dir
         uses: actions/upload-artifact@v2
-        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'ubuntu-latest')"
+        if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
         with:
-          name: zax-linux
-          path: dist/zax
+          name: zax-dir
+          path: dist-dir/*
 
       - name: Upload file
         uses: actions/upload-artifact@v2
         if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
         with:
-          name: zax.exe
-          path: dist/zax.exe
+          name: zax-file
+          path: dist-file/*

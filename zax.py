@@ -17,15 +17,6 @@ import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
-# splash only working in one-file mode
-splash = False
-try:
-    import pyi_splash
-
-    splash = True
-except:
-    print("can't import pyi_splash, not one-file mode")
-
 
 def get_game_paths(games):
     game_paths = [g["path"] for g in games]
@@ -78,9 +69,7 @@ def launch_game(path, wine_prefix=None, wine_debug=None, sfall_version=None):
 
 
 @logger.catch
-def __main__(splash=False):
-    if splash:
-        pyi_splash.update_text("Furiously loading...")
+def __main__():
     sg.theme("Dark Brown")
     gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
     # sg.theme('material 2')
@@ -170,8 +159,6 @@ def __main__(splash=False):
         ]
     ]
 
-    if splash:
-        pyi_splash.close()
     window = sg.Window("zax", main_layout, finalize=True)
 
     try:
@@ -245,4 +232,4 @@ def __main__(splash=False):
     window.close()
 
 
-__main__(splash=splash)
+__main__()

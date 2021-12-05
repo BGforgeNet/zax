@@ -3,8 +3,9 @@ iniparse>=0.5
 loguru>=0.5.3
 packaging>=20.4
 pefile>=2021.9.3
-py7zr>=0.16.3
 pyinstaller>=4.7
+py2exe>=0.11.0.1; platform_system=="Windows"
+py7zr>=0.16.3
 PySimpleGUIQt>=0.35.0
 requests>=2.22.0
 ruamel.yaml>=0.16.10

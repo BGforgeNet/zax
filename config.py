@@ -3,7 +3,7 @@ import os
 import io
 import iniparse
 from zax_log import log
-from common import resource_path
+import sys
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -13,6 +13,13 @@ def get_ini_format(f):
     with open(f) as yf:
         data = yaml.load(yf)
     return data
+
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    base_path = getattr(sys, "_MEIPASS", '')
+    rpath = os.path.join(base_path, relative_path)
+    return rpath
 
 
 def get_ini_formats():
