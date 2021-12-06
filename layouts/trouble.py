@@ -2,7 +2,6 @@ from datetime import datetime
 import platform
 import subprocess
 import PySimpleGUIQt as sg
-
 from .common import disable_element, enable_element, frame
 from variables import debug_dir, tmp_dir
 import os
@@ -33,6 +32,23 @@ layout = [
         ],
     ),
 ]
+
+
+def get_save_dir():
+    upper = os.path.join("data", "SAVEGAME")
+    lower = os.path.join("data", "savegame")
+    if os.path.isdir(upper):
+        return upper
+    if os.path.isdir(lower):
+        return lower
+    return None
+
+
+def zip_recursive(dir_path, zipfile_handle):
+    for dirname, subdirs, files in os.walk(dir_path):
+        zipfile_handle.write(dirname)
+        for filename in files:
+            zipfile_handle.write(os.path.join(dirname, filename))
 
 
 def handle_event(window: sg.Window, event: str, values, game_config, game_path=None):
@@ -89,9 +105,10 @@ def handle_event(window: sg.Window, event: str, values, game_config, game_path=N
                         zip_h.write(f, f)
                 maindir_list = os.path.join(tmp_dir, "game.txt")
                 with open(maindir_list, "w") as fh:
-                    content = '\n'.join(sorted(os.listdir(game_path)))
+                    content = "\n".join(sorted(os.listdir(game_path)))
                     fh.write(content)
                 zip_h.write(maindir_list, "game.txt")
+
                 if os.path.isdir("mods"):
                     for f in os.listdir("mods"):
                         if f.lower().endswith(".ini"):
@@ -99,9 +116,23 @@ def handle_event(window: sg.Window, event: str, values, game_config, game_path=N
                             zip_h.write(fpath, fpath)
                     mods_list = os.path.join(tmp_dir, "mods.txt")
                     with open(mods_list, "w") as fh:
-                        content = '\n'.join(sorted(os.listdir("mods")))
+                        content = "\n".join(sorted(os.listdir("mods")))
                         fh.write(content)
                     zip_h.write(mods_list, "mods.txt")
+
+                save_dir = get_save_dir()
+                if save_dir is not None:
+                    saves = os.listdir(save_dir)
+                    save_list = [[sg.Checkbox(s, key=s)] for s in saves if s.startswith("SLOT")]
+                    save_list.insert(0, [sg.Text("Select savegames to attach")])
+                    save_list.append([sg.Button("OK")])
+                    if len(saves) > 0:
+                        event, values = sg.Window("Savegames", save_list, size=(250, 100)).read(close=True)
+                        selected_saves = [s for s in values if values[s] is True]
+                        for ss in selected_saves:
+                            s_dir = os.path.join(save_dir, ss)
+                            zip_recursive(s_dir, zip_h)
+
         if platform.system() == "Windows":
             subprocess.Popen(["explorer", "/select", zip_path])
         else:
