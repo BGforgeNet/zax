@@ -65,15 +65,23 @@ def handle_zax_tab(event):
 def handle_event(window: sg.Window, event, values: dict, game_path: str, game_config):
     if event.startswith("zax-"):
         handle_zax_tab(event)
+
     if event == "listbox_games" or event == "btn_sfall_update":
         window["configs_loaded"](False)
         game_config = GameConfig(game_path)
         game_config.load_from_disk(window, values)
+
     config_paths = game_config.config_paths
     for p in config_paths:
         layout.handle_custom_event(p, window, event, values)
+
+    # this must go last, so that ui is updated properly on game switch
+    if event == "btn_trouble_enable_debug" or event == "tg_main" or event == "configs_loaded":
+        layout.handle_non_config_event("trouble", window, event, values, game_config)
+
     if event == "listbox_games":
         window["configs_loaded"](True)
+
     return game_config
 
 
@@ -152,20 +160,6 @@ def __main__(splash=False):
         ],
     ]
 
-    trouble_layout = [
-        [sg.Text("This tab contains shortcuts for resolving various common issues,", justification="c")],
-        [sg.Text(" and allows you to prepare an archive with information needed in bug reports.", justification="c")],
-        [sg.HSeperator()],
-        [sg.Text("Bug reports", justification="l")],
-        [
-            sg.Button("Enable debug", tooltip="Enable sfall and game debug", key="trouble-enable-debug"),
-            sg.Button(
-                "Prepare debug package",
-                tooltip="Create an archive with all relevant configs and versions",
-                key="trouble-debug-package",
-            ),
-        ],
-    ]
     games_layout = [
         [
             sg.Listbox(
@@ -182,16 +176,17 @@ def __main__(splash=False):
     ]
 
     left_col = [[sg.TabGroup([[sg.Tab("Games", games_layout), sg.Tab("ZAX", zax_layout)]])]]
-
     right_col = [
         [
             sg.TabGroup(
                 [
                     [
                         sg.Tab("Settings", settings_layout),
-                        sg.Tab("Troubleshooting", trouble_layout),
+                        sg.Tab("Troubleshooting", layout.layout["trouble"]),
                     ]
-                ]
+                ],
+                key="tg_main",
+                enable_events=True,
             )
         ]
     ]

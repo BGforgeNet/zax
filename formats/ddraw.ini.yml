@@ -359,13 +359,13 @@ Debugging:
     display_type: dropdown
     options:
       - value: 0
-        name: Disable
+        name: disable
       - value: 1
-        name: Output to the screen
+        name: screen
       - value: 2
-        name: Output to the debug.log
+        name: debug.log
       - value: 3
-        name: Both screen and debug.log
+        name: screen and debug.log
 
   Init:
     name: Sfall initialization
