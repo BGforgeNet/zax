@@ -22,6 +22,12 @@ zax_layout = [
         sg.Button("Wipe", key="zax-backup-wipe", enable_events=True),
     ],
     [sg.HSeperator()],
+    [sg.Text("Debug archive directory", justification="c")],
+    [
+        sg.Button("Open", key="zax-debug-open", enable_events=True),
+        sg.Button("Wipe", key="zax-debug-wipe", enable_events=True),
+    ],
+    [sg.HSeperator()],
     [sg.Text("Log file", justification="c")],
     [sg.Button("View", key="zax-log-view", enable_events=True)],
 ]

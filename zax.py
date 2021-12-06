@@ -14,7 +14,7 @@ import wine
 import shutil
 from packaging import version
 from zax_log import log, logger
-from variables import set_theme, config_dir, backup_dir, log_file
+from variables import set_theme, config_dir, backup_dir, log_file, debug_dir
 from version import VERSION
 from layouts.zax import zax_layout
 import ruamel.yaml
@@ -55,6 +55,16 @@ def handle_zax_tab(event):
     if event == "zax-backup-wipe":
         shutil.rmtree(backup_dir)
         os.makedirs(backup_dir, exist_ok=True)
+
+    if event == "zax-debug-open":
+        if platform.system() == "Windows":
+            subprocess.Popen(["explorer", debug_dir])
+        else:
+            subprocess.Popen(["xdg-open", debug_dir])
+    if event == "zax-debug-wipe":
+        shutil.rmtree(debug_dir)
+        os.makedirs(debug_dir, exist_ok=True)
+
     if event == "zax-log-view":
         if platform.system() == "Windows":
             subprocess.Popen(["explorer", "/select", log_file])
