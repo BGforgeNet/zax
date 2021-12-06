@@ -17,6 +17,7 @@ from zax_log import log, logger
 from variables import set_theme, config_dir, backup_dir, log_file, debug_dir
 from version import VERSION
 from layouts.zax import zax_layout
+import scan
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -35,15 +36,6 @@ def get_game_paths(games):
     game_paths = [g["path"] for g in games]
     game_paths = sorted(list(set(game_paths)))
     return game_paths
-
-
-def is_f2_game(path: str):
-    if path is not None:
-        if os.path.isdir(path):
-            files = [f.lower() for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-            if "fallout2.exe" in files:
-                return True
-    return False
 
 
 def handle_zax_tab(event):
@@ -223,7 +215,15 @@ def __main__(splash=False):
         listbox_games(set_to_index=0)
         log("found games!")
     except:
-        log("no games in list found")
+        log("no games in list found, scanning")
+        games = scan.games()
+        if len(games) > 0:
+            game_paths = get_game_paths(games)
+            window["listbox_games"](values=game_paths)
+            listbox_games(set_to_index=0)
+        log("finished scanning")
+
+    # this hack allows to trigger ui updates after game list changes
     window["configs_loaded"](False)
 
     while True:  # Main event Loop
@@ -243,7 +243,7 @@ def __main__(splash=False):
 
         if event == "add-game":
             dname = sg.popup_get_folder("Enter game path")
-            if is_f2_game(dname):
+            if scan.is_f2_game(dname):
                 games.append({"path": dname})
                 game_paths = get_game_paths(games)
                 window["listbox_games"](values=game_paths)
