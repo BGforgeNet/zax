@@ -3,6 +3,7 @@ import threading
 from layouts.common import disable_element, enable_element
 from zax_log import log
 import webbrowser
+import platform
 
 
 def get_latest():
@@ -11,7 +12,12 @@ def get_latest():
         release = resp.json()
         latest = {}
         latest["ver"] = release["tag_name"]
-        latest["url"] = release["assets"][0]["browser_download_url"]
+        artifacts = {a["name"]: a["browser_download_url"] for a in release["assets"]}
+        if platform.system() == "Windows":
+            name = [a for a in artifacts if a.endswith(".exe")][0]
+        else:
+            name = [a for a in artifacts if not a.endswith(".exe")][0]
+        latest["url"] = artifacts[name]
         return latest
     except:
         log("failed to get latest ZAX version")
