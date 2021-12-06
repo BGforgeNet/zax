@@ -38,8 +38,11 @@ def checkbox(cfg_data, section, key, visible=True, disabled=False):
     ]
 
 
-def tab(tab_name, items):
-    return sg.Tab(tab_name, [[sg.Column(items, scrollable=True, size=(500, 500))]])
+def tab(tab_name, items, key=None):
+    if key:
+        return sg.Tab(tab_name, [[sg.Column(items, scrollable=True, size=(500, 500))]], key=key)
+    else:
+        return sg.Tab(tab_name, [[sg.Column(items, scrollable=True, size=(500, 500))]])
 
 
 def frame(name, items):

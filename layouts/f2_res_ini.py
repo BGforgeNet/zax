@@ -207,7 +207,8 @@ tabs["Advanced"] = [
         ],
     ),
 ]
-tab_list = [tab(t, tabs[t]) for t in tabs]
+
+tab_list = [tab(t, tabs[t], key="f2_res.ini-{}".format(t)) for t in tabs]
 
 layout = sg.TabGroup([tab_list])
 

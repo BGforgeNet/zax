@@ -168,7 +168,7 @@ tabs["Debug"] = [
     checkbox(c, "Debugging", "Fixes"),
 ]
 
-tab_list = [tab(t, tabs[t]) for t in tabs]
+tab_list = [tab(t, tabs[t], key="ddraw.ini-{}".format(t)) for t in tabs]
 
 layout = sg.TabGroup([tab_list])
 
