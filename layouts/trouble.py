@@ -10,16 +10,16 @@ layout = [
         [
             [
                 sg.Text("Step 1: enable debug."),
-                sg.Text("(already done)", key="txt_trouble_debug_done"),
-                sg.Button("Enable", key="btn_trouble_enable_debug"),
+                sg.Button("Enable", key="btn_trouble_enable_debug", size=(150, None)),
             ],
             [sg.Text("Step 2: launch the game and reproduce the issue. Exit game.")],
             [
-                sg.Text("Step 3: prepare debug package"),
+                sg.Text("Step 3: create debug package"),
                 sg.Button(
-                    "Prepare",
-                    tooltip="Create an archive with all relevant configs and mod versions",
+                    "Create",
+                    tooltip="Prepare an archive with all relevant configs and mod versions",
                     key="btn_trouble_package_debug",
+                    size=(150, None),
                 ),
             ],
         ],
@@ -49,11 +49,11 @@ def handle_event(window: sg.Window, event: str, values, game_config):
                 debug_all_enabled = False
                 break
         if debug_all_enabled and values["ddraw.ini-Debugging-DebugMode"] == "debug.log":
-            window["txt_trouble_debug_done"]("(already done)")
             disable_element("btn_trouble_enable_debug", window)
+            window["btn_trouble_enable_debug"](text="Already enabled")
         else:
-            window["txt_trouble_debug_done"]("")
             enable_element("btn_trouble_enable_debug", window)
+            window["btn_trouble_enable_debug"](text="Enable")
 
     if event == "btn_trouble_enable_debug":
         window["ddraw.ini-Debugging-DebugMode"]("debug.log")
@@ -61,5 +61,6 @@ def handle_event(window: sg.Window, event: str, values, game_config):
         for k in debug_keys:
             window[k](True)
             values[k] = True
-        window["txt_trouble_debug_done"]("(already done)")
+        disable_element("btn_trouble_enable_debug", window)
+        window["btn_trouble_enable_debug"](text="Already enabled")
         game_config.save(values)
