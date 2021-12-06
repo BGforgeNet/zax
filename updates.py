@@ -7,7 +7,7 @@ import webbrowser
 
 def get_latest():
     try:
-        resp = requests.get("https://api.github.com/repos/BGforgeNet/FO2tweaks/releases/latest", timeout=10)
+        resp = requests.get("https://api.github.com/repos/BGforgeNet/zax/releases/latest", timeout=10)
         release = resp.json()
         latest = {}
         latest["ver"] = release["tag_name"]
