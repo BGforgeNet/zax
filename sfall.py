@@ -28,7 +28,7 @@ def get_latest():
             log(resp)
         except:
             log("couldn't log http response")
-        return {"ver": "unknown", "url": ""}
+        return {"ver": "Unknown", "url": ""}
 
 
 def get_current(path):
@@ -94,7 +94,7 @@ def launch_latest_check(gui_queue):
 
 def handle_ui_update(window, sfall_current, sfall_latest_version=None):
     if sfall_latest_version is None:
-        latest = "Uknown"
+        latest = "Unknown"
     else:
         latest = sfall_latest_version
     window["txt_sfall_current"](value=sfall_current)

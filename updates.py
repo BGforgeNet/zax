@@ -25,7 +25,7 @@ def get_latest():
             log(resp)
         except:
             log("couldn't log http response")
-        return {"ver": "unknown", "url": ""}
+        return {"ver": "Unknown", "url": ""}
 
 
 def launch_latest_check(gui_queue):
