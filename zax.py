@@ -240,6 +240,15 @@ def __main__(splash=False):
         if event == sg.WIN_CLOSED:
             break
 
+        if event == "btn_zax_scan":
+            log("scanning for games")
+            games = scan.games(games)
+            if len(games) > 0:
+                game_paths = get_game_paths(games)
+                window["listbox_games"](values=game_paths)
+                window["listbox_games"](set_to_index=0)
+            log("finished scanning")
+
         if event == "add-game":
             dname = sg.popup_get_folder("Enter game path")
             if scan.is_f2_game(dname):

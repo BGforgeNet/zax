@@ -16,6 +16,11 @@ zax_layout = [
     ],
     [sg.Button("Download latest", key="btn_zax_update")],
     [sg.HSeperator()],
+    [sg.Text("Auto scan for games", justification="c")],
+    [
+        sg.Button("Scan", key="btn_zax_scan", enable_events=True),
+    ],
+    [sg.HSeperator()],
     [sg.Text("Backup directory", justification="c")],
     [
         sg.Button("Open", key="zax-backup-open", enable_events=True),
