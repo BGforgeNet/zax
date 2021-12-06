@@ -1,3 +1,6 @@
+from datetime import datetime
+import platform
+import subprocess
 import PySimpleGUIQt as sg
 
 from .common import disable_element, enable_element, frame
@@ -72,7 +75,8 @@ def handle_event(window: sg.Window, event: str, values, game_config, game_path=N
 
     if event == "btn_trouble_package_debug":
         with cd(game_path):
-            zip_path = os.path.join(debug_dir, "zax.zip")
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            zip_path = os.path.join(debug_dir, "zax_debug_{}.zip".format(timestamp))
             with ZipFile(zip_path, "w", ZIP_DEFLATED) as zip_h:
                 for f in os.listdir("."):
                     if (
@@ -88,4 +92,8 @@ def handle_event(window: sg.Window, event: str, values, game_config, game_path=N
                         if f.lower().endswith(".ini"):
                             fpath = os.path.join("mods", f)
                             zip_h.write(fpath, fpath)
+        if platform.system() == "Windows":
+            subprocess.Popen(["explorer", "/select", zip_path])
+        else:
+            subprocess.Popen(["xdg-open", debug_dir])
         log("debug archive created")
