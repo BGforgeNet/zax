@@ -13,8 +13,8 @@ import wine
 import shutil
 from packaging import version
 from zax_log import log, logger
-from variables import BUTTON_DISABLED_COLOR, set_theme, config_dir, backup_dir, log_file
-from version import VERSION
+from variables import set_theme, config_dir, backup_dir, log_file
+from layouts.zax import zax_layout
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -175,29 +175,7 @@ def __main__(splash=False):
         [sg.Button("Add game")],
         [sg.Button("Remove from list")],
     ]
-    zax_layout = [
-        [sg.HSeperator()],
-        [sg.Text("Version", justification="c")],
-        [
-            sg.Text("Current:"),
-            sg.Text(VERSION),
-            sg.Button("Update", key="zax-version-update"),
-        ],
-        [
-            sg.Text("Latest:"),
-            sg.Text("unknown"),
-            sg.Button("Check", key="zax-version-check", disabled=True, button_color=BUTTON_DISABLED_COLOR),
-        ],
-        [sg.HSeperator()],
-        [sg.Text("Backup directory", justification="c")],
-        [
-            sg.Button("Open", key="zax-backup-open", enable_events=True),
-            sg.Button("Wipe", key="zax-backup-wipe", enable_events=True),
-        ],
-        [sg.HSeperator()],
-        [sg.Text("Log file", justification="c")],
-        [sg.Button("View", key="zax-log-view", enable_events=True)],
-    ]
+
     left_col = [[sg.TabGroup([[sg.Tab("Games", games_layout), sg.Tab("ZAX", zax_layout)]])]]
 
     right_col = [
