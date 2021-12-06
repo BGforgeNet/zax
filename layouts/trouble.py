@@ -4,7 +4,7 @@ import subprocess
 import PySimpleGUIQt as sg
 
 from .common import disable_element, enable_element, frame
-from variables import debug_dir
+from variables import debug_dir, tmp_dir
 import os
 from zipfile import ZIP_DEFLATED, ZipFile
 from common import cd
@@ -87,11 +87,21 @@ def handle_event(window: sg.Window, event: str, values, game_config, game_path=N
                         or f.lower() == "sfall-log.txt"
                     ):
                         zip_h.write(f, f)
+                maindir_list = os.path.join(tmp_dir, "game.txt")
+                with open(maindir_list, "w") as fh:
+                    content = '\n'.join(sorted(os.listdir(game_path)))
+                    fh.write(content)
+                zip_h.write(maindir_list, "game.txt")
                 if os.path.isdir("mods"):
                     for f in os.listdir("mods"):
                         if f.lower().endswith(".ini"):
                             fpath = os.path.join("mods", f)
                             zip_h.write(fpath, fpath)
+                    mods_list = os.path.join(tmp_dir, "mods.txt")
+                    with open(mods_list, "w") as fh:
+                        content = '\n'.join(sorted(os.listdir("mods")))
+                        fh.write(content)
+                    zip_h.write(mods_list, "mods.txt")
         if platform.system() == "Windows":
             subprocess.Popen(["explorer", "/select", zip_path])
         else:
