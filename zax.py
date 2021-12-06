@@ -25,7 +25,7 @@ yaml = ruamel.yaml.YAML(typ="rt")
 # splash only working when compiled
 splash = False
 try:
-    import pyi_splash
+    import pyi_splash  # type: ignore
 
     splash = True
 except:
