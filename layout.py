@@ -21,6 +21,6 @@ def handle_custom_event(config_path: str, window: sg.Window, event, values):
         ddraw_ini.handle_event(window, event, values)
 
 
-def handle_non_config_event(type: str, window: sg.Window, event, values, game_config=None):
+def handle_non_config_event(type: str, window: sg.Window, event, values, game_config=None, game_path=None):
     if type == "trouble":
-        trouble.handle_event(window, event, values, game_config)
+        trouble.handle_event(window, event, values, game_config, game_path)

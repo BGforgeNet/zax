@@ -1,6 +1,11 @@
 import PySimpleGUIQt as sg
 
 from .common import disable_element, enable_element, frame
+from variables import debug_dir
+import os
+from zipfile import ZIP_DEFLATED, ZipFile
+from common import cd
+from zax_log import log
 
 layout = [
     [sg.Text("This tab contains shortcuts for resolving various common issues,", justification="c")],
@@ -27,7 +32,7 @@ layout = [
 ]
 
 
-def handle_event(window: sg.Window, event: str, values, game_config):
+def handle_event(window: sg.Window, event: str, values, game_config, game_path=None):
     debug_keys = [
         "ddraw.ini-Debugging-Init",
         "ddraw.ini-Debugging-Hook",
@@ -64,3 +69,23 @@ def handle_event(window: sg.Window, event: str, values, game_config):
         disable_element("btn_trouble_enable_debug", window)
         window["btn_trouble_enable_debug"](text="Already enabled")
         game_config.save(values)
+
+    if event == "btn_trouble_package_debug":
+        with cd(game_path):
+            zip_path = os.path.join(debug_dir, "zax.zip")
+            with ZipFile(zip_path, "w", ZIP_DEFLATED) as zip_h:
+                for f in os.listdir("."):
+                    if (
+                        f.lower().endswith(".ini")
+                        or f.lower().endswith(".cfg")
+                        or f.lower() == "ddraw.dll"
+                        or f.lower() == "debug.log"
+                        or f.lower() == "sfall-log.txt"
+                    ):
+                        zip_h.write(f, f)
+                if os.path.isdir("mods"):
+                    for f in os.listdir("mods"):
+                        if f.lower().endswith(".ini"):
+                            fpath = os.path.join("mods", f)
+                            zip_h.write(fpath, fpath)
+        log("debug archive created")

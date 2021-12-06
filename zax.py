@@ -76,8 +76,13 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
         layout.handle_custom_event(p, window, event, values)
 
     # this must go last, so that ui is updated properly on game switch
-    if event == "btn_trouble_enable_debug" or event == "tg_main" or event == "configs_loaded":
-        layout.handle_non_config_event("trouble", window, event, values, game_config)
+    if (
+        event == "btn_trouble_enable_debug"
+        or event == "tg_main"
+        or event == "configs_loaded"
+        or event == "btn_trouble_package_debug"
+    ):
+        layout.handle_non_config_event("trouble", window, event, values, game_config, game_path)
 
     if event == "listbox_games":
         window["configs_loaded"](True)
