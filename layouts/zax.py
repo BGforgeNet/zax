@@ -8,16 +8,13 @@ set_theme(sg)
 zax_layout = [
     [sg.HSeperator()],
     [sg.Text("Version", justification="c")],
-    [
-        sg.Text("Current:"),
-        sg.Text(VERSION, key="txt_zax_current_version"),
-        sg.Button("Update", key="btn_zax_update"),
-    ],
+    [sg.Text("Current:"), sg.Text(VERSION, key="txt_zax_current_version"), sg.Text("")],  # dummy for alignment
     [
         sg.Text("Latest:"),
         sg.Text("Unknown", key="txt_zax_latest_version"),
         sg.Button("Check", key="btn_zax_version_check", disabled=True, button_color=BUTTON_DISABLED_COLOR),
     ],
+    [sg.Button("Download latest", key="btn_zax_update")],
     [sg.HSeperator()],
     [sg.Text("Backup directory", justification="c")],
     [

@@ -2,11 +2,12 @@ import requests
 import threading
 from layouts.common import disable_element, enable_element
 from zax_log import log
+import webbrowser
 
 
 def get_latest():
     try:
-        resp = requests.get("https://api.github.com/repos/BGforgeNet/zax/releases/latest", timeout=10)
+        resp = requests.get("https://api.github.com/repos/BGforgeNet/FO2tweaks/releases/latest", timeout=10)
         release = resp.json()
         latest = {}
         latest["ver"] = release["tag_name"]
@@ -49,7 +50,5 @@ def handle_ui_update(window, zax_current, zax_latest=None):
     return zax_latest
 
 
-def update(window, zax_latest, game_path):
-    # download(zax_latest["url"], game_path)
-    disable_element("btn_zax_update", window)
-    window["txt_zax_current_version"](value=zax_latest["ver"])
+def update(zax_latest):
+    webbrowser.open_new_tab(zax_latest["url"])

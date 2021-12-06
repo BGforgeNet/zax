@@ -262,16 +262,18 @@ def __main__(splash=False):
             if message:  # if message received from queue, display the message in the Window
                 log("Got a message back from the thread: {}".format(message))
                 if message["type"] == "sfall_latest":
-                    sfall_latest_data = message
-                    sfall_latest_version = sfall_latest_data["value"]["ver"]
+                    sfall_latest_data = message["value"]
+                    sfall_latest_version = sfall_latest_data["ver"]
                     sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
                 if message["type"] == "zax_latest":
-                    zax_latest_data = message
-                    zax_latest_version = zax_latest_data["value"]["ver"]
+                    zax_latest_data = message["value"]
+                    zax_latest_version = zax_latest_data["ver"]
                     updates.handle_ui_update(window, VERSION, zax_latest_version)
 
             if event == "btn_sfall_update":
                 sfall.update(window, sfall_latest_data, game_path)
+            if event == "btn_zax_update":
+                updates.update(zax_latest_data)
 
             game_config = handle_event(window, event, values, game_path, game_config)
 
