@@ -1,20 +1,29 @@
 import PySimpleGUIQt as sg
 
-from .common import disable_element, enable_element
+from .common import disable_element, enable_element, frame
 
 layout = [
     [sg.Text("This tab contains shortcuts for resolving various common issues,", justification="c")],
     [sg.Text(" and allows you to prepare an archive with information needed in bug reports.", justification="c")],
-    [sg.HSeperator()],
-    [sg.Text("Bug reports", justification="l")],
-    [
-        sg.Button("Enable debug", tooltip="Enable sfall and game debug", key="btn_trouble_enable_debug"),
-        sg.Button(
-            "Prepare debug package",
-            tooltip="Create an archive with all relevant configs and versions",
-            key="btn_trouble_package_debug",
-        ),
-    ],
+    frame(
+        "Bug report",
+        [
+            [
+                sg.Text("Step 1: enable debug."),
+                sg.Text("(already done)", key="txt_trouble_debug_done"),
+                sg.Button("Enable", key="btn_trouble_enable_debug"),
+            ],
+            [sg.Text("Step 2: launch the game and reproduce the issue. Exit game.")],
+            [
+                sg.Text("Step 3: prepare debug package"),
+                sg.Button(
+                    "Prepare",
+                    tooltip="Create an archive with all relevant configs and mod versions",
+                    key="btn_trouble_package_debug",
+                ),
+            ],
+        ],
+    ),
 ]
 
 
@@ -40,8 +49,10 @@ def handle_event(window: sg.Window, event: str, values, game_config):
                 debug_all_enabled = False
                 break
         if debug_all_enabled and values["ddraw.ini-Debugging-DebugMode"] == "debug.log":
+            window["txt_trouble_debug_done"]("(already done)")
             disable_element("btn_trouble_enable_debug", window)
         else:
+            window["txt_trouble_debug_done"]("")
             enable_element("btn_trouble_enable_debug", window)
 
     if event == "btn_trouble_enable_debug":
@@ -50,5 +61,5 @@ def handle_event(window: sg.Window, event: str, values, game_config):
         for k in debug_keys:
             window[k](True)
             values[k] = True
-        disable_element("btn_trouble_enable_debug", window)
+        window["txt_trouble_debug_done"]("(already done)")
         game_config.save(values)
