@@ -16,12 +16,23 @@ jobs:
           python-version: '3.8'
       - uses: actions/checkout@v2
 
+      - name: Set dev version
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          echo "VERSION = \"git_hash\"" > version.py
+
+      - name: Set release version
+        if: "startsWith(github.ref, 'refs/tags/')"
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          version="$(echo $GITHUB_REF | sed 's|refs\/tags\/||')"
+          echo "VERSION = \"version\"" > version.py
+
       - name: Build
         run: |
           set -xeu -o pipefail
           pip install -r requirements.txt
-          git_hash=$(git rev-parse --short "$GITHUB_SHA")
-          echo "VERSION = \"git_hash\"" > version.py
           pyinstaller zax.spec
         shell: bash
 
