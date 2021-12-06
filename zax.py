@@ -211,8 +211,7 @@ def __main__(splash=False):
     window = sg.Window("ZAX", main_layout, finalize=True)
 
     try:
-        listbox_games = window["listbox_games"]
-        listbox_games(set_to_index=0)
+        window["listbox_games"](set_to_index=0)
         log("found games!")
     except:
         log("no games in list found, scanning")
@@ -220,7 +219,7 @@ def __main__(splash=False):
         if len(games) > 0:
             game_paths = get_game_paths(games)
             window["listbox_games"](values=game_paths)
-            listbox_games(set_to_index=0)
+            window["listbox_games"](set_to_index=0)
         log("finished scanning")
 
     # this hack allows to trigger ui updates after game list changes
@@ -244,11 +243,15 @@ def __main__(splash=False):
         if event == "add-game":
             dname = sg.popup_get_folder("Enter game path")
             if scan.is_f2_game(dname):
-                games.append({"path": dname})
-                game_paths = get_game_paths(games)
-                window["listbox_games"](values=game_paths)
-                new_game_index = game_paths.index(dname)
-                listbox_games(set_to_index=new_game_index)
+                old_game_paths = get_game_paths(games)
+                if dname in old_game_paths:
+                    sg.popup("This game is already on the list!")
+                else:
+                    games.append({"path": dname})
+                    game_paths = get_game_paths(games)
+                    window["listbox_games"](values=game_paths)
+                    new_game_index = game_paths.index(dname)
+                    window["listbox_games"](set_to_index=new_game_index)
             elif dname is not None:
                 sg.popup("fallout2.exe not found in directory {}".format(dname))
 
@@ -270,7 +273,7 @@ def __main__(splash=False):
                 game_paths = get_game_paths(games)
                 window["listbox_games"](values=game_paths)
                 if len(games) > 0:
-                    listbox_games(set_to_index=0)
+                    window["listbox_games"](set_to_index=0)
 
             # background process handling
             try:

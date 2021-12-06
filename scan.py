@@ -5,7 +5,7 @@ from zax_log import log
 
 
 # returns game list [{"path": dir}] as in zax.yml
-def games():
+def games(old_games=None):
     DIR_LIST = []
     REL_DIR_LIST = [
         "GOG Games/Fallout 2",
@@ -25,7 +25,10 @@ def games():
             DIR_LIST.append(str(Path("{}/.wine/drive_c/{}".format(home, rd)).resolve()))
             DIR_LIST.append(str(Path("{}/.wine/drive_c/{}".format(home, rd.lower())).resolve()))
 
-    game_list = []
+    if old_games:
+        game_list = old_games
+    else:
+        game_list = []
     for d in DIR_LIST:
         if os.path.isdir(d) and is_f2_game(d):
             log("found game: {}".format(d))
