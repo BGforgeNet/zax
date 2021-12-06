@@ -92,20 +92,22 @@ def launch_latest_check(gui_queue):
     log("started background thread")
 
 
-def handle_update_ui(window, sfall_current, message=None, sfall_latest=None):
-    if not sfall_latest:
-        sfall_latest = message["value"]
-    window["txt_sfall_latest"](value=sfall_latest["ver"])
+def handle_ui_update(window, sfall_current, sfall_latest_version=None):
+    if sfall_latest_version is None:
+        latest = "Uknown"
+    else:
+        latest = sfall_latest_version
+    window["txt_sfall_current"](value=sfall_current)
+    window["txt_sfall_latest"](value=latest)
     disable_element("btn_sfall_check", window)
-    if sfall_current != sfall_latest["ver"]:
+    if sfall_current != latest:
         enable_element("btn_sfall_update", window)
     else:
         disable_element("btn_sfall_update", window)
-        window["txt_sfall_current"](value=sfall_latest["ver"])
-    return sfall_latest
+        window["txt_sfall_current"](value=latest)
 
 
-def update(window, sfall_latest, game_path):
-    download(sfall_latest["url"], game_path)
+def update(window, sfall_latest_data, game_path):
+    download(sfall_latest_data["url"], game_path)
     disable_element("btn_sfall_update", window)
-    window["txt_sfall_current"](value=sfall_latest["ver"])
+    window["txt_sfall_current"](value=sfall_latest_data["ver"])

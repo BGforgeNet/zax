@@ -7,6 +7,7 @@ from PySimpleGUIQt.PySimpleGUIQt import SELECT_MODE_SINGLE
 import layout
 from config import GameConfig
 import sfall
+import updates
 import queue
 import platform
 import wine
@@ -14,6 +15,7 @@ import shutil
 from packaging import version
 from zax_log import log, logger
 from variables import set_theme, config_dir, backup_dir, log_file
+from version import VERSION
 from layouts.zax import zax_layout
 import ruamel.yaml
 
@@ -104,8 +106,11 @@ def __main__(splash=False):
     set_theme(sg)
     gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
 
-    sfall_latest = None
+    sfall_latest_version = None
+    sfall.launch_latest_check(gui_queue)
     sfall_current = None
+    zax_latest_version = None
+    updates.launch_latest_check(gui_queue)
     game_config = None
     game_paths = []
     game_path = None
@@ -220,11 +225,7 @@ def __main__(splash=False):
         if event == "-LIST-" and values["-LIST-"]:
             game_path = values["-LIST-"][0]
             sfall_current = sfall.get_current(game_path)
-            window["txt_sfall_current"](value=sfall_current)
-            if sfall_latest is None:
-                sfall.launch_latest_check(gui_queue)
-            else:
-                sfall_latest = sfall.handle_update_ui(window, sfall_current, sfall_latest=sfall_latest)
+            sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
             wine.load(games, game_path, window)
 
         if event == sg.WIN_CLOSED:
@@ -261,10 +262,16 @@ def __main__(splash=False):
             if message:  # if message received from queue, display the message in the Window
                 log("Got a message back from the thread: {}".format(message))
                 if message["type"] == "sfall_latest":
-                    sfall_latest = sfall.handle_update_ui(window, sfall_current, message=message)
+                    sfall_latest_data = message
+                    sfall_latest_version = sfall_latest_data["value"]["ver"]
+                    sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
+                if message["type"] == "zax_latest":
+                    zax_latest_data = message
+                    zax_latest_version = zax_latest_data["value"]["ver"]
+                    updates.handle_ui_update(window, VERSION, zax_latest_version)
 
             if event == "btn_sfall_update":
-                sfall.update(window, sfall_latest, game_path)
+                sfall.update(window, sfall_latest_data, game_path)
 
             game_config = handle_event(window, event, values, game_path, game_config)
 
