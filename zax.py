@@ -65,14 +65,14 @@ def handle_zax_tab(event):
 def handle_event(window: sg.Window, event, values: dict, game_path: str, game_config):
     if event.startswith("zax-"):
         handle_zax_tab(event)
-    if event == "-LIST-" or event == "btn_sfall_update":
+    if event == "listbox_games" or event == "btn_sfall_update":
         window["configs_loaded"](False)
         game_config = GameConfig(game_path)
         game_config.load_from_disk(window, values)
     config_paths = game_config.config_paths
     for p in config_paths:
         layout.handle_custom_event(p, window, event, values)
-    if event == "-LIST-":
+    if event == "listbox_games":
         window["configs_loaded"](True)
     return game_config
 
@@ -171,14 +171,14 @@ def __main__(splash=False):
             sg.Listbox(
                 values=game_paths,
                 size=(23, 17),
-                key="-LIST-",
+                key="listbox_games",
                 enable_events=True,
                 select_mode=SELECT_MODE_SINGLE,
                 pad=((12, 5), (10, 10)),  # ((left, right), (top, bottom)) - for some reason it's skewed to the left
             )
         ],
-        [sg.Button("Add game")],
-        [sg.Button("Remove from list")],
+        [sg.Button("Add game", key="add-game")],
+        [sg.Button("Remove from list", key="remove-game")],
     ]
 
     left_col = [[sg.TabGroup([[sg.Tab("Games", games_layout), sg.Tab("ZAX", zax_layout)]])]]
@@ -209,8 +209,8 @@ def __main__(splash=False):
     window = sg.Window("ZAX", main_layout, finalize=True)
 
     try:
-        game_list = window["-LIST-"]
-        game_list(set_to_index=0)
+        listbox_games = window["listbox_games"]
+        listbox_games(set_to_index=0)
         log("found games!")
     except:
         log("no games in list found")
@@ -222,8 +222,8 @@ def __main__(splash=False):
 
         log("event = {}".format(event))
 
-        if event == "-LIST-" and values["-LIST-"]:
-            game_path = values["-LIST-"][0]
+        if event == "listbox_games" and values["listbox_games"]:
+            game_path = values["listbox_games"][0]
             sfall_current = sfall.get_current(game_path)
             sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
             wine.load(games, game_path, window)
@@ -231,14 +231,14 @@ def __main__(splash=False):
         if event == sg.WIN_CLOSED:
             break
 
-        if event == "Add game":
+        if event == "add-game":
             dname = sg.popup_get_folder("Enter game path")
             if is_f2_game(dname):
                 games.append({"path": dname})
                 game_paths = get_game_paths(games)
-                window["-LIST-"](values=game_paths)
+                window["listbox_games"](values=game_paths)
                 new_game_index = game_paths.index(dname)
-                game_list(set_to_index=new_game_index)
+                listbox_games(set_to_index=new_game_index)
             elif dname is not None:
                 sg.popup("fallout2.exe not found in directory {}".format(dname))
 
@@ -246,6 +246,7 @@ def __main__(splash=False):
             if event == "save":
                 game_config.save(values)
                 wine.save(zax_yml, config, games, game_path, values)
+
             if event == "play":
                 launch_game(
                     game_path,
@@ -253,6 +254,13 @@ def __main__(splash=False):
                     wine_debug=values["wine_debug"],
                     sfall_version=sfall_current,
                 )
+
+            if event == "remove-game":
+                games = [g for g in games if g["path"] != game_path]
+                game_paths = get_game_paths(games)
+                window["listbox_games"](values=game_paths)
+                if len(games) > 0:
+                    listbox_games(set_to_index=0)
 
             # background process handling
             try:
