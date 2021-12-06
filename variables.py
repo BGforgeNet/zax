@@ -16,7 +16,10 @@ log_file = os.path.join(cache_dir, "zax.log")
 # THEME = "dark grey 7"
 # THEME = "reddit"
 
+BUTTON_ENABLED_COLOR = ("white", "#004880")
+BUTTON_DISABLED_COLOR = ("white", "grey")
+
 
 def set_theme(sg):
     sg.theme("reddit")
-    sg.theme_button_color(("white", "#004880"))  # more contrast for button names
+    sg.theme_button_color(BUTTON_ENABLED_COLOR)  # more contrast for button names

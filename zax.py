@@ -13,7 +13,7 @@ import wine
 import shutil
 from packaging import version
 from zax_log import log, logger
-from variables import set_theme, config_dir, backup_dir, log_file
+from variables import BUTTON_DISABLED_COLOR, set_theme, config_dir, backup_dir, log_file
 from version import VERSION
 import ruamel.yaml
 
@@ -177,7 +177,17 @@ def __main__(splash=False):
     ]
     zax_layout = [
         [sg.HSeperator()],
-        [sg.Text("Version:  {}".format(VERSION), justification="c")],
+        [sg.Text("Version", justification="c")],
+        [
+            sg.Text("Current:"),
+            sg.Text(VERSION),
+            sg.Button("Update", key="zax-version-update"),
+        ],
+        [
+            sg.Text("Latest:"),
+            sg.Text("unknown"),
+            sg.Button("Check", key="zax-version-check", disabled=True, button_color=BUTTON_DISABLED_COLOR),
+        ],
         [sg.HSeperator()],
         [sg.Text("Backup directory", justification="c")],
         [

@@ -3,7 +3,7 @@
 from typing import OrderedDict
 import PySimpleGUIQt as sg
 
-from variables import set_theme
+from variables import BUTTON_DISABLED_COLOR, set_theme
 from .common import frame, checkbox, spin, dropdown, qinput, tab, disable_if, get_ini_data
 import ruamel.yaml
 
@@ -23,16 +23,18 @@ tabs["Main"] = [
             [
                 sg.Text("Current version: "),
                 sg.InputText("", key="txt_sfall_current", size=(70, None), disabled=True, text_color="grey"),
-                sg.Button("Update", key="btn_sfall_update", size=(100, None), disabled=True, visible=False),
-                sg.Text(
-                    "", key="txt_sfall_update_placeholder", size=(100, None)
-                ),  # to prevent versions from jumping when buttons disappear
+                sg.Button(
+                    "Update",
+                    key="btn_sfall_update",
+                    size=(100, None),
+                    disabled=True,
+                    button_color=BUTTON_DISABLED_COLOR,
+                ),
             ],
             [
                 sg.Text("Latest version: "),
                 sg.InputText("", key="txt_sfall_latest", size=(70, None), disabled=True, text_color="grey"),
                 sg.Button("Check", key="btn_sfall_check", size=(100, None)),
-                sg.Text("", key="txt_sfall_check_placeholder", size=(100, None), visible=False),
             ],
         ],
     ),

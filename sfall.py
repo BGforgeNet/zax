@@ -9,6 +9,7 @@ import pefile
 import threading
 import datetime
 from common import cd
+from layouts.common import disable_element, enable_element
 from zax_log import log
 from variables import backup_dir
 
@@ -95,20 +96,16 @@ def handle_update_ui(window, sfall_current, message=None, sfall_latest=None):
     if not sfall_latest:
         sfall_latest = message["value"]
     window["txt_sfall_latest"](value=sfall_latest["ver"])
-    window["btn_sfall_check"](visible=False)
-    window["txt_sfall_check_placeholder"](visible=True)
+    disable_element("btn_sfall_check", window)
     if sfall_current != sfall_latest["ver"]:
-        window["txt_sfall_update_placeholder"](visible=False)
-        window["btn_sfall_update"](visible=True, disabled=False)
+        enable_element("btn_sfall_update", window)
     else:
-        window["txt_sfall_update_placeholder"](visible=True)
-        window["btn_sfall_update"](visible=False, disabled=True)
+        disable_element("btn_sfall_update", window)
         window["txt_sfall_current"](value=sfall_latest["ver"])
     return sfall_latest
 
 
 def update(window, sfall_latest, game_path):
     download(sfall_latest["url"], game_path)
-    window["txt_sfall_update_placeholder"](visible=True)
-    window["btn_sfall_update"](visible=False, disabled=True)
+    disable_element("btn_sfall_update", window)
     window["txt_sfall_current"](value=sfall_latest["ver"])

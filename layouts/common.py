@@ -3,6 +3,7 @@ import os
 import pprint
 import ruamel.yaml
 from common import resource_path
+from variables import BUTTON_DISABLED_COLOR, BUTTON_ENABLED_COLOR
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
@@ -160,7 +161,12 @@ def qinput(cfg_data, section, key, size=(100, None)):
         return [sg.Text("       " + name), sg.InputText("", key=wkey, size=size, enable_events=True)]
 
 
-def enable_element(key: str, window: sg.Window, values: dict, new_value=None, event=None):
+def enable_element(key: str, window: sg.Window, values={}, new_value=None, event=None):
+    if type(window[key]) is sg.Button:
+        window[key](disabled=False)
+        window[key](button_color=BUTTON_ENABLED_COLOR)
+        return
+
     old_value = values[key]
     window[key](
         text_color=sg.theme_element_text_color()
@@ -176,14 +182,19 @@ def enable_element(key: str, window: sg.Window, values: dict, new_value=None, ev
         window[key](value=old_value)
 
 
-def disable_element(key: str, window: sg.Window, values: dict, new_value=None, event=None):
+def disable_element(key: str, window: sg.Window, values={}, new_value=None, event=None):
+    if type(window[key]) is sg.Button:
+        window[key](disabled=True)
+        window[key](button_color=BUTTON_DISABLED_COLOR)
+        return
+
     old_value = values[key]
     window[key](text_color="grey")  # doesn't work in some items, for example dropdown. Works for spin.
     window[key](disabled=True)
     if new_value is not None:
         window[key](value=new_value)
 
-    # see enable_elemnt comment
+    # see enable_element comment
     elif (type(window[key]) is sg.Checkbox) and (event not in ["-LIST-", "configs_loaded"]):
         window[key](value=old_value)
 
