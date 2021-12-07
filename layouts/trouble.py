@@ -29,7 +29,7 @@ layout = [
                     size=(150, None),
                 ),
             ],
-            [sg.Text("Step 4: go to github issue or mod forum, describe the issue, attach the generated zip archive.")]
+            [sg.Text("Step 4: go to github repo or mod forum, describe the issue, attach the generated zip archive.")]
         ],
     ),
 ]
