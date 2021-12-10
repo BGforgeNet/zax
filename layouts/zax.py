@@ -31,4 +31,8 @@ zax_layout = [
     [sg.HSeperator()],
     [sg.Text("Log file", justification="c")],
     [sg.Button("View", key="zax-log-view", enable_events=True)],
+    [sg.HSeperator()],
+    [sg.Text("Theme", justification="c")],
+    [sg.Combo(["light", "dark"], readonly=True, key="dd_zax_theme", enable_events=True)],
+    [sg.Button("Save and restart", key="btn_zax_theme_restart", enable_events=True)],
 ]

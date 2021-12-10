@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import subprocess
+import sys
 from theme import sg
 import os
 from PySimpleGUIQt.PySimpleGUIQt import SELECT_MODE_SINGLE
@@ -12,12 +13,12 @@ import queue
 import platform
 import shutil
 from packaging import version
-from zax_config import ZaxConfig
 from zax_log import log, logger
 from variables import backup_dir, log_file, debug_dir
 from version import VERSION
 from layouts.zax import zax_layout
 from games import Games
+from zax_config import ZaxConfig
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -32,7 +33,7 @@ except:
     log("can't import pyi_splash, not compiled by pyinstaller")
 
 
-def handle_zax_tab(event):
+def handle_zax_tab(event, values, zax_config):
     if event == "zax-backup-open":
         if platform.system() == "Windows":
             subprocess.Popen(["explorer", backup_dir])
@@ -57,10 +58,18 @@ def handle_zax_tab(event):
         else:
             subprocess.Popen(["xdg-open", log_file])
 
+    if event == "btn_zax_theme_restart":
+        zax_config.theme = values["dd_zax_theme"]
+        zax_config.save()
+        # os.execl(sys.executable, '"{}"'.format(sys.executable), *sys.argv)
+        os.execl(sys.executable, os.path.abspath(__file__), *sys.argv)
 
-def handle_event(window: sg.Window, event, values: dict, game_path: str, game_config: GameConfig, games: Games):
-    if event.startswith("zax-"):
-        handle_zax_tab(event)
+
+def handle_event(
+    window: sg.Window, event, values: dict, game_path: str, game_config: GameConfig, games: Games, zax_config
+):
+    if event.startswith("zax-") or event == "btn_zax_theme_restart":
+        handle_zax_tab(event, values, zax_config)
 
     if event == "listbox_games" or event == "btn_sfall_update":
         window["configs_loaded"](False)
@@ -204,9 +213,15 @@ def __main__(splash=False):
 
     try:
         window["listbox_games"](set_to_index=0)
+        event, values = window.read()
+        game_path = values["listbox_games"][0]
+        game_config = GameConfig(game_path)
+        game_config.load_from_disk(window, values, games, game_path)
         log("found games!")
     except:
         scan(games, window)
+
+    window["dd_zax_theme"](zax_config.theme)
 
     # this hack allows to trigger ui updates after game list changes
     window["configs_loaded"](False)
@@ -237,7 +252,7 @@ def __main__(splash=False):
                 new_game_index = games.paths.index(dir_path)
                 window["listbox_games"](set_to_index=new_game_index)
                 continue
-
+        log(game_path)
         if game_path is not None:
             if event == "save":
                 game_config.save(values)
@@ -281,7 +296,7 @@ def __main__(splash=False):
             if event == "btn_zax_update":
                 updates.update(zax_latest_data)
 
-            game_config = handle_event(window, event, values, game_path, game_config, games)
+            game_config = handle_event(window, event, values, game_path, game_config, games, zax_config)
 
     zax_config.save()
     window.close()

@@ -9,6 +9,11 @@ class ZaxConfig:
     def __init__(self):
         self.data = self.load()
         self.games = Games(self.data["games"])
+        try:
+            self.theme = self.data["theme"]
+        except:
+            self.theme = "light"
+            self.data["theme"] = "light"
 
     def load(self):
         yaml = ruamel.yaml.YAML(typ="rt")
@@ -46,7 +51,7 @@ class ZaxConfig:
 
             self.games.games = new_games
             self.data["games"] = self.games.games
-
+        self.data["theme"] = self.theme
         with open(zax_yml, "w") as yf:
             yaml.dump(self.data, yf)
 
