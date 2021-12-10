@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import subprocess
-import PySimpleGUIQt as sg
+from theme import sg
 import os
 from PySimpleGUIQt.PySimpleGUIQt import SELECT_MODE_SINGLE
 import layout
@@ -14,7 +14,7 @@ import shutil
 from packaging import version
 from zax_config import ZaxConfig
 from zax_log import log, logger
-from variables import set_theme, backup_dir, log_file, debug_dir
+from variables import backup_dir, log_file, debug_dir
 from version import VERSION
 from layouts.zax import zax_layout
 from games import Games
@@ -120,7 +120,7 @@ def scan(games, window):
 def __main__(splash=False):
     if splash:
         pyi_splash.update_text("Furiously loading...")
-    set_theme(sg)
+
     gui_queue = queue.Queue()  # queue used to communicate between the gui and the threads
 
     sfall_latest_version = None

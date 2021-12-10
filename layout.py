@@ -1,8 +1,8 @@
+from theme import sg
 import layouts.fallout2_cfg as fallout2_cfg
 import layouts.f2_res_ini as f2_res_ini
 import layouts.ddraw_ini as ddraw_ini
 import layouts.wine as wine
-import PySimpleGUIQt as sg
 import layouts.trouble as trouble
 
 

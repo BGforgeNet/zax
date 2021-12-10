@@ -1,9 +1,5 @@
-import PySimpleGUIQt as sg
-
-from variables import BUTTON_DISABLED_COLOR, set_theme
+from theme import sg, BUTTON_DISABLED_COLOR
 from version import VERSION
-
-set_theme(sg)
 
 zax_layout = [
     [sg.HSeperator()],

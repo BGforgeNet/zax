@@ -1,7 +1,7 @@
 from datetime import datetime
 import platform
 import subprocess
-import PySimpleGUIQt as sg
+from theme import sg
 from .common import disable_element, enable_element, frame
 from variables import debug_dir, tmp_dir
 import os

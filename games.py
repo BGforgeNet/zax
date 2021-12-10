@@ -1,14 +1,12 @@
 import os
 from pathlib import Path
 import platform
-import PySimpleGUIQt as sg
-from variables import set_theme
+from theme import sg
 from zax_log import log
 
 
 class Games:
     def __init__(self, games_config):
-        set_theme(sg)
         self.games = games_config  # [{'path': path},] from zax.yml
         self.paths = self.get_paths()
 

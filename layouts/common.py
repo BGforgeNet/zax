@@ -1,9 +1,8 @@
-import PySimpleGUIQt as sg
 import os
 import pprint
 import ruamel.yaml
 from common import resource_path
-from variables import BUTTON_DISABLED_COLOR, BUTTON_ENABLED_COLOR
+from theme import sg, BUTTON_DISABLED_COLOR, BUTTON_ENABLED_COLOR
 
 yaml = ruamel.yaml.YAML(typ="rt")
 

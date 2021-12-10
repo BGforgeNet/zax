@@ -1,15 +1,9 @@
-#!/usr/bin/env python3
-
 from typing import OrderedDict
-import PySimpleGUIQt as sg
-
-from variables import BUTTON_DISABLED_COLOR, set_theme
+from theme import sg, BUTTON_DISABLED_COLOR
 from .common import frame, checkbox, spin, dropdown, qinput, tab, disable_if, get_ini_data
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
-
-set_theme(sg)
 
 c = get_ini_data("ddraw.ini")
 

@@ -1,9 +1,5 @@
-#!/usr/bin/env python3
-
 from typing import OrderedDict
-import PySimpleGUIQt as sg
-
-from variables import set_theme
+from theme import sg
 from .common import (
     frame,
     checkbox,
@@ -21,8 +17,6 @@ from .common import (
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
-
-set_theme(sg)
 
 c = get_ini_data("f2_res.ini")
 

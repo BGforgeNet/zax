@@ -1,15 +1,9 @@
-#!/usr/bin/env python3
-
 from typing import OrderedDict
-import PySimpleGUIQt as sg
-
-from variables import set_theme
+from theme import sg
 from .common import frame, checkbox, spin, dropdown, qinput, tab, get_ini_data, slider, radio
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
-
-set_theme(sg)
 
 c = get_ini_data("fallout2.cfg")
 
