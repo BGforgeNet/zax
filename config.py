@@ -2,6 +2,7 @@ from typing import OrderedDict
 import os
 import io
 import iniparse
+from games import Games
 from zax_log import log
 from common import resource_path
 import ruamel.yaml
@@ -340,7 +341,7 @@ class GameConfig:
             configs[path] = cfg
         return configs
 
-    def load_from_disk(self, window, values):
+    def load_from_disk(self, window, values, games: Games, game_path):
         for c in self.configs:
             new_values = self.configs[c].window_data()
             for key in new_values:
@@ -348,6 +349,10 @@ class GameConfig:
                     window[key](new_values[key])
                 else:
                     log("warning: key {} not found in window".format(key))
+        wine_config = games.get_wine_config(game_path)
+        if wine_config:
+            for k in wine_config:
+                window[k](wine_config[k])
 
     def get_config_paths(self):
         configs = self.config_formats

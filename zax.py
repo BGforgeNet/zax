@@ -10,14 +10,14 @@ import sfall
 import updates
 import queue
 import platform
-import wine
 import shutil
 from packaging import version
+from zax_config import ZaxConfig
 from zax_log import log, logger
-from variables import set_theme, config_dir, backup_dir, log_file, debug_dir
+from variables import set_theme, backup_dir, log_file, debug_dir
 from version import VERSION
 from layouts.zax import zax_layout
-import scan
+from games import Games
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
@@ -30,12 +30,6 @@ try:
     splash = True
 except:
     log("can't import pyi_splash, not compiled by pyinstaller")
-
-
-def get_game_paths(games):
-    game_paths = [g["path"] for g in games]
-    game_paths = sorted(list(set(game_paths)))
-    return game_paths
 
 
 def handle_zax_tab(event):
@@ -64,14 +58,14 @@ def handle_zax_tab(event):
             subprocess.Popen(["xdg-open", log_file])
 
 
-def handle_event(window: sg.Window, event, values: dict, game_path: str, game_config):
+def handle_event(window: sg.Window, event, values: dict, game_path: str, game_config: GameConfig, games: Games):
     if event.startswith("zax-"):
         handle_zax_tab(event)
 
     if event == "listbox_games" or event == "btn_sfall_update":
         window["configs_loaded"](False)
         game_config = GameConfig(game_path)
-        game_config.load_from_disk(window, values)
+        game_config.load_from_disk(window, values, games, game_path)
 
     config_paths = game_config.config_paths
     for p in config_paths:
@@ -92,14 +86,14 @@ def handle_event(window: sg.Window, event, values: dict, game_path: str, game_co
     return game_config
 
 
-def launch_game(path, wine_prefix=None, wine_debug=None, sfall_version=None):
+def launch_game(path, wine_prefix="", wine_debug="", sfall_version=None):
     try:
         subprocess.CREATE_NEW_PROCESS_GROUP
     except AttributeError:
         my_env = os.environ.copy()
-        if wine_prefix and wine_prefix != "":
+        if wine_prefix != "":
             my_env["WINEPREFIX"] = wine_prefix
-        if wine_debug and wine_debug != "":
+        if wine_debug != "":
             my_env["WINEDEBUG"] = wine_debug
         if version.parse(sfall_version) < version.parse("4.1.2"):
             my_env["WINEDLLOVERRIDES"] = "ddraw.dll=n"
@@ -112,6 +106,14 @@ def launch_game(path, wine_prefix=None, wine_debug=None, sfall_version=None):
         # Windows
         args = "fallout2.exe"
         subprocess.Popen(args, cwd=path, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+
+
+def scan(games, window):
+    games.scan()
+    if len(games.paths) > 0:
+        window["listbox_games"](values=games.paths)
+        window["listbox_games"](set_to_index=0)
+    log("finished scanning")
 
 
 @logger.catch
@@ -127,24 +129,14 @@ def __main__(splash=False):
     zax_latest_version = None
     updates.launch_latest_check(gui_queue)
     game_config = None
-    game_paths = []
+    zax_config = ZaxConfig()
+    games = zax_config.games
     game_path = None
+
     wine_visible = False
-
-    zax_yml = os.path.join(config_dir, "zax.yml")
-    config = {}
-    games = []
-    if os.path.isfile(zax_yml):
-        try:
-            with open(zax_yml) as yf:
-                config = yaml.load(yf)
-            games = config["games"]
-            game_paths = get_game_paths(games)
-        except:
-            os.makedirs(config_dir, exist_ok=True)
-
     if platform.system() != "Windows":
         wine_visible = True
+
     settings_tabs = [
         sg.Tab("Game", [[layout.layout["fallout2.cfg"]]], key="tab-fallout2.cfg"),
         sg.Tab("HiRes", [[layout.layout["f2_res.ini"]]], key="tab-f2_res.ini"),
@@ -170,7 +162,7 @@ def __main__(splash=False):
     games_layout = [
         [
             sg.Listbox(
-                values=game_paths,
+                values=games.paths,
                 size=(23, 17),
                 key="listbox_games",
                 enable_events=True,
@@ -214,13 +206,7 @@ def __main__(splash=False):
         window["listbox_games"](set_to_index=0)
         log("found games!")
     except:
-        log("no games in list found, scanning")
-        games = scan.games()
-        if len(games) > 0:
-            game_paths = get_game_paths(games)
-            window["listbox_games"](values=game_paths)
-            window["listbox_games"](set_to_index=0)
-        log("finished scanning")
+        scan(games, window)
 
     # this hack allows to trigger ui updates after game list changes
     window["configs_loaded"](False)
@@ -235,39 +221,27 @@ def __main__(splash=False):
             game_path = values["listbox_games"][0]
             sfall_current = sfall.get_current(game_path)
             sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
-            wine.load(games, game_path, window)
 
         if event == sg.WIN_CLOSED:
             break
 
         if event == "btn_zax_scan":
-            log("scanning for games")
-            games = scan.games(games)
-            if len(games) > 0:
-                game_paths = get_game_paths(games)
-                window["listbox_games"](values=game_paths)
-                window["listbox_games"](set_to_index=0)
-            log("finished scanning")
+            scan(games, window)
+            continue
 
         if event == "add-game":
-            dname = sg.popup_get_folder("Enter game path")
-            if scan.is_f2_game(dname):
-                old_game_paths = get_game_paths(games)
-                if dname in old_game_paths:
-                    sg.popup("This game is already on the list!")
-                else:
-                    games.append({"path": dname})
-                    game_paths = get_game_paths(games)
-                    window["listbox_games"](values=game_paths)
-                    new_game_index = game_paths.index(dname)
-                    window["listbox_games"](set_to_index=new_game_index)
-            elif dname is not None:
-                sg.popup("fallout2.exe not found in directory {}".format(dname))
+            dir_path = sg.popup_get_folder("Enter game path")
+            if dir_path:  # if a dir is selected
+                zax_config.add_game(dir_path)
+                window["listbox_games"](values=games.paths)
+                new_game_index = games.paths.index(dir_path)
+                window["listbox_games"](set_to_index=new_game_index)
+                continue
 
         if game_path is not None:
             if event == "save":
                 game_config.save(values)
-                wine.save(zax_yml, config, games, game_path, values)
+                zax_config.save(game_path, wine_prefix=values["wine_prefix"], wine_debug=values["wine_debug"])
 
             if event == "play":
                 launch_game(
@@ -276,13 +250,15 @@ def __main__(splash=False):
                     wine_debug=values["wine_debug"],
                     sfall_version=sfall_current,
                 )
+                continue
 
             if event == "remove-game":
-                games = [g for g in games if g["path"] != game_path]
-                game_paths = get_game_paths(games)
-                window["listbox_games"](values=game_paths)
-                if len(games) > 0:
+                zax_config.remove_game(game_path)
+                window["listbox_games"](values=games.paths)
+                if len(games.paths) > 0:
                     window["listbox_games"](set_to_index=0)
+                    game_path = games.paths[0]
+                continue
 
             # background process handling
             try:
@@ -305,11 +281,9 @@ def __main__(splash=False):
             if event == "btn_zax_update":
                 updates.update(zax_latest_data)
 
-            game_config = handle_event(window, event, values, game_path, game_config)
+            game_config = handle_event(window, event, values, game_path, game_config, games)
 
-    config["games"] = games
-    with open(zax_yml, "w") as yf:
-        yaml.dump(config, yf)
+    zax_config.save()
     window.close()
 
 
