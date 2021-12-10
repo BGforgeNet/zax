@@ -1,6 +1,7 @@
-import PySimpleGUIQt as pysg
+import PySimpleGUIQt as sg
 import ruamel.yaml
 from variables import zax_yml
+
 # some notable themes
 # THEME = "Dark Brown"
 # THEME = "material 3"
@@ -10,11 +11,8 @@ from variables import zax_yml
 # THEME = "dark grey 7"
 # THEME = "reddit"
 
-BUTTON_ENABLED_COLOR = ("white", "#004880")
-BUTTON_DISABLED_COLOR = ("white", "grey")
 
-
-def init(pysg):
+def get_theme():
     # ZaxConfig is not initialized yet, loading theme manially
     yaml = ruamel.yaml.YAML(typ="rt")
     try:
@@ -23,13 +21,16 @@ def init(pysg):
             theme = config["theme"]
     except:
         theme = "light"
-
-    if theme == "light":
-        pysg.theme("reddit")
-        pysg.theme_button_color(BUTTON_ENABLED_COLOR)  # more contrast for button names
-    else:
-        pysg.theme("Dark Brown")
-    return pysg
+    return theme
 
 
-sg = init(pysg)
+theme = get_theme()
+if theme == "light":
+    BUTTON_ENABLED_COLOR = ("white", "#004880")
+    BUTTON_DISABLED_COLOR = ("white", "grey")
+    sg.theme("reddit")
+    sg.theme_button_color(BUTTON_ENABLED_COLOR)  # more contrast for button names
+else:
+    sg.theme("Dark Brown")
+    BUTTON_ENABLED_COLOR = sg.theme_button_color()
+    BUTTON_DISABLED_COLOR = ("grey", "#333333")
