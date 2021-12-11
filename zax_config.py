@@ -17,7 +17,7 @@ class ZaxConfig:
 
     def load(self):
         yaml = ruamel.yaml.YAML(typ="rt")
-        config = {}
+        config = {"games": []}
         if os.path.isfile(zax_yml):
             try:
                 with open(zax_yml) as yf:
@@ -52,6 +52,7 @@ class ZaxConfig:
             self.games.games = new_games
             self.data["games"] = self.games.games
         self.data["theme"] = self.theme
+        os.makedirs(os.path.dirname(zax_yml), exist_ok=True)
         with open(zax_yml, "w") as yf:
             yaml.dump(self.data, yf)
 

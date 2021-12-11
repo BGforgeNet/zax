@@ -252,7 +252,7 @@ def __main__(splash=False):
                 new_game_index = games.paths.index(dir_path)
                 window["listbox_games"](set_to_index=new_game_index)
                 continue
-        log(game_path)
+
         if game_path is not None:
             if event == "save":
                 game_config.save(values)
@@ -273,6 +273,9 @@ def __main__(splash=False):
                 if len(games.paths) > 0:
                     window["listbox_games"](set_to_index=0)
                     game_path = games.paths[0]
+                else:
+                    game_path = None
+                    game_config = None
                 continue
 
             # background process handling
