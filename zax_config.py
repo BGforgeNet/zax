@@ -17,13 +17,13 @@ class ZaxConfig:
 
     def load(self):
         yaml = ruamel.yaml.YAML(typ="rt")
+        config = {}
         if os.path.isfile(zax_yml):
             try:
                 with open(zax_yml) as yf:
                     config = yaml.load(yf)
             except:
                 os.makedirs(self.config_dir, exist_ok=True)
-                config = {}
         return config
 
     def save(self, game_path=None, wine_prefix="", wine_debug=""):
