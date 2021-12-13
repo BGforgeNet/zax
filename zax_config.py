@@ -48,9 +48,15 @@ class ZaxConfig:
                     if ("wine_debug" in g) and (g["wine_debug"] != "") and (g["wine_debug"] is not None):
                         ng["wine_debug"] = g["wine_debug"]
                 new_games.append(ng)
-
             self.games.games = new_games
             self.data["games"] = self.games.games
+
+        # sort
+        new_games = [g for g in self.games.games]
+        new_games = sorted(new_games, key=lambda k: k["path"])
+        self.games.games = new_games
+        self.data["games"] = self.games.games
+
         self.data["theme"] = self.theme
         os.makedirs(os.path.dirname(zax_yml), exist_ok=True)
         with open(zax_yml, "w") as yf:
