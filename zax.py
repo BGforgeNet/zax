@@ -171,7 +171,7 @@ def __main__(splash=False):
     games_ilb = ilb.ImageListBox(
         [g["path"] for g in games.games],
         headings=["tree_games"],
-        num_rows=10,
+        num_rows=25,
         size=(24 * 9, 10 * 10),
         pad=((12, 5), (10, 10)),
         # size=(23, 17),
