@@ -132,7 +132,7 @@ class ImageListBox:
         self.widget.setRootIsDecorated(False)
         self._set_tooltip_style()
         self._hide_header()
-        if select_first:
+        if select_first and (len(self.treedata.tree_dict) > 1):
             self._select_first()
         self._set_tooltips()
 

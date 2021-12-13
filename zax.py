@@ -4,7 +4,6 @@ import subprocess
 import sys
 from theme import sg
 import os
-from PySimpleGUIQt.PySimpleGUIQt import SELECT_MODE_SINGLE
 import layout
 from config import GameConfig
 import sfall
@@ -72,7 +71,7 @@ def handle_event(
     if event.startswith("zax-") or event == "btn_zax_theme_restart":
         handle_zax_tab(event, values, zax_config)
 
-    if event == "listbox_games" or event == "btn_sfall_update":
+    if event == "tree_games" or event == "btn_sfall_update":
         window["configs_loaded"](False)
         game_config = GameConfig(game_path)
         game_config.load_from_disk(window, values, games, game_path)
@@ -90,7 +89,7 @@ def handle_event(
     ):
         layout.handle_non_config_event("trouble", window, event, values, game_config, game_path)
 
-    if event == "listbox_games":
+    if event == "tree_games":
         window["configs_loaded"](True)
 
     return game_config
@@ -118,11 +117,12 @@ def launch_game(path, wine_prefix="", wine_debug="", sfall_version=None):
         subprocess.Popen(args, cwd=path, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
 
 
-def scan(games, window):
+def scan(games, games_ilb):
     games.scan()
+    print(games.paths)
     if len(games.paths) > 0:
-        window["listbox_games"](values=games.paths)
-        window["listbox_games"](set_to_index=0)
+        games_ilb.update(values=games.paths)
+        games_ilb.select(0)
     log("finished scanning")
 
 
@@ -178,22 +178,11 @@ def __main__(splash=False):
         select_mode=ilb.SELECT_MODE_SINGLE,
         enable_events=True,
         key="tree_games",
-        default_icon=ilb.icon_folder
+        default_icon=ilb.icon_folder,
     )
 
     games_layout = [
         [games_ilb.element],
-        [
-            sg.Listbox(
-                values=games.paths,
-                size=(23, 17),
-                key="listbox_games",
-                enable_events=True,
-                select_mode=SELECT_MODE_SINGLE,
-                pad=((12, 5), (10, 10)),  # ((left, right), (top, bottom)) - for some reason it's skewed to the left
-                visible=False
-            )
-        ],
         [sg.Button("Add game", key="add-game")],
         [sg.Button("Remove from list", key="remove-game")],
     ]
@@ -227,16 +216,14 @@ def __main__(splash=False):
     window = sg.Window("ZAX", main_layout, finalize=True)
 
     try:
-        window["listbox_games"](set_to_index=0)
+        games_ilb.init_finalize(select_first=True)
         event, values = window.read()
-        game_path = values["listbox_games"][0]
+        game_path = games_ilb.value(values)[0]
         game_config = GameConfig(game_path)
         game_config.load_from_disk(window, values, games, game_path)
         log("found games!")
     except:
-        scan(games, window)
-
-    games_ilb.init_finalize(select_first=True)
+        scan(games, window, games_ilb)
 
     window["dd_zax_theme"](zax_config.theme)
 
@@ -252,11 +239,9 @@ def __main__(splash=False):
             log("value = {}".format(values[event]))
             if event == "tree_games":
                 log(games_ilb.value(values))
-            # if type(window[event]) is sg.Tree:
-            #     log(sg.obj_to_string(window[event]))
 
-        if event == "listbox_games" and values["listbox_games"]:
-            game_path = values["listbox_games"][0]
+        if event == "tree_games":
+            game_path = games_ilb.value(values)[0]
             sfall_current = sfall.get_current(game_path)
             sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
 
@@ -264,17 +249,13 @@ def __main__(splash=False):
             break
 
         if event == "btn_zax_scan":
-            scan(games, window)
+            scan(games, games_ilb)
             continue
 
         if event == "add-game":
             dir_path = sg.popup_get_folder("Enter game path")
             if dir_path:  # if a dir is selected
                 zax_config.add_game(dir_path)
-                window["listbox_games"](values=games.paths)
-                new_game_index = games.paths.index(dir_path)
-                window["listbox_games"](set_to_index=new_game_index)
-
                 games_ilb.update(values=games.paths)
                 games_ilb.select(dir_path)
                 continue
@@ -295,11 +276,9 @@ def __main__(splash=False):
 
             if event == "remove-game":
                 zax_config.remove_game(game_path)
-                window["listbox_games"](values=games.paths)
+                games_ilb.update(values=games.paths)
                 if len(games.paths) > 0:
-                    window["listbox_games"](set_to_index=0)
                     game_path = games.paths[0]
-                    games_ilb.update(values=games.paths)
                     games_ilb.select(0)
                 else:
                     game_path = None
