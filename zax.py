@@ -299,6 +299,8 @@ def __main__(splash=False):
                 if len(games.paths) > 0:
                     window["listbox_games"](set_to_index=0)
                     game_path = games.paths[0]
+                    games_ilb.update(values=games.paths)
+                    games_ilb.select(0)
                 else:
                     game_path = None
                     game_config = None
