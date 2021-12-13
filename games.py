@@ -7,13 +7,23 @@ from zax_log import log
 
 class Games:
     def __init__(self, games_config):
-        self.games = games_config  # [{'path': path},] from zax.yml
+        self.games = []
+        for g in games_config:  # [{'path': path},] from zax.yml
+            g["type"] = self.game_type(g["path"])
+            self.games.append(g)
         self.paths = self.get_paths()
+        self.paths_with_icons = self._games_with_icons()
 
     def get_paths(self):
         paths = [g["path"] for g in self.games]
         paths = sorted(list(set(paths)))
         return paths
+
+    def _games_with_icons(self):
+        values = []
+        for g in self.games:
+            values.append([g["path"], "icons/{}.png".format(g["type"])])
+        return values
 
     def get_wine_config(self, path):
         if platform.system == "Windows":
@@ -32,20 +42,27 @@ class Games:
         if not os.path.isdir(path):
             sg.popup("{} is not a directory!".format(path))
             return False
-        if self.game_type(path) is not None:
+        type = self.game_type(path)
+        if type is not None:
             if path in self.paths:
                 sg.popup("This game is already on the list!")
             else:
-                self.games.append({"path": path})
+                self.games.append({"path": path, "type": type})
         self.paths = self.get_paths()
+        self.paths_with_icons = self._games_with_icons()
 
     def remove(self, path):
         self.games = [g for g in self.games if g["path"] != path]
         self.paths = self.get_paths()
+        self.paths_with_icons = self._games_with_icons()
 
     def game_type(self, path):
         files = [f.lower() for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
         if "fallout2.exe" in files:
+            if os.path.exists(os.path.join(path, "mods", "rpu.dat")):
+                return "fallout2rpu"
+            if os.path.exists(os.path.join(path, "mods", "upu.dat")):
+                return "fallout2upu"
             return "fallout2"
         return None
 
@@ -73,4 +90,5 @@ class Games:
             if os.path.isdir(d) and self.game_type(d) and d not in self.paths:
                 log("found game: {}".format(d))
                 self.games.append({"path": d})
-                self.paths = self.get_paths()
+        self.paths = self.get_paths()
+        self.paths_with_icons = self._games_with_icons()

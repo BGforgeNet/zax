@@ -119,9 +119,8 @@ def launch_game(path, wine_prefix="", wine_debug="", sfall_version=None):
 
 def scan(games, games_ilb):
     games.scan()
-    print(games.paths)
     if len(games.paths) > 0:
-        games_ilb.update(values=games.paths)
+        games_ilb.update(values=games.paths_with_icons)
         games_ilb.select(0)
     log("finished scanning")
 
@@ -169,7 +168,7 @@ def __main__(splash=False):
         ],
     ]
     games_ilb = ilb.ImageListBox(
-        [g["path"] for g in games.games],
+        games.paths_with_icons,
         headings=["tree_games"],
         num_rows=25,
         size=(24 * 9, 10 * 10),
@@ -179,7 +178,8 @@ def __main__(splash=False):
         enable_events=True,
         key="tree_games",
         default_icon=ilb.icon_folder,
-        font='Helvetica 12'
+        font="Helvetica 12",
+        icon_size=(40, 40)
     )
 
     games_layout = [
@@ -257,7 +257,7 @@ def __main__(splash=False):
             dir_path = sg.popup_get_folder("Enter game path")
             if dir_path:  # if a dir is selected
                 zax_config.add_game(dir_path)
-                games_ilb.update(values=games.paths)
+                games_ilb.update(values=games.paths_with_icons)
                 games_ilb.select(dir_path)
                 continue
 
@@ -277,7 +277,7 @@ def __main__(splash=False):
 
             if event == "remove-game":
                 zax_config.remove_game(game_path)
-                games_ilb.update(values=games.paths)
+                games_ilb.update(values=games.paths_with_icons)
                 if len(games.paths) > 0:
                     game_path = games.paths[0]
                     games_ilb.select(0)

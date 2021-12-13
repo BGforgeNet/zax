@@ -1,3 +1,4 @@
+from PySide2.QtCore import QSize
 from PySide2.QtWidgets import QTreeWidgetItemIterator
 import cssutils
 
@@ -53,6 +54,7 @@ class ImageListBox:
         size_px=(None, None),
         metadata=None,
         default_icon=None,
+        icon_size=None
     ):
         self.values = values
         self.headings = headings
@@ -76,6 +78,7 @@ class ImageListBox:
         self.size_px = size_px
         self.metadata = metadata
         self.default_icon = default_icon
+        self.icon_size = icon_size
 
         self.treedata = sg.TreeData()
         self._insert_values(values)
@@ -135,6 +138,8 @@ class ImageListBox:
         if select_first and (len(self.treedata.tree_dict) > 1):
             self._select_first()
         self._set_tooltips()
+        if self.icon_size is not None:
+            self.widget.setIconSize(QSize(self.icon_size[0], self.icon_size[1]))
 
     def value(self, values):
         tree_values = values[self.key]
