@@ -179,6 +179,7 @@ def __main__(splash=False):
         enable_events=True,
         key="tree_games",
         default_icon=ilb.icon_folder,
+        font='Helvetica 12'
     )
 
     games_layout = [
