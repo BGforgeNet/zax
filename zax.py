@@ -274,6 +274,9 @@ def __main__(splash=False):
                 window["listbox_games"](values=games.paths)
                 new_game_index = games.paths.index(dir_path)
                 window["listbox_games"](set_to_index=new_game_index)
+
+                games_ilb.update(values=games.paths)
+                games_ilb.select(dir_path)
                 continue
 
         if game_path is not None:

@@ -78,17 +78,7 @@ class ImageListBox:
         self.default_icon = default_icon
 
         self.treedata = sg.TreeData()
-        # values can be string "text" or list ["text", "icon"]
-        i = 0
-        for v in values:
-            if type(v) is str:
-                if self.default_icon is not None:
-                    self.treedata.insert("", "{}-{}".format(self.key, i), v, [], icon=default_icon)
-                else:
-                    self.treedata.insert("", "{}-{}".format(self.key, i), v, [])
-            else:
-                self.treedata.insert("", "{}-{}".format(self.key, i), v[0], [], icon=v[1])
-            i += 1
+        self._insert_values(values)
 
         self.element = sg.Tree(
             self.treedata,
@@ -114,14 +104,37 @@ class ImageListBox:
             metadata=self.metadata,
         )
 
+    def _insert_values(self, values):
+        for v in values:
+            self._insert_value(v)
+
+    def _insert_value(self, v):
+        # values can be string "text" or list ["text", "icon"]
+        i = len(self.treedata.tree_dict) - 1  # exclude root node
+        if type(v) is str:
+            if self.default_icon is not None:
+                self.treedata.insert("", "{}-{}".format(self.key, i), v, [], icon=self.default_icon)
+            else:
+                self.treedata.insert("", "{}-{}".format(self.key, i), v, [])
+        else:
+            self.treedata.insert("", "{}-{}".format(self.key, i), v[0], [], icon=v[1])
+
+    def update(self, values):
+        self.values = values
+        self.treedata = sg.TreeData()
+        self.widget.clear()
+        self._insert_values(values)
+        self.element.update(self.treedata)
+        self._set_tooltips()
+
     def init_finalize(self, select_first=False):
         self.widget = self.element.Widget
         self.widget.setRootIsDecorated(False)
-        self.set_tooltip_style()
-        self.hide_header()
+        self._set_tooltip_style()
+        self._hide_header()
         if select_first:
-            self.select_first()
-        self.set_tooltips()
+            self._select_first()
+        self._set_tooltips()
 
     def value(self, values):
         tree_values = values[self.key]
@@ -131,12 +144,28 @@ class ImageListBox:
             ret.append(self.treedata.tree_dict[key].text)
         return ret
 
-    def select_first(self):
-        first = QTreeWidgetItemIterator(self.widget).value()
-        self.widget.setCurrentItem(first)
+    def _select_first(self):
+        self.select(0)
+
+    def select(self, item):  # item text or ordinal number
+        it = QTreeWidgetItemIterator(self.widget)
+        i = 0
+        if type(item) is int:
+            while it:
+                if i == item:
+                    self.widget.setCurrentItem(it.value())
+                    break
+                it += 1
+                i += 1
+        else:
+            while it:
+                if it.value().text(0) == item:
+                    self.widget.setCurrentItem(it.value())
+                    break
+                it += 1
 
     # for some reason tooltips have no style, copying it from the tree
-    def set_tooltip_style(self):
+    def _set_tooltip_style(self):
         w_style = self.widget.styleSheet()
         sheet = cssutils.parseString(w_style)
         rule = [r for r in sheet if (r.type == r.STYLE_RULE) and (r.selectorText == "QTreeWidget")][0]
@@ -147,7 +176,7 @@ class ImageListBox:
         style = "{} {}".format(w_style, style)
         self.widget.setStyleSheet(style)
 
-    def set_tooltips(self):
+    def _set_tooltips(self):
         it = QTreeWidgetItemIterator(self.widget)
         while it.value():
             row = it.value()
@@ -156,5 +185,5 @@ class ImageListBox:
                 it.value().setToolTip(0, text)
             it += 1
 
-    def hide_header(self):
+    def _hide_header(self):
         self.widget.setHeaderHidden(True)
