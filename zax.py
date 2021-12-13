@@ -20,6 +20,7 @@ from layouts.zax import zax_layout
 from games import Games
 from zax_config import ZaxConfig
 import ruamel.yaml
+import image_listbox as ilb
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
@@ -167,8 +168,21 @@ def __main__(splash=False):
             )
         ],
     ]
+    games_ilb = ilb.ImageListBox(
+        [g["path"] for g in games.games],
+        headings=["tree_games"],
+        num_rows=10,
+        size=(24 * 9, 10 * 10),
+        pad=((12, 5), (10, 10)),
+        # size=(23, 17),
+        select_mode=ilb.SELECT_MODE_SINGLE,
+        enable_events=True,
+        key="tree_games",
+        default_icon=ilb.icon_folder
+    )
 
     games_layout = [
+        [games_ilb.element],
         [
             sg.Listbox(
                 values=games.paths,
@@ -177,6 +191,7 @@ def __main__(splash=False):
                 enable_events=True,
                 select_mode=SELECT_MODE_SINGLE,
                 pad=((12, 5), (10, 10)),  # ((left, right), (top, bottom)) - for some reason it's skewed to the left
+                visible=False
             )
         ],
         [sg.Button("Add game", key="add-game")],
@@ -221,6 +236,8 @@ def __main__(splash=False):
     except:
         scan(games, window)
 
+    games_ilb.init_finalize(select_first=True)
+
     window["dd_zax_theme"](zax_config.theme)
 
     # this hack allows to trigger ui updates after game list changes
@@ -231,6 +248,12 @@ def __main__(splash=False):
         event, values = window.read()
 
         log("event = {}".format(event))
+        if event in values:
+            log("value = {}".format(values[event]))
+            if event == "tree_games":
+                log(games_ilb.value(values))
+            # if type(window[event]) is sg.Tree:
+            #     log(sg.obj_to_string(window[event]))
 
         if event == "listbox_games" and values["listbox_games"]:
             game_path = values["listbox_games"][0]
