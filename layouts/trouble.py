@@ -93,6 +93,7 @@ def handle_event(window: sg.Window, event: str, values, game_config, game_path=N
     if event == "btn_trouble_package_debug":
         with cd(game_path):
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            os.makedirs(debug_dir, exist_ok=True)
             zip_path = os.path.join(debug_dir, "zax_debug_{}.zip".format(timestamp))
             with ZipFile(zip_path, "w", ZIP_DEFLATED) as zip_h:
                 for f in os.listdir("."):
