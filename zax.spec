@@ -7,7 +7,10 @@ block_cipher = None
 a = Analysis(['zax.py'],
              pathex=[],
              binaries=[],
-             datas=[('formats/*.yml', 'formats')],
+             datas=[
+                ('formats/*.yml', 'formats'),
+                ('icons/*.png', 'icons')
+             ],
              hiddenimports=[],
              hookspath=[],
              hooksconfig={},
