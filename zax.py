@@ -214,7 +214,7 @@ def __main__(splash=False):
 
     if splash:
         pyi_splash.close()
-    window = sg.Window("ZAX", main_layout, finalize=True)
+    window = sg.Window("ZAX", main_layout, finalize=True, resizable=False)
 
     try:
         games_ilb.init_finalize(select_first=True)
