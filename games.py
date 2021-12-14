@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import platform
+from common import resource_path
 from theme import sg
 from zax_log import log
 
@@ -20,9 +21,10 @@ class Games:
         return paths
 
     def _games_with_icons(self):
+        icons_dir = resource_path("icons")
         values = []
         for g in self.games:
-            values.append([g["path"], "icons/{}.png".format(g["type"])])
+            values.append([g["path"], os.path.join(icons_dir, "{}.png".format(g["type"]))])
         return values
 
     def get_wine_config(self, path):
