@@ -18,11 +18,8 @@ from version import VERSION
 from layouts.zax import zax_layout
 from games import Games
 from zax_config import ZaxConfig
-import ruamel.yaml
 import image_listbox as ilb
 from images.zax_png import zax_icon
-
-yaml = ruamel.yaml.YAML(typ="rt")
 
 # splash only working when compiled
 splash = False
