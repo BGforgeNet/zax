@@ -20,6 +20,7 @@ from games import Games
 from zax_config import ZaxConfig
 import ruamel.yaml
 import image_listbox as ilb
+from images.zax_png import zax_icon
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
@@ -214,7 +215,7 @@ def __main__(splash=False):
 
     if splash:
         pyi_splash.close()
-    window = sg.Window("ZAX", main_layout, finalize=True, resizable=False)
+    window = sg.Window("ZAX", main_layout, finalize=True, resizable=False, icon=zax_icon)
 
     try:
         games_ilb.init_finalize(select_first=True)
