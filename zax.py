@@ -225,16 +225,19 @@ def __main__(splash=False):
         pyi_splash.close()
     window = sg.Window("ZAX", main_layout, finalize=True, resizable=False, icon=zax_icon)
 
-    try:
-        games_ilb.init_finalize(select_first=True)
+    games_ilb.init_finalize(select_first=True)
+
+    if len(games.paths) == 0:
+        scan(games, games_ilb)
+    if len(games.paths) > 0:
+        log("found games!")
+        games_ilb.update(values=games.paths_with_icons)
+        games_ilb.select(0)
         event, values = window.read()
         game_path = games_ilb.value(values)[0]
         game_config = GameConfig(game_path)
         game_config.load_from_disk(window, values, games, game_path)
-        log("found games!")
-    except:
-        scan(games, games_ilb)
-        update_tabs(games, window)
+    update_tabs(games, window)
 
     window["dd_zax_theme"](zax_config.theme)
 
@@ -274,6 +277,17 @@ def __main__(splash=False):
                 games_ilb.select(dir_path)
                 continue
 
+        if event == "remove-game":
+            if len(games.paths) > 0:
+                zax_config.remove_game(game_path)
+                games_ilb.update(values=games.paths_with_icons)
+                if len(games.paths) > 0:
+                    game_path = games.paths[0]
+                    games_ilb.select(0)
+                else:
+                    game_path = None
+                    game_config = None
+
         if game_path is not None:
             if event == "save":
                 game_config.save(values)
@@ -286,17 +300,6 @@ def __main__(splash=False):
                     wine_debug=values["wine_debug"],
                     sfall_version=sfall_current,
                 )
-                continue
-
-            if event == "remove-game":
-                zax_config.remove_game(game_path)
-                games_ilb.update(values=games.paths_with_icons)
-                if len(games.paths) > 0:
-                    game_path = games.paths[0]
-                    games_ilb.select(0)
-                else:
-                    game_path = None
-                    game_config = None
                 continue
 
             # background process handling
