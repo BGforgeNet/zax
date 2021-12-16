@@ -156,14 +156,14 @@ def __main__(splash=False):
         wine_visible = True
 
     settings_tabs = [
-        sg.Tab("Game", [[layout.layout["fallout2.cfg"]]], key="tab-fallout2.cfg"),
-        sg.Tab("HiRes", [[layout.layout["f2_res.ini"]]], key="tab-f2_res.ini"),
-        sg.Tab("Sfall", [[layout.layout["ddraw.ini"]]], key="tab-ddraw.ini"),
-        sg.Tab("Wine", layout.layout["wine"], key="tab-wine", visible=wine_visible),
+        sg.Tab("Game", [[layout.layout["fallout2.cfg"]]], key="tab_fallout2.cfg"),
+        sg.Tab("HiRes", [[layout.layout["f2_res.ini"]]], key="tab_f2_res.ini"),
+        sg.Tab("Sfall", [[layout.layout["ddraw.ini"]]], key="tab_ddraw.ini"),
+        sg.Tab("Wine", layout.layout["wine"], key="tab_wine", visible=wine_visible),
     ]
 
     settings_layout = [
-        [sg.TabGroup([settings_tabs], enable_events=True, key="tab-settings-sub")],
+        [sg.TabGroup([settings_tabs], enable_events=True, key="tab_settings_sub")],
         [sg.Button("btn_save", key="btn_save")],
         [sg.Button("btn_play", key="btn_play")],
         # checkbox is a hack for triggering event to disable elements after config loading
