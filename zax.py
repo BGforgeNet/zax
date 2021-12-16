@@ -164,8 +164,8 @@ def __main__(splash=False):
 
     settings_layout = [
         [sg.TabGroup([settings_tabs], enable_events=True, key="tab-settings-sub")],
-        [sg.Button("Save", key="save")],
-        [sg.Button("Play", key="play")],
+        [sg.Button("btn_save", key="btn_save")],
+        [sg.Button("btn_play", key="btn_play")],
         # checkbox is a hack for triggering event to disable elements after config loading
         [
             sg.Checkbox(
@@ -193,8 +193,8 @@ def __main__(splash=False):
 
     games_layout = [
         [games_ilb.element],
-        [sg.Button("Add game", key="add-game")],
-        [sg.Button("Remove from list", key="remove-game")],
+        [sg.Button("Add game", key="btn_add_game")],
+        [sg.Button("Remove from list", key="btn_remove_game")],
     ]
 
     left_col = [[sg.TabGroup([[sg.Tab("Games", games_layout), sg.Tab("ZAX", zax_layout)]])]]
@@ -269,7 +269,7 @@ def __main__(splash=False):
             scan(games, games_ilb)
             continue
 
-        if event == "add-game":
+        if event == "btn_add_game":
             dir_path = sg.popup_get_folder("Enter game path")
             if dir_path:  # if a dir is selected
                 zax_config.add_game(dir_path)
@@ -277,7 +277,7 @@ def __main__(splash=False):
                 games_ilb.select(dir_path)
                 continue
 
-        if event == "remove-game":
+        if event == "btn_remove_game":
             if len(games.paths) > 0:
                 zax_config.remove_game(game_path)
                 games_ilb.update(values=games.paths_with_icons)
@@ -289,11 +289,11 @@ def __main__(splash=False):
                     game_config = None
 
         if game_path is not None:
-            if event == "save":
+            if event == "btn_save":
                 game_config.save(values)
                 zax_config.save(game_path, wine_prefix=values["wine_prefix"], wine_debug=values["wine_debug"])
 
-            if event == "play":
+            if event == "btn_play":
                 launch_game(
                     game_path,
                     wine_prefix=values["wine_prefix"],
