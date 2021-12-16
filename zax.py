@@ -115,12 +115,23 @@ def launch_game(path, wine_prefix="", wine_debug="", sfall_version=None):
         subprocess.Popen(args, cwd=path, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
 
 
-def scan(games, games_ilb):
+def scan(games: Games, games_ilb: ilb.ImageListBox):
     games.scan()
     if len(games.paths) > 0:
         games_ilb.update(values=games.paths_with_icons)
         games_ilb.select(0)
     log("finished scanning")
+
+
+def update_tabs(games: Games, window):
+    if len(games.paths) == 0:
+        for tab_key in ["tab_settings", "tab_trouble"]:
+            window[tab_key](disabled=True, visible=False)
+        log("disabled tabs")
+    else:
+        for tab_key in ["tab_settings", "tab_trouble"]:
+            window[tab_key](disabled=False, visible=True)
+        log("enabled tabs")
 
 
 @logger.catch
@@ -177,7 +188,7 @@ def __main__(splash=False):
         key="tree_games",
         default_icon=ilb.icon_folder,
         font="Helvetica 12",
-        icon_size=(40, 40)
+        icon_size=(40, 40),
     )
 
     games_layout = [
@@ -192,8 +203,8 @@ def __main__(splash=False):
             sg.TabGroup(
                 [
                     [
-                        sg.Tab("Settings", settings_layout),
-                        sg.Tab("Troubleshooting", layout.layout["trouble"]),
+                        sg.Tab("Settings", settings_layout, key="tab_settings"),
+                        sg.Tab("Troubleshooting", layout.layout["trouble"], key="tab_trouble"),
                     ]
                 ],
                 key="tg_main",
@@ -222,7 +233,8 @@ def __main__(splash=False):
         game_config.load_from_disk(window, values, games, game_path)
         log("found games!")
     except:
-        scan(games, window, games_ilb)
+        scan(games, games_ilb)
+        update_tabs(games, window)
 
     window["dd_zax_theme"](zax_config.theme)
 
@@ -239,13 +251,16 @@ def __main__(splash=False):
             if event == "tree_games":
                 log(games_ilb.value(values))
 
-        if event == "tree_games":
-            game_path = games_ilb.value(values)[0]
-            sfall_current = sfall.get_current(game_path)
-            sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
-
         if event == sg.WIN_CLOSED:
             break
+
+        update_tabs(games, window)
+
+        if event == "tree_games":
+            if len(games.paths) > 0:
+                game_path = games_ilb.value(values)[0]
+                sfall_current = sfall.get_current(game_path)
+                sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
 
         if event == "btn_zax_scan":
             scan(games, games_ilb)
