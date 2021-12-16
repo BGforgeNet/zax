@@ -91,6 +91,8 @@ class Games:
         for d in DIR_LIST:
             if os.path.isdir(d) and self.game_type(d) and d not in self.paths:
                 log("found game: {}".format(d))
-                self.games.append({"path": d})
+                gtype = self.game_type(d)
+                if gtype is not None:
+                    self.games.append({"path": d, "type": gtype})
         self.paths = self.get_paths()
         self.paths_with_icons = self._games_with_icons()
