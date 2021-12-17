@@ -34,3 +34,5 @@ else:
     sg.theme("Dark Brown")
     BUTTON_ENABLED_COLOR = sg.theme_button_color()
     BUTTON_DISABLED_COLOR = ("grey", "#333333")
+
+TEXT_DISABLED_COLOR = "grey"

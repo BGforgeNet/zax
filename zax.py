@@ -20,6 +20,7 @@ from games import Games
 from zax_config import ZaxConfig
 import image_listbox as ilb
 from images.zax_png import zax_icon
+from pyqt_hacks import enable_tab, disable_tab
 
 # splash only working when compiled
 splash = False
@@ -70,7 +71,7 @@ def handle_event(
         handle_zax_tab(event, values, zax_config)
 
     if event == "tree_games" or event == "btn_sfall_update":
-        window["configs_loaded"](False)
+        window["game_switched"](False)
         game_config = GameConfig(game_path)
         game_config.load_from_disk(window, values, games, game_path)
 
@@ -82,13 +83,13 @@ def handle_event(
     if (
         event == "btn_trouble_enable_debug"
         or event == "tg_main"
-        or event == "configs_loaded"
+        or event == "game_switched"
         or event == "btn_trouble_package_debug"
     ):
         layout.handle_non_config_event("trouble", window, event, values, game_config, game_path)
 
     if event == "tree_games":
-        window["configs_loaded"](True)
+        window["game_switched"](True)
 
     return game_config
 
@@ -123,15 +124,23 @@ def scan(games: Games, games_ilb: ilb.ImageListBox):
     log("finished scanning")
 
 
-def update_tabs(games: Games, window):
+def update_tabs(games: Games, window: sg.Window, game_config: GameConfig):
+    main_tabs = ["tab_settings", "tab_trouble"]
     if len(games.paths) == 0:
-        for tab_key in ["tab_settings", "tab_trouble"]:
+        for tab_key in main_tabs:
             window[tab_key](disabled=True, visible=False)
-        log("disabled tabs")
     else:
-        for tab_key in ["tab_settings", "tab_trouble"]:
+        for tab_key in main_tabs:
             window[tab_key](disabled=False, visible=True)
-        log("enabled tabs")
+
+    if game_config is not None:
+        config_tabs = ["tab_fallout2.cfg", "tab_f2_res.ini", "tab_ddraw.ini"]
+        enabled_tabs = ["tab_{}".format(cp) for cp in game_config.config_paths]
+        disabled_tabs = [t for t in config_tabs if t not in enabled_tabs]
+        for dt in disabled_tabs:
+            disable_tab(window, dt)
+        for et in enabled_tabs:
+            enable_tab(window, et)
 
 
 @logger.catch
@@ -157,20 +166,20 @@ def __main__(splash=False):
 
     settings_tabs = [
         sg.Tab("Game", [[layout.layout["fallout2.cfg"]]], key="tab_fallout2.cfg"),
-        sg.Tab("HiRes", [[layout.layout["f2_res.ini"]]], key="tab_f2_res.ini"),
+        sg.Tab("HiRes", [[layout.layout["f2_res.ini"]]], key="tab_f2_res.ini", visible=False, disabled=True),
         sg.Tab("Sfall", [[layout.layout["ddraw.ini"]]], key="tab_ddraw.ini"),
         sg.Tab("Wine", layout.layout["wine"], key="tab_wine", visible=wine_visible),
     ]
 
     settings_layout = [
         [sg.TabGroup([settings_tabs], enable_events=True, key="tab_settings_sub")],
-        [sg.Button("btn_save", key="btn_save")],
-        [sg.Button("btn_play", key="btn_play")],
+        [sg.Button("Save", key="btn_save")],
+        [sg.Button("Play", key="btn_play")],
         # checkbox is a hack for triggering event to disable elements after config loading
         [
             sg.Checkbox(
-                "configs_loaded",
-                key="configs_loaded",
+                "game_switched",
+                key="game_switched",
                 enable_events=True,
                 visible=False,
             )
@@ -237,12 +246,12 @@ def __main__(splash=False):
         game_path = games_ilb.value(values)[0]
         game_config = GameConfig(game_path)
         game_config.load_from_disk(window, values, games, game_path)
-    update_tabs(games, window)
+    update_tabs(games, window, game_config)
 
     window["dd_zax_theme"](zax_config.theme)
 
-    # this hack allows to trigger ui updates after game list changes
-    window["configs_loaded"](False)
+    # this hack allows to trigger ui updates AFTER game list changes
+    window["game_switched"](False)
 
     while True:  # Main event Loop
 
@@ -257,7 +266,8 @@ def __main__(splash=False):
         if event == sg.WIN_CLOSED:
             break
 
-        update_tabs(games, window)
+        if event == "game_switched" and values[event] is True:
+            update_tabs(games, window, game_config)
 
         if event == "tree_games":
             if len(games.paths) > 0:
