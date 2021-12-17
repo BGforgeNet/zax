@@ -329,7 +329,8 @@ class GameConfig:
             with open(f) as yf:
                 data = yaml.load(yf)
             path = data["zax"]["path"]
-            configs[path] = data
+            if os.path.exists(os.path.join(self.game_path, path)):
+                configs[path] = data
         return configs
 
     def init_configs(self):
