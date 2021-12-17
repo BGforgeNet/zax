@@ -20,7 +20,7 @@ from games import Games
 from zax_config import ZaxConfig
 import image_listbox as ilb
 from images.zax_png import zax_icon
-from pyqt_hacks import enable_tab, disable_tab
+from pyqt_hacks import enable_tab, disable_tab, hide_tab
 
 # splash only working when compiled
 splash = False
@@ -168,7 +168,7 @@ def __main__(splash=False):
         sg.Tab("Game", [[layout.layout["fallout2.cfg"]]], key="tab_fallout2.cfg"),
         sg.Tab("HiRes", [[layout.layout["f2_res.ini"]]], key="tab_f2_res.ini", visible=False, disabled=True),
         sg.Tab("Sfall", [[layout.layout["ddraw.ini"]]], key="tab_ddraw.ini"),
-        sg.Tab("Wine", layout.layout["wine"], key="tab_wine", visible=wine_visible),
+        sg.Tab("Wine", layout.layout["wine"], key="tab_wine"),
     ]
 
     settings_layout = [
@@ -247,6 +247,9 @@ def __main__(splash=False):
         game_config = GameConfig(game_path)
         game_config.load_from_disk(window, values, games, game_path)
     update_tabs(games, window, game_config)
+    if not wine_visible:
+        disable_tab(window, "tab_wine")
+        hide_tab(window, "tab_wine")
 
     window["dd_zax_theme"](zax_config.theme)
 
