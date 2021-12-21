@@ -124,14 +124,16 @@ def scan(games: Games, games_ilb: ilb.ImageListBox):
     log("finished scanning")
 
 
-def update_tabs(games: Games, window: sg.Window, game_config: GameConfig):
-    main_tabs = ["tab_settings", "tab_trouble"]
+def update_tabs(games: Games, window: sg.Window, game_config: GameConfig = None):
+    main_tabs = ["tab_trouble", "tab_settings"]
     if len(games.paths) == 0:
         for tab_key in main_tabs:
             window[tab_key](disabled=True, visible=False)
+            disable_tab(window, tab_key)
     else:
         for tab_key in main_tabs:
             window[tab_key](disabled=False, visible=True)
+            enable_tab(window, tab_key)
 
     if game_config is not None:
         config_tabs = ["tab_fallout2.cfg", "tab_f2_res.ini", "tab_ddraw.ini"]
@@ -277,6 +279,9 @@ def __main__(splash=False):
                 game_path = games_ilb.value(values)[0]
                 sfall_current = sfall.get_current(game_path)
                 sfall.handle_ui_update(window, sfall_current, sfall_latest_version)
+                update_tabs(games, window, game_config)
+            else:
+                update_tabs(games, window)
 
         if event == "btn_zax_scan":
             scan(games, games_ilb)
