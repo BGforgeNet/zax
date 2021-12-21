@@ -338,8 +338,12 @@ class GameConfig:
         configs = {}
         for c in formats:
             path = formats[c]["zax"]["path"]
-            cfg = Config(self.game_path, formats[c]["zax"]["path"])
-            configs[path] = cfg
+            file_path = os.path.join(self.game_path, formats[c]["zax"]["path"])
+            if os.path.isfile(file_path):
+                cfg = Config(self.game_path, formats[c]["zax"]["path"])
+                configs[path] = cfg
+            else:
+                log("{} not found in {}".format(path, self.game_path))
         return configs
 
     def load_from_disk(self, window, values, games: Games, game_path):
@@ -377,4 +381,7 @@ class GameConfig:
                 log("can't get ini key for {}".format(wk))
                 pass
         for c in new_ini_data:
-            self.configs[c].save(new_ini_data[c])
+            if c in self.configs:
+                self.configs[c].save(new_ini_data[c])
+            else:
+                log("{} not found, skipping save".format(c))
