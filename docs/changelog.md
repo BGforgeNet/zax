@@ -8,3 +8,5 @@ Added theme selector.
 - Fixed window icons.
 - Added game type detection, icons to game list.
 
+### 0.4
+- Disable tabs when there's no games or configs are missing.
