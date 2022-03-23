@@ -50,6 +50,8 @@ class Games:
                 sg.popup("This game is already on the list!")
             else:
                 self.games.append({"path": path, "type": type})
+                games = sorted(self.games, key=lambda k: k["path"])
+                self.games = games
         self.paths = self.get_paths()
         self.paths_with_icons = self._games_with_icons()
 
