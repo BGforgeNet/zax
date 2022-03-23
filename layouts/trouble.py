@@ -67,7 +67,7 @@ def handle_event(window: sg.Window, event: str, values, game_config, game_path=N
         "fallout2.cfg-sound-debug_sfxc",
     ]
 
-    if event == "tg_main" or event == "configs_loaded":
+    if event == "tg_main" or event == "configs_loaded" or event == "game_switched":
         debug_all_enabled = True
         for k in debug_keys:
             if values[k] is not True:
