@@ -35,8 +35,9 @@ jobs:
         run: |
           set -xeu -o pipefail
           pip install poetry
+          poetry config virtualenvs.in-project true
           poetry install
-          poetry shell
+          . .venv/bin/activate
           cd zax
           pyinstaller zax.spec
         shell: bash
