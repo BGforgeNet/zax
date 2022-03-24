@@ -1,31 +1,26 @@
+# external
 from typing import OrderedDict
 import os
 import io
 import iniparse
-from games import Games
-from zax_log import log
-from common import resource_path
 import ruamel.yaml
+
+# internal
+from zax.games import Games
+from zax.zax_log import log
+from zax.resources import RESOURCES
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
 
 def get_ini_format(f):
-    with open(f) as yf:
-        data = yaml.load(yf)
+    data = yaml.load(RESOURCES.ini_formats[f])
     return data
 
 
 def get_ini_formats():
-    format_dir = resource_path("formats")
-    format_files = [
-        os.path.join(format_dir, f)
-        for f in os.listdir(format_dir)
-        if os.path.isfile(os.path.join(format_dir, f)) and f.lower().endswith(".yml")
-    ]
-    format_files.sort()
     formats = OrderedDict()
-    for f in format_files:
+    for f in RESOURCES.ini_formats:
         data = get_ini_format(f)
         path = data["zax"]["path"]
         formats[path] = data
@@ -317,18 +312,12 @@ class GameConfig:
         self.configs = self.init_configs()
 
     def get_config_formats(self):
-        config_dir = resource_path("formats")
-        config_files = [
-            os.path.join(config_dir, f)
-            for f in os.listdir(config_dir)
-            if os.path.isfile(os.path.join(config_dir, f)) and f.lower().endswith(".yml")
-        ]
-        config_files.sort()
         configs = OrderedDict()
-        for f in config_files:
-            with open(f) as yf:
-                data = yaml.load(yf)
+        formats = OrderedDict()
+        for f in RESOURCES.ini_formats:
+            data = get_ini_format(f)
             path = data["zax"]["path"]
+            formats[path] = data
             if os.path.exists(os.path.join(self.game_path, path)):
                 configs[path] = data
         return configs

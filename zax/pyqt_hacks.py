@@ -1,5 +1,5 @@
 import PySimpleGUIQt as sg
-from theme import TEXT_DISABLED_COLOR
+from zax.theme import TEXT_DISABLED_COLOR
 
 
 def hide_tab(window: sg.Window, key: str):

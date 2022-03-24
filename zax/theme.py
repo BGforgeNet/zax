@@ -1,6 +1,6 @@
 import PySimpleGUIQt as sg
 import ruamel.yaml
-from variables import zax_yml
+from zax.variables import zax_yml
 
 # some notable themes
 # THEME = "Dark Brown"

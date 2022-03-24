@@ -1,9 +1,9 @@
-from theme import sg
-import layouts.fallout2_cfg as fallout2_cfg
-import layouts.f2_res_ini as f2_res_ini
-import layouts.ddraw_ini as ddraw_ini
-import layouts.wine as wine
-import layouts.trouble as trouble
+from zax.theme import sg
+import zax.layouts.fallout2_cfg as fallout2_cfg
+import zax.layouts.f2_res_ini as f2_res_ini
+import zax.layouts.ddraw_ini as ddraw_ini
+import zax.layouts.wine as wine
+import zax.layouts.trouble as trouble
 
 
 layout = {}

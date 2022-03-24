@@ -1,2 +1,31 @@
+[tool.poetry]
+name = "zax"
+version = "0.4.0"
+description = "ZAX"
+authors = ["BGforge <dev@bgforge.net>"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+appdirs = ">=1.4.3"
+cssutils = ">=2.3.0"
+iniparse = ">=0.5"
+loguru = ">=0.5.3"
+packaging = ">=20.4"
+pefile = ">=2021.9.3"
+py7zr = ">=0.16.3"
+PySimpleGUIQt = ">=0.35.0"
+requests = ">=2.22.0"
+"ruamel.yaml" = ">=0.16.10"
+
+[tool.poetry.dev-dependencies]
+black = ">=21.12b0"
+flake8 = ">=4.0.1"
+pyinstaller = ">=4.7"
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.black]
 line-length = 120

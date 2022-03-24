@@ -1,4 +1,4 @@
-from theme import sg
+from zax.theme import sg
 
 layout = [
     [sg.Text("WINEPREFIX"), sg.InputText("", key="wine_prefix", size=(350, None))],

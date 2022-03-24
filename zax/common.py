@@ -1,5 +1,4 @@
 import os
-import sys
 
 
 class cd:
@@ -14,10 +13,3 @@ class cd:
 
     def __exit__(self, etype, value, traceback):
         os.chdir(self.savedPath)
-
-
-def resource_path(relative_path):
-    """Get absolute path to resource, works for dev and for PyInstaller"""
-    base_path = getattr(sys, "_MEIPASS", "")
-    rpath = os.path.join(base_path, relative_path)
-    return rpath

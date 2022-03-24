@@ -1,9 +1,9 @@
 import requests
 import threading
-from layouts.common import disable_element, enable_element
-from zax_log import log
 import webbrowser
 import platform
+from zax.layouts.common import disable_element, enable_element
+from zax.zax_log import log
 
 
 def get_latest():

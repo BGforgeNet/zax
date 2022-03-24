@@ -1,13 +1,15 @@
 from datetime import datetime
 import platform
 import subprocess
-from theme import sg
-from .common import disable_element, enable_element, frame
-from variables import debug_dir, tmp_dir
 import os
 from zipfile import ZIP_DEFLATED, ZipFile
-from common import cd
-from zax_log import log
+
+# internal
+from zax.theme import sg
+from zax.layouts.common import disable_element, enable_element, frame
+from zax.variables import debug_dir, tmp_dir
+from zax.common import cd
+from zax.zax_log import log
 
 layout = [
     [sg.Text("This tab contains shortcuts for resolving various common issues,", justification="c")],
@@ -29,7 +31,7 @@ layout = [
                     size=(150, None),
                 ),
             ],
-            [sg.Text("Step 4: go to github repo or mod forum, describe the issue, attach the generated zip archive.")]
+            [sg.Text("Step 4: go to github repo or mod forum, describe the issue, attach the generated zip archive.")],
         ],
     ),
 ]

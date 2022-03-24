@@ -1,7 +1,9 @@
 from typing import OrderedDict
-from theme import sg
-from .common import frame, checkbox, spin, dropdown, qinput, tab, get_ini_data, slider, radio
 import ruamel.yaml
+
+# internal
+from zax.theme import sg
+from zax.layouts.common import frame, checkbox, spin, dropdown, qinput, tab, get_ini_data, slider, radio
 
 yaml = ruamel.yaml.YAML(typ="rt")
 

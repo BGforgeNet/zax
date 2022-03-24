@@ -4,14 +4,15 @@
 block_cipher = None
 
 
-a = Analysis(['zax.py'],
+a = Analysis(['__main__.py'],
              pathex=[],
-             binaries=[],
-             datas=[
-                ('formats/*.yml', 'formats'),
-                ('icons/*.png', 'icons')
+             binaries=[
+                ('icons/*.png', 'zax/icons')
              ],
-             hiddenimports=[],
+             datas=[
+                ('formats/*.yml', 'zax/formats'),
+             ],
+             hiddenimports=['zax.formats', 'zax.icons'],
              hookspath=[],
              hooksconfig={},
              runtime_hooks=[],

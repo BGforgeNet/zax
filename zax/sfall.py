@@ -8,10 +8,10 @@ import shutil
 import pefile
 import threading
 import datetime
-from common import cd
-from layouts.common import disable_element, enable_element
-from zax_log import log
-from variables import backup_dir
+from zax.common import cd
+from zax.layouts.common import disable_element, enable_element
+from zax.zax_log import log
+from zax.variables import backup_dir
 
 
 def get_latest():

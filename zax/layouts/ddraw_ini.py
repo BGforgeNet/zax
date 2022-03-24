@@ -1,7 +1,9 @@
 from typing import OrderedDict
-from theme import sg, BUTTON_DISABLED_COLOR
-from .common import frame, checkbox, spin, dropdown, qinput, tab, disable_if, get_ini_data
 import ruamel.yaml
+
+# internal
+from zax.theme import sg, BUTTON_DISABLED_COLOR
+from zax.layouts.common import frame, checkbox, spin, dropdown, qinput, tab, disable_if, get_ini_data
 
 yaml = ruamel.yaml.YAML(typ="rt")
 

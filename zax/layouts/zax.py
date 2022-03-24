@@ -1,5 +1,5 @@
-from theme import sg, BUTTON_DISABLED_COLOR
-from version import VERSION
+from zax.theme import sg, BUTTON_DISABLED_COLOR
+from zax.version import VERSION
 
 zax_layout = [
     [sg.HSeperator()],

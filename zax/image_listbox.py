@@ -3,7 +3,7 @@ from PySide2.QtWidgets import QTreeWidgetItemIterator
 import cssutils
 
 # import PySimpleGUIQt as sg
-from theme import sg
+from zax.theme import sg
 from PySimpleGUIQt.PySimpleGUIQt import DEFAULT_INPUT_ELEMENTS_COLOR
 
 icon_folder = b"""

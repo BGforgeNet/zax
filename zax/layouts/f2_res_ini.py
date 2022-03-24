@@ -1,6 +1,9 @@
 from typing import OrderedDict
-from theme import sg
-from .common import (
+import ruamel.yaml
+
+# internal
+from zax.theme import sg
+from zax.layouts.common import (
     frame,
     checkbox,
     spin,
@@ -14,7 +17,6 @@ from .common import (
     disable_element,
     enable_if,
 )
-import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="rt")
 

@@ -1,5 +1,5 @@
 from loguru import logger
-from variables import log_file
+from zax.variables import log_file
 
 logger.add(
     log_file,

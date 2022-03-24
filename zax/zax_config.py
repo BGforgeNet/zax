@@ -1,8 +1,10 @@
 import os
 import platform
-from variables import zax_yml
 import ruamel.yaml
-from games import Games
+
+# internal
+from zax.variables import zax_yml
+from zax.games import Games
 
 
 class ZaxConfig:

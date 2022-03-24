@@ -1,8 +1,9 @@
-import os
 import pprint
 import ruamel.yaml
-from common import resource_path
-from theme import sg, BUTTON_DISABLED_COLOR, BUTTON_ENABLED_COLOR
+
+# internal
+from zax.theme import sg, BUTTON_DISABLED_COLOR, BUTTON_ENABLED_COLOR
+from zax.resources import RESOURCES
 
 yaml = ruamel.yaml.YAML(typ="rt")
 
@@ -10,9 +11,7 @@ pp = pprint.PrettyPrinter(indent=2)
 
 
 def get_ini_data(filename):
-    yml_path = resource_path(os.path.join("formats", filename + ".yml"))
-    with open(yml_path) as yf:
-        data = yaml.load(yf)
+    data = yaml.load(RESOURCES.ini_formats[filename])
     return data
 
 

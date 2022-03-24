@@ -1,26 +1,27 @@
-#!/usr/bin/env python3
-
+# external
 import subprocess
 import sys
-from theme import sg
-import os
-import layout
-from config import GameConfig
-import sfall
-import updates
 import queue
 import platform
 import shutil
+import os
 from packaging import version
-from zax_log import log, logger
-from variables import backup_dir, log_file, debug_dir
-from version import VERSION
-from layouts.zax import zax_layout
-from games import Games
-from zax_config import ZaxConfig
-import image_listbox as ilb
-from images.zax_png import zax_icon
-from pyqt_hacks import enable_tab, disable_tab, hide_tab
+
+# internal
+from zax.theme import sg
+from zax import layout
+from zax.config import GameConfig
+import zax.sfall as sfall
+import zax.updates as updates
+from zax.zax_log import log, logger
+from zax.variables import backup_dir, log_file, debug_dir
+from zax.version import VERSION
+from zax.layouts.zax import zax_layout
+from zax.games import Games
+from zax.zax_config import ZaxConfig
+import zax.image_listbox as ilb
+from zax.images.zax_png import zax_icon
+from zax.pyqt_hacks import enable_tab, disable_tab, hide_tab
 
 # splash only working when compiled
 splash = False
@@ -146,7 +147,7 @@ def update_tabs(games: Games, window: sg.Window, game_config: GameConfig = None)
 
 
 @logger.catch
-def __main__(splash=False):
+def main(splash=False):
     if splash:
         pyi_splash.update_text("Furiously loading...")
 
@@ -347,4 +348,5 @@ def __main__(splash=False):
     window.close()
 
 
-__main__(splash=splash)
+if __name__ == "__main__":
+    main(splash=splash)
