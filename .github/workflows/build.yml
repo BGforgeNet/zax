@@ -23,12 +23,14 @@ jobs:
           key: poetry-0  # increment to reset cache
       - name: Install Poetry
         uses: snok/install-poetry@v1.3.1
+        with:
+          virtualenvs-in-project: true
 
       - name: Load cached venv
-        id: cached-pip-wheels
+        id: cached-poetry-dependencies
         uses: actions/cache@v2
         with:
-          path: ~/.cache
+          path: .venv
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
       - name: Set dev version
