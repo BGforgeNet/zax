@@ -16,6 +16,21 @@ jobs:
           python-version: '3.8'
       - uses: actions/checkout@v2
 
+      - name: Load cached Poetry installation
+        uses: actions/cache@v2
+        with:
+          path: ~/.local  # the path depends on the OS
+          key: poetry-0  # increment to reset cache
+      - name: Install Poetry
+        uses: snok/install-poetry@v1.3.1
+
+      - name: Load cached venv
+        id: cached-pip-wheels
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
       - name: Set dev version
         if: "!startsWith(github.ref, 'refs/tags/')"
         run: |
@@ -34,11 +49,8 @@ jobs:
       - name: Build
         run: |
           set -xeu -o pipefail
-          pip install poetry
-          poetry config virtualenvs.in-project true
           poetry install
-          uname
-          . .venv/bin/activate
+          source $VENV
           cd zax
           pyinstaller zax.spec
         shell: bash
