@@ -37,9 +37,8 @@ jobs:
           pip install poetry
           poetry config virtualenvs.in-project true
           poetry install
+          uname
           . .venv/bin/activate
-          ls -la
-          ls -la zax
           cd zax
           pyinstaller zax.spec
         shell: bash
