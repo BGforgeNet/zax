@@ -36,6 +36,7 @@ jobs:
           set -xeu -o pipefail
           pip install poetry
           poetry install
+          poetry shell
           cd zax
           pyinstaller zax.spec
         shell: bash
