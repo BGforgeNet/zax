@@ -71,21 +71,21 @@ jobs:
         if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'ubuntu-latest')"
         with:
           name: zax-linux
-          path: dist/zax
+          path: zax/dist/zax
 
       - name: Upload | win
         uses: actions/upload-artifact@v2
         if: "!startsWith(github.ref, 'refs/tags/') && (matrix.os == 'windows-latest')"
         with:
           name: zax.exe
-          path: dist/zax.exe
+          path: zax/dist/zax.exe
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            dist/zax.exe
-            dist/zax
+            zax/dist/zax.exe
+            zax/dist/zax
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
