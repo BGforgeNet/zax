@@ -20,14 +20,14 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.local  # the path depends on the OS
-          key: poetry-lin-2  # increment to reset cache
+          key: poetry-lin-3  # increment to reset cache
         if: matrix.os != 'windows-latest'
 
       - name: Load cached Poetry installation | windows
         uses: actions/cache@v2
         with:
-          path: ~/AppData/Roaming/Python/Scripts  # the path depends on the OS
-          key: poetry-win-2  # increment to reset cache
+          path: "C:/Users/runneradmin/AppData/Roaming/Python/Scripts"  # the path depends on the OS
+          key: poetry-win-3  # increment to reset cache
         if: matrix.os == 'windows-latest'
 
       - name: Install Poetry
