@@ -2,6 +2,10 @@ name: build
 
 on: [push]
 
+defaults:
+  run:
+    shell: bash # snok/install-poetry requirement
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -16,19 +20,12 @@ jobs:
           python-version: '3.8'
       - uses: actions/checkout@v2
 
-      - name: Load cached Poetry installation | linux
+      - name: Load cached Poetry installation | linux # windows doesn't work for some reason
         uses: actions/cache@v2
         with:
           path: ~/.local  # the path depends on the OS
           key: poetry-lin-3  # increment to reset cache
         if: matrix.os != 'windows-latest'
-
-      - name: Load cached Poetry installation | windows
-        uses: actions/cache@v2
-        with:
-          path: "C:/Users/runneradmin/AppData/Roaming/Python/Scripts"  # the path depends on the OS
-          key: poetry-win-3  # increment to reset cache
-        if: matrix.os == 'windows-latest'
 
       - name: Install Poetry
         uses: snok/install-poetry@v1.3.1
