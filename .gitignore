@@ -1,5 +1,6 @@
 __pycache__
 .venv
+dist/
 zax/__pycache__/
 zax/zax.yml
 zax/build/
