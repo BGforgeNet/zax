@@ -20,7 +20,7 @@ requests = ">=2.22.0"
 [tool.poetry.dev-dependencies]
 black = ">=21.12b0"
 flake8 = ">=4.0.1"
-pyinstaller = ">=4.7"
+pyinstaller = ">=4.7,<4.10"
 pytest = "^5.2"
 
 [build-system]
