@@ -42,3 +42,4 @@ jobs:
         with:
           add: 'requirements.txt requirements-dev.txt'
           message: 'Updated requirements.txt'
+          default_author: github_actions

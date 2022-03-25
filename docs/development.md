@@ -17,3 +17,6 @@ virtualenv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
+
+### Requirements
+Requirements are managed in `pyproject.toml` with Poetry. `requirements[-dev].txt` are generated automatically for backwards compatibility and should not be changed manually.
