@@ -34,7 +34,7 @@ pycparser==2.21; python_version >= "3.6" and python_full_version < "3.0.0" and p
 pycryptodomex==3.14.1; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version >= "3.6"
 pyflakes==2.4.0; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.4.0" and python_version >= "3.6"
 pyinstaller-hooks-contrib==2022.3; python_version >= "3.7" and python_version < "3.11"
-pyinstaller==4.9; python_version >= "3.6" and python_version < "3.11"
+pyinstaller==4.10; python_version >= "3.6" and python_version < "3.11"
 pyparsing==3.0.7; python_version >= "3.6"
 pyppmd==0.17.4; python_version >= "3.6"
 pyside2==5.15.2.1; python_version >= "2.7" and python_full_version < "3.0.0" or python_full_version >= "3.5.0" and python_version < "3.11"
