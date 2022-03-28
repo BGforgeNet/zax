@@ -88,9 +88,8 @@ jobs:
         if: "startsWith(github.ref, 'refs/tags/') && (matrix.os == 'ubuntu-latest')"
         run: |
           set -xeu -o pipefail
-          poetry config repositories.test-pypi https://test.pypi.org/legacy/
-          poetry config pypi-token.test-pypi $PYPI_TOKEN
+          poetry config pypi-token.pypi $PYPI_TOKEN
           poetry build
-          poetry publish -r test-pypi
+          poetry publish
         env:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
