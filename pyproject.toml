@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "zax"
-version = "0.5"
+version = "0.4.2"
 description = "ZAX"
 authors = ["BGforge <dev@bgforge.net>"]
 keywords = ["fallout", "fallout2"]
