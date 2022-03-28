@@ -1,4 +1,4 @@
-### WIP
+### 0.5
 - Fixed Troubleshooting tab not updating on game switch.
 - Published to PyPi.
 
