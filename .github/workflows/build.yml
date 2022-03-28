@@ -89,6 +89,7 @@ jobs:
         run: |
           set -xeu -o pipefail
           poetry config pypi-token.test-pypi $PYPI_TOKEN
+          poetry build
           poetry publish -r test-pypi
         env:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
