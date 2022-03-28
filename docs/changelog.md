@@ -1,3 +1,6 @@
+### 0.6
+Fixed ZAX displayed version.
+
 ### 0.5
 - Fixed Troubleshooting tab not updating on game switch.
 - Published to PyPi.
