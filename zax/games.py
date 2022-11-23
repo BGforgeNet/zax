@@ -10,8 +10,9 @@ class Games:
     def __init__(self, games_config):
         self.games = []
         for g in games_config:  # [{'path': path},] from zax.yml
-            g["type"] = self.game_type(g["path"])
-            self.games.append(g)
+            if os.path.isdir(g["path"]):  # if game dir was deleted since last Zax launch, skip
+                g["type"] = self.game_type(g["path"])
+                self.games.append(g)
         self.paths = self.get_paths()
         self.paths_with_icons = self._games_with_icons()
 
