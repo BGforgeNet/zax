@@ -127,6 +127,7 @@ def handle_event(window: sg.Window, event: str, values, game_config, game_path=N
                 save_dir = get_save_dir()
                 if save_dir is not None:
                     saves = os.listdir(save_dir)
+                    saves = sorted(saves)
                     save_list = [[sg.Checkbox(s, key=s)] for s in saves if s.startswith("SLOT")]
                     save_list.insert(0, [sg.Text("Select savegames to attach")])
                     save_list.append([sg.Button("OK")])
