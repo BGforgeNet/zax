@@ -1,7 +1,7 @@
 appdirs==1.4.4 ; python_version >= "3.8" and python_version < "3.11"
 brotli==1.1.0 ; python_version >= "3.8" and python_version < "3.11" and platform_python_implementation == "CPython"
 brotlicffi==1.1.0.0 ; python_version >= "3.8" and python_version < "3.11" and platform_python_implementation == "PyPy"
-certifi==2024.6.2 ; python_version >= "3.8" and python_version < "3.11"
+certifi==2024.7.4 ; python_version >= "3.8" and python_version < "3.11"
 cffi==1.16.0 ; python_version >= "3.8" and python_version < "3.11" and platform_python_implementation == "PyPy"
 charset-normalizer==3.3.2 ; python_version >= "3.8" and python_version < "3.11"
 colorama==0.4.6 ; python_version >= "3.8" and python_version < "3.11" and sys_platform == "win32"
