@@ -18,6 +18,8 @@ packaging = ">=20.4"
 pefile = ">=2021.9.3"
 py7zr = ">=0.16.3"
 PySimpleGUIQt = ">=0.35.0,<5"
+PySide2 = "5.15.2.1"
+shiboken2 = "5.15.2.1"
 requests = ">=2.22.0"
 "ruamel.yaml" = ">=0.16.10"
 
