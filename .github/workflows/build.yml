@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.10'
       - uses: actions/checkout@v4
 
       - name: Load cached Poetry installation | linux # windows doesn't work for some reason
