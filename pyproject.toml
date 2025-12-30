@@ -9,7 +9,7 @@ homepage = "https://github.com/BGforgeNet/zax"
 repository = "https://github.com/BGforgeNet/zax"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
+python = ">=3.8,<3.14"
 appdirs = ">=1.4.3"
 cssutils = ">=2.3.0"
 iniparse = ">=0.5"
