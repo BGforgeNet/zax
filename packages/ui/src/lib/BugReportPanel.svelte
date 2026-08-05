@@ -6,6 +6,27 @@
   const enableDebug = $derived(store.actionById("debug.enable"));
   const disableDebug = $derived(store.actionById("debug.disable"));
   const debugOn = $derived(enableDebug !== undefined && store.actionApplied(enableDebug));
+
+  /*
+    Saves are offered rather than swept in: they are the largest thing in the archive and the one part a user
+    may not want to hand over, so the list is read when the step is reached and each slot is opted into.
+  */
+  let slots = $state<string[]>([]);
+  let chosen = $state<string[]>([]);
+
+  $effect(() => {
+    // Re-read when the selected install changes: another install's slots are not this one's.
+    const path = store.install?.path;
+    void path;
+    void store.saveSlots().then((found) => {
+      slots = found;
+      chosen = [];
+    });
+  });
+
+  function toggle(slot: string) {
+    chosen = chosen.includes(slot) ? chosen.filter((one) => one !== slot) : [...chosen, slot];
+  }
 </script>
 
 <div class="list">
@@ -29,14 +50,24 @@
     <li>
       <div class="step">
         <span>Collect the logs and your setup into one archive.</span>
-        <!--
-          Shown rather than hidden so the workflow reads as four steps, but it cannot run here: the browser
-          preview has no access to the game folder. Fail visibly instead of appearing to work.
-        -->
-        <button class="package" disabled title="Needs filesystem access, which the browser preview has not">
-          Create debug package
+        {#if slots.length > 0}
+          <fieldset class="saves">
+            <legend>Savegames to attach</legend>
+            {#each slots as slot (slot)}
+              <label>
+                <input type="checkbox" checked={chosen.includes(slot)} onchange={() => toggle(slot)} />
+                {slot}
+              </label>
+            {/each}
+          </fieldset>
+        {/if}
+        <button
+          class="package"
+          disabled={!store.install || store.busy !== null}
+          onclick={() => void store.createDebugPackage(chosen)}
+        >
+          {store.busy === "Creating the debug package" ? "Collecting..." : "Create debug package"}
         </button>
-        <span class="unavailable">not available in the browser preview - needs the desktop build</span>
         <ul class="contents">
           {#each DEBUG_PACKAGE_CONTENTS as item (item)}
             <li>{item}</li>
@@ -118,9 +149,28 @@
     opacity: 0.6;
   }
 
-  .unavailable {
-    color: var(--modified);
-    font-size: 12px;
+  .saves {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 12px 8px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  .saves legend {
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  .saves label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
   }
 
   .contents {

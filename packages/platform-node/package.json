@@ -1,14 +1,13 @@
 {
-  "name": "@zax/fallout2",
+  "name": "@zax/platform-node",
   "version": "0.8.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
-    "@zax/core": "workspace:*",
     "@zax/platform": "workspace:*",
-    "pe-library": "2.0.1",
-    "resedit": "3.0.2"
+    "7z-wasm": "1.2.0",
+    "fflate": "0.8.3"
   }
 }

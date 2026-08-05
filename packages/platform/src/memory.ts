@@ -1,0 +1,260 @@
+/**
+ * The platform, in memory. Domain tests run against this so they exercise the real code paths without a
+ * filesystem, a network or a child process, and so a failing test names a domain defect rather than a fixture
+ * that was not cleaned up.
+ *
+ * Everything the outside world would have done is recorded instead: launches, downloads, opened paths and
+ * archives written. Asserting on those records is how a test checks an effect that has no return value.
+ */
+
+import type {
+  Archive,
+  ArchiveEntry,
+  DirEntry,
+  FileStat,
+  FileSystem,
+  LaunchOptions,
+  Network,
+  OperatingSystem,
+  Paths,
+  Platform,
+  ProcessLauncher,
+} from "./index.js";
+
+/** Bytes for a string, one byte per code point. Lossless for the latin1 config files, and ASCII is ASCII. */
+export function bytes(text: string): Uint8Array {
+  const out = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) out[i] = text.charCodeAt(i) & 0xff;
+  return out;
+}
+
+export function text(data: Uint8Array): string {
+  let s = "";
+  for (const b of data) s += String.fromCharCode(b);
+  return s;
+}
+
+/** Collapses repeated and trailing separators so two spellings of one path are one key. */
+function normalize(path: string): string {
+  const absolute = path.startsWith("/");
+  const parts: string[] = [];
+  for (const part of path.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === ".." && parts.length > 0 && parts[parts.length - 1] !== "..") parts.pop();
+    else parts.push(part);
+  }
+  return (absolute ? "/" : "") + parts.join("/");
+}
+
+function dirname(path: string): string {
+  const at = normalize(path);
+  const cut = at.lastIndexOf("/");
+  if (cut < 0) return "";
+  return cut === 0 ? "/" : at.slice(0, cut);
+}
+
+export interface MemoryOptions {
+  os?: OperatingSystem;
+  home?: string;
+  config?: string;
+  cache?: string;
+  /** Initial files, by absolute path. A string is stored as its bytes; pass a `Uint8Array` for binary content. */
+  files?: Readonly<Record<string, string | Uint8Array>>;
+  /** Directories that exist while holding no files - an empty `mods/`, a game folder with nothing in it. */
+  dirs?: readonly string[];
+  /** Canned responses for `net.fetchText`, by URL. A URL with no entry rejects, as an unreachable host would. */
+  responses?: Readonly<Record<string, string>>;
+  /** What `net.download` writes at the destination, by URL. A URL with no entry rejects, as fetching does. */
+  downloads?: Readonly<Record<string, string | Uint8Array>>;
+  /** What `archive.extract` produces, by archive path: file contents keyed by path inside the archive. */
+  archives?: Readonly<Record<string, Readonly<Record<string, string | Uint8Array>>>>;
+}
+
+export class MemoryPlatform implements Platform {
+  readonly os: OperatingSystem;
+  readonly fs: FileSystem;
+  readonly paths: Paths;
+  readonly process: ProcessLauncher;
+  readonly net: Network;
+  readonly archive: Archive;
+
+  /** Everything the outside world was asked to do, in the order it was asked. */
+  readonly launched: Array<{ program: string; args: readonly string[]; options?: LaunchOptions }> = [];
+  readonly opened: string[] = [];
+  readonly fetched: string[] = [];
+  readonly downloaded: Array<{ url: string; destination: string }> = [];
+  readonly extracted: Array<{ archive: string; destination: string }> = [];
+  /**
+   * Archives written, each with what was in it at the time. The contents are captured rather than looked up
+   * later because an archive routinely outlives the scratch files that went into it.
+   */
+  readonly zipped: Array<{
+    destination: string;
+    entries: readonly ArchiveEntry[];
+    contents: Record<string, string>;
+  }> = [];
+
+  private readonly files = new Map<string, Uint8Array>();
+  private readonly dirs = new Set<string>(["/"]);
+  private readonly times = new Map<string, number>();
+  private readonly responses: Record<string, string>;
+  private readonly payloads: Record<string, string | Uint8Array>;
+  private readonly contents: Record<string, Readonly<Record<string, string | Uint8Array>>>;
+  /** Advanced by one on each write, so a rewritten file is detectably newer without a real clock. */
+  private clock = 1_700_000_000_000;
+
+  constructor(options: MemoryOptions = {}) {
+    this.os = options.os ?? "linux";
+    const home = normalize(options.home ?? "/home/tester");
+    const config = normalize(options.config ?? `${home}/.config/zax`);
+    const cache = normalize(options.cache ?? `${home}/.cache/zax`);
+    this.responses = { ...options.responses };
+    this.payloads = { ...options.downloads };
+    this.contents = { ...options.archives };
+
+    for (const dir of options.dirs ?? []) this.makeDirs(normalize(dir));
+    for (const [path, content] of Object.entries(options.files ?? {})) {
+      this.put(normalize(path), typeof content === "string" ? bytes(content) : content);
+    }
+
+    this.paths = {
+      config,
+      cache,
+      home,
+      separator: "/",
+      join: (...parts) => normalize(parts.filter((p) => p !== "").join("/")),
+      dirname,
+      basename: (path) => normalize(path).split("/").pop() ?? "",
+    };
+
+    this.fs = {
+      read: async (path) => {
+        const found = this.files.get(normalize(path));
+        if (!found) throw new Error(`No such file: ${path}`);
+        return found;
+      },
+      write: async (path, data) => this.put(normalize(path), data),
+      stat: async (path) => this.statOf(normalize(path)),
+      list: async (path) => this.listOf(normalize(path)),
+      mkdir: async (path) => this.makeDirs(normalize(path)),
+      copy: async (from, to) => {
+        const found = this.files.get(normalize(from));
+        if (!found) throw new Error(`No such file: ${from}`);
+        this.put(normalize(to), found);
+      },
+      remove: async (path) => this.removeAt(normalize(path)),
+    };
+
+    this.process = {
+      launch: async (program, args, launchOptions) => {
+        this.launched.push({ program, args, ...(launchOptions ? { options: launchOptions } : {}) });
+      },
+      open: async (target) => {
+        this.opened.push(target);
+      },
+    };
+
+    this.net = {
+      fetchText: async (url) => {
+        this.fetched.push(url);
+        const body = this.responses[url];
+        if (body === undefined) throw new Error(`No canned response for ${url}`);
+        return body;
+      },
+      download: async (url, destination) => {
+        this.downloaded.push({ url, destination });
+        const payload = this.payloads[url];
+        if (payload === undefined) throw new Error(`No canned download for ${url}`);
+        this.put(normalize(destination), typeof payload === "string" ? bytes(payload) : payload);
+      },
+    };
+
+    this.archive = {
+      extract: async (archive, destination) => {
+        this.extracted.push({ archive, destination });
+        const inside = this.contents[normalize(archive)] ?? this.contents[archive];
+        if (!inside) throw new Error(`No canned contents for ${archive}`);
+        for (const [name, content] of Object.entries(inside)) {
+          this.put(normalize(`${destination}/${name}`), typeof content === "string" ? bytes(content) : content);
+        }
+      },
+      createZip: async (destination, entries) => {
+        const contents: Record<string, string> = {};
+        for (const entry of entries) {
+          const found = this.files.get(normalize(entry.source));
+          if (!found) throw new Error(`No such file: ${entry.source}`);
+          contents[entry.name] = text(found);
+        }
+        this.zipped.push({ destination, entries, contents });
+        this.put(normalize(destination), bytes(entries.map((e) => e.name).join("\n")));
+      },
+    };
+  }
+
+  /** The bytes at a path, for asserting on what was written. Undefined when nothing is there. */
+  fileAt(path: string): Uint8Array | undefined {
+    return this.files.get(normalize(path));
+  }
+
+  /** The bytes at a path as a string, one character per byte. */
+  textAt(path: string): string | undefined {
+    const found = this.files.get(normalize(path));
+    return found === undefined ? undefined : text(found);
+  }
+
+  /** Every file present, by path, for asserting that a write touched nothing else. */
+  allFiles(): string[] {
+    return [...this.files.keys()].sort();
+  }
+
+  private put(path: string, data: Uint8Array): void {
+    this.makeDirs(dirname(path));
+    this.files.set(path, data);
+    this.clock += 1;
+    this.times.set(path, this.clock);
+  }
+
+  private makeDirs(path: string): void {
+    if (path === "" || path === "/") return;
+    const parts = path.split("/");
+    let at = path.startsWith("/") ? "" : ".";
+    for (const part of parts) {
+      if (part === "") continue;
+      at = at === "." ? part : `${at}/${part}`;
+      this.dirs.add(at);
+    }
+  }
+
+  private statOf(path: string): FileStat | null {
+    const file = this.files.get(path);
+    if (file) return { kind: "file", size: file.length, modified: this.times.get(path) ?? this.clock };
+    if (this.dirs.has(path) || path === "/") return { kind: "dir", size: 0, modified: this.clock };
+    return null;
+  }
+
+  private listOf(path: string): DirEntry[] {
+    if (!this.dirs.has(path) && path !== "/") throw new Error(`Not a directory: ${path}`);
+    const prefix = path === "/" ? "/" : `${path}/`;
+    const names = new Map<string, DirEntry["kind"]>();
+    for (const key of this.files.keys()) {
+      if (!key.startsWith(prefix)) continue;
+      const rest = key.slice(prefix.length);
+      const head = rest.split("/")[0]!;
+      names.set(head, rest.includes("/") ? "dir" : "file");
+    }
+    for (const key of this.dirs) {
+      if (!key.startsWith(prefix) || key === path) continue;
+      names.set(key.slice(prefix.length).split("/")[0]!, "dir");
+    }
+    return [...names].map(([name, kind]) => ({ name, kind })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private removeAt(path: string): void {
+    for (const key of [...this.files.keys()]) {
+      if (key === path || key.startsWith(`${path}/`)) this.files.delete(key);
+    }
+    for (const key of [...this.dirs]) {
+      if (key === path || key.startsWith(`${path}/`)) this.dirs.delete(key);
+    }
+  }
+}

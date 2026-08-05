@@ -1,24 +1,48 @@
 <script lang="ts">
   /*
     The previous interface showed the installed sfall version beside the latest release, with a check and an
-    update button. Both reads need the platform - the installed version comes from ddraw.dll, the latest from
-    the network - so they are shown with the reason rather than omitted.
+    update button. The installed one is read from ddraw.dll and needs no network; the latest one does, which is
+    the half the browser preview cannot do.
   */
-  const OFFLINE = "Needs the desktop build - the browser preview cannot read ddraw.dll or reach the network";
+  import { isPreview } from "./host.js";
+  import { store } from "./store.svelte.js";
+
+  const OUTSIDE = "The browser preview cannot reach the release feed - this needs the desktop build";
 </script>
 
 <div class="row">
   <div class="label"><span class="name">sfall version</span></div>
   <div class="control">
-    <span class="unknown">not detected</span>
+    {#if store.sfallInstalled}
+      <strong>{store.sfallInstalled}</strong>
+    {:else}
+      <span class="unknown">{store.install ? "not installed" : "no install selected"}</span>
+    {/if}
   </div>
   <div class="notes">
-    <span class="help">Latest release: <span class="unknown">not checked</span></span>
-    <span class="buttons">
-      <button disabled title={OFFLINE}>Check</button>
-      <button disabled title={OFFLINE}>Update</button>
+    <span class="help">
+      Latest release:
+      {#if store.sfallLatest}{store.sfallLatest.version}{:else}<span class="unknown">not checked</span>{/if}
     </span>
-    <span class="unavailable">{OFFLINE}</span>
+    <span class="buttons">
+      <button
+        disabled={isPreview || store.busy !== null}
+        title={isPreview ? OUTSIDE : null}
+        onclick={() => void store.checkSfallVersion()}
+      >
+        Check
+      </button>
+      <button
+        disabled={!store.sfallOutdated || store.busy !== null}
+        title={store.sfallOutdated ? "Replace the installed sfall, keeping your settings" : "Nothing newer has been found"}
+        onclick={() => void store.updateSfall()}
+      >
+        Update
+      </button>
+    </span>
+    {#if store.sfallOutdated}
+      <span class="help">Your settings are carried into the new ddraw.ini, and replaced files are backed up.</span>
+    {/if}
   </div>
 </div>
 
@@ -46,9 +70,5 @@
   .buttons button:disabled {
     cursor: not-allowed;
     opacity: 0.6;
-  }
-
-  .unavailable {
-    color: var(--modified);
   }
 </style>

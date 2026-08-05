@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@zax/core": "workspace:*",
-    "@zax/fallout2": "workspace:*"
+    "@zax/fallout2": "workspace:*",
+    "@zax/platform": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.1",

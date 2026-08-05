@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store } from "./store.svelte.js";
 
+  // Written on commit rather than per keystroke: each write is a rewrite of the state file on disk.
   const current = $derived(store.install);
 </script>
 
@@ -14,8 +15,8 @@
         value={current.wine?.prefix ?? ""}
         placeholder="default prefix"
         aria-label="WINEPREFIX"
-        oninput={(e) =>
-          store.setWine(current.path, { prefix: e.currentTarget.value, debug: current.wine?.debug ?? "" })}
+        onchange={(e) =>
+          void store.setWine(current.path, { prefix: e.currentTarget.value, debug: current.wine?.debug ?? "" })}
       />
     </div>
     <div class="notes">
@@ -31,8 +32,8 @@
         value={current.wine?.debug ?? ""}
         placeholder="unset"
         aria-label="WINEDEBUG"
-        oninput={(e) =>
-          store.setWine(current.path, { prefix: current.wine?.prefix ?? "", debug: e.currentTarget.value })}
+        onchange={(e) =>
+          void store.setWine(current.path, { prefix: current.wine?.prefix ?? "", debug: e.currentTarget.value })}
       />
     </div>
     <div class="notes">

@@ -1,48 +1,69 @@
 <script lang="ts">
+  import { compareVersions } from "@zax/core";
+  import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
 
   const VERSION = "0.8";
 
   /*
-    Everything here but the theme reaches outside the application - the network for a version check, the cache
-    directory for the rest - so none of it can run in the browser preview. Shown disabled with the reason rather
-    than hidden, so the column says what the desktop build does instead of quietly omitting it.
+    Version checks and opening a directory in the desktop's file manager both leave the page, which the browser
+    preview cannot do. Shown disabled with the reason rather than hidden, so the column says what the desktop
+    build does instead of quietly omitting it. Wiping is a filesystem write, so it runs either way.
   */
-  const OFFLINE = "Needs the desktop build - the browser preview has no filesystem or network access";
+  const OUTSIDE = "The browser preview has no machine to reach - this needs the desktop build";
+  const outdated = $derived(store.zaxLatest !== null && compareVersions(VERSION, store.zaxLatest) < 0);
 </script>
 
 <div class="panel">
   <h2 class="section">Version</h2>
   <p class="line">Current <strong>{VERSION}</strong></p>
-  <p class="line">Latest <span class="unknown">not checked</span></p>
+  <p class="line">
+    Latest
+    {#if store.zaxLatest}<strong>{store.zaxLatest}</strong>{:else}<span class="unknown">not checked</span>{/if}
+  </p>
   <div class="buttons">
-    <button disabled title={OFFLINE}>Check</button>
-    <button disabled title={OFFLINE}>Download latest</button>
+    <button disabled={isPreview || store.busy !== null} title={isPreview ? OUTSIDE : null} onclick={() => void store.checkZaxVersion()}>
+      Check
+    </button>
+    <!-- ZAX does not replace its own running binary; the release page is where the new one comes from. -->
+    <button
+      disabled={!outdated || isPreview}
+      title={outdated ? "Open the release page" : "Nothing newer has been found"}
+      onclick={() => void store.open("https://github.com/BGforgeNet/zax/releases/latest")}
+    >
+      Download latest
+    </button>
   </div>
 
   <h2 class="section">Auto scan for games</h2>
   <div class="buttons">
-    <button disabled title={OFFLINE}>Scan</button>
+    <button disabled={store.busy !== null} onclick={() => void store.scan()}>Scan</button>
   </div>
 
   <h2 class="section">Backup directory</h2>
-  <p class="path">{"<cache>/zax/backup"}</p>
+  <p class="path">{store.paths.backup}</p>
   <div class="buttons">
-    <button disabled title={OFFLINE}>Open</button>
-    <button disabled title={OFFLINE}>Wipe</button>
+    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open(store.paths.backup)}>
+      Open
+    </button>
+    <button disabled={store.busy !== null} onclick={() => void store.wipe(store.paths.backup)}>Wipe</button>
   </div>
 
   <h2 class="section">Debug archive directory</h2>
-  <p class="path">{"<cache>/zax/debug"}</p>
+  <p class="path">{store.paths.debug}</p>
   <div class="buttons">
-    <button disabled title={OFFLINE}>Open</button>
-    <button disabled title={OFFLINE}>Wipe</button>
+    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open(store.paths.debug)}>
+      Open
+    </button>
+    <button disabled={store.busy !== null} onclick={() => void store.wipe(store.paths.debug)}>Wipe</button>
   </div>
 
   <h2 class="section">Log file</h2>
-  <p class="path">{"<cache>/zax/zax.log"}</p>
+  <p class="path">{store.paths.log}</p>
   <div class="buttons">
-    <button disabled title={OFFLINE}>View</button>
+    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open(store.paths.log)}>
+      View
+    </button>
   </div>
 
   <!-- The only one that needs nothing outside the page, so the only one that works. -->
@@ -51,7 +72,7 @@
     <select
       aria-label="Theme"
       value={store.theme}
-      onchange={(e) => (store.theme = e.currentTarget.value as typeof store.theme)}
+      onchange={(e) => void store.setTheme(e.currentTarget.value as typeof store.theme)}
     >
       <option value="system">Match the system</option>
       <option value="light">Light</option>

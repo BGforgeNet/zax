@@ -1,8 +1,15 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
   import TroubleView from "./lib/TroubleView.svelte";
   import { store } from "./lib/store.svelte.js";
+
+  // Reading the state file and the selected install's config files is the first thing that happens, and it is
+  // a filesystem read, so the interface renders its empty shape until it lands rather than blocking on it.
+  onMount(() => {
+    void store.start();
+  });
 
   // The palette reads the used color-scheme, so applying a theme is one attribute on the root element.
   // "system" removes it rather than pinning a value, or the choice would stop following the OS.
@@ -64,6 +71,18 @@
     {/if}
   </header>
 
+  <!--
+    Outcomes of anything that reached the machine - a save, a refusal, a failed version check - land here
+    rather than beside the button that started them: several of those buttons live in the sidebar, and a
+    message that scrolls away with its panel is a message the user never reads.
+  -->
+  {#if store.notice}
+    <div class="notice" class:problem={store.notice.kind === "problem"} role="status">
+      <span>{store.notice.text}</span>
+      <button class="dismiss" onclick={() => (store.notice = null)}>Dismiss</button>
+    </div>
+  {/if}
+
   <div class="body">
     <Sidebar />
     {#if store.view === "settings"}<SettingsView />{:else}<TroubleView />{/if}
@@ -99,6 +118,38 @@
   .brand {
     font-weight: 650;
     letter-spacing: 0.02em;
+  }
+
+  .notice {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex: 0 0 auto;
+    padding: 7px var(--gutter);
+    background: var(--accent-soft);
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--text);
+  }
+
+  .notice.problem {
+    background: color-mix(in srgb, var(--invalid) 14%, transparent);
+    color: var(--invalid);
+  }
+
+  .notice span {
+    /* The path a save reports is long and has nowhere to be cut, so the banner grows instead of clipping it. */
+    overflow-wrap: anywhere;
+  }
+
+  .dismiss {
+    margin-left: auto;
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-size: 11.5px;
+    padding: 2px 9px;
   }
 
   .version {

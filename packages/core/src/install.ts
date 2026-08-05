@@ -89,9 +89,3 @@ export const SCAN_LOCATIONS: readonly string[] = [
 ];
 
 export type Theme = "light" | "dark" | "system";
-
-/** The whole of `zax.yml`. Written back in one piece, so it is one type rather than a bag of loose keys. */
-export interface ZaxSettings {
-  installs: readonly Install[];
-  theme: Theme;
-}

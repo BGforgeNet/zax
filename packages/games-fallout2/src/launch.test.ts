@@ -1,0 +1,45 @@
+import { describe, expect, it } from "vitest";
+import { planLaunch } from "./launch.js";
+import type { Install } from "@zax/core";
+
+const INSTALL: Install = { path: "/games/one", type: "fallout2" };
+
+describe("planning a launch", () => {
+  it("runs the executable directly on Windows", () => {
+    expect(planLaunch("windows", INSTALL, "4.5")).toEqual({
+      program: "fallout2.exe",
+      args: [],
+      cwd: "/games/one",
+      env: {},
+    });
+  });
+
+  it("runs it through Wine everywhere else", () => {
+    const plan = planLaunch("linux", INSTALL, "4.5");
+    expect(plan.program).toBe("wine");
+    expect(plan.args).toEqual(["fallout2.exe"]);
+    expect(plan.cwd).toBe("/games/one");
+  });
+
+  it("passes the install's own prefix and debug setting", () => {
+    const wine = { prefix: "/home/t/.wine-fallout", debug: "-all" };
+    expect(planLaunch("linux", { ...INSTALL, wine }, "4.5").env).toMatchObject({
+      WINEPREFIX: "/home/t/.wine-fallout",
+      WINEDEBUG: "-all",
+    });
+  });
+
+  it("leaves out a Wine setting the install does not have, rather than setting it empty", () => {
+    expect(planLaunch("linux", INSTALL, "4.5").env).not.toHaveProperty("WINEPREFIX");
+  });
+
+  it("asks Wine for the native DirectDraw only, on the sfall releases that require it", () => {
+    expect(planLaunch("linux", INSTALL, "4.1.1").env["WINEDLLOVERRIDES"]).toBe("ddraw.dll=n");
+    expect(planLaunch("linux", INSTALL, "4.1.2").env["WINEDLLOVERRIDES"]).toBe("ddraw.dll=n,b");
+    expect(planLaunch("linux", INSTALL, "4.5").env["WINEDLLOVERRIDES"]).toBe("ddraw.dll=n,b");
+  });
+
+  it("sets no override at all when the install has no sfall to load", () => {
+    expect(planLaunch("linux", INSTALL, null).env).not.toHaveProperty("WINEDLLOVERRIDES");
+  });
+});

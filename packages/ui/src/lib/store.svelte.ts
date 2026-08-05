@@ -1,40 +1,53 @@
 import {
   IniDocument,
+  addInstall,
+  backupDirectory,
+  compareVersions,
+  debugDirectory,
   describeValueTest,
+  identifyInstall,
   isApplied,
+  latestZax,
+  loadConfigFiles,
+  loadState,
+  logFile,
   matchesValueTest,
   removeInstall,
+  saveConfigFiles,
+  saveState,
+  scanForInstalls,
   withWine,
   type Action,
+  type ConfigChange,
+  type ConfigFileContents,
   type Install,
   type SettingDef,
+  type StoredInstall,
   type Theme,
   type ValueTest,
   type WineConfig,
 } from "@zax/core";
-import { ACTIONS, CONFIG_FILES, SETTINGS, describePlace, hiddenIds, placesById, type Place } from "@zax/fallout2";
+import {
+  ACTIONS,
+  CONFIG_FILES,
+  SETTINGS,
+  createDebugPackage,
+  describePlace,
+  hiddenIds,
+  installedSfallVersion,
+  latestSfall,
+  listSaves,
+  placesById,
+  planLaunch,
+  updateSfall,
+  type Place,
+  type SfallRelease,
+} from "@zax/fallout2";
+import { isPreview, platform } from "./host.js";
 
 // Built once: the layout does not change at runtime, and every search result needs a lookup in it.
 const PLACES = placesById();
 const HIDDEN = hiddenIds();
-
-import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
-import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
-import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
-
-const SOURCE: Record<string, string> = {
-  "fallout2.cfg": fallout2cfg,
-  "f2_res.ini": f2resini,
-  "ddraw.ini": ddrawini,
-};
-
-/** Value a setting has on disk, before any edit. Undefined when the install has never written the key. */
-function readBaseline(): Record<string, string | undefined> {
-  const docs = Object.fromEntries(CONFIG_FILES.map((f) => [f, IniDocument.parse(SOURCE[f] ?? "")]));
-  return Object.fromEntries(SETTINGS.map((s) => [s.id, docs[s.file]?.get(s.section, s.key)]));
-}
-
-const baseline = readBaseline();
 
 const CURATED = new Map(SETTINGS.map((s) => [`${s.file}|${s.section}|${s.key}`.toLowerCase(), s]));
 
@@ -43,15 +56,14 @@ const CURATED = new Map(SETTINGS.map((s) => [`${s.file}|${s.section}|${s.key}`.t
  * 115 keys, most undocumented by the catalog but documented by its own inline comments, which become the help
  * text for free.
  */
-function discover(): SettingDef[] {
+function discover(documents: Record<string, IniDocument>): SettingDef[] {
   const out: SettingDef[] = [];
   for (const file of CONFIG_FILES) {
-    const doc = IniDocument.parse(SOURCE[file] ?? "");
-    doc.entries().forEach((entry) => {
+    for (const entry of documents[file]?.entries() ?? []) {
       const curated = CURATED.get(`${file}|${entry.section}|${entry.key}`.toLowerCase());
       if (curated) {
         out.push(curated);
-        return;
+        continue;
       }
       out.push({
         id: `raw.${file}.${entry.section}.${entry.key}`.toLowerCase(),
@@ -62,30 +74,10 @@ function discover(): SettingDef[] {
         label: entry.key,
         ...(entry.comment ? { help: entry.comment } : {}),
       });
-    });
+    }
   }
   return out;
 }
-
-/**
- * Values ZAX pins regardless of what the file says. UAC_AWARE=1 makes the high-resolution patch read its
- * settings from roaming appdata instead of the game folder, so leaving it on means editing an ini the patch
- * never reads. They start as pending changes so the user sees them rather than having them applied invisibly.
- */
-function managedOverrides(): Record<string, string> {
-  const docs = Object.fromEntries(CONFIG_FILES.map((f) => [f, IniDocument.parse(SOURCE[f] ?? "")]));
-  const out: Record<string, string> = {};
-  for (const s of SETTINGS) {
-    if (!s.managed) continue;
-    if (docs[s.file]?.get(s.section, s.key) !== s.managed.value) out[s.id] = s.managed.value;
-  }
-  return out;
-}
-
-const DISCOVERED = discover();
-const RAW_BASELINE: Record<string, string | undefined> = Object.fromEntries(
-  DISCOVERED.map((s) => [s.id, IniDocument.parse(SOURCE[s.file] ?? "").get(s.section, s.key)]),
-);
 
 /** The two the previous implementation had at the top level, in its order. */
 export type View = "settings" | "trouble";
@@ -105,24 +97,10 @@ export type SettingsTab = string;
  */
 export type Panel = "games" | "zax";
 
-/**
- * The install the preview edits: the vendored fixture, which is a real GOG install's config files with the
- * unofficial patch applied. Named for what it actually is - a plausible-looking home directory would be a
- * fabricated path that reads as a real install nobody has.
- *
- * Scanning and adding need to read directories, so until the platform layer exists the list cannot grow. What
- * acts on the list rather than on the filesystem - selecting, removing, wine settings - runs for real.
- */
-const PREVIEW_INSTALLS: readonly Install[] = [
-  { path: "fixtures/vanilla-f2up", type: "fallout2upu" },
-];
-
-/**
- * Wine only exists off Windows, matching the previous implementation, which hid the whole tab there. The
- * browser reports the machine it runs on, which for the desktop build is the machine that matters.
- */
-function onWindows(): boolean {
-  return typeof navigator !== "undefined" && /win/i.test(navigator.userAgent);
+/** Something that happened and the user needs told: a save, a refusal, a failure. */
+export interface Notice {
+  kind: "done" | "problem";
+  text: string;
 }
 
 /**
@@ -138,10 +116,104 @@ class Store {
   /** The selected tab within each file, kept per file so switching files does not reset the other's place. */
   fileTab = $state<Record<string, string>>({});
   query = $state("");
-  installs = $state<readonly Install[]>(PREVIEW_INSTALLS);
-  selectedInstall = $state<string>(PREVIEW_INSTALLS[0]?.path ?? "");
+  installs = $state<readonly Install[]>([]);
+  selectedInstall = $state<string>("");
   theme = $state<Theme>("system");
-  overrides = $state<Record<string, string>>(managedOverrides());
+  overrides = $state<Record<string, string>>({});
+
+  /** Contents of the selected install's config files, exactly as they were read. */
+  contents = $state<ConfigFileContents>({});
+  /** False until the first read of the state file and the selected install's config files has finished. */
+  loaded = $state(false);
+  /** The operation in progress, for disabling the controls that would start a second one. */
+  busy = $state<string | null>(null);
+  notice = $state<Notice | null>(null);
+
+  sfallInstalled = $state<string | null>(null);
+  sfallLatest = $state<SfallRelease | null>(null);
+  zaxLatest = $state<string | null>(null);
+
+  /**
+   * Installs the state file lists but that could not be read. Held so saving the file writes them back rather
+   * than turning a drive being offline for one session into losing the entry.
+   */
+  private unavailable: readonly StoredInstall[] = [];
+
+  /**
+   * The values on disk, and every key the files actually hold. Computed when an install is read rather than
+   * derived from `contents`: this is three file parses and a pass over 166 settings, and a derivation would
+   * repeat it on every access from a plain function call.
+   */
+  private baseline: Record<string, string | undefined> = $state({});
+  private rawBaseline: Record<string, string | undefined> = $state({});
+  discovered = $state<SettingDef[]>([]);
+
+  private index(): void {
+    const documents = Object.fromEntries(CONFIG_FILES.map((f) => [f, IniDocument.parse(this.contents[f] ?? "")]));
+    const valueOf = (s: SettingDef) => documents[s.file]?.get(s.section, s.key);
+    this.discovered = discover(documents);
+    this.baseline = Object.fromEntries(SETTINGS.map((s) => [s.id, valueOf(s)]));
+    this.rawBaseline = Object.fromEntries(this.discovered.map((s) => [s.id, valueOf(s)]));
+  }
+
+  /**
+   * Values ZAX pins regardless of what the file says. UAC_AWARE=1 makes the high-resolution patch read its
+   * settings from roaming appdata instead of the game folder, so leaving it on means editing an ini the patch
+   * never reads. They start as pending changes so the user sees them rather than having them applied invisibly.
+   */
+  private managedOverrides(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const s of SETTINGS) {
+      if (s.managed && this.baselineOf(s.id) !== s.managed.value) out[s.id] = s.managed.value;
+    }
+    return out;
+  }
+
+  /** Reads the state file, then the selected install's config files. Runs once, at startup. */
+  async start(): Promise<void> {
+    const { state, problem } = await loadState(platform);
+    this.installs = state.installs;
+    this.unavailable = state.unavailable;
+    this.theme = state.theme;
+    this.selectedInstall = state.installs[0]?.path ?? "";
+    if (problem) this.notice = { kind: "problem", text: problem };
+    await this.readInstall();
+    this.loaded = true;
+  }
+
+  /** Rereads the selected install: its config files and which sfall it has. */
+  private async readInstall(): Promise<void> {
+    const install = this.install;
+    this.sfallInstalled = null;
+    if (!install) {
+      this.contents = {};
+      this.index();
+      this.overrides = {};
+      return;
+    }
+    this.contents = await loadConfigFiles(platform, install.path, [...CONFIG_FILES]);
+    this.index();
+    this.overrides = this.managedOverrides();
+    this.sfallInstalled = await installedSfallVersion(platform, install);
+  }
+
+  /** Runs one outward-facing operation, reporting whatever it fails with rather than swallowing it. */
+  private async run(what: string, work: () => Promise<Notice | null>): Promise<void> {
+    if (this.busy !== null) return;
+    this.busy = what;
+    this.notice = null;
+    try {
+      this.notice = await work();
+    } catch (error) {
+      this.notice = { kind: "problem", text: `${what} failed: ${(error as Error).message}` };
+    } finally {
+      this.busy = null;
+    }
+  }
+
+  private async persist(): Promise<void> {
+    await saveState(platform, { installs: this.installs, unavailable: this.unavailable, theme: this.theme });
+  }
 
   /** Writes every target of an action in one step, so it lands as a single user-visible change. */
   applyAction(action: Action): void {
@@ -158,21 +230,21 @@ class Store {
   }
 
   baselineOf(id: string): string | undefined {
-    return id in baseline ? baseline[id] : RAW_BASELINE[id];
+    return id in this.baseline ? this.baseline[id] : this.rawBaseline[id];
   }
 
   valueOf(id: string): string | undefined {
     return id in this.overrides ? this.overrides[id] : this.baselineOf(id);
   }
 
-  /**
-   * The key is not in the config file at all - usually because the installed component predates it. The engine
-   * falls back to its own built-in default, so this is not the same as an empty value.
-   */
   defOf(id: string): SettingDef | undefined {
     return SETTINGS.find((s) => s.id === id);
   }
 
+  /**
+   * The key is not in the config file at all - usually because the installed component predates it. The engine
+   * falls back to its own built-in default, so this is not the same as an empty value.
+   */
   isAbsent(id: string): boolean {
     return this.baselineOf(id) === undefined;
   }
@@ -230,8 +302,6 @@ class Store {
     this.overrides = { ...this.overrides, [id]: value };
   }
 
-
-
   revert(id: string): void {
     const { [id]: _dropped, ...rest } = this.overrides;
     this.overrides = rest;
@@ -239,7 +309,7 @@ class Store {
 
   revertAll(): void {
     // Pinned values are ZAX policy rather than a user edit, so reverting restores them instead of dropping them.
-    this.overrides = managedOverrides();
+    this.overrides = this.managedOverrides();
   }
 
   get modifiedCount(): number {
@@ -293,7 +363,6 @@ class Store {
     return SETTINGS.filter((s) => s.file === file && this.isModified(s.id)).length;
   }
 
-
   actionById(id: string): Action | undefined {
     return ACTIONS.find((a) => a.id === id);
   }
@@ -302,25 +371,177 @@ class Store {
     return this.installs.find((g) => g.path === this.selectedInstall);
   }
 
+  /**
+   * Wine only exists off Windows, matching the previous implementation, which hid the whole tab there. The
+   * machine that decides is the one the files are on, which the platform reports.
+   */
   get wineAvailable(): boolean {
-    return !onWindows();
+    return platform.os !== "windows";
   }
 
-  selectInstall(path: string): void {
+  get paths(): { backup: string; debug: string; log: string } {
+    return { backup: backupDirectory(platform), debug: debugDirectory(platform), log: logFile(platform) };
+  }
+
+  // ---- Operations that reach the machine ----------------------------------------------------------------
+
+  async selectInstall(path: string): Promise<void> {
+    if (path === this.selectedInstall) return;
     this.selectedInstall = path;
+    await this.readInstall();
   }
 
-  removeInstall(path: string): void {
+  async removeInstall(path: string): Promise<void> {
     this.installs = removeInstall(this.installs, path);
     // Dropping the selected install would leave every settings view bound to something no longer listed.
-    if (this.selectedInstall === path) this.selectedInstall = this.installs[0]?.path ?? "";
+    if (this.selectedInstall === path) {
+      this.selectedInstall = this.installs[0]?.path ?? "";
+      await this.readInstall();
+    }
+    await this.persist();
   }
 
-  setWine(path: string, wine: WineConfig): void {
+  async setWine(path: string, wine: WineConfig): Promise<void> {
     this.installs = withWine(this.installs, path, wine);
+    await this.persist();
   }
 
+  async setTheme(theme: Theme): Promise<void> {
+    this.theme = theme;
+    await this.persist();
+  }
+
+  /** Adds a directory the user pointed at, refusing one that does not hold a game. */
+  async addInstall(path: string): Promise<void> {
+    await this.run("Adding the install", async () => {
+      const trimmed = path.trim();
+      if (trimmed === "") return null;
+      const type = await identifyInstall(platform, trimmed);
+      if (type === null) return { kind: "problem", text: `${trimmed} does not hold a Fallout 2 install.` };
+      const result = addInstall(this.installs, { path: trimmed, type });
+      if (!result.ok) return { kind: "problem", text: result.reason };
+      this.installs = result.installs;
+      await this.persist();
+      if (this.selectedInstall === "") await this.selectInstall(trimmed);
+      return { kind: "done", text: `Added ${trimmed}.` };
+    });
+  }
+
+  async scan(): Promise<void> {
+    await this.run("Scanning", async () => {
+      const found = await scanForInstalls(platform, this.installs);
+      if (found.length === 0) return { kind: "done", text: "Nothing found in the usual places." };
+      this.installs = [...this.installs, ...found].sort((a, b) => a.path.localeCompare(b.path));
+      await this.persist();
+      if (this.selectedInstall === "") await this.selectInstall(found[0]!.path);
+      return { kind: "done", text: `Found ${found.length === 1 ? "one install" : `${found.length} installs`}.` };
+    });
+  }
+
+  /** Every pending edit, as the keys they write. */
+  private pendingChanges(): ConfigChange[] {
+    const out: ConfigChange[] = [];
+    for (const [id, value] of Object.entries(this.overrides)) {
+      const def = SETTINGS.find((s) => s.id === id) ?? this.discovered.find((s) => s.id === id);
+      if (def) out.push({ file: def.file, section: def.section, key: def.key, value });
+    }
+    return out;
+  }
+
+  async save(): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    await this.run("Saving", async () => {
+      const outcome = await saveConfigFiles(platform, {
+        installPath: install.path,
+        original: this.contents,
+        changes: this.pendingChanges(),
+      });
+      if (!outcome.ok) {
+        // Rereading would silently drop the edits; the user decides, so the files are left as they are.
+        return {
+          kind: "problem",
+          text: `${outcome.changed.join(" and ")} changed on disk since it was read. Nothing was written.`,
+        };
+      }
+      await this.readInstall();
+      if (outcome.files.length === 0) return null;
+      return { kind: "done", text: `Saved ${outcome.files.join(", ")}. Previous copies are in ${outcome.backup}.` };
+    });
+  }
+
+  async play(): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    await this.run("Starting the game", async () => {
+      const plan = planLaunch(platform.os, install, this.sfallInstalled);
+      await platform.process.launch(plan.program, plan.args, { cwd: plan.cwd, env: plan.env });
+      return null;
+    });
+  }
+
+  async checkZaxVersion(): Promise<void> {
+    await this.run("Checking for a newer ZAX", async () => {
+      this.zaxLatest = (await latestZax(platform)).version;
+      return null;
+    });
+  }
+
+  async checkSfallVersion(): Promise<void> {
+    await this.run("Checking for a newer sfall", async () => {
+      this.sfallLatest = await latestSfall(platform);
+      return null;
+    });
+  }
+
+  /** Whether the release that was found is newer than what the install has. */
+  get sfallOutdated(): boolean {
+    if (!this.sfallLatest || this.sfallInstalled === null) return false;
+    return compareVersions(this.sfallInstalled, this.sfallLatest.version) < 0;
+  }
+
+  async updateSfall(): Promise<void> {
+    const install = this.install;
+    const release = this.sfallLatest;
+    if (!install || !release) return;
+    await this.run("Updating sfall", async () => {
+      const result = await updateSfall(platform, install, release);
+      await this.readInstall();
+      const kept = result.backup === null ? "" : ` Replaced files are in ${result.backup}.`;
+      return { kind: "done", text: `sfall is now ${result.version}.${kept}` };
+    });
+  }
+
+  async saveSlots(): Promise<string[]> {
+    const install = this.install;
+    return install ? listSaves(platform, install) : [];
+  }
+
+  async createDebugPackage(saves: readonly string[]): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    await this.run("Creating the debug package", async () => {
+      const result = await createDebugPackage(platform, install, saves);
+      return { kind: "done", text: `Wrote ${result.path} - ${result.contents.length} files.` };
+    });
+  }
+
+  async open(path: string): Promise<void> {
+    await this.run("Opening", async () => {
+      await platform.process.open(path);
+      return null;
+    });
+  }
+
+  /** Empties one of ZAX's own directories. Recreated straight away, so the path stays valid. */
+  async wipe(path: string): Promise<void> {
+    await this.run("Emptying the directory", async () => {
+      await platform.fs.remove(path);
+      await platform.fs.mkdir(path);
+      return { kind: "done", text: `Emptied ${path}.` };
+    });
+  }
 }
 
 export const store = new Store();
-export { DISCOVERED, SETTINGS };
+export { SETTINGS, isPreview };

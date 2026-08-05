@@ -3,6 +3,7 @@
   import LayoutNodes from "./LayoutNodes.svelte";
   import SettingRow from "./SettingRow.svelte";
   import WinePanel from "./WinePanel.svelte";
+  import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
 
   const file = $derived(LAYOUT.find((f) => f.file === store.settingsTab));
@@ -88,20 +89,26 @@
       {/if}
     </div>
 
-    <!--
-      Both sat under the settings tabs in the previous interface, not in the window chrome. Disabled rather
-      than wired to something that clears the pending edits: that would look exactly like a successful write.
-    -->
+    <!-- Both sat under the settings tabs in the previous interface, not in the window chrome. -->
     <div class="footer">
-      <button class="primary" disabled title="Needs the desktop build - the preview cannot write config files">
-        Save
+      <button
+        class="primary"
+        disabled={!store.install || store.modifiedCount === 0 || store.busy !== null}
+        onclick={() => void store.save()}
+      >
+        {store.busy === "Saving" ? "Saving..." : "Save"}
       </button>
-      <button disabled title="Needs the desktop build - the preview cannot launch the game">Play</button>
+      <button
+        disabled={!store.install || isPreview || store.busy !== null}
+        title={isPreview ? "The browser preview cannot start a program - this needs the desktop build" : null}
+        onclick={() => void store.play()}
+      >
+        Play
+      </button>
       {#if store.modifiedCount > 0}
         <span class="pending">{store.modifiedCount} unsaved</span>
         <button class="link" onclick={() => store.revertAll()}>Revert all</button>
       {/if}
-      <span class="unavailable">saving needs the desktop build</span>
     </div>
   </main>
 </div>
@@ -188,9 +195,4 @@
     text-decoration: underline;
   }
 
-  .unavailable {
-    margin-left: auto;
-    color: var(--text-faint);
-    font-size: 12px;
-  }
 </style>

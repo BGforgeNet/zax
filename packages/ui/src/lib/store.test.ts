@@ -1,43 +1,77 @@
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test } from "vitest";
 import { SETTINGS } from "@zax/fallout2";
+import { PREVIEW_INSTALL, platform } from "./host.js";
 import { store } from "./store.svelte.js";
+import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
+import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
+import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
+
+/**
+ * The store reads its state and the selected install's config files from the platform, and the tests below
+ * write to both, so each starts from the seeded state file rather than from whatever the last test left.
+ *
+ * Without this the gate and conflict tests run against an empty baseline, where every value reads as absent -
+ * and they pass, because "absent" is also what a closed gate looks like.
+ */
+const bytes = (text: string) => {
+  const out = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) out[i] = text.charCodeAt(i) & 0xff;
+  return out;
+};
+
+beforeEach(async () => {
+  const seeded = `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`;
+  await platform.fs.write("preview/config/zax.yml", new TextEncoder().encode(seeded));
+  // The config files too: a test that saves rewrites them, and the next test would inherit that.
+  await platform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(fallout2cfg));
+  await platform.fs.write(`${PREVIEW_INSTALL}/f2_res.ini`, bytes(f2resini));
+  await platform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddrawini));
+  await store.start();
+});
+
+test("starts on the seeded install with its config files read", () => {
+  expect(store.installs.map((one) => one.path)).toEqual([PREVIEW_INSTALL]);
+  // Read from the fixture rather than defaulted: everything below distinguishes a value from its absence.
+  expect(store.baselineOf("sfall.misc.processoridle")).toBe("-1");
+  expect(store.baselineOf("hires.other-settings.cpu-usage-fix")).toBe("0");
+});
 
 describe("installs", () => {
-  const seed = () => {
+  const seed = async () => {
     store.installs = [
       { path: "/games/a", type: "fallout2" },
       { path: "/games/b", type: "fallout2rpu" },
     ];
-    store.selectInstall("/games/a");
+    await store.selectInstall("/games/a");
   };
 
-  test("removing the selected install moves the selection rather than stranding it", () => {
-    seed();
-    store.removeInstall("/games/a");
+  test("removing the selected install moves the selection rather than stranding it", async () => {
+    await seed();
+    await store.removeInstall("/games/a");
     // Every settings view reads the selected install, so leaving it pointing at a removed one would leave
     // them all bound to something no longer in the list.
     expect(store.selectedInstall).toBe("/games/b");
     expect(store.install?.path).toBe("/games/b");
   });
 
-  test("removing an install that is not selected leaves the selection alone", () => {
-    seed();
-    store.removeInstall("/games/b");
+  test("removing an install that is not selected leaves the selection alone", async () => {
+    await seed();
+    await store.removeInstall("/games/b");
     expect(store.selectedInstall).toBe("/games/a");
   });
 
-  test("removing the last install leaves nothing selected rather than a stale path", () => {
-    seed();
-    store.removeInstall("/games/a");
-    store.removeInstall("/games/b");
+  test("removing the last install leaves nothing selected rather than a stale path", async () => {
+    await seed();
+    await store.removeInstall("/games/a");
+    await store.removeInstall("/games/b");
     expect(store.selectedInstall).toBe("");
     expect(store.install).toBeUndefined();
   });
 
-  test("wine settings attach to one install and survive a change to the other", () => {
-    seed();
-    store.setWine("/games/a", { prefix: "/home/u/.wine-a" });
-    store.setWine("/games/b", { debug: "-all" });
+  test("wine settings attach to one install and survive a change to the other", async () => {
+    await seed();
+    await store.setWine("/games/a", { prefix: "/home/u/.wine-a" });
+    await store.setWine("/games/b", { debug: "-all" });
     expect(store.installs.find((g) => g.path === "/games/a")?.wine).toEqual({ prefix: "/home/u/.wine-a" });
     expect(store.installs.find((g) => g.path === "/games/b")?.wine).toEqual({ debug: "-all" });
   });
@@ -163,5 +197,93 @@ describe("conflicts", () => {
     expect(store.conflictOf(idle)?.other.id).toBe("hires.other-settings.cpu-usage-fix");
     store.revertAll();
     expect(store.conflictOf(idle)).toBeNull();
+  });
+});
+
+describe("saving", () => {
+  const MUSIC = "game.sound.music";
+
+  test("writes the pending edits to the install's own files and clears them", async () => {
+    const before = store.baselineOf(MUSIC);
+    store.set(MUSIC, before === "1" ? "0" : "1");
+    expect(store.isModified(MUSIC)).toBe(true);
+
+    await store.save();
+
+    expect(store.notice?.kind).toBe("done");
+    expect(store.isModified(MUSIC), "a saved edit is no longer pending").toBe(false);
+    // Read back through a fresh start, which is the only proof the value reached the file.
+    await store.start();
+    expect(store.baselineOf(MUSIC)).toBe(before === "1" ? "0" : "1");
+  });
+
+  test("leaves every other line of the file exactly as it was", async () => {
+    store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
+    await store.save();
+
+    const written = new TextDecoder("latin1").decode(await platform.fs.read(`${PREVIEW_INSTALL}/fallout2.cfg`));
+    const changed = written.split("\n").filter((line, at) => line !== fallout2cfg.split("\n")[at]);
+    expect(changed, "a save must rewrite one line").toHaveLength(1);
+    expect(changed[0]).toMatch(/^music=/);
+  });
+
+  test("refuses and writes nothing when the file changed underneath the open window", async () => {
+    store.set(MUSIC, "0");
+    // What a text editor open on the same file would do.
+    await platform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(`${fallout2cfg}\n; edited elsewhere\n`));
+
+    await store.save();
+
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.notice?.text).toContain("fallout2.cfg");
+    expect(store.isModified(MUSIC), "the edit is kept so the user can decide").toBe(true);
+    const onDisk = new TextDecoder("latin1").decode(await platform.fs.read(`${PREVIEW_INSTALL}/fallout2.cfg`));
+    expect(onDisk).toContain("; edited elsewhere");
+  });
+
+  test("keeps a copy of what it replaced", async () => {
+    store.set(MUSIC, "0");
+    await store.save();
+    const backup = store.notice?.text.match(/preview\/cache\/backup\/[\d_-]+/)?.[0];
+    expect(backup, "the save reports where the previous copy went").toBeDefined();
+    expect(new TextDecoder("latin1").decode(await platform.fs.read(`${backup}/fallout2.cfg`))).toBe(fallout2cfg);
+  });
+});
+
+describe("adding an install", () => {
+  test("refuses a directory that does not hold a game, naming it", async () => {
+    await platform.fs.mkdir("/elsewhere/not-a-game");
+    await store.addInstall("/elsewhere/not-a-game");
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.installs.map((one) => one.path)).toEqual([PREVIEW_INSTALL]);
+  });
+
+  test("refuses one already on the list rather than listing it twice", async () => {
+    await store.addInstall(PREVIEW_INSTALL);
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.installs).toHaveLength(1);
+  });
+
+  test("adds one that does, and it survives a restart", async () => {
+    await platform.fs.write("/elsewhere/Fallout 2/fallout2.exe", bytes("MZ"));
+    await store.addInstall("/elsewhere/Fallout 2");
+    expect(store.notice?.kind).toBe("done");
+
+    await store.start();
+    expect(store.installs.map((one) => one.path)).toContain("/elsewhere/Fallout 2");
+  });
+});
+
+describe("what the browser preview cannot do", () => {
+  test("reports a refusal rather than pretending the game started", async () => {
+    await store.play();
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.notice?.text).toContain("desktop build");
+  });
+
+  test("reports a refusal rather than inventing a release", async () => {
+    await store.checkSfallVersion();
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.sfallLatest, "nothing is shown as the latest version").toBeNull();
   });
 });

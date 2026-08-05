@@ -4,3 +4,14 @@ export { ACTIONS, COMMON_RESOLUTIONS, RESOLUTION_PAIRS, type ResolutionPair } fr
 export { DEBUG_PACKAGE_CONTENTS } from "./trouble.js";
 export { LAYOUT, type LayoutFile, type LayoutNode, type LayoutTab } from "./layout.js";
 export { describePlace, hiddenIds, placesById, type Place } from "./places.js";
+export { EXECUTABLE, planLaunch, type LaunchPlan } from "./launch.js";
+export {
+  SFALL_LIBRARY,
+  installedSfallVersion,
+  latestSfall,
+  readSfallVersion,
+  updateSfall,
+  type SfallRelease,
+  type SfallUpdate,
+} from "./sfall.js";
+export { createDebugPackage, listSaves, saveDirectory, type DebugPackage } from "./debug-package.js";

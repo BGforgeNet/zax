@@ -1,5 +1,6 @@
 <script lang="ts">
   import { GAME_TYPES, type GameType } from "@zax/core";
+  import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
   import fallout2 from "../assets/fallout2.png";
   import fallout2rpu from "../assets/fallout2rpu.png";
@@ -9,6 +10,16 @@
   const ICON: Record<GameType, string> = { fallout2, fallout2upu, fallout2rpu };
 
   const current = $derived(store.install);
+
+  let adding = $state(false);
+  let candidate = $state("");
+
+  function submit() {
+    void store.addInstall(candidate).then(() => {
+      candidate = "";
+      adding = false;
+    });
+  }
 </script>
 
 <div class="panel">
@@ -21,7 +32,7 @@
           class:selected={install.path === store.selectedInstall}
           aria-pressed={install.path === store.selectedInstall}
           title="{type.label} at {install.path}"
-          onclick={() => store.selectInstall(install.path)}
+          onclick={() => void store.selectInstall(install.path)}
         >
           <img class="icon" src={ICON[install.type]} alt={type.label} width="32" height="32" />
           <span class="text">
@@ -39,21 +50,38 @@
     {/each}
   </ul>
 
-  <!-- Says which install the preview is actually editing, rather than letting one entry imply a real scan. -->
-  <p class="note">The bundled fixture, until the desktop build can scan for real installs.</p>
+  {#if isPreview}
+    <!-- Says which install the preview is actually editing, rather than letting one entry imply a real scan. -->
+    <p class="note">The bundled fixture, edited in memory. Nothing here reaches a real game folder.</p>
+  {/if}
 
-  <div class="buttons">
-    <!--
-      Adding has to read a directory to decide whether it holds a game at all, so it can do nothing until the
-      platform layer exists. Shown disabled rather than hidden, so the column is not silently missing it.
-    -->
-    <button disabled title="Needs the desktop build - the browser preview cannot read directories">
-      Add game
-    </button>
-    <button class="remove" disabled={!current} onclick={() => current && store.removeInstall(current.path)}>
-      Remove from list
-    </button>
-  </div>
+  {#if adding}
+    <!-- A typed path rather than a directory picker: choosing one is the desktop shell's job, not the page's. -->
+    <form
+      class="add"
+      onsubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <input
+        aria-label="Path to the game folder"
+        placeholder="Path to the game folder"
+        bind:value={candidate}
+      />
+      <div class="buttons">
+        <button type="submit" disabled={candidate.trim() === ""}>Add</button>
+        <button type="button" onclick={() => (adding = false)}>Cancel</button>
+      </div>
+    </form>
+  {:else}
+    <div class="buttons">
+      <button onclick={() => (adding = true)}>Add game</button>
+      <button class="remove" disabled={!current} onclick={() => current && void store.removeInstall(current.path)}>
+        Remove from list
+      </button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -147,6 +175,23 @@
     color: var(--text-faint);
     font-size: 12.5px;
     padding: 6px 8px;
+  }
+
+  .add {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .add input {
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    padding: 3px 7px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    min-width: 0;
   }
 
   .buttons {

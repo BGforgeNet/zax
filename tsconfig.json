@@ -6,5 +6,11 @@
     "declaration": false,
     "types": ["node"]
   },
-  "include": ["packages/core/src/**/*.ts", "packages/games-fallout2/src/**/*.ts", "vitest.config.ts"]
+  "include": [
+    "packages/core/src/**/*.ts",
+    "packages/games-fallout2/src/**/*.ts",
+    "packages/platform/src/**/*.ts",
+    "packages/platform-node/src/**/*.ts",
+    "vitest.config.ts"
+  ]
 }
