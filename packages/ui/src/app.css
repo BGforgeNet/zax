@@ -1,0 +1,379 @@
+/*
+  One palette rather than two: `light-dark()` picks its arm from the used `color-scheme`, so the theme picker
+  narrows that below and every token follows. Two blocks under a `prefers-color-scheme` query would each need
+  an override for the picker, which is where a pair of palettes drifts apart.
+*/
+:root {
+  color-scheme: light dark;
+
+  --bg: light-dark(#f6f7f9, #16191d);
+  --panel: light-dark(#ffffff, #1d2126);
+  --panel-alt: light-dark(#fbfbfd, #21262c);
+  /* A header band, dark enough to read as one against `--bg` rather than as a slightly-off row. */
+  --band: light-dark(#d9e0e9, #2f3843);
+  --border: light-dark(#dfe3e8, #2e343c);
+  --border-strong: light-dark(#c6ccd4, #3d454f);
+  --text: light-dark(#1c2127, #e4e8ed);
+  --text-dim: light-dark(#5c6773, #a3adb9);
+  --text-faint: light-dark(#8b95a1, #78828e);
+  --accent: light-dark(#2f6fb5, #6fa8e0);
+  --accent-soft: light-dark(#e7f0fa, #22303e);
+  --modified: light-dark(#b26a00, #e0a458);
+  --modified-soft: light-dark(#fdf3e3, #33291a);
+  --invalid: light-dark(#c0392b, #ff8a7a);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /*
+    Content stops at this width and the surplus becomes symmetric margin; the row's three tracks total about
+    1100px, so past it the window grew and nothing in it did. Bands still span the full window and inset only
+    their own content, so backgrounds and separators reach both edges.
+
+    Measured from the pane because the list scrolls and the heading above it does not: where scrollbars take
+    width the two would otherwise disagree, and the difference is better spent on the right edge than the left.
+  */
+  --col: 1150px;
+  --gutter: max(16px, calc((100cqi - var(--col)) / 2));
+}
+
+/* The theme picker's only job: narrowing the used scheme, which is what every token above reads. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100vh;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
+/* The shell every view is built from: a fixed heading over one scrolling list. */
+.pane {
+  /* What `--gutter` measures against, so every band in the view lines up whether or not the list scrolls. */
+  container-type: inline-size;
+  flex: 1 1 auto;
+  min-width: 430px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pane main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pane .heading {
+  padding: 16px var(--gutter) 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pane .heading h1 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.pane .heading p {
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+
+.pane .list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.pane .empty {
+  padding: 28px var(--gutter);
+  color: var(--text-faint);
+}
+
+/*
+  Tab strip, shared by both views so they cannot drift apart.
+
+  The strip scrolls sideways when the tabs outgrow the window, and `overflow-x: auto` alone would compute the
+  other axis to `auto` as well - so the 1px by which the active tab overlaps the separator would turn the strip
+  into a vertical scroller. Hence the explicit `overflow-y: hidden`, with the separator moved out to `.tabbar`
+  and the overlap done by the scroller's own negative margin, where clipping cannot reach it.
+*/
+.tabbar {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px var(--gutter) 0;
+  margin-bottom: -1px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 7px 13px 8px;
+  color: var(--text-dim);
+}
+
+.tab:hover {
+  background: var(--panel-alt);
+}
+
+.tab[aria-selected="true"] {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tab .count {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Second-level tab strip, shared by the views that have one so the two cannot drift apart. */
+.subtabs {
+  display: flex;
+  gap: 14px;
+  padding: 0 var(--gutter);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 0 0 auto;
+}
+
+.subtab {
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 7px 1px 6px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.subtab:hover {
+  color: var(--text-dim);
+}
+
+.subtab[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 550;
+}
+
+/*
+  Setting rows, shared by every row-shaped control so they cannot drift apart.
+
+  Three fixed tracks rather than label-left/control-right: pushing the control to the far edge grew the gap
+  between a label and its own value with the window - past 900px on a wide monitor - which reads as two
+  unrelated columns. Fixed tracks keep that gap constant and spend the remaining width on the help text, which
+  otherwise needed a line of its own under every row.
+*/
+.list .row {
+  display: grid;
+  grid-template-columns: minmax(0, 19rem) minmax(0, 16rem) minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: baseline;
+  padding: 6px var(--gutter);
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid transparent;
+}
+
+/*
+  Zebra, so the eye can carry a value back to its label across the row's three tracks. Counted among sibling
+  rows, which restarts inside each group - the group's own heading already breaks the run, so a stripe carried
+  across it would read as arbitrary.
+*/
+.list .row:nth-of-type(even) {
+  background: color-mix(in srgb, var(--band) 40%, transparent);
+}
+
+.list .row:hover {
+  background: var(--panel-alt);
+}
+
+.list .row.modified {
+  border-left-color: var(--modified);
+  background: var(--modified-soft);
+}
+
+/*
+  A left rule plus an indented label, so the dependency on the row above is visible without reading the note.
+  The indent is applied to the label alone - indenting the row would shift its control and notes tracks out of
+  line with every unnested row.
+*/
+.list .row.nested {
+  border-left-color: var(--border);
+}
+
+.list .row.nested .label {
+  padding-left: calc(var(--row-indent, 0px) + 20px);
+}
+
+.list .row.nested.modified {
+  border-left-color: var(--modified);
+}
+
+.list .row .label {
+  /* Set by an enclosing group; ungrouped rows inherit nothing and sit flush. */
+  padding-left: var(--row-indent, 0);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Not emphasised: the group titles above carry the hierarchy, and bolding every row flattened it again. */
+.list .row .name {
+  font-weight: 400;
+}
+
+.list .row .control {
+  justify-self: stretch;
+  min-width: 0;
+}
+
+.list .row .notes {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 64ch;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Dimmed rather than disabled: the value is still editable and still written, it simply has no effect yet. */
+.list .row.inert .name,
+.list .row.inert .control {
+  opacity: 0.55;
+}
+
+.list .row .badge {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.list .row .was {
+  font-size: 11.5px;
+  color: var(--modified);
+}
+
+.list .row .revert {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.list .row .help {
+  color: var(--text-dim);
+}
+
+.list .row .note,
+.list .row .absent,
+.list .row .sentinel {
+  color: var(--text-faint);
+}
+
+.list .row .sentinel {
+  font-style: italic;
+}
+
+/*
+  Both warn that a value will not behave as read, so they share the amber; red stays for a value that is itself
+  invalid. The opening word separates them, since colour alone must not carry the difference.
+*/
+.list .row .gate,
+.list .row .clash {
+  color: var(--modified);
+}
+
+.list .row .invalid {
+  color: var(--invalid);
+}
+
+/* Below this the three tracks no longer fit, so the notes drop to their own line under the label and control. */
+@media (max-width: 950px) {
+  .list .row {
+    /* The control track keeps its width so the controls stay a column rather than a ragged right edge. */
+    grid-template-columns: minmax(0, 1fr) 16rem;
+  }
+
+  .list .row .notes {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+}
+
+/* Sub-heading inside a settings list. Shared so the two views cannot drift apart. */
+.group {
+  margin: 0;
+  padding: 9px var(--gutter) 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: var(--panel-alt);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}

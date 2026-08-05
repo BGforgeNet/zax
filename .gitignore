@@ -1,13 +1,9 @@
-__pycache__
-.venv
+node_modules/
 dist/
-zax/__pycache__/
-zax/zax.yml
-zax/build/
-zax/dist/
-zax/dist-dir/
-zax/dist-file/
-zax/zax.build/
-zax/zax.dist/
-zax/pyoxidizer.bzl
-zax/zax.bin
+tmp/
+
+# Scratch: the extraction scripts and fetched upstream sources the catalog generators read.
+.work/
+
+# Per-user state the application writes, when it is run from a checkout.
+zax.yml

@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+
+# esbuild ships a prebuilt binary its install script unpacks; vitest cannot run without it.
+allowBuilds:
+  esbuild: true

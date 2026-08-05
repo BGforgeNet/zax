@@ -24,5 +24,4 @@ Download `zax.exe` from the [latest release page](https://github.com/BGforgeNet/
 
 ### Info
 - [Forums](https://forums.bgforge.net/viewforum.php?f=34)
-- [Development](docs/development.md)
 - [Changelog](docs/changelog.md)

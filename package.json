@@ -1,0 +1,21 @@
+{
+  "name": "zax",
+  "version": "0.8.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @zax/ui dev",
+    "build": "pnpm --filter @zax/ui build",
+    "test": "vitest run",
+    "check": "tsc -p tsconfig.json && pnpm --filter @zax/ui exec svelte-check --tsconfig ./tsconfig.json"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "@types/node": "^26.1.2",
+    "fast-check": "^4.3.0",
+    "playwright": "^1.62.1",
+    "svelte": "^5.56.8",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
