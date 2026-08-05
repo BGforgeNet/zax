@@ -15,3 +15,12 @@ export {
   type SfallUpdate,
 } from "./sfall.js";
 export { createDebugPackage, listSaves, saveDirectory, type DebugPackage } from "./debug-package.js";
+export { BACKEND_METHODS, type BackendMethod } from "./backend-methods.js";
+export {
+  RELEASES_PAGE,
+  createBackend,
+  type Backend,
+  type MachineDescription,
+  type OpenTarget,
+  type OwnDirectory,
+} from "./backend.js";

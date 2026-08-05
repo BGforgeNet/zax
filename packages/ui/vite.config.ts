@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const workspaceRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 export default defineConfig({
+  // Relative asset URLs: the desktop build loads index.html from a file, where a root-absolute "/assets/..."
+  // resolves against the filesystem root rather than against the page.
+  base: "./",
   plugins: [svelte()],
   // HOST and PORT are read from the environment so a machine that needs a specific bind address or port can
   // say so without editing this file.

@@ -29,7 +29,7 @@
     <button
       disabled={!outdated || isPreview}
       title={outdated ? "Open the release page" : "Nothing newer has been found"}
-      onclick={() => void store.open("https://github.com/BGforgeNet/zax/releases/latest")}
+      onclick={() => void store.open("releases")}
     >
       Download latest
     </button>
@@ -43,25 +43,25 @@
   <h2 class="section">Backup directory</h2>
   <p class="path">{store.paths.backup}</p>
   <div class="buttons">
-    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open(store.paths.backup)}>
+    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("backup")}>
       Open
     </button>
-    <button disabled={store.busy !== null} onclick={() => void store.wipe(store.paths.backup)}>Wipe</button>
+    <button disabled={store.busy !== null} onclick={() => void store.wipe("backup")}>Wipe</button>
   </div>
 
   <h2 class="section">Debug archive directory</h2>
   <p class="path">{store.paths.debug}</p>
   <div class="buttons">
-    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open(store.paths.debug)}>
+    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("debug")}>
       Open
     </button>
-    <button disabled={store.busy !== null} onclick={() => void store.wipe(store.paths.debug)}>Wipe</button>
+    <button disabled={store.busy !== null} onclick={() => void store.wipe("debug")}>Wipe</button>
   </div>
 
   <h2 class="section">Log file</h2>
   <p class="path">{store.paths.log}</p>
   <div class="buttons">
-    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open(store.paths.log)}>
+    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("log")}>
       View
     </button>
   </div>

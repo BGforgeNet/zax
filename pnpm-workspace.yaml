@@ -1,6 +1,7 @@
 packages:
   - packages/*
 
-# esbuild ships a prebuilt binary its install script unpacks; vitest cannot run without it.
+# Both ship a prebuilt binary their install script fetches or unpacks; neither runs without it.
 allowBuilds:
   esbuild: true
+  electron: true

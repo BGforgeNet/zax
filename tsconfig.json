@@ -4,13 +4,16 @@
     "noEmit": true,
     "composite": false,
     "declaration": false,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "packages/core/src/**/*.ts",
     "packages/games-fallout2/src/**/*.ts",
     "packages/platform/src/**/*.ts",
     "packages/platform-node/src/**/*.ts",
+    "packages/app/src/**/*.ts",
     "vitest.config.ts"
   ]
 }

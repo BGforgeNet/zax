@@ -1,0 +1,117 @@
+/**
+ * Everything the interface asks the machine to do, as one flat list of operations.
+ *
+ * This is what crosses the process boundary in the desktop build, which is why it is operations rather than the
+ * platform interface itself. Three reasons. Path joining is synchronous and cannot be proxied over an
+ * asynchronous channel at all. One user action becomes one message instead of the dozens a file-by-file proxy
+ * would send. And the privileged surface a renderer can reach is an enumerable list rather than "any file".
+ *
+ * Composed here because these are operations on a Fallout 2 install: the config files, sfall, the debug archive.
+ */
+
+import {
+  backupDirectory,
+  debugDirectory,
+  identifyInstall,
+  latestZax,
+  loadConfigFiles,
+  loadState,
+  logFile,
+  saveConfigFiles,
+  saveState,
+  scanForInstalls,
+  type AppState,
+  type ConfigFileContents,
+  type GameType,
+  type Install,
+  type LoadedState,
+  type SaveOutcome,
+  type SaveRequest,
+  type ZaxRelease,
+} from "@zax/core";
+import type { OperatingSystem, Platform } from "@zax/platform";
+import { CONFIG_FILES } from "./files.js";
+import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
+import { planLaunch } from "./launch.js";
+import { installedSfallVersion, latestSfall, updateSfall, type SfallRelease, type SfallUpdate } from "./sfall.js";
+
+/** The application's own directories, and which machine this is. Read once, at startup. */
+export interface MachineDescription {
+  os: OperatingSystem;
+  backupDirectory: string;
+  debugDirectory: string;
+  logFile: string;
+}
+
+/** One of ZAX's own directories, named rather than passed as a path so a renderer cannot ask for another. */
+export type OwnDirectory = "backup" | "debug";
+
+/** Somewhere the desktop's own handler is asked to open. Named for the same reason. */
+export type OpenTarget = OwnDirectory | "log" | "releases";
+
+export const RELEASES_PAGE = "https://github.com/BGforgeNet/zax/releases/latest";
+
+export interface Backend {
+  describe(): Promise<MachineDescription>;
+  loadState(): Promise<LoadedState>;
+  saveState(state: AppState): Promise<void>;
+  loadConfigFiles(installPath: string): Promise<ConfigFileContents>;
+  saveConfigFiles(request: SaveRequest): Promise<SaveOutcome>;
+  identifyInstall(path: string): Promise<GameType | null>;
+  scanForInstalls(known: readonly Install[]): Promise<readonly Install[]>;
+  installedSfallVersion(install: Install): Promise<string | null>;
+  latestSfall(): Promise<SfallRelease>;
+  updateSfall(install: Install, release: SfallRelease): Promise<SfallUpdate>;
+  latestZax(): Promise<ZaxRelease>;
+  listSaves(install: Install): Promise<readonly string[]>;
+  createDebugPackage(install: Install, saves: readonly string[]): Promise<DebugPackage>;
+  launch(install: Install, sfallVersion: string | null): Promise<void>;
+  open(target: OpenTarget): Promise<void>;
+  wipe(which: OwnDirectory): Promise<void>;
+}
+
+
+export function createBackend(platform: Platform): Backend {
+  const own = (which: OwnDirectory) => (which === "backup" ? backupDirectory(platform) : debugDirectory(platform));
+
+  return {
+    describe: async () => ({
+      os: platform.os,
+      backupDirectory: backupDirectory(platform),
+      debugDirectory: debugDirectory(platform),
+      logFile: logFile(platform),
+    }),
+
+    loadState: () => loadState(platform),
+    saveState: (state) => saveState(platform, state),
+    loadConfigFiles: (installPath) => loadConfigFiles(platform, installPath, [...CONFIG_FILES]),
+    saveConfigFiles: (request) => saveConfigFiles(platform, request),
+    identifyInstall: (path) => identifyInstall(platform, path),
+    scanForInstalls: (known) => scanForInstalls(platform, known),
+
+    installedSfallVersion: (install) => installedSfallVersion(platform, install),
+    latestSfall: () => latestSfall(platform),
+    updateSfall: (install, release) => updateSfall(platform, install, release),
+    latestZax: () => latestZax(platform),
+
+    listSaves: (install) => listSaves(platform, install),
+    createDebugPackage: (install, saves) => createDebugPackage(platform, install, saves),
+
+    launch: async (install, sfallVersion) => {
+      const plan = planLaunch(platform.os, install, sfallVersion);
+      await platform.process.launch(plan.program, plan.args, { cwd: plan.cwd, env: plan.env });
+    },
+
+    open: async (target) => {
+      if (target === "releases") return platform.process.open(RELEASES_PAGE);
+      if (target === "log") return platform.process.open(logFile(platform));
+      return platform.process.open(own(target));
+    },
+
+    // Recreated straight away, so the path the interface shows stays valid.
+    wipe: async (which) => {
+      await platform.fs.remove(own(which));
+      await platform.fs.mkdir(own(which));
+    },
+  };
+}

@@ -11,7 +11,7 @@
     Saves are offered rather than swept in: they are the largest thing in the archive and the one part a user
     may not want to hand over, so the list is read when the step is reached and each slot is opted into.
   */
-  let slots = $state<string[]>([]);
+  let slots = $state<readonly string[]>([]);
   let chosen = $state<string[]>([]);
 
   $effect(() => {

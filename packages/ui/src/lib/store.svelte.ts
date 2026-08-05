@@ -1,21 +1,11 @@
 import {
   IniDocument,
   addInstall,
-  backupDirectory,
   compareVersions,
-  debugDirectory,
   describeValueTest,
-  identifyInstall,
   isApplied,
-  latestZax,
-  loadConfigFiles,
-  loadState,
-  logFile,
   matchesValueTest,
   removeInstall,
-  saveConfigFiles,
-  saveState,
-  scanForInstalls,
   withWine,
   type Action,
   type ConfigChange,
@@ -29,21 +19,43 @@ import {
 } from "@zax/core";
 import {
   ACTIONS,
+  BACKEND_METHODS,
   CONFIG_FILES,
   SETTINGS,
-  createDebugPackage,
   describePlace,
   hiddenIds,
-  installedSfallVersion,
-  latestSfall,
-  listSaves,
   placesById,
-  planLaunch,
-  updateSfall,
+  type Backend,
+  type MachineDescription,
+  type OpenTarget,
+  type OwnDirectory,
   type Place,
   type SfallRelease,
 } from "@zax/fallout2";
-import { isPreview, platform } from "./host.js";
+import { backend as host, isPreview } from "./host.js";
+
+/**
+ * Every argument is unwrapped before it leaves the interface. The store holds its state in reactive proxies,
+ * and a proxy cannot be structured-cloned - which is exactly what the desktop build's channel does to it, so
+ * passing one straight through fails there with "an object could not be cloned" and works everywhere else.
+ * Done once here rather than per call site, where the next operation added would forget it.
+ *
+ * Exported so a test can assert the unwrapping happens: Node's own `structuredClone` accepts a proxy where
+ * Electron's serializer rejects it, so nothing short of checking this directly catches a regression here.
+ */
+export function unwrapArguments(backend: Backend): Backend {
+  const callable = backend as unknown as Record<string, (...args: unknown[]) => unknown>;
+  const unwrapped = Object.fromEntries(
+    // Called rather than passed by reference: the compiler rewrites `$state.snapshot(x)`, not a bare mention.
+    BACKEND_METHODS.map((name) => [
+      name,
+      (...args: unknown[]) => callable[name]!(...args.map((arg) => $state.snapshot(arg))),
+    ]),
+  );
+  return unwrapped as unknown as Backend;
+}
+
+const backend: Backend = unwrapArguments(host);
 
 // Built once: the layout does not change at runtime, and every search result needs a lookup in it.
 const PLACES = placesById();
@@ -139,6 +151,9 @@ class Store {
    */
   private unavailable: readonly StoredInstall[] = [];
 
+  /** Read once at startup: which machine this is and where its own directories are. */
+  private machine = $state<MachineDescription | null>(null);
+
   /**
    * The values on disk, and every key the files actually hold. Computed when an install is read rather than
    * derived from `contents`: this is three file parses and a pass over 166 settings, and a derivation would
@@ -169,9 +184,10 @@ class Store {
     return out;
   }
 
-  /** Reads the state file, then the selected install's config files. Runs once, at startup. */
+  /** Reads the machine's own description and state file, then the selected install. Runs once, at startup. */
   async start(): Promise<void> {
-    const { state, problem } = await loadState(platform);
+    this.machine = await backend.describe();
+    const { state, problem } = await backend.loadState();
     this.installs = state.installs;
     this.unavailable = state.unavailable;
     this.theme = state.theme;
@@ -191,10 +207,10 @@ class Store {
       this.overrides = {};
       return;
     }
-    this.contents = await loadConfigFiles(platform, install.path, [...CONFIG_FILES]);
+    this.contents = await backend.loadConfigFiles(install.path);
     this.index();
     this.overrides = this.managedOverrides();
-    this.sfallInstalled = await installedSfallVersion(platform, install);
+    this.sfallInstalled = await backend.installedSfallVersion(install);
   }
 
   /** Runs one outward-facing operation, reporting whatever it fails with rather than swallowing it. */
@@ -212,7 +228,7 @@ class Store {
   }
 
   private async persist(): Promise<void> {
-    await saveState(platform, { installs: this.installs, unavailable: this.unavailable, theme: this.theme });
+    await backend.saveState({ installs: this.installs, unavailable: this.unavailable, theme: this.theme });
   }
 
   /** Writes every target of an action in one step, so it lands as a single user-visible change. */
@@ -376,11 +392,16 @@ class Store {
    * machine that decides is the one the files are on, which the platform reports.
    */
   get wineAvailable(): boolean {
-    return platform.os !== "windows";
+    return this.machine?.os !== "windows";
   }
 
+  /** Where ZAX keeps its own files, for the panel that shows and empties them. Empty until startup finishes. */
   get paths(): { backup: string; debug: string; log: string } {
-    return { backup: backupDirectory(platform), debug: debugDirectory(platform), log: logFile(platform) };
+    return {
+      backup: this.machine?.backupDirectory ?? "",
+      debug: this.machine?.debugDirectory ?? "",
+      log: this.machine?.logFile ?? "",
+    };
   }
 
   // ---- Operations that reach the machine ----------------------------------------------------------------
@@ -416,7 +437,7 @@ class Store {
     await this.run("Adding the install", async () => {
       const trimmed = path.trim();
       if (trimmed === "") return null;
-      const type = await identifyInstall(platform, trimmed);
+      const type = await backend.identifyInstall(trimmed);
       if (type === null) return { kind: "problem", text: `${trimmed} does not hold a Fallout 2 install.` };
       const result = addInstall(this.installs, { path: trimmed, type });
       if (!result.ok) return { kind: "problem", text: result.reason };
@@ -429,7 +450,7 @@ class Store {
 
   async scan(): Promise<void> {
     await this.run("Scanning", async () => {
-      const found = await scanForInstalls(platform, this.installs);
+      const found = await backend.scanForInstalls(this.installs);
       if (found.length === 0) return { kind: "done", text: "Nothing found in the usual places." };
       this.installs = [...this.installs, ...found].sort((a, b) => a.path.localeCompare(b.path));
       await this.persist();
@@ -452,7 +473,7 @@ class Store {
     const install = this.install;
     if (!install) return;
     await this.run("Saving", async () => {
-      const outcome = await saveConfigFiles(platform, {
+      const outcome = await backend.saveConfigFiles({
         installPath: install.path,
         original: this.contents,
         changes: this.pendingChanges(),
@@ -474,22 +495,21 @@ class Store {
     const install = this.install;
     if (!install) return;
     await this.run("Starting the game", async () => {
-      const plan = planLaunch(platform.os, install, this.sfallInstalled);
-      await platform.process.launch(plan.program, plan.args, { cwd: plan.cwd, env: plan.env });
+      await backend.launch(install, this.sfallInstalled);
       return null;
     });
   }
 
   async checkZaxVersion(): Promise<void> {
     await this.run("Checking for a newer ZAX", async () => {
-      this.zaxLatest = (await latestZax(platform)).version;
+      this.zaxLatest = (await backend.latestZax()).version;
       return null;
     });
   }
 
   async checkSfallVersion(): Promise<void> {
     await this.run("Checking for a newer sfall", async () => {
-      this.sfallLatest = await latestSfall(platform);
+      this.sfallLatest = await backend.latestSfall();
       return null;
     });
   }
@@ -505,40 +525,38 @@ class Store {
     const release = this.sfallLatest;
     if (!install || !release) return;
     await this.run("Updating sfall", async () => {
-      const result = await updateSfall(platform, install, release);
+      const result = await backend.updateSfall(install, release);
       await this.readInstall();
       const kept = result.backup === null ? "" : ` Replaced files are in ${result.backup}.`;
       return { kind: "done", text: `sfall is now ${result.version}.${kept}` };
     });
   }
 
-  async saveSlots(): Promise<string[]> {
+  async saveSlots(): Promise<readonly string[]> {
     const install = this.install;
-    return install ? listSaves(platform, install) : [];
+    return install ? backend.listSaves(install) : [];
   }
 
   async createDebugPackage(saves: readonly string[]): Promise<void> {
     const install = this.install;
     if (!install) return;
     await this.run("Creating the debug package", async () => {
-      const result = await createDebugPackage(platform, install, saves);
+      const result = await backend.createDebugPackage(install, saves);
       return { kind: "done", text: `Wrote ${result.path} - ${result.contents.length} files.` };
     });
   }
 
-  async open(path: string): Promise<void> {
+  async open(target: OpenTarget): Promise<void> {
     await this.run("Opening", async () => {
-      await platform.process.open(path);
+      await backend.open(target);
       return null;
     });
   }
 
-  /** Empties one of ZAX's own directories. Recreated straight away, so the path stays valid. */
-  async wipe(path: string): Promise<void> {
+  async wipe(which: OwnDirectory): Promise<void> {
     await this.run("Emptying the directory", async () => {
-      await platform.fs.remove(path);
-      await platform.fs.mkdir(path);
-      return { kind: "done", text: `Emptied ${path}.` };
+      await backend.wipe(which);
+      return { kind: "done", text: `Emptied the ${which} directory.` };
     });
   }
 }

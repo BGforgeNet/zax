@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import NoInstall from "./lib/NoInstall.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
   import TroubleView from "./lib/TroubleView.svelte";
@@ -85,7 +86,14 @@
 
   <div class="body">
     <Sidebar />
-    {#if store.view === "settings"}<SettingsView />{:else}<TroubleView />{/if}
+    <!-- Both views act on the selected install, so neither has anything to show until there is one. -->
+    {#if store.loaded && !store.install}
+      <NoInstall />
+    {:else if store.view === "settings"}
+      <SettingsView />
+    {:else}
+      <TroubleView />
+    {/if}
   </div>
 </div>
 

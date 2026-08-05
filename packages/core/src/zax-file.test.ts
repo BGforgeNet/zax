@@ -68,3 +68,18 @@ describe("writing zax.yml", () => {
     expect(text.indexOf("/a")).toBeLessThan(text.indexOf("/b"));
   });
 });
+
+describe("long paths", () => {
+  const long = "/home/tester/some/deeply/nested/place/for/games/GOG Games/Fallout 2 with the restoration project";
+
+  it("keeps an install path on one line, since people hand-edit this file", () => {
+    const text = formatZaxFile({ installs: [{ path: long }], theme: "system" });
+    expect(text).toContain(`- path: ${long}\n`);
+  });
+
+  it("reads back what it wrote", () => {
+    expect(parseZaxFile(formatZaxFile({ installs: [{ path: long }], theme: "system" })).installs).toEqual([
+      { path: long },
+    ]);
+  });
+});

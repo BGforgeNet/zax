@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { SETTINGS } from "@zax/fallout2";
-import { PREVIEW_INSTALL, platform } from "./host.js";
-import { store } from "./store.svelte.js";
+import { PREVIEW_INSTALL, previewPlatform } from "./host.js";
+import { store, unwrapArguments } from "./store.svelte.js";
+import { BACKEND_METHODS, type Backend } from "@zax/fallout2";
 import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
 import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
@@ -21,11 +22,11 @@ const bytes = (text: string) => {
 
 beforeEach(async () => {
   const seeded = `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`;
-  await platform.fs.write("preview/config/zax.yml", new TextEncoder().encode(seeded));
+  await previewPlatform.fs.write("preview/config/zax.yml", new TextEncoder().encode(seeded));
   // The config files too: a test that saves rewrites them, and the next test would inherit that.
-  await platform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(fallout2cfg));
-  await platform.fs.write(`${PREVIEW_INSTALL}/f2_res.ini`, bytes(f2resini));
-  await platform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddrawini));
+  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(fallout2cfg));
+  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/f2_res.ini`, bytes(f2resini));
+  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddrawini));
   await store.start();
 });
 
@@ -221,7 +222,7 @@ describe("saving", () => {
     store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
     await store.save();
 
-    const written = new TextDecoder("latin1").decode(await platform.fs.read(`${PREVIEW_INSTALL}/fallout2.cfg`));
+    const written = new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${PREVIEW_INSTALL}/fallout2.cfg`));
     const changed = written.split("\n").filter((line, at) => line !== fallout2cfg.split("\n")[at]);
     expect(changed, "a save must rewrite one line").toHaveLength(1);
     expect(changed[0]).toMatch(/^music=/);
@@ -230,14 +231,14 @@ describe("saving", () => {
   test("refuses and writes nothing when the file changed underneath the open window", async () => {
     store.set(MUSIC, "0");
     // What a text editor open on the same file would do.
-    await platform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(`${fallout2cfg}\n; edited elsewhere\n`));
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(`${fallout2cfg}\n; edited elsewhere\n`));
 
     await store.save();
 
     expect(store.notice?.kind).toBe("problem");
     expect(store.notice?.text).toContain("fallout2.cfg");
     expect(store.isModified(MUSIC), "the edit is kept so the user can decide").toBe(true);
-    const onDisk = new TextDecoder("latin1").decode(await platform.fs.read(`${PREVIEW_INSTALL}/fallout2.cfg`));
+    const onDisk = new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${PREVIEW_INSTALL}/fallout2.cfg`));
     expect(onDisk).toContain("; edited elsewhere");
   });
 
@@ -246,13 +247,13 @@ describe("saving", () => {
     await store.save();
     const backup = store.notice?.text.match(/preview\/cache\/backup\/[\d_-]+/)?.[0];
     expect(backup, "the save reports where the previous copy went").toBeDefined();
-    expect(new TextDecoder("latin1").decode(await platform.fs.read(`${backup}/fallout2.cfg`))).toBe(fallout2cfg);
+    expect(new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${backup}/fallout2.cfg`))).toBe(fallout2cfg);
   });
 });
 
 describe("adding an install", () => {
   test("refuses a directory that does not hold a game, naming it", async () => {
-    await platform.fs.mkdir("/elsewhere/not-a-game");
+    await previewPlatform.fs.mkdir("/elsewhere/not-a-game");
     await store.addInstall("/elsewhere/not-a-game");
     expect(store.notice?.kind).toBe("problem");
     expect(store.installs.map((one) => one.path)).toEqual([PREVIEW_INSTALL]);
@@ -265,7 +266,7 @@ describe("adding an install", () => {
   });
 
   test("adds one that does, and it survives a restart", async () => {
-    await platform.fs.write("/elsewhere/Fallout 2/fallout2.exe", bytes("MZ"));
+    await previewPlatform.fs.write("/elsewhere/Fallout 2/fallout2.exe", bytes("MZ"));
     await store.addInstall("/elsewhere/Fallout 2");
     expect(store.notice?.kind).toBe("done");
 
@@ -285,5 +286,30 @@ describe("what the browser preview cannot do", () => {
     await store.checkSfallVersion();
     expect(store.notice?.kind).toBe("problem");
     expect(store.sfallLatest, "nothing is shown as the latest version").toBeNull();
+  });
+});
+
+describe("crossing the process boundary", () => {
+  /*
+    The desktop build runs the backend in another process, and everything the interface sends is serialized on
+    the way out. The store's state lives in reactive proxies, which that serializer refuses - so an argument
+    has to be unwrapped before it goes. Node's own structuredClone accepts a proxy, so this is asserted by
+    identity rather than by trying to clone it: what the backend receives must not be the object the store holds.
+  */
+  test("unwraps the reactive state it sends, rather than handing the proxy across", async () => {
+    const seen: unknown[][] = [];
+    const recorder = Object.fromEntries(
+      BACKEND_METHODS.map((name) => [name, (...args: unknown[]) => (seen.push(args), Promise.resolve(undefined))]),
+    ) as unknown as Backend;
+
+    await unwrapArguments(recorder).saveState({
+      installs: store.installs,
+      unavailable: [],
+      theme: store.theme,
+    } as never);
+
+    const sent = seen[0]![0] as { installs: unknown };
+    expect(sent.installs, "the proxy itself would not survive the channel").not.toBe(store.installs);
+    expect(sent.installs).toEqual(store.installs);
   });
 });

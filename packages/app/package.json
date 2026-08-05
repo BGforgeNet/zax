@@ -1,0 +1,22 @@
+{
+  "name": "@zax/app",
+  "version": "0.8.0",
+  "private": true,
+  "main": "./dist/main.mjs",
+  "dependencies": {
+    "7z-wasm": "1.2.0",
+    "@zax/core": "workspace:*",
+    "@zax/fallout2": "workspace:*",
+    "@zax/platform": "workspace:*",
+    "@zax/platform-node": "workspace:*"
+  },
+  "devDependencies": {
+    "electron": "43.2.0",
+    "esbuild": "0.27.1"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "electron ."
+  }
+}

@@ -71,5 +71,7 @@ export function formatZaxFile(state: ZaxFile): string {
       ...(install.wine?.prefix ? { wine_prefix: install.wine.prefix } : {}),
       ...(install.wine?.debug ? { wine_debug: install.wine.debug } : {}),
     }));
-  return stringify({ games, theme: state.theme });
+  // Unwrapped: the emitter folds a long scalar across lines by default, which is lossless but splits an install
+  // path over two lines in a file people hand-edit.
+  return stringify({ games, theme: state.theme }, { lineWidth: 0 });
 }
