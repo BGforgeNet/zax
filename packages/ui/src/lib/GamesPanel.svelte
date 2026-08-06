@@ -1,24 +1,47 @@
 <script lang="ts">
-  import { GAME_TYPES, type GameType } from "@zax/core";
+  import { GAME_TYPES, displayName, type GameType } from "@zax/core";
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
   import fallout2 from "../assets/fallout2.png";
   import fallout2rpu from "../assets/fallout2rpu.png";
   import fallout2upu from "../assets/fallout2upu.png";
 
-  // The previous interface's own icons, one per install type, carried over from its `zax/icons/`.
-  const ICON: Record<GameType, string> = { fallout2, fallout2upu, fallout2rpu };
+  // The previous interface's own icons, carried over from its `zax/icons/`. It had none for killap's two
+  // patches, which each share the icon of the fork that descends from it.
+  const ICON: Record<GameType, string> = {
+    fallout2,
+    fallout2up: fallout2upu,
+    fallout2rp: fallout2rpu,
+    fallout2upu,
+    fallout2rpu,
+  };
 
   const current = $derived(store.install);
 
   let adding = $state(false);
   let candidate = $state("");
 
+  let renaming = $state("");
+  let proposed = $state("");
+
   function submit() {
     void store.addInstall(candidate).then(() => {
       candidate = "";
       adding = false;
     });
+  }
+
+  function startRename() {
+    if (!current) return;
+    renaming = current.path;
+    // Seeded with the name on screen, so clearing the field is a deliberate act rather than the starting state.
+    proposed = displayName(current);
+  }
+
+  function submitRename() {
+    const path = renaming;
+    renaming = "";
+    void store.renameInstall(path, proposed);
   }
 </script>
 
@@ -32,13 +55,17 @@
           class:selected={install.path === store.selectedInstall}
           aria-pressed={install.path === store.selectedInstall}
           title="{type.label} at {install.path}"
-          onclick={() => void store.selectInstall(install.path)}
+          onclick={() => {
+            // Selecting elsewhere abandons a rename in progress, which is still holding the previous install.
+            renaming = "";
+            void store.selectInstall(install.path);
+          }}
         >
           <img class="icon" src={ICON[install.type]} alt={type.label} width="32" height="32" />
           <span class="text">
             <span class="top">
-              <!-- The folder is what tells two installs apart; the mod is the badge and the icon. -->
-              <span class="name">{install.path.split("/").filter(Boolean).pop() ?? install.path}</span>
+              <!-- The path below is what tells two installs of one type apart; the name says what the game is. -->
+              <span class="name">{displayName(install)}</span>
               <span class="badge">{type.badge}</span>
             </span>
             <span class="path">{install.path}</span>
@@ -55,10 +82,25 @@
     <p class="note">The bundled fixture, edited in memory. Nothing here reaches a real game folder.</p>
   {/if}
 
-  {#if adding}
+  {#if renaming !== ""}
+    <form
+      class="form"
+      onsubmit={(event) => {
+        event.preventDefault();
+        submitRename();
+      }}
+    >
+      <input class="prose" aria-label="Name for this install" placeholder="Name for this install" bind:value={proposed} />
+      <div class="buttons">
+        <button type="submit">Rename</button>
+        <button type="button" onclick={() => (renaming = "")}>Cancel</button>
+      </div>
+      <p class="note">Leave it empty to go back to {current ? GAME_TYPES[current.type].name : "the default"}.</p>
+    </form>
+  {:else if adding}
     <!-- A typed path rather than a directory picker: choosing one is the desktop shell's job, not the page's. -->
     <form
-      class="add"
+      class="form"
       onsubmit={(event) => {
         event.preventDefault();
         submit();
@@ -77,6 +119,7 @@
   {:else}
     <div class="buttons">
       <button onclick={() => (adding = true)}>Add game</button>
+      <button disabled={!current} onclick={startRename}>Rename</button>
       <button class="remove" disabled={!current} onclick={() => current && void store.removeInstall(current.path)}>
         Remove from list
       </button>
@@ -177,14 +220,15 @@
     padding: 6px 8px;
   }
 
-  .add {
+  .form {
     display: flex;
     flex-direction: column;
     gap: 6px;
     margin-bottom: 6px;
   }
 
-  .add input {
+  /* Monospaced because the field these styles were written for holds a path. */
+  .form input {
     background: var(--panel);
     border: 1px solid var(--border-strong);
     border-radius: 5px;
@@ -192,6 +236,12 @@
     font-family: var(--mono);
     font-size: 11.5px;
     min-width: 0;
+  }
+
+  /* A name is not a path, so it reads in the interface's own font at the size the name renders at. */
+  .form input.prose {
+    font-family: inherit;
+    font-size: 12.5px;
   }
 
   .buttons {

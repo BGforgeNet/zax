@@ -63,6 +63,17 @@ describe("writing zax.yml", () => {
     expect(formatZaxFile({ installs: [{ path: "/a" }], theme: "system" })).not.toContain("wine_");
   });
 
+  it("keeps a name the user chose across a round trip", () => {
+    const text = formatZaxFile({ installs: [{ path: "/a", name: "My playthrough" }], theme: "system" });
+    expect(text).toContain("name: My playthrough");
+    expect(parseZaxFile(text).installs).toEqual([{ path: "/a", name: "My playthrough" }]);
+  });
+
+  it("writes no name for an install left at its type's, so it follows the type", () => {
+    expect(formatZaxFile({ installs: [{ path: "/a" }], theme: "system" })).not.toContain("name:");
+    expect(parseZaxFile("games:\n- path: /a\n  name: '   '\n").installs).toEqual([{ path: "/a" }]);
+  });
+
   it("sorts by path, so the file does not reorder itself between saves", () => {
     const text = formatZaxFile({ installs: [{ path: "/b" }, { path: "/a" }], theme: "system" });
     expect(text.indexOf("/a")).toBeLessThan(text.indexOf("/b"));

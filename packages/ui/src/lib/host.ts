@@ -44,9 +44,10 @@ export const previewPlatform: Platform = (() => {
       [`${PREVIEW_INSTALL}/fallout2.cfg`]: fallout2cfg,
       [`${PREVIEW_INSTALL}/f2_res.ini`]: f2resini,
       [`${PREVIEW_INSTALL}/ddraw.ini`]: ddrawini,
-      // The fixture directory holds config files only; these are what make it read as an install at all.
+      // The fixture directory holds config files only; these are what make it read as an install at all, and
+      // they are the ones the install it came from has - a GOG game with killap's Unofficial Patch.
       [`${PREVIEW_INSTALL}/fallout2.exe`]: "",
-      [`${PREVIEW_INSTALL}/mods/upu.dat`]: "",
+      [`${PREVIEW_INSTALL}/up-changelog.txt`]: "",
       "preview/config/zax.yml": `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`,
     },
   });

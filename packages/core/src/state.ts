@@ -55,7 +55,14 @@ export async function loadState(platform: Platform): Promise<LoadedState> {
   for (const entry of stored.installs) {
     const type = await identifyInstall(platform, entry.path);
     if (type === null) unavailable.push(entry);
-    else installs.push({ path: entry.path, type, ...(entry.wine ? { wine: entry.wine } : {}) });
+    else {
+      installs.push({
+        path: entry.path,
+        type,
+        ...(entry.name ? { name: entry.name } : {}),
+        ...(entry.wine ? { wine: entry.wine } : {}),
+      });
+    }
   }
 
   return { state: { installs, unavailable, theme: stored.theme } };
@@ -63,7 +70,11 @@ export async function loadState(platform: Platform): Promise<LoadedState> {
 
 export async function saveState(platform: Platform, state: AppState): Promise<void> {
   const stored: StoredInstall[] = [
-    ...state.installs.map((install) => ({ path: install.path, ...(install.wine ? { wine: install.wine } : {}) })),
+    ...state.installs.map((install) => ({
+      path: install.path,
+      ...(install.name ? { name: install.name } : {}),
+      ...(install.wine ? { wine: install.wine } : {}),
+    })),
     ...state.unavailable,
   ];
   const text = formatZaxFile({ ...EMPTY_ZAX_FILE, installs: stored, theme: state.theme });

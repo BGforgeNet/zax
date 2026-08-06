@@ -4,13 +4,38 @@
  * config directory, and the shape here is the same one so an existing file still loads.
  */
 
-/** Which mod is installed, decided by what sits in `mods/` rather than by anything the user tells us. */
-export type GameType = "fallout2" | "fallout2upu" | "fallout2rpu";
+/**
+ * Which mod is installed, decided by reading the directory rather than by anything the user tells us.
+ *
+ * The four patched types are two pairs, and the distinction is not cosmetic: killap's Unofficial Patch and
+ * Restoration Project patch `data/` in place, while the Updated forks that descend from them are separate mods
+ * distributed as a `mods/*.dat`. Calling either one "the unofficial patch" mislabels the other.
+ */
+export type GameType = "fallout2" | "fallout2up" | "fallout2rp" | "fallout2upu" | "fallout2rpu";
 
-export const GAME_TYPES: Readonly<Record<GameType, { label: string; badge: string }>> = {
-  fallout2: { label: "Fallout 2", badge: "vanilla" },
-  fallout2upu: { label: "Fallout 2 with the unofficial patch", badge: "upu" },
-  fallout2rpu: { label: "Fallout 2 with the restoration project", badge: "rpu" },
+/** `name` is the install's default display name; `label` says the same thing in full, for the tooltip. */
+export const GAME_TYPES: Readonly<Record<GameType, { name: string; label: string; badge: string }>> = {
+  fallout2: { name: "Fallout 2", label: "Fallout 2", badge: "vanilla" },
+  fallout2up: {
+    name: "Unofficial Patch",
+    label: "Fallout 2 with killap's Unofficial Patch",
+    badge: "up",
+  },
+  fallout2rp: {
+    name: "Restoration Project",
+    label: "Fallout 2 with killap's Restoration Project",
+    badge: "rp",
+  },
+  fallout2upu: {
+    name: "Unofficial Patch Updated",
+    label: "Fallout 2 with the Unofficial Patch Updated",
+    badge: "upu",
+  },
+  fallout2rpu: {
+    name: "Restoration Project Updated",
+    label: "Fallout 2 with the Restoration Project Updated",
+    badge: "rpu",
+  },
 };
 
 /**
@@ -25,7 +50,14 @@ export interface WineConfig {
 export interface Install {
   path: string;
   type: GameType;
+  /** What the user renamed this install to. Absent means the type's own name, which is what most installs use. */
+  name?: string;
   wine?: WineConfig;
+}
+
+/** What to call an install: the user's name for it, or the one its type carries. */
+export function displayName(install: Install): string {
+  return install.name ?? GAME_TYPES[install.type].name;
 }
 
 /**
@@ -38,11 +70,28 @@ export interface Install {
 export function detectGameType(rootEntries: readonly string[], modEntries: readonly string[]): GameType | null {
   const root = new Set(rootEntries.map((f) => f.toLowerCase()));
   if (!root.has("fallout2.exe")) return null;
+
+  // The Updated forks first: each descends from a killap patch and can carry the files that identify it, so
+  // testing killap's markers first would report the ancestor.
   const mods = new Set(modEntries.map((f) => f.toLowerCase()));
   if (mods.has("rpu.dat")) return "fallout2rpu";
   if (mods.has("upu.dat")) return "fallout2upu";
+
+  for (const { marker, type } of ROOT_MARKERS) if (root.has(marker)) return type;
   return "fallout2";
 }
+
+/**
+ * What killap's installers leave in the game folder. These patches write into `data/` and add no `mods/*.dat`,
+ * so a root file is the only thing that distinguishes them from an unpatched game.
+ *
+ * The Restoration Project's marker is not here because it has not been confirmed against a real install, and a
+ * guessed filename would silently never match. Until it is added, an RP install reports as `fallout2up`: RP
+ * carries the Unofficial Patch, so it matches that marker.
+ */
+const ROOT_MARKERS: readonly { marker: string; type: GameType }[] = [
+  { marker: "up-changelog.txt", type: "fallout2up" },
+];
 
 /** Installs are held sorted by path, so the list does not reorder itself as one is added or removed. */
 const byPath = (a: Install, b: Install) => a.path.localeCompare(b.path);
@@ -73,7 +122,28 @@ export function withWine(installs: readonly Install[], path: string, wine: WineC
   const debug = wine.debug?.trim() ?? "";
   const kept: WineConfig = { ...(prefix ? { prefix } : {}), ...(debug ? { debug } : {}) };
   return installs.map((g) =>
-    g.path !== path ? g : { path: g.path, type: g.type, ...(Object.keys(kept).length ? { wine: kept } : {}) },
+    g.path !== path
+      ? g
+      : {
+          path: g.path,
+          type: g.type,
+          ...(g.name ? { name: g.name } : {}),
+          ...(Object.keys(kept).length ? { wine: kept } : {}),
+        },
+  );
+}
+
+/**
+ * Renames an install, or clears the name back to the type's when given nothing - the same drop-when-empty rule
+ * the Wine fields use, so clearing the field removes it rather than pinning an empty string the display would
+ * then show in place of the name.
+ */
+export function renameInstall(installs: readonly Install[], path: string, name: string): readonly Install[] {
+  const chosen = name.trim();
+  return installs.map((g) =>
+    g.path !== path
+      ? g
+      : { path: g.path, type: g.type, ...(chosen ? { name: chosen } : {}), ...(g.wine ? { wine: g.wine } : {}) },
   );
 }
 

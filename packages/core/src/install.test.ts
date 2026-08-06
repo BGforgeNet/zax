@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { addInstall, detectGameType, removeInstall, withWine, type Install } from "./install.js";
+import {
+  addInstall,
+  detectGameType,
+  displayName,
+  removeInstall,
+  renameInstall,
+  withWine,
+  type Install,
+} from "./install.js";
 
 const at = (path: string): Install => ({ path, type: "fallout2" });
 
@@ -22,6 +30,59 @@ describe("detecting an install", () => {
 
   it("matches case-insensitively, because Wine and Windows disagree about it", () => {
     expect(detectGameType(["FALLOUT2.EXE"], ["RPU.DAT"])).toBe("fallout2rpu");
+  });
+
+  it("names killap's unofficial patch from its root marker, since it adds no mods/ entry", () => {
+    // Taken from a real killap-patched install: the patch writes into data/ and leaves these in the root.
+    const root = ["fallout2.exe", "up-changelog.txt", "up-readme.txt", "master.dat"];
+    expect(detectGameType(root, [])).toBe("fallout2up");
+  });
+
+  it("prefers the updated fork over the killap marker it descends from", () => {
+    // A UPU folder can hold both; reporting the ancestor there would name a mod that is not the one loaded.
+    expect(detectGameType(["fallout2.exe", "up-changelog.txt"], ["upu.dat"])).toBe("fallout2upu");
+    expect(detectGameType(["fallout2.exe", "up-changelog.txt"], ["rpu.dat"])).toBe("fallout2rpu");
+  });
+
+  it("is still vanilla when nothing marks a patch", () => {
+    expect(detectGameType(["fallout2.exe", "master.dat", "readme.rtf"], [])).toBe("fallout2");
+  });
+});
+
+describe("naming an install", () => {
+  it("falls back to the name the type carries", () => {
+    expect(displayName({ path: "/games/a", type: "fallout2" })).toBe("Fallout 2");
+    expect(displayName({ path: "/games/a", type: "fallout2up" })).toBe("Unofficial Patch");
+    expect(displayName({ path: "/games/a", type: "fallout2upu" })).toBe("Unofficial Patch Updated");
+  });
+
+  it("uses the user's name once there is one", () => {
+    const named = renameInstall([at("/games/a")], "/games/a", "My playthrough");
+    expect(displayName(named[0]!)).toBe("My playthrough");
+  });
+
+  it("renames only the named install", () => {
+    const list = renameInstall([at("/games/a"), at("/games/b")], "/games/a", "Mine");
+    expect(list[0]?.name).toBe("Mine");
+    expect(list[1]?.name).toBeUndefined();
+  });
+
+  it("clears back to the type's name rather than storing a blank", () => {
+    const named = renameInstall([at("/games/a")], "/games/a", "  Mine  ");
+    expect(named[0]?.name, "surrounding space is not part of the name").toBe("Mine");
+
+    const cleared = renameInstall(named, "/games/a", "   ");
+    expect(cleared[0]?.name).toBeUndefined();
+    expect(displayName(cleared[0]!)).toBe("Fallout 2");
+  });
+
+  it("keeps the name when wine settings change, and the wine settings when the name does", () => {
+    const named = renameInstall([at("/games/a")], "/games/a", "Mine");
+    const wined = withWine(named, "/games/a", { prefix: "/p" });
+    expect(wined[0]?.name).toBe("Mine");
+
+    const renamed = renameInstall(wined, "/games/a", "Yours");
+    expect(renamed[0]?.wine).toEqual({ prefix: "/p" });
   });
 });
 

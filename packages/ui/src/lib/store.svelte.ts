@@ -6,6 +6,7 @@ import {
   isApplied,
   matchesValueTest,
   removeInstall,
+  renameInstall,
   withWine,
   type Action,
   type ConfigChange,
@@ -419,6 +420,12 @@ class Store {
       this.selectedInstall = this.installs[0]?.path ?? "";
       await this.readInstall();
     }
+    await this.persist();
+  }
+
+  /** Renames an install, or restores the type's own name when given nothing. */
+  async renameInstall(path: string, name: string): Promise<void> {
+    this.installs = renameInstall(this.installs, path, name);
     await this.persist();
   }
 
