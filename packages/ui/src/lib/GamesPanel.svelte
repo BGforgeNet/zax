@@ -1,6 +1,6 @@
 <script lang="ts">
   import { GAME_TYPES, displayName, type GameType } from "@zax/core";
-  import { isPreview } from "./host.js";
+  import { isPreview, PREVIEW_REASON } from "./host.js";
   import { store } from "./store.svelte.js";
   import fallout2 from "../assets/fallout2.png";
   import fallout2rpu from "../assets/fallout2rpu.png";
@@ -76,7 +76,7 @@
   {/if}
 
   {#if adding}
-    <!-- A typed path rather than a directory picker: choosing one is the desktop shell's job, not the page's. -->
+    <!-- Typing stays alongside the picker: a browser has no picker, and a path can be pasted from elsewhere. -->
     <form
       class="form"
       onsubmit={(event) => {
@@ -91,6 +91,15 @@
       />
       <div class="buttons">
         <button type="submit" disabled={candidate.trim() === ""}>Add</button>
+        <!-- The picker belongs to the desktop shell; typing a path is what a browser is left with. -->
+        <button
+          type="button"
+          disabled={isPreview}
+          title={isPreview ? PREVIEW_REASON : null}
+          onclick={() => void store.browseForInstall().then(() => (adding = false))}
+        >
+          Browse...
+        </button>
         <button type="button" onclick={() => (adding = false)}>Cancel</button>
       </div>
     </form>

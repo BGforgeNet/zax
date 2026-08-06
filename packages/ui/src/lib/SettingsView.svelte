@@ -3,6 +3,7 @@
   import LayoutNodes from "./LayoutNodes.svelte";
   import SettingRow from "./SettingRow.svelte";
   import InstallPanel from "./InstallPanel.svelte";
+  import MissingFile from "./MissingFile.svelte";
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
 
@@ -80,6 +81,8 @@
             <p class="empty">Nothing matches "{store.query}".</p>
           {/if}
         {/each}
+      {:else if file && store.install && !store.hasFile(file.file)}
+        <MissingFile file={file.file} label={file.label} />
       {:else if file}
         <LayoutNodes {items} />
       {:else}

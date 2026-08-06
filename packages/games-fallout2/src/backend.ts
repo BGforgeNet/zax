@@ -47,12 +47,20 @@ export interface MachineDescription {
 export type OwnDirectory = "backup" | "debug";
 
 /** Somewhere the desktop's own handler is asked to open. Named for the same reason. */
-export type OpenTarget = OwnDirectory | "log" | "releases";
+export type OpenTarget = OwnDirectory | "log" | "releases" | "hires";
 
 export const RELEASES_PAGE = "https://github.com/BGforgeNet/zax/releases/latest";
 
+/**
+ * Where the High Resolution Patch comes from. A forum thread rather than a release feed, which is why the
+ * interface offers to open it instead of installing the patch the way it installs sfall.
+ */
+export const HIRES_PAGE = "https://www.nma-fallout.com/threads/hi-res-patches-for-fallout1-2-the-bis-mapper.181743/";
+
 export interface Backend {
   describe(): Promise<MachineDescription>;
+  /** A directory the user picked, or null if they cancelled. The picker belongs to the shell, not the page. */
+  chooseFolder(): Promise<string | null>;
   loadState(): Promise<LoadedState>;
   saveState(state: AppState): Promise<void>;
   loadConfigFiles(installPath: string): Promise<ConfigFileContents>;
@@ -71,10 +79,20 @@ export interface Backend {
 }
 
 
-export function createBackend(platform: Platform): Backend {
+/**
+ * What only the window's own shell can do. Kept out of the platform interface because it is not a capability of
+ * the machine but of whatever is presenting the interface, and a browser has none.
+ */
+export interface Shell {
+  chooseFolder(): Promise<string | null>;
+}
+
+export function createBackend(platform: Platform, shell: Shell): Backend {
   const own = (which: OwnDirectory) => (which === "backup" ? backupDirectory(platform) : debugDirectory(platform));
 
   return {
+    chooseFolder: () => shell.chooseFolder(),
+
     describe: async () => ({
       os: platform.os,
       backupDirectory: backupDirectory(platform),
@@ -104,6 +122,7 @@ export function createBackend(platform: Platform): Backend {
 
     open: async (target) => {
       if (target === "releases") return platform.process.open(RELEASES_PAGE);
+      if (target === "hires") return platform.process.open(HIRES_PAGE);
       if (target === "log") return platform.process.open(logFile(platform));
       return platform.process.open(own(target));
     },

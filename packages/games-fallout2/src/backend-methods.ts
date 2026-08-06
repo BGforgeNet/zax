@@ -14,6 +14,7 @@ import type { Backend } from "./backend.js";
 
 export const BACKEND_METHODS = [
   "describe",
+  "chooseFolder",
   "loadState",
   "saveState",
   "loadConfigFiles",

@@ -456,6 +456,17 @@ class Store {
     await this.persist();
   }
 
+  /** Opens the shell's directory picker and adds what comes back. Cancelling adds nothing and says nothing. */
+  async browseForInstall(): Promise<void> {
+    const chosen = await backend.chooseFolder();
+    if (chosen !== null) await this.addInstall(chosen);
+  }
+
+  /** Whether the selected install has this config file at all. Unknown until the first read finishes. */
+  hasFile(file: string): boolean {
+    return this.contents[file] !== undefined;
+  }
+
   /** Adds a directory the user pointed at, refusing one that does not hold a game. */
   async addInstall(path: string): Promise<void> {
     await this.run("Adding the install", async () => {
@@ -556,6 +567,22 @@ class Store {
     });
   }
 
+  /**
+   * Installs sfall into an install that has none. The same download, merge and backup as an update - there is
+   * simply nothing to merge or back up - so it goes through one path rather than a second, thinner one.
+   */
+  async installSfall(): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    await this.run("Installing sfall", async () => {
+      const release = await backend.latestSfall();
+      this.sfallLatest = release;
+      const result = await backend.updateSfall(install, release);
+      await this.readInstall();
+      return { kind: "done", text: `sfall ${result.version} is installed.` };
+    });
+  }
+
   async saveSlots(): Promise<readonly string[]> {
     const install = this.install;
     return install ? backend.listSaves(install) : [];
@@ -566,6 +593,14 @@ class Store {
     if (!install) return;
     await this.run("Creating the debug package", async () => {
       const result = await backend.createDebugPackage(install, saves);
+      // Opened where it was written, as the previous implementation did: the next step is attaching the file to
+      // a report, and a path in a notice still leaves the user to go find it. The archive is what was asked
+      // for, so a machine that cannot open a directory reports the path rather than reporting a failure.
+      try {
+        await backend.open("debug");
+      } catch {
+        // Nothing to add: the notice below already says where the file is.
+      }
       return { kind: "done", text: `Wrote ${result.path} - ${result.contents.length} files.` };
     });
   }

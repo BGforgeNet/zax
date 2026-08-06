@@ -3,7 +3,7 @@
  * is allowed to ask for, dispatched by name.
  */
 
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { BACKEND_METHODS, createBackend, type Backend } from "@zax/fallout2";
@@ -25,6 +25,17 @@ function register(backend: Backend): void {
   });
 }
 
+/**
+ * The directory picker, attached to the window so it is modal to it rather than a stray dialog. Returns null on
+ * cancel, which is not a failure: the caller simply has nothing to add.
+ */
+async function chooseFolder(): Promise<string | null> {
+  const [parent] = BrowserWindow.getAllWindows();
+  const options = { title: "Select the game folder", properties: ["openDirectory" as const] };
+  const result = await (parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options));
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+}
+
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
@@ -34,6 +45,9 @@ function createWindow(): BrowserWindow {
     // Shown once it has something to draw, so the window does not flash empty on a slow first paint.
     show: false,
     title: "ZAX",
+    // The interface's own favicon, which the renderer build copies out of its `public/`. Set here as well
+    // because a window's icon comes from the process, not from the page it happens to be showing.
+    icon: join(here, "renderer", "zax.png"),
     webPreferences: {
       preload: join(here, "preload.cjs"),
       contextIsolation: true,
@@ -68,7 +82,7 @@ else {
   });
 
   void app.whenReady().then(() => {
-    register(createBackend(nodePlatform()));
+    register(createBackend(nodePlatform(), { chooseFolder }));
     createWindow();
     // macOS keeps the application running with no windows; clicking the dock icon opens one again.
     app.on("activate", () => {
