@@ -3,9 +3,9 @@
   import { store } from "./store.svelte.js";
 
   // Actions that repair a symptom, as opposed to a setting you choose. Each writes several keys at once, which
-  // is the whole reason it exists as one button rather than as the settings it happens to touch.
-  const FIXES = ["fix.not-responding"];
-  const fixes = $derived(FIXES.map((id) => store.actionById(id)).filter((a) => a !== undefined));
+  // is the whole reason it exists as one button rather than as the settings it happens to touch. Taken from the
+  // catalog by group, so an action added there appears here rather than waiting to be listed twice.
+  const fixes = $derived(store.actionsIn("fix"));
 </script>
 
 <div class="list">

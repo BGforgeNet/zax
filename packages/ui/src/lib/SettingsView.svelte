@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LAYOUT } from "@zax/fallout2";
+  import { LAYOUT, SETTINGS } from "@zax/fallout2";
   import BugReportPanel from "./BugReportPanel.svelte";
   import FixesPanel from "./FixesPanel.svelte";
   import LayoutNodes from "./LayoutNodes.svelte";
@@ -18,10 +18,17 @@
   const file = $derived(LAYOUT.find((f) => f.file === store.settingsTab));
   const tab = $derived(file ? (store.fileTab[file.file] ?? file.tabs[0]?.title ?? "") : "");
   const items = $derived(file?.tabs.find((t) => t.title === tab)?.items ?? []);
-  const searching = $derived(store.query.trim() !== "");
+  // The search box lives on the "all settings" tab; the window still focuses it with Ctrl-F.
+  let searchBox = $state<HTMLInputElement | null>(null);
+  $effect(() => {
+    if (store.searchRequest > 0 && store.settingsTab === "all") {
+      searchBox?.focus();
+      searchBox?.select();
+    }
+  });
 </script>
 
-<div class="pane" class:searching={searching}>
+<div class="pane">
   <div class="tabbar">
     <div class="tabs" role="tablist">
       {#each LAYOUT as f (f.file)}
@@ -60,6 +67,15 @@
       >
         Troubleshooting
       </button>
+      <!-- The whole catalog, flat. Its own tab rather than a mode that took over whichever tab you were on. -->
+      <button
+        role="tab"
+        class="tab"
+        aria-selected={store.settingsTab === "all"}
+        onclick={() => (store.settingsTab = "all")}
+      >
+        All settings
+      </button>
     </div>
   </div>
 
@@ -93,17 +109,31 @@
 
   <main>
     <div class="list">
-      {#if searching}
+      {#if store.settingsTab === "all"}
+        <!--
+          Every setting in one flat list, whatever tab it normally lives on. Each carries its own address and a
+          way to go there, since finding one here means not knowing which component owns it.
+        -->
+        <div class="find">
+          <input
+            bind:this={searchBox}
+            type="search"
+            placeholder="Filter by name, key, section or tab"
+            aria-label="Filter settings"
+            bind:value={store.query}
+          />
+          <!-- Only while narrowing: with nothing typed, a count against the catalog total reads as a filter
+               being applied, when what is on screen is everything the layout places. -->
+          {#if store.query.trim() !== ""}
+            <span class="count">{store.results.length} of {SETTINGS.length}</span>
+          {/if}
+        </div>
         {#if store.installMatches}
           <button class="found" onclick={() => { store.settingsTab = "install"; store.query = ""; }}>Install</button>
           <InstallPanel />
         {/if}
-        <!--
-          A flat list across every file and tab: the point of searching is to find a setting whose tab you do
-          not know, so each result carries its own address and a way to go there.
-        -->
         {#each store.results as r, i (r.def.id)}
-          <!-- Grouped under the address they came from, so a run of results reads as the tab it belongs to
+          <!-- Grouped under the address they came from, so a run of rows reads as the tab it belongs to
                rather than as one badge repeated down the column. -->
           {#if r.where !== store.results[i - 1]?.where}
             <button class="found" onclick={() => store.goTo(r.place)}>{r.where}</button>
@@ -152,12 +182,6 @@
 </div>
 
 <style>
-  /* While searching, the tab strips no longer describe what is on screen. */
-  .searching :global(.tab[aria-selected="true"]),
-  .searching :global(.subtab[aria-selected="true"]) {
-    opacity: 0.5;
-  }
-
   /* Same band as a frame heading, because that is what it is: the group a result was found in. */
   .found {
     display: block;
@@ -180,7 +204,30 @@
     color: var(--accent);
   }
 
+  /* The filter sits with the list it filters, not in the window chrome, so it is clear what it narrows. */
+  .find {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px var(--gutter);
+    border-bottom: 1px solid var(--border);
+  }
 
+  .find input {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: var(--text);
+  }
+
+  .find .count {
+    flex: 0 0 auto;
+    font-size: 11.5px;
+    color: var(--text-faint);
+  }
 
   .dot {
     width: 6px;

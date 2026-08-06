@@ -20,15 +20,13 @@
     else root.setAttribute("data-theme", store.theme);
   });
 
-  let searchBox = $state<HTMLInputElement | null>(null);
 
-  // Ctrl/Cmd-F is what a user reaches for; the browser's own find would search the rendered tab only.
-  // F2 renames the selected install, at the window rather than on the row, so it does not need the list focused.
+  // Ctrl/Cmd-F opens the tab that lists every setting and focuses its filter; the browser's own find would
+  // search the rendered tab only. F2 renames the selected install, at the window rather than on the row.
   function onWindowKey(event: KeyboardEvent) {
     if ((event.ctrlKey || event.metaKey) && event.key === "f") {
       event.preventDefault();
-      searchBox?.focus();
-      searchBox?.select();
+      store.searchSettings();
     } else if (event.key === "F2") {
       event.preventDefault();
       store.renameSelected();
@@ -42,17 +40,6 @@
   <header class="top">
     <div class="brand">ZAX <span class="version">{VERSION}</span></div>
 
-    <!--
-      Searches every file and tab, not the one on screen: the tabs are the previous interface's, and finding a
-      setting in them means already knowing which component owns it.
-    -->
-    <input
-      bind:this={searchBox}
-      class="search"
-      type="search"
-      placeholder="Search all settings"
-      bind:value={store.query}
-    />
 
     <div class="spacer"></div>
 
@@ -106,7 +93,7 @@
     flex: 0 0 auto;
   }
 
-  /* Everything in the bar holds its size except the search box, or they all shrink together and it wraps. */
+  /* Nothing in the bar shrinks; the spacer takes the slack. */
   .top > * {
     flex: 0 0 auto;
     white-space: nowrap;
@@ -155,15 +142,6 @@
     font-size: 12px;
   }
 
-
-  .search {
-    flex: 0 1 260px;
-    min-width: 130px;
-    background: var(--panel-alt);
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    padding: 5px 10px;
-  }
 
   .spacer {
     flex: 1;

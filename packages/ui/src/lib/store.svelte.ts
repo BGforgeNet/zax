@@ -9,6 +9,7 @@ import {
   setAlias,
   withWine,
   type Action,
+  type ActionGroup,
   type ConfigChange,
   type ConfigFileContents,
   type Install,
@@ -127,6 +128,8 @@ class Store {
    * must both land, and nothing has to reset it afterwards.
    */
   aliasRequest = $state(0);
+  /** The same shape, for the filter on the "all settings" tab, which Ctrl-F reaches from anywhere. */
+  searchRequest = $state(0);
   /** The selected tab within each file, kept per file so switching files does not reset the other's place. */
   fileTab = $state<Record<string, string>>({});
   query = $state("");
@@ -344,10 +347,11 @@ class Store {
    */
   get results(): Array<{ def: SettingDef; place: Place; where: string }> {
     const q = this.query.trim().toLowerCase();
-    if (q === "") return [];
+    // No query lists everything: the tab this feeds is the whole catalog in one place, and searching narrows
+    // it rather than being the only way to see anything at all.
     // Every word has to appear somewhere, not the phrase in one field: a label carries no frame or tab words
     // any more, so "interface bar width" is spread across the address and the label and matches neither alone.
-    const terms = q.split(/\s+/);
+    const terms = q === "" ? [] : q.split(/\s+/);
     const out: Array<{ def: SettingDef; place: Place; where: string }> = [];
     for (const def of SETTINGS) {
       const place = PLACES.get(def.id);
@@ -376,6 +380,12 @@ class Store {
    * Opens the install tab with its alias field focused. One route for every way of asking to rename - the
    * games list's context menu, F2 - so a second entry point cannot drift into editing somewhere else.
    */
+  /** Opens the tab that lists every setting, with its filter focused. */
+  searchSettings(): void {
+    this.settingsTab = "all";
+    this.searchRequest += 1;
+  }
+
   renameSelected(): void {
     if (!this.install) return;
     this.settingsTab = "install";
@@ -397,6 +407,11 @@ class Store {
 
   actionById(id: string): Action | undefined {
     return ACTIONS.find((a) => a.id === id);
+  }
+
+  /** Every action offered in one place, so a panel does not carry its own list of what to show. */
+  actionsIn(group: ActionGroup): readonly Action[] {
+    return ACTIONS.filter((a) => a.group === group);
   }
 
   get install(): Install | undefined {

@@ -12,6 +12,7 @@ import type { Action } from "@zax/core";
 export const ACTIONS: readonly Action[] = [
   {
     id: "debug.enable",
+    group: "report",
     label: "Enable full debugging",
     description:
       "Turns on every engine and script log and writes them to debug.log. Do this before reproducing a bug you want to report.",
@@ -33,6 +34,7 @@ export const ACTIONS: readonly Action[] = [
   },
   {
     id: "debug.disable",
+    group: "report",
     label: "Turn debugging off",
     description: "Restores quiet operation. Logging costs performance, so leave it off for normal play.",
     appliedLabel: "Debugging is off",
@@ -53,6 +55,7 @@ export const ACTIONS: readonly Action[] = [
   },
   {
     id: "fix.not-responding",
+    group: "fix",
     label: 'Fix "NOT RESPONDING" freezes',
     description:
       "Applies the two compatibility fixes for the window going unresponsive, most often seen in windowed mode on modern Windows.",
@@ -64,6 +67,7 @@ export const ACTIONS: readonly Action[] = [
   },
   {
     id: "speed.up",
+    group: "fix",
     label: "Speed up combat and interface",
     description:
       "Removes the deliberate pauses in combat, panel animations and floating text. The single biggest quality-of-life change for a replay.",

@@ -1,5 +1,5 @@
 export { IniDocument, type IniNode } from "./ini.js";
-export { isApplied, pendingTargets, type Action } from "./action.js";
+export { isApplied, pendingTargets, type Action, type ActionGroup } from "./action.js";
 export { validate, type Validation } from "./validate.js";
 export {
   GAME_TYPES,

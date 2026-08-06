@@ -5,9 +5,17 @@
  */
 
 
+/**
+ * Where an action is offered. Declared on the action rather than listed by the panel that shows it: a panel
+ * holding its own list of ids silently drops any action added afterwards, which is how one of these came to
+ * exist in the catalog and appear nowhere in the interface.
+ */
+export type ActionGroup = "report" | "fix";
+
 export interface Action {
   id: string;
   label: string;
+  group: ActionGroup;
   /** What the user gets, in their language. Not a list of the keys involved. */
   description: string;
   /** Setting id -> the value this action writes. */
