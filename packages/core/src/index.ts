@@ -8,7 +8,7 @@ export {
   detectGameType,
   displayName,
   removeInstall,
-  renameInstall,
+  setAlias,
   withWine,
   type GameType,
   type Install,

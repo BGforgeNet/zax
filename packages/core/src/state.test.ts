@@ -32,11 +32,11 @@ describe("loading application state", () => {
     expect((await loadState(platform)).state.installs[0]?.wine).toEqual({ prefix: "/p" });
   });
 
-  it("carries a chosen name through, alongside the type it still reads from the directory", async () => {
-    const platform = withState("games:\n- path: /games/one\n  name: My playthrough\n", present("/games/one"));
+  it("carries a chosen alias through, alongside the type it still reads from the directory", async () => {
+    const platform = withState("games:\n- path: /games/one\n  alias: My playthrough\n", present("/games/one"));
     const install = (await loadState(platform)).state.installs[0];
-    expect(install?.name).toBe("My playthrough");
-    expect(install?.type, "the name is the user's; the type is still the directory's").toBe("fallout2");
+    expect(install?.alias).toBe("My playthrough");
+    expect(install?.type, "the alias is the user's; the type is still the directory's").toBe("fallout2");
   });
 
   it("sets aside an install it cannot read instead of listing it", async () => {
@@ -65,14 +65,14 @@ describe("saving application state", () => {
     expect(platform.textAt(`${CONFIG}/zax.yml`)).toContain("wine_prefix: /p");
   });
 
-  it("writes a chosen name so it is there on the next run", async () => {
+  it("writes a chosen alias so it is there on the next run", async () => {
     const platform = new MemoryPlatform({ home: "/home/t" });
     await saveState(platform, {
-      installs: [{ path: "/games/one", type: "fallout2up", name: "My playthrough" }],
+      installs: [{ path: "/games/one", type: "fallout2up", alias: "My playthrough" }],
       unavailable: [],
       theme: "system",
     });
-    expect(platform.textAt(`${CONFIG}/zax.yml`)).toContain("name: My playthrough");
+    expect(platform.textAt(`${CONFIG}/zax.yml`)).toContain("alias: My playthrough");
   });
 
   it("does not write the detected type, which is read from the directory each time", async () => {

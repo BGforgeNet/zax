@@ -21,9 +21,6 @@
   let adding = $state(false);
   let candidate = $state("");
 
-  let renaming = $state("");
-  let proposed = $state("");
-
   function submit() {
     void store.addInstall(candidate).then(() => {
       candidate = "";
@@ -31,17 +28,9 @@
     });
   }
 
-  function startRename() {
-    if (!current) return;
-    renaming = current.path;
-    // Seeded with the name on screen, so clearing the field is a deliberate act rather than the starting state.
-    proposed = displayName(current);
-  }
-
-  function submitRename() {
-    const path = renaming;
-    renaming = "";
-    void store.renameInstall(path, proposed);
+  /** Renaming a row means selecting it first, so the field that opens belongs to the row you asked about. */
+  function rename(path: string) {
+    void store.selectInstall(path).then(() => store.renameSelected());
   }
 </script>
 
@@ -50,15 +39,19 @@
     {#each store.installs as install (install.path)}
       {@const type = GAME_TYPES[install.type]}
       <li>
+        <!--
+          Right-click renames, which is what a list of named things is expected to do; F2 is handled for the
+          window, so it works without the row holding focus. Neither is discoverable, so the tooltip says so.
+        -->
         <button
           class="install"
           class:selected={install.path === store.selectedInstall}
           aria-pressed={install.path === store.selectedInstall}
-          title="{type.label} at {install.path}"
-          onclick={() => {
-            // Selecting elsewhere abandons a rename in progress, which is still holding the previous install.
-            renaming = "";
-            void store.selectInstall(install.path);
+          title="{type.label} at {install.path}&#10;Right-click or press F2 to rename"
+          onclick={() => void store.selectInstall(install.path)}
+          oncontextmenu={(event) => {
+            event.preventDefault();
+            rename(install.path);
           }}
         >
           <img class="icon" src={ICON[install.type]} alt={type.label} width="32" height="32" />
@@ -82,22 +75,7 @@
     <p class="note">The bundled fixture, edited in memory. Nothing here reaches a real game folder.</p>
   {/if}
 
-  {#if renaming !== ""}
-    <form
-      class="form"
-      onsubmit={(event) => {
-        event.preventDefault();
-        submitRename();
-      }}
-    >
-      <input class="prose" aria-label="Name for this install" placeholder="Name for this install" bind:value={proposed} />
-      <div class="buttons">
-        <button type="submit">Rename</button>
-        <button type="button" onclick={() => (renaming = "")}>Cancel</button>
-      </div>
-      <p class="note">Leave it empty to go back to {current ? GAME_TYPES[current.type].name : "the default"}.</p>
-    </form>
-  {:else if adding}
+  {#if adding}
     <!-- A typed path rather than a directory picker: choosing one is the desktop shell's job, not the page's. -->
     <form
       class="form"
@@ -119,7 +97,6 @@
   {:else}
     <div class="buttons">
       <button onclick={() => (adding = true)}>Add game</button>
-      <button disabled={!current} onclick={startRename}>Rename</button>
       <button class="remove" disabled={!current} onclick={() => current && void store.removeInstall(current.path)}>
         Remove from list
       </button>
@@ -227,7 +204,7 @@
     margin-bottom: 6px;
   }
 
-  /* Monospaced because the field these styles were written for holds a path. */
+  /* Monospaced because the only field here holds a path. */
   .form input {
     background: var(--panel);
     border: 1px solid var(--border-strong);
@@ -236,12 +213,6 @@
     font-family: var(--mono);
     font-size: 11.5px;
     min-width: 0;
-  }
-
-  /* A name is not a path, so it reads in the interface's own font at the size the name renders at. */
-  .form input.prose {
-    font-family: inherit;
-    font-size: 12.5px;
   }
 
   .buttons {

@@ -6,7 +6,7 @@ import {
   isApplied,
   matchesValueTest,
   removeInstall,
-  renameInstall,
+  setAlias,
   withWine,
   type Action,
   type ConfigChange,
@@ -124,8 +124,13 @@ class Store {
   view = $state<View>("settings");
   panel = $state<Panel>("games");
   troubleTab = $state<TroubleTab>("report");
-  /** Which Settings sub-tab: a config file, or "wine". */
+  /** Which Settings sub-tab: a config file, or "install". */
   settingsTab = $state<SettingsTab>("fallout2.cfg");
+  /**
+   * Bumped to ask the install tab's alias field for focus. A counter rather than a flag: two requests in a row
+   * must both land, and nothing has to reset it afterwards.
+   */
+  aliasRequest = $state(0);
   /** The selected tab within each file, kept per file so switching files does not reset the other's place. */
   fileTab = $state<Record<string, string>>({});
   query = $state("");
@@ -357,15 +362,27 @@ class Store {
   }
 
   /**
-   * Wine is the one settings tab holding nothing from the catalog - its two fields belong to the install, not
-   * to a config file - so search cannot reach it the way it reaches every other tab, and "wine" would report
-   * nothing while the tab sits in plain view.
+   * Install is the one settings tab holding nothing from the catalog - its fields belong to the install, not to
+   * a config file - so search cannot reach it the way it reaches every other tab, and "wine" would report
+   * nothing while the tab sits in plain view. The Wine terms only count where Wine exists.
    */
-  get wineMatches(): boolean {
+  get installMatches(): boolean {
     const q = this.query.trim().toLowerCase();
-    if (q === "" || !this.wineAvailable) return false;
-    const hay = "wine wineprefix winedebug prefix launch";
+    if (q === "") return false;
+    const hay = `install alias name folder path${this.wineAvailable ? " wine wineprefix winedebug prefix launch" : ""}`;
     return q.split(/\s+/).every((t) => hay.includes(t));
+  }
+
+  /**
+   * Opens the install tab with its alias field focused. One route for every way of asking to rename - the
+   * games list's context menu, F2 - so a second entry point cannot drift into editing somewhere else.
+   */
+  renameSelected(): void {
+    if (!this.install) return;
+    this.view = "settings";
+    this.settingsTab = "install";
+    this.query = "";
+    this.aliasRequest += 1;
   }
 
   /** Jumps to where a result lives and clears the search, so the row keeps its surrounding group. */
@@ -424,8 +441,8 @@ class Store {
   }
 
   /** Renames an install, or restores the type's own name when given nothing. */
-  async renameInstall(path: string, name: string): Promise<void> {
-    this.installs = renameInstall(this.installs, path, name);
+  async setAlias(path: string, name: string): Promise<void> {
+    this.installs = setAlias(this.installs, path, name);
     await this.persist();
   }
 

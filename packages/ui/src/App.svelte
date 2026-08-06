@@ -23,12 +23,16 @@
   let searchBox = $state<HTMLInputElement | null>(null);
 
   // Ctrl/Cmd-F is what a user reaches for; the browser's own find would search the rendered tab only.
+  // F2 renames the selected install, at the window rather than on the row, so it does not need the list focused.
   function onWindowKey(event: KeyboardEvent) {
     if ((event.ctrlKey || event.metaKey) && event.key === "f") {
       event.preventDefault();
       store.view = "settings";
       searchBox?.focus();
       searchBox?.select();
+    } else if (event.key === "F2") {
+      event.preventDefault();
+      store.renameSelected();
     }
   }
 </script>

@@ -59,7 +59,7 @@ export async function loadState(platform: Platform): Promise<LoadedState> {
       installs.push({
         path: entry.path,
         type,
-        ...(entry.name ? { name: entry.name } : {}),
+        ...(entry.alias ? { alias: entry.alias } : {}),
         ...(entry.wine ? { wine: entry.wine } : {}),
       });
     }
@@ -72,7 +72,7 @@ export async function saveState(platform: Platform, state: AppState): Promise<vo
   const stored: StoredInstall[] = [
     ...state.installs.map((install) => ({
       path: install.path,
-      ...(install.name ? { name: install.name } : {}),
+      ...(install.alias ? { alias: install.alias } : {}),
       ...(install.wine ? { wine: install.wine } : {}),
     })),
     ...state.unavailable,

@@ -13,7 +13,7 @@ import type { Theme, WineConfig } from "./install.js";
 export interface StoredInstall {
   path: string;
   /** Only what the user typed: an install left at its type's name stores nothing, so it follows the type. */
-  name?: string;
+  alias?: string;
   wine?: WineConfig;
 }
 
@@ -51,11 +51,11 @@ export function parseZaxFile(text: string): ZaxFile {
     const fields = entry as Record<string, unknown>;
     const path = trimmed(fields["path"]);
     if (path === undefined) continue;
-    const name = trimmed(fields["name"]);
+    const alias = trimmed(fields["alias"]);
     const prefix = trimmed(fields["wine_prefix"]);
     const debug = trimmed(fields["wine_debug"]);
     const wine: WineConfig = { ...(prefix ? { prefix } : {}), ...(debug ? { debug } : {}) };
-    installs.push({ path, ...(name ? { name } : {}), ...(Object.keys(wine).length ? { wine } : {}) });
+    installs.push({ path, ...(alias ? { alias } : {}), ...(Object.keys(wine).length ? { wine } : {}) });
   }
 
   const theme = record["theme"];
@@ -71,7 +71,7 @@ export function formatZaxFile(state: ZaxFile): string {
     .sort((a, b) => a.path.localeCompare(b.path))
     .map((install) => ({
       path: install.path,
-      ...(install.name ? { name: install.name } : {}),
+      ...(install.alias ? { alias: install.alias } : {}),
       ...(install.wine?.prefix ? { wine_prefix: install.wine.prefix } : {}),
       ...(install.wine?.debug ? { wine_debug: install.wine.debug } : {}),
     }));

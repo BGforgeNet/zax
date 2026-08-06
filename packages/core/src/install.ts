@@ -50,14 +50,14 @@ export interface WineConfig {
 export interface Install {
   path: string;
   type: GameType;
-  /** What the user renamed this install to. Absent means the type's own name, which is what most installs use. */
-  name?: string;
+  /** What the user chose to call this install. Absent means the type's own name, which is what most use. */
+  alias?: string;
   wine?: WineConfig;
 }
 
 /** What to call an install: the user's name for it, or the one its type carries. */
 export function displayName(install: Install): string {
-  return install.name ?? GAME_TYPES[install.type].name;
+  return install.alias ?? GAME_TYPES[install.type].name;
 }
 
 /**
@@ -127,23 +127,23 @@ export function withWine(installs: readonly Install[], path: string, wine: WineC
       : {
           path: g.path,
           type: g.type,
-          ...(g.name ? { name: g.name } : {}),
+          ...(g.alias ? { alias: g.alias } : {}),
           ...(Object.keys(kept).length ? { wine: kept } : {}),
         },
   );
 }
 
 /**
- * Renames an install, or clears the name back to the type's when given nothing - the same drop-when-empty rule
- * the Wine fields use, so clearing the field removes it rather than pinning an empty string the display would
- * then show in place of the name.
+ * Sets an install's alias, or clears it back to the type's name when given nothing - the same drop-when-empty
+ * rule the Wine fields use, so clearing the field removes it rather than pinning an empty string the display
+ * would then show in place of a name.
  */
-export function renameInstall(installs: readonly Install[], path: string, name: string): readonly Install[] {
-  const chosen = name.trim();
+export function setAlias(installs: readonly Install[], path: string, alias: string): readonly Install[] {
+  const chosen = alias.trim();
   return installs.map((g) =>
     g.path !== path
       ? g
-      : { path: g.path, type: g.type, ...(chosen ? { name: chosen } : {}), ...(g.wine ? { wine: g.wine } : {}) },
+      : { path: g.path, type: g.type, ...(chosen ? { alias: chosen } : {}), ...(g.wine ? { wine: g.wine } : {}) },
   );
 }
 

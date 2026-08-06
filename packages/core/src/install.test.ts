@@ -4,7 +4,7 @@ import {
   detectGameType,
   displayName,
   removeInstall,
-  renameInstall,
+  setAlias,
   withWine,
   type Install,
 } from "./install.js";
@@ -49,39 +49,39 @@ describe("detecting an install", () => {
   });
 });
 
-describe("naming an install", () => {
+describe("an install's alias", () => {
   it("falls back to the name the type carries", () => {
     expect(displayName({ path: "/games/a", type: "fallout2" })).toBe("Fallout 2");
     expect(displayName({ path: "/games/a", type: "fallout2up" })).toBe("Unofficial Patch");
     expect(displayName({ path: "/games/a", type: "fallout2upu" })).toBe("Unofficial Patch Updated");
   });
 
-  it("uses the user's name once there is one", () => {
-    const named = renameInstall([at("/games/a")], "/games/a", "My playthrough");
+  it("uses the alias once there is one", () => {
+    const named = setAlias([at("/games/a")], "/games/a", "My playthrough");
     expect(displayName(named[0]!)).toBe("My playthrough");
   });
 
-  it("renames only the named install", () => {
-    const list = renameInstall([at("/games/a"), at("/games/b")], "/games/a", "Mine");
-    expect(list[0]?.name).toBe("Mine");
-    expect(list[1]?.name).toBeUndefined();
+  it("sets the alias on only the named install", () => {
+    const list = setAlias([at("/games/a"), at("/games/b")], "/games/a", "Mine");
+    expect(list[0]?.alias).toBe("Mine");
+    expect(list[1]?.alias).toBeUndefined();
   });
 
-  it("clears back to the type's name rather than storing a blank", () => {
-    const named = renameInstall([at("/games/a")], "/games/a", "  Mine  ");
-    expect(named[0]?.name, "surrounding space is not part of the name").toBe("Mine");
+  it("clears back to the type's name rather than storing a blank alias", () => {
+    const named = setAlias([at("/games/a")], "/games/a", "  Mine  ");
+    expect(named[0]?.alias, "surrounding space is not part of the alias").toBe("Mine");
 
-    const cleared = renameInstall(named, "/games/a", "   ");
-    expect(cleared[0]?.name).toBeUndefined();
+    const cleared = setAlias(named, "/games/a", "   ");
+    expect(cleared[0]?.alias).toBeUndefined();
     expect(displayName(cleared[0]!)).toBe("Fallout 2");
   });
 
-  it("keeps the name when wine settings change, and the wine settings when the name does", () => {
-    const named = renameInstall([at("/games/a")], "/games/a", "Mine");
+  it("keeps the alias when wine settings change, and the wine settings when the alias does", () => {
+    const named = setAlias([at("/games/a")], "/games/a", "Mine");
     const wined = withWine(named, "/games/a", { prefix: "/p" });
-    expect(wined[0]?.name).toBe("Mine");
+    expect(wined[0]?.alias).toBe("Mine");
 
-    const renamed = renameInstall(wined, "/games/a", "Yours");
+    const renamed = setAlias(wined, "/games/a", "Yours");
     expect(renamed[0]?.wine).toEqual({ prefix: "/p" });
   });
 });

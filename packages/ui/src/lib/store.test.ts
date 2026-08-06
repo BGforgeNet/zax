@@ -105,17 +105,20 @@ describe("search", () => {
   });
 
   test("reaches the one tab that holds nothing from the catalog", () => {
-    // Wine's two fields belong to the install, not to a config file, so they are not in SETTINGS at all - and
-    // a search that silently omits a whole tab reads as a search that does not work.
+    // The install tab's fields belong to the install, not to a config file, so they are not in SETTINGS at all
+    // - and a search that silently omits a whole tab reads as a search that does not work.
     store.query = "wine";
-    expect(store.results, "wine holds no catalog settings").toEqual([]);
-    expect(store.wineMatches).toBe(true);
+    expect(store.results, "the install tab holds no catalog settings").toEqual([]);
+    expect(store.installMatches).toBe(true);
 
     store.query = "wineprefix";
-    expect(store.wineMatches).toBe(true);
+    expect(store.installMatches).toBe(true);
+
+    store.query = "alias";
+    expect(store.installMatches, "the alias lives there too, on every platform").toBe(true);
 
     store.query = "worldmap";
-    expect(store.wineMatches, "an unrelated query must not offer it").toBe(false);
+    expect(store.installMatches, "an unrelated query must not offer it").toBe(false);
     store.query = "";
   });
 

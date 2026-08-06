@@ -2,7 +2,7 @@
   import { LAYOUT } from "@zax/fallout2";
   import LayoutNodes from "./LayoutNodes.svelte";
   import SettingRow from "./SettingRow.svelte";
-  import WinePanel from "./WinePanel.svelte";
+  import InstallPanel from "./InstallPanel.svelte";
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
 
@@ -30,17 +30,15 @@
           {/if}
         </button>
       {/each}
-      <!-- The previous interface hid this tab entirely on Windows rather than disabling it. -->
-      {#if store.wineAvailable}
-        <button
-          role="tab"
-          class="tab"
-          aria-selected={store.settingsTab === "wine"}
-          onclick={() => (store.settingsTab = "wine")}
-        >
-          Wine
-        </button>
-      {/if}
+      <!-- Always shown, unlike the Wine tab it replaced: an install has an alias on every platform. -->
+      <button
+        role="tab"
+        class="tab"
+        aria-selected={store.settingsTab === "install"}
+        onclick={() => (store.settingsTab = "install")}
+      >
+        Install
+      </button>
     </div>
   </div>
 
@@ -62,9 +60,9 @@
   <main>
     <div class="list">
       {#if searching}
-        {#if store.wineMatches}
-          <button class="found" onclick={() => { store.settingsTab = "wine"; store.query = ""; }}>Wine</button>
-          <WinePanel />
+        {#if store.installMatches}
+          <button class="found" onclick={() => { store.settingsTab = "install"; store.query = ""; }}>Install</button>
+          <InstallPanel />
         {/if}
         <!--
           A flat list across every file and tab: the point of searching is to find a setting whose tab you do
@@ -78,14 +76,14 @@
           {/if}
           <SettingRow def={r.def} />
         {:else}
-          {#if !store.wineMatches}
+          {#if !store.installMatches}
             <p class="empty">Nothing matches "{store.query}".</p>
           {/if}
         {/each}
       {:else if file}
         <LayoutNodes {items} />
       {:else}
-        <WinePanel />
+        <InstallPanel />
       {/if}
     </div>
 
