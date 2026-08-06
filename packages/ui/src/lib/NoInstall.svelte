@@ -11,7 +11,7 @@
   <h2>No game to configure yet</h2>
   <p>ZAX edits the config files inside a Fallout 2 folder, so it needs to know where one is.</p>
   <div class="actions">
-    <button class="primary" onclick={() => ((store.panel = "games"), (store.view = "settings"))}>
+    <button class="primary" onclick={() => (store.panel = "games")}>
       Add one from the Games column
     </button>
     <button disabled={store.busy !== null} onclick={() => void store.scan()}>Scan the usual places</button>

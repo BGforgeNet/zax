@@ -3,7 +3,6 @@
   import NoInstall from "./lib/NoInstall.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
-  import TroubleView from "./lib/TroubleView.svelte";
   import { store } from "./lib/store.svelte.js";
   import { VERSION } from "./lib/version.js";
 
@@ -28,7 +27,6 @@
   function onWindowKey(event: KeyboardEvent) {
     if ((event.ctrlKey || event.metaKey) && event.key === "f") {
       event.preventDefault();
-      store.view = "settings";
       searchBox?.focus();
       searchBox?.select();
     } else if (event.key === "F2") {
@@ -44,29 +42,17 @@
   <header class="top">
     <div class="brand">ZAX <span class="version">{VERSION}</span></div>
 
-    <!-- The two the previous interface had at this level, in its order. -->
-    <div class="views" role="tablist">
-      <button role="tab" aria-selected={store.view === "settings"} onclick={() => (store.view = "settings")}>
-        Settings
-      </button>
-      <button role="tab" aria-selected={store.view === "trouble"} onclick={() => (store.view = "trouble")}>
-        Troubleshooting
-      </button>
-    </div>
-
     <!--
       Searches every file and tab, not the one on screen: the tabs are the previous interface's, and finding a
       setting in them means already knowing which component owns it.
     -->
-    {#if store.view === "settings"}
-      <input
-        bind:this={searchBox}
-        class="search"
-        type="search"
-        placeholder="Search all settings"
-        bind:value={store.query}
-      />
-    {/if}
+    <input
+      bind:this={searchBox}
+      class="search"
+      type="search"
+      placeholder="Search all settings"
+      bind:value={store.query}
+    />
 
     <div class="spacer"></div>
 
@@ -91,13 +77,11 @@
 
   <div class="body">
     <Sidebar />
-    <!-- Both views act on the selected install, so neither has anything to show until there is one. -->
+    <!-- Everything here acts on the selected install, so there is nothing to show until there is one. -->
     {#if store.loaded && !store.install}
       <NoInstall />
-    {:else if store.view === "settings"}
-      <SettingsView />
     {:else}
-      <TroubleView />
+      <SettingsView />
     {/if}
   </div>
 </div>
@@ -171,32 +155,6 @@
     font-size: 12px;
   }
 
-
-
-  .views {
-    display: flex;
-    background: var(--panel-alt);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 2px;
-    gap: 2px;
-  }
-
-  .views button {
-    background: none;
-    border: none;
-    border-radius: 5px;
-    padding: 4px 13px;
-    color: var(--text-dim);
-    font-size: 12.5px;
-  }
-
-  .views button[aria-selected="true"] {
-    background: var(--panel);
-    color: var(--text);
-    font-weight: 550;
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
-  }
 
   .search {
     flex: 0 1 260px;

@@ -92,9 +92,6 @@ function discover(documents: Record<string, IniDocument>): SettingDef[] {
   return out;
 }
 
-/** The two the previous implementation had at the top level, in its order. */
-export type View = "settings" | "trouble";
-
 /**
  * Troubleshooting's own tab. A fix is one click and a report is a sequence you work through, so they are
  * separated rather than stacked on one screen where neither reads as the whole of it.
@@ -121,7 +118,6 @@ export interface Notice {
  * "what did I change" and revert trivial, and it is the shape a saved profile will store.
  */
 class Store {
-  view = $state<View>("settings");
   panel = $state<Panel>("games");
   troubleTab = $state<TroubleTab>("report");
   /** Which Settings sub-tab: a config file, or "install". */
@@ -382,7 +378,6 @@ class Store {
    */
   renameSelected(): void {
     if (!this.install) return;
-    this.view = "settings";
     this.settingsTab = "install";
     this.query = "";
     this.aliasRequest += 1;

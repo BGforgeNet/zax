@@ -1,11 +1,19 @@
 <script lang="ts">
   import { LAYOUT } from "@zax/fallout2";
+  import BugReportPanel from "./BugReportPanel.svelte";
+  import FixesPanel from "./FixesPanel.svelte";
   import LayoutNodes from "./LayoutNodes.svelte";
   import SettingRow from "./SettingRow.svelte";
   import InstallPanel from "./InstallPanel.svelte";
   import MissingFile from "./MissingFile.svelte";
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
+
+  // A fix is one click and a report is a sequence you work through, so they stay apart.
+  const TROUBLE_TABS = [
+    { id: "report", title: "Bug report" },
+    { id: "fixes", title: "Fixes" },
+  ] as const;
 
   const file = $derived(LAYOUT.find((f) => f.file === store.settingsTab));
   const tab = $derived(file ? (store.fileTab[file.file] ?? file.tabs[0]?.title ?? "") : "");
@@ -40,6 +48,18 @@
       >
         Install
       </button>
+      <!--
+        A tab rather than the top-level switch it used to be. Its fixes write the same config files as every
+        other tab, so it belongs beside them and under the same Save, which the separate view had no room for.
+      -->
+      <button
+        role="tab"
+        class="tab"
+        aria-selected={store.settingsTab === "trouble"}
+        onclick={() => (store.settingsTab = "trouble")}
+      >
+        Troubleshooting
+      </button>
     </div>
   </div>
 
@@ -51,6 +71,19 @@
           class="subtab"
           aria-selected={tab === t.title}
           onclick={() => (store.fileTab = { ...store.fileTab, [file.file]: t.title })}
+        >
+          {t.title}
+        </button>
+      {/each}
+    </div>
+  {:else if store.settingsTab === "trouble"}
+    <div class="subtabs" role="tablist">
+      {#each TROUBLE_TABS as t (t.id)}
+        <button
+          role="tab"
+          class="subtab"
+          aria-selected={store.troubleTab === t.id}
+          onclick={() => (store.troubleTab = t.id)}
         >
           {t.title}
         </button>
@@ -87,6 +120,8 @@
           <MissingFile file={file.file} />
         {/if}
         <LayoutNodes {items} />
+      {:else if store.settingsTab === "trouble"}
+        {#if store.troubleTab === "report"}<BugReportPanel />{:else}<FixesPanel />{/if}
       {:else}
         <InstallPanel />
       {/if}
