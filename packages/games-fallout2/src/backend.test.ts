@@ -47,6 +47,7 @@ describe("the operations", () => {
       os: "linux",
       backupDirectory: "/home/t/.cache/zax/backup",
       debugDirectory: "/home/t/.cache/zax/debug",
+      packageDirectory: "/home/t/.cache/zax/packages",
       logFile: "/home/t/.cache/zax/zax.log",
     });
   });
@@ -72,10 +73,11 @@ describe("the operations", () => {
   it("opens its own directories by name, so a caller cannot ask for another path", async () => {
     const platform = ready();
     const backend = createBackend(platform, noShell);
-    for (const target of ["backup", "debug", "log", "releases"] as const) await backend.open(target);
+    for (const target of ["backup", "debug", "packages", "log", "releases"] as const) await backend.open(target);
     expect(platform.opened).toEqual([
       "/home/t/.cache/zax/backup",
       "/home/t/.cache/zax/debug",
+      "/home/t/.cache/zax/packages",
       "/home/t/.cache/zax/zax.log",
       RELEASES_PAGE,
     ]);

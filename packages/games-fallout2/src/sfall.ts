@@ -6,7 +6,18 @@
  * `ddraw.ini` into the new one rather than shipping the release's defaults over their settings.
  */
 
-import { IniDocument, backupDirectory, copyTree, listFilesRecursively, stamp, temporaryDirectory } from "@zax/core";
+import {
+  IniDocument,
+  backupDirectory,
+  compareVersions,
+  copyTree,
+  listFilesRecursively,
+  mergeIni,
+  packageDirectory,
+  stamp,
+  temporaryDirectory,
+  type MergeConflict,
+} from "@zax/core";
 import type { Install } from "@zax/core";
 import type { Platform } from "@zax/platform";
 import { NtExecutable, NtExecutableResource } from "pe-library";
@@ -17,9 +28,31 @@ export const SFALL_LIBRARY = "ddraw.dll";
 
 const RELEASE_INFO = "https://sourceforge.net/projects/sfall/best_release.json";
 
+/** Every published archive, newest first. The feed caps at 100 entries and ignores a page parameter. */
+const RELEASE_LIST = "https://sourceforge.net/projects/sfall/rss?path=/sfall";
+
 export interface SfallRelease {
   version: string;
   url: string;
+}
+
+/**
+ * Where a given version is published. The release feed names only the newest, but every version is a file in
+ * the same directory under a predictable name, which is what makes changing to an arbitrary version possible.
+ */
+export function releaseUrl(version: string): string {
+  return `https://sourceforge.net/projects/sfall/files/sfall/sfall_${version}.7z/download`;
+}
+
+/**
+ * The versions available to change to, newest first. Read from the file listing rather than the release feed,
+ * which names one: the listing is capped at its most recent 100 files, so this is not the whole history.
+ */
+export async function listSfallVersions(platform: Platform): Promise<readonly string[]> {
+  const feed = await platform.net.fetchText(RELEASE_LIST);
+  const seen = new Set<string>();
+  for (const match of feed.matchAll(/sfall_(\d[^< "]*?)\.7z/g)) if (match[1]) seen.add(match[1]);
+  return [...seen].sort((a, b) => compareVersions(b, a));
 }
 
 /**
@@ -70,6 +103,39 @@ export interface SfallUpdate {
   replaced: readonly string[];
   /** Where the replaced copies were put, or null when the update added files without replacing any. */
   backup: string | null;
+  /** Settings both the user and the release changed. The user's won; these are worth a second look. */
+  conflicts: readonly MergeConflict[];
+  /** Settings the release retired that the user had left at the old default. */
+  removed: readonly { section: string; key: string }[];
+}
+
+/** The cached archive for a version, downloaded if this is the first time it is asked for. */
+export async function sfallPackage(platform: Platform, version: string): Promise<string> {
+  const path = platform.paths.join(packageDirectory(platform), `sfall-${version}.7z`);
+  if ((await platform.fs.stat(path))?.kind === "file") return path;
+  await platform.net.download(releaseUrl(version), path);
+  return path;
+}
+
+/**
+ * What a version shipped as its own `ddraw.ini`, or null when that version's archive cannot be had. This is the
+ * base a merge compares against: without it there is no telling a chosen setting from an untouched one.
+ */
+export async function sfallDefaults(platform: Platform, version: string): Promise<IniDocument | null> {
+  const { join } = platform.paths;
+  const work = join(temporaryDirectory(platform), `sfall-defaults-${version}`);
+  try {
+    await platform.archive.extract(await sfallPackage(platform, version), work);
+    const ini = join(work, "ddraw.ini");
+    if ((await platform.fs.stat(ini))?.kind !== "file") return null;
+    return IniDocument.parseBytes(await platform.fs.read(ini));
+  } catch {
+    // An archive that will not download or will not open is a missing base, not a failed update: the merge
+    // falls back to carrying every value across, which is what it did before any of this existed.
+    return null;
+  } finally {
+    await platform.fs.remove(work);
+  }
 }
 
 /**
@@ -79,7 +145,7 @@ export interface SfallUpdate {
 export async function updateSfall(
   platform: Platform,
   install: Install,
-  release: SfallRelease,
+  version: string,
   now: Date = new Date(),
 ): Promise<SfallUpdate> {
   const { join } = platform.paths;
@@ -88,11 +154,11 @@ export async function updateSfall(
   const unpacked = join(work, "unpacked");
 
   try {
-    const archive = join(work, "sfall.7z");
-    await platform.net.download(release.url, archive);
-    await platform.archive.extract(archive, unpacked);
+    await platform.archive.extract(await sfallPackage(platform, version), unpacked);
 
-    await mergeSettings(platform, install, unpacked);
+    // The version being replaced, read before anything is written over it.
+    const previous = await installedSfallVersion(platform, install);
+    const merge = await mergeSettings(platform, install, unpacked, previous);
 
     const incoming = await listFilesRecursively(platform, unpacked);
     const replaced: string[] = [];
@@ -105,7 +171,13 @@ export async function updateSfall(
     }
 
     await copyTree(platform, unpacked, install.path);
-    return { version: release.version, replaced, backup: replaced.length > 0 ? backup : null };
+    return {
+      version,
+      replaced,
+      backup: replaced.length > 0 ? backup : null,
+      conflicts: merge.conflicts,
+      removed: merge.removed,
+    };
   } finally {
     await platform.fs.remove(work);
   }
@@ -114,19 +186,30 @@ export async function updateSfall(
 /**
  * Carries the install's settings into the release's `ddraw.ini`. That direction rather than the reverse: the
  * new file's comments are sfall's documentation and its keys are what this release understands, while only the
- * values are the user's. A key the user has that the release dropped is still written, so nothing is lost
- * silently.
+ * values are the user's.
+ *
+ * What the version being replaced shipped decides the rest - see `mergeIni`. Reading it costs a download the
+ * first time and nothing after, since the archive is kept.
  */
-async function mergeSettings(platform: Platform, install: Install, unpacked: string): Promise<void> {
+async function mergeSettings(
+  platform: Platform,
+  install: Install,
+  unpacked: string,
+  previous: string | null,
+): Promise<{ conflicts: readonly MergeConflict[]; removed: readonly { section: string; key: string }[] }> {
   const { join } = platform.paths;
+  const empty = { conflicts: [], removed: [] };
   const mine = join(install.path, "ddraw.ini");
   const theirs = join(unpacked, "ddraw.ini");
-  if ((await platform.fs.stat(mine))?.kind !== "file") return;
-  if ((await platform.fs.stat(theirs))?.kind !== "file") return;
+  if ((await platform.fs.stat(mine))?.kind !== "file") return empty;
+  if ((await platform.fs.stat(theirs))?.kind !== "file") return empty;
 
-  const merged = IniDocument.parseBytes(await platform.fs.read(theirs));
-  for (const entry of IniDocument.parseBytes(await platform.fs.read(mine)).entries()) {
-    merged.set(entry.section, entry.key, entry.value);
-  }
-  await platform.fs.write(theirs, merged.toBytes());
+  const base = previous === null ? null : await sfallDefaults(platform, previous);
+  const outcome = mergeIni(
+    IniDocument.parseBytes(await platform.fs.read(theirs)),
+    IniDocument.parseBytes(await platform.fs.read(mine)),
+    base,
+  );
+  await platform.fs.write(theirs, outcome.document.toBytes());
+  return { conflicts: outcome.conflicts, removed: outcome.removed };
 }

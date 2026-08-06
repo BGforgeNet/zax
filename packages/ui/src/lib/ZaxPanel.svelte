@@ -48,6 +48,16 @@
     <button disabled={store.busy !== null} onclick={() => void store.wipe("backup")}>Wipe</button>
   </div>
 
+  <h2 class="section">sfall packages</h2>
+  <p class="path">{store.paths.packages}</p>
+  <div class="buttons">
+    <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("packages")}>
+      Open
+    </button>
+    <!-- Emptying costs nothing but a download next time, which is what makes this a cache rather than state. -->
+    <button disabled={store.busy !== null} onclick={() => void store.wipe("packages")}>Wipe</button>
+  </div>
+
   <h2 class="section">Debug archive directory</h2>
   <p class="path">{store.paths.debug}</p>
   <div class="buttons">

@@ -414,10 +414,11 @@ class Store {
   }
 
   /** Where ZAX keeps its own files, for the panel that shows and empties them. Empty until startup finishes. */
-  get paths(): { backup: string; debug: string; log: string } {
+  get paths(): { backup: string; debug: string; packages: string; log: string } {
     return {
       backup: this.machine?.backupDirectory ?? "",
       debug: this.machine?.debugDirectory ?? "",
+      packages: this.machine?.packageDirectory ?? "",
       log: this.machine?.logFile ?? "",
     };
   }
@@ -555,29 +556,53 @@ class Store {
     return compareVersions(this.sfallInstalled, this.sfallLatest.version) < 0;
   }
 
-  async updateSfall(): Promise<void> {
-    const install = this.install;
-    const release = this.sfallLatest;
-    if (!install || !release) return;
-    await this.run("Updating sfall", async () => {
-      const result = await backend.updateSfall(install, release);
-      await this.readInstall();
-      const kept = result.backup === null ? "" : ` Replaced files are in ${result.backup}.`;
-      return { kind: "done", text: `sfall is now ${result.version}.${kept}` };
+  /** Versions that can be changed to, read on demand: it is a second request nobody needs until they ask. */
+  sfallVersions = $state<readonly string[]>([]);
+
+  async loadSfallVersions(): Promise<void> {
+    if (this.sfallVersions.length > 0) return;
+    await this.run("Reading the sfall versions", async () => {
+      this.sfallVersions = await backend.listSfallVersions();
+      return null;
     });
   }
 
   /**
-   * Installs sfall into an install that has none. The same download, merge and backup as an update - there is
-   * simply nothing to merge or back up - so it goes through one path rather than a second, thinner one.
+   * Puts a given version of sfall into the install, whichever direction that is. Installing, updating and going
+   * back are one operation: each downloads that version, merges the settings, backs up what it replaces and
+   * copies it over. The labels differ, so the caller says what it was doing.
    */
+  async changeSfall(version: string, doing = "Updating sfall"): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    await this.run(doing, async () => {
+      const result = await backend.updateSfall(install, version);
+      await this.readInstall();
+      const kept = result.backup === null ? "" : ` Replaced files are in ${result.backup}.`;
+      // Both sides changed these, and the user's won. Nothing is broken, but it is the one part of a merge
+      // worth looking at, so it is named rather than counted.
+      const clashed = result.conflicts.length
+        ? ` Kept your value for ${result.conflicts.map((c) => c.key).join(", ")}.`
+        : "";
+      const count = result.removed.length;
+      const gone = count ? ` Dropped ${count} setting${count === 1 ? "" : "s"} this release does not have.` : "";
+      return { kind: "done", text: `sfall is now ${result.version}.${kept}${clashed}${gone}` };
+    });
+  }
+
+  async updateSfall(): Promise<void> {
+    const release = this.sfallLatest;
+    if (release) await this.changeSfall(release.version);
+  }
+
+  /** Installs sfall into an install that has none, which is the same operation with nothing to merge. */
   async installSfall(): Promise<void> {
     const install = this.install;
     if (!install) return;
     await this.run("Installing sfall", async () => {
       const release = await backend.latestSfall();
       this.sfallLatest = release;
-      const result = await backend.updateSfall(install, release);
+      const result = await backend.updateSfall(install, release.version);
       await this.readInstall();
       return { kind: "done", text: `sfall ${result.version} is installed.` };
     });

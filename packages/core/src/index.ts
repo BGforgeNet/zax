@@ -16,8 +16,9 @@ export {
   type WineConfig,
 } from "./install.js";
 export { identifyInstall, scanForInstalls, scanRoots } from "./discovery.js";
-export { backupDirectory, debugDirectory, logFile, temporaryDirectory } from "./directories.js";
+export { backupDirectory, debugDirectory, logFile, packageDirectory, temporaryDirectory } from "./directories.js";
 export { copyTree, listFilesRecursively } from "./fs.js";
+export { mergeIni, type MergeConflict, type MergeOutcome } from "./ini-merge.js";
 export { stamp } from "./stamp.js";
 export { latestZax, type ZaxRelease } from "./updates.js";
 export { compareVersions } from "./version.js";

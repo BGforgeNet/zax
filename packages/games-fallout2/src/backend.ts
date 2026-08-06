@@ -12,6 +12,7 @@
 import {
   backupDirectory,
   debugDirectory,
+  packageDirectory,
   identifyInstall,
   latestZax,
   loadConfigFiles,
@@ -33,18 +34,26 @@ import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
 import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
 import { planLaunch } from "./launch.js";
-import { installedSfallVersion, latestSfall, updateSfall, type SfallRelease, type SfallUpdate } from "./sfall.js";
+import {
+  installedSfallVersion,
+  latestSfall,
+  listSfallVersions,
+  updateSfall,
+  type SfallRelease,
+  type SfallUpdate,
+} from "./sfall.js";
 
 /** The application's own directories, and which machine this is. Read once, at startup. */
 export interface MachineDescription {
   os: OperatingSystem;
   backupDirectory: string;
   debugDirectory: string;
+  packageDirectory: string;
   logFile: string;
 }
 
 /** One of ZAX's own directories, named rather than passed as a path so a renderer cannot ask for another. */
-export type OwnDirectory = "backup" | "debug";
+export type OwnDirectory = "backup" | "debug" | "packages";
 
 /** Somewhere the desktop's own handler is asked to open. Named for the same reason. */
 export type OpenTarget = OwnDirectory | "log" | "releases" | "hires";
@@ -69,7 +78,8 @@ export interface Backend {
   scanForInstalls(known: readonly Install[]): Promise<readonly Install[]>;
   installedSfallVersion(install: Install): Promise<string | null>;
   latestSfall(): Promise<SfallRelease>;
-  updateSfall(install: Install, release: SfallRelease): Promise<SfallUpdate>;
+  updateSfall(install: Install, version: string): Promise<SfallUpdate>;
+  listSfallVersions(): Promise<readonly string[]>;
   latestZax(): Promise<ZaxRelease>;
   listSaves(install: Install): Promise<readonly string[]>;
   createDebugPackage(install: Install, saves: readonly string[]): Promise<DebugPackage>;
@@ -88,7 +98,8 @@ export interface Shell {
 }
 
 export function createBackend(platform: Platform, shell: Shell): Backend {
-  const own = (which: OwnDirectory) => (which === "backup" ? backupDirectory(platform) : debugDirectory(platform));
+  const own = (which: OwnDirectory) =>
+    which === "backup" ? backupDirectory(platform) : which === "debug" ? debugDirectory(platform) : packageDirectory(platform);
 
   return {
     chooseFolder: () => shell.chooseFolder(),
@@ -97,6 +108,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       os: platform.os,
       backupDirectory: backupDirectory(platform),
       debugDirectory: debugDirectory(platform),
+      packageDirectory: packageDirectory(platform),
       logFile: logFile(platform),
     }),
 
@@ -109,7 +121,8 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
 
     installedSfallVersion: (install) => installedSfallVersion(platform, install),
     latestSfall: () => latestSfall(platform),
-    updateSfall: (install, release) => updateSfall(platform, install, release),
+    updateSfall: (install, version) => updateSfall(platform, install, version),
+    listSfallVersions: () => listSfallVersions(platform),
     latestZax: () => latestZax(platform),
 
     listSaves: (install) => listSaves(platform, install),

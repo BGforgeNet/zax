@@ -15,4 +15,12 @@ export const debugDirectory = (platform: Platform): string => platform.paths.joi
 /** Scratch space for downloads and for listings that go into an archive. Safe to remove at any point. */
 export const temporaryDirectory = (platform: Platform): string => platform.paths.join(platform.paths.cache, "tmp");
 
+/**
+ * Release archives, kept by version. They are what a merge reads the previous version's defaults out of, and
+ * what makes changing version again cost an extract rather than a download. Genuinely a cache: everything here
+ * can be fetched again, which is why emptying it is offered.
+ */
+export const packageDirectory = (platform: Platform): string =>
+  platform.paths.join(platform.paths.cache, "packages");
+
 export const logFile = (platform: Platform): string => platform.paths.join(platform.paths.cache, "zax.log");

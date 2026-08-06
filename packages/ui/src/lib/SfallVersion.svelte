@@ -8,6 +8,15 @@
   import { store } from "./store.svelte.js";
 
   const OUTSIDE = "The browser preview cannot reach the release feed - this needs the desktop build";
+
+  let changing = $state(false);
+  let wanted = $state("");
+
+  function open() {
+    changing = true;
+    wanted = store.sfallInstalled ?? "";
+    void store.loadSfallVersions();
+  }
 </script>
 
 <div class="row">
@@ -39,9 +48,37 @@
       >
         Update
       </button>
+      <!-- Going back matters as much as going forward: mods pin particular sfall versions. -->
+      <button disabled={isPreview || !store.install || store.busy !== null} title={isPreview ? OUTSIDE : null} onclick={open}>
+        Change version
+      </button>
     </span>
     {#if store.sfallOutdated}
       <span class="help">Your settings are carried into the new ddraw.ini, and replaced files are backed up.</span>
+    {/if}
+    {#if changing}
+      <span class="change">
+        <select aria-label="sfall version" bind:value={wanted} disabled={store.sfallVersions.length === 0}>
+          {#each store.sfallVersions as version (version)}
+            <option value={version}>{version}{version === store.sfallInstalled ? " (installed)" : ""}</option>
+          {:else}
+            <option value="">Reading the list...</option>
+          {/each}
+        </select>
+        <span class="buttons">
+          <button
+            disabled={wanted === "" || wanted === store.sfallInstalled || store.busy !== null}
+            onclick={() => void store.changeSfall(wanted, `Changing sfall to ${wanted}`).then(() => (changing = false))}
+          >
+            Apply
+          </button>
+          <button onclick={() => (changing = false)}>Cancel</button>
+        </span>
+        <span class="help">
+          Files a newer release added are left in place. Settings are merged against what the installed version
+          shipped, so defaults you never changed follow the release you move to.
+        </span>
+      </span>
     {/if}
   </div>
 </div>
@@ -56,6 +93,23 @@
     display: flex;
     gap: 8px;
     margin-top: 2px;
+  }
+
+  .change {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .change select {
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    padding: 2px 6px;
+    color: var(--text);
+    font-size: 12px;
   }
 
   .buttons button {
