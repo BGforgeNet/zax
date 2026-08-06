@@ -2,8 +2,7 @@
   import { compareVersions } from "@zax/core";
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
-
-  const VERSION = "0.8";
+  import { VERSION } from "./version.js";
 
   /*
     Version checks and opening a directory in the desktop's file manager both leave the page, which the browser

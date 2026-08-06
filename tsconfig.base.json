@@ -10,6 +10,7 @@
     "noImplicitOverride": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "declaration": true,
     "composite": true

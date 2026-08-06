@@ -5,6 +5,7 @@
   import Sidebar from "./lib/Sidebar.svelte";
   import TroubleView from "./lib/TroubleView.svelte";
   import { store } from "./lib/store.svelte.js";
+  import { VERSION } from "./lib/version.js";
 
   // Reading the state file and the selected install's config files is the first thing that happens, and it is
   // a filesystem read, so the interface renders its empty shape until it lands rather than blocking on it.
@@ -41,7 +42,7 @@
 
 <div class="shell">
   <header class="top">
-    <div class="brand">ZAX <span class="version">0.8</span></div>
+    <div class="brand">ZAX <span class="version">{VERSION}</span></div>
 
     <!-- The two the previous interface had at this level, in its order. -->
     <div class="views" role="tablist">
