@@ -221,9 +221,11 @@
     background: none;
   }
 
+  /* The gutter is the same one the header and the notice inset by, so all three share one left edge. */
   .body {
     flex: 1;
     display: flex;
     min-height: 0;
+    padding-inline: var(--gutter);
   }
 </style>

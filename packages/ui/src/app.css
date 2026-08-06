@@ -24,15 +24,17 @@
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
   /*
-    Content stops at this width and the surplus becomes symmetric margin; the row's three tracks total about
-    1100px, so past it the window grew and nothing in it did. Bands still span the full window and inset only
-    their own content, so backgrounds and separators reach both edges.
-
-    Measured from the pane because the list scrolls and the heading above it does not: where scrollbars take
-    width the two would otherwise disagree, and the difference is better spent on the right edge than the left.
+    The settings column stops at what its row actually needs - three tracks of 19rem, 16rem and 22rem, plus the
+    two gaps and the pane's own inset - so no width is left over to render as blank space on the right.
   */
-  --col: 1150px;
-  --gutter: max(16px, calc((100cqi - var(--col)) / 2));
+  --col: calc(57rem + 60px);
+  --sidebar: 264px;
+
+  /*
+    Both columns are centred as one block, so the surplus width becomes margin at the window's two edges rather
+    than a gap opening between them. Measured against the shell, which is what holds both.
+  */
+  --gutter: max(16px, calc((100cqi - var(--sidebar) - var(--col)) / 2));
 }
 
 /* The theme picker's only job: narrowing the used scheme, which is what every token above reads. */
@@ -84,13 +86,15 @@ button {
 
 /* The shell every view is built from: a fixed heading over one scrolling list. */
 .pane {
-  /* What `--gutter` measures against, so every band in the view lines up whether or not the list scrolls. */
-  container-type: inline-size;
+  /* Inside the column the gutter is a plain inset: the centring happens once, around both columns together. */
+  --gutter: 14px;
   flex: 1 1 auto;
   min-width: 430px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Closes the block the sidebar opens, so the centred pair reads as bounded on both sides. */
+  border-right: 1px solid var(--border);
 }
 
 .pane main {
@@ -222,7 +226,9 @@ button {
 */
 .list .row {
   display: grid;
-  grid-template-columns: minmax(0, 19rem) minmax(0, 16rem) minmax(0, 1fr);
+  /* The notes track is bounded rather than 1fr: as a fraction it absorbed every surplus pixel, which on a tab
+     whose settings carry no help text left the row's whole right half blank. */
+  grid-template-columns: minmax(0, 19rem) minmax(0, 16rem) minmax(0, 22rem);
   column-gap: 16px;
   align-items: baseline;
   padding: 6px var(--gutter);
