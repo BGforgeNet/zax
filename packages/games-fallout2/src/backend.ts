@@ -56,15 +56,9 @@ export interface MachineDescription {
 export type OwnDirectory = "backup" | "debug" | "packages";
 
 /** Somewhere the desktop's own handler is asked to open. Named for the same reason. */
-export type OpenTarget = OwnDirectory | "log" | "releases" | "hires";
+export type OpenTarget = OwnDirectory | "log" | "releases";
 
 export const RELEASES_PAGE = "https://github.com/BGforgeNet/zax/releases/latest";
-
-/**
- * Where the High Resolution Patch comes from. A forum thread rather than a release feed, which is why the
- * interface offers to open it instead of installing the patch the way it installs sfall.
- */
-export const HIRES_PAGE = "https://www.nma-fallout.com/threads/hi-res-patches-for-fallout1-2-the-bis-mapper.181743/";
 
 export interface Backend {
   describe(): Promise<MachineDescription>;
@@ -135,7 +129,6 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
 
     open: async (target) => {
       if (target === "releases") return platform.process.open(RELEASES_PAGE);
-      if (target === "hires") return platform.process.open(HIRES_PAGE);
       if (target === "log") return platform.process.open(logFile(platform));
       return platform.process.open(own(target));
     },

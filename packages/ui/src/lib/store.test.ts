@@ -316,3 +316,23 @@ describe("crossing the process boundary", () => {
     expect(sent.installs).toEqual(store.installs);
   });
 });
+
+describe("a config file the install does not have", () => {
+  const PINNED = "hires.main.uac-aware";
+
+  test("pins its value while the file is there", () => {
+    // The seeded fixture ships UAC_AWARE=1, which ZAX pins off - so it starts as a pending change.
+    expect(store.isModified(PINNED)).toBe(true);
+  });
+
+  test("queues nothing once it is gone, so saving cannot create the file", async () => {
+    await previewPlatform.fs.remove(`${PREVIEW_INSTALL}/f2_res.ini`);
+    await store.start();
+
+    expect(store.hasFile("f2_res.ini")).toBe(false);
+    expect(store.isModified(PINNED), "a pinned value for an absent file would be written on the next save").toBe(
+      false,
+    );
+    expect(store.modifiedCount, "nothing else is pending either").toBe(0);
+  });
+});

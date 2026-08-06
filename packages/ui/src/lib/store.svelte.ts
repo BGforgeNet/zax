@@ -185,6 +185,9 @@ class Store {
   private managedOverrides(): Record<string, string> {
     const out: Record<string, string> = {};
     for (const s of SETTINGS) {
+      // Not for a file the install does not have: a pending change there would put the config file of an
+      // uninstalled component into the game folder on the next save, which is the opposite of pinning a value.
+      if (!this.hasFile(s.file)) continue;
       if (s.managed && this.baselineOf(s.id) !== s.managed.value) out[s.id] = s.managed.value;
     }
     return out;

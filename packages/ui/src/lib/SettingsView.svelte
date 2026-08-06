@@ -81,9 +81,11 @@
             <p class="empty">Nothing matches "{store.query}".</p>
           {/if}
         {/each}
-      {:else if file && store.install && !store.hasFile(file.file)}
-        <MissingFile file={file.file} label={file.label} />
       {:else if file}
+        <!-- The settings stay on screen when their file is absent; the rows themselves refuse input. -->
+        {#if store.install && !store.hasFile(file.file)}
+          <MissingFile file={file.file} />
+        {/if}
         <LayoutNodes {items} />
       {:else}
         <InstallPanel />

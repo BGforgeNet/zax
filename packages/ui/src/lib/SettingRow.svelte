@@ -24,6 +24,10 @@
   const managed = $derived(def.managed);
   const inert = $derived(gate !== null && !gate.active);
   const origin = $derived(`${def.file} [${def.section}] ${def.key}`);
+
+  // The component this setting belongs to is not installed. Editing would write its config file into the game
+  // folder, which is not a thing to do on the user's behalf, so the row reads but does not take input.
+  const unavailable = $derived(store.install !== undefined && !store.hasFile(def.file));
 </script>
 
 <div class="row" class:modified class:inert class:nested>
@@ -45,7 +49,10 @@
     {#if managed}
       <span class="pinned">{displayValue(def, managed.value)}</span>
     {:else}
-      <Control {def} {control} />
+      <!-- A fieldset so one attribute disables whichever control this row draws. -->
+      <fieldset class="controls" disabled={unavailable}>
+        <Control {def} {control} />
+      </fieldset>
     {/if}
   </div>
 
@@ -71,6 +78,18 @@
 </div>
 
 <style>
+  /* Carries no appearance of its own: it is here to disable, not to draw a box. */
+  .controls {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+
+  .controls:disabled {
+    opacity: 0.55;
+  }
+
   .go {
     border: 1px solid transparent;
     cursor: pointer;

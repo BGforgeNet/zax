@@ -25,7 +25,13 @@
 <div class="row">
   <div class="label"><span class="name">Select from common options</span></div>
   <div class="control">
-    <select value="" aria-label="Common resolutions" onchange={(e) => choose(e.currentTarget.value)}>
+    <!-- This writes two f2_res.ini keys, so it follows the same rule as the rows: no file, no editing. -->
+    <select
+      value=""
+      aria-label="Common resolutions"
+      disabled={store.install !== undefined && !store.hasFile("f2_res.ini")}
+      onchange={(e) => choose(e.currentTarget.value)}
+    >
       <option value="">...</option>
       {#each options as r (`${r.width}x${r.height}`)}
         <option value={`${r.width}x${r.height}`}>{r.width} x {r.height}</option>

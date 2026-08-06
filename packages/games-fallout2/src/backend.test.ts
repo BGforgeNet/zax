@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MemoryPlatform } from "@zax/platform/memory";
 import { BACKEND_METHODS } from "./backend-methods.js";
-import { HIRES_PAGE, RELEASES_PAGE, createBackend } from "./backend.js";
+import { RELEASES_PAGE, createBackend } from "./backend.js";
 import type { Backend } from "./backend.js";
 
 const install = { path: "/games/one", type: "fallout2" as const };
@@ -101,12 +101,6 @@ describe("the operations", () => {
   it("hands the folder picker to the shell rather than choosing one itself", async () => {
     const shell = { chooseFolder: async () => "/games/picked" };
     expect(await createBackend(new MemoryPlatform(), shell).chooseFolder()).toBe("/games/picked");
-  });
-
-  it("opens the hi-res patch's page, which is not a directory of ours", async () => {
-    const platform = new MemoryPlatform({ home: "/home/t" });
-    await createBackend(platform, noShell).open("hires");
-    expect(platform.opened).toEqual([HIRES_PAGE]);
   });
 });
 
