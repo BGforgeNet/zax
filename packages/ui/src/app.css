@@ -432,18 +432,3 @@ button {
   border-bottom-color: var(--border);
 }
 
-/* Sub-heading inside a settings list. Shared so the two views cannot drift apart. */
-.group {
-  margin: 0;
-  padding: 9px var(--gutter) 7px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  background: var(--panel-alt);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}

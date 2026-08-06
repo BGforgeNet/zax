@@ -44,6 +44,14 @@ describe("detecting an install", () => {
     expect(detectGameType(["fallout2.exe", "up-changelog.txt"], ["rpu.dat"])).toBe("fallout2rpu");
   });
 
+  it("names killap's restoration project, which carries the unofficial patch and both markers", () => {
+    // The restoration project's own installer makes this exact test: an install is the unofficial patch only
+    // when up-changelog.txt is there and rp-changelog.txt is not.
+    const root = ["fallout2.exe", "up-changelog.txt", "rp-changelog.txt"];
+    expect(detectGameType(root, [])).toBe("fallout2rp");
+    expect(detectGameType(["fallout2.exe", "rp-changelog.txt"], [])).toBe("fallout2rp");
+  });
+
   it("is still vanilla when nothing marks a patch", () => {
     expect(detectGameType(["fallout2.exe", "master.dat", "readme.rtf"], [])).toBe("fallout2");
   });

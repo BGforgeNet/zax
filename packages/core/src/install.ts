@@ -85,11 +85,13 @@ export function detectGameType(rootEntries: readonly string[], modEntries: reado
  * What killap's installers leave in the game folder. These patches write into `data/` and add no `mods/*.dat`,
  * so a root file is the only thing that distinguishes them from an unpatched game.
  *
- * The Restoration Project's marker is not here because it has not been confirmed against a real install, and a
- * guessed filename would silently never match. Until it is added, an RP install reports as `fallout2up`: RP
- * carries the Unofficial Patch, so it matches that marker.
+ * The Restoration Project comes first because it carries the Unofficial Patch and leaves both files. This is
+ * the same test the Restoration Project's own installer makes, which reads an install as the Unofficial Patch
+ * only when `up-changelog.txt` is present and `rp-changelog.txt` is not:
+ * https://github.com/BGforgeNet/Fallout2_Restoration_Project/blob/master/release/rpu-install.sh
  */
 const ROOT_MARKERS: readonly { marker: string; type: GameType }[] = [
+  { marker: "rp-changelog.txt", type: "fallout2rp" },
   { marker: "up-changelog.txt", type: "fallout2up" },
 ];
 
