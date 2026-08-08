@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isApplied, pendingTargets, validate } from "@zax/core";
-import { ACTIONS, COMMON_RESOLUTIONS, RESOLUTION_PAIRS } from "./actions.js";
+import { ACTIONS, COMMON_RESOLUTIONS } from "./actions.js";
 import { SETTINGS } from "./catalog.js";
 
 const byId = new Map(SETTINGS.map((s) => [s.id, s]));
@@ -26,7 +26,10 @@ describe("actions reference real settings", () => {
           expect([def.kind.onValue, def.kind.offValue], `${action.id} -> ${id}`).toContain(value);
         }
         if (def.kind.type === "choice") {
-          expect(def.kind.options.map((o) => o.value), `${action.id} -> ${id}`).toContain(value);
+          expect(
+            def.kind.options.map((o) => o.value),
+            `${action.id} -> ${id}`,
+          ).toContain(value);
         }
       }
     }
@@ -47,7 +50,6 @@ describe("actions reference real settings", () => {
       expect(a.label.trim()).not.toBe("");
       expect(a.description.trim()).not.toBe("");
       expect(a.appliedLabel.trim()).not.toBe("");
-
     }
   });
 
@@ -84,35 +86,17 @@ describe("applied detection", () => {
 });
 
 describe("curated surface", () => {
-  it("points every resolution pair at real settings in one file", () => {
-    for (const pair of RESOLUTION_PAIRS) {
-      const w = byId.get(pair.width);
-      const h = byId.get(pair.height);
-      expect(w, `${pair.id} width`).toBeDefined();
-      expect(h, `${pair.id} height`).toBeDefined();
-      // A merged control writes both keys at once, so they have to belong to the same file.
-      expect(w!.file, `${pair.id} spans files`).toBe(h!.file);
+  it("offers only resolutions the preset targets actually accept", () => {
+    // The same two ids the presets dropdown writes; validated here because the dropdown itself never checks.
+    const w = byId.get("hires.main.scr-width");
+    const h = byId.get("hires.main.scr-height");
+    expect(w).toBeDefined();
+    expect(h).toBeDefined();
+    // One control writes both keys at once, so they have to belong to the same file.
+    expect(w!.file).toBe(h!.file);
+    for (const r of COMMON_RESOLUTIONS) {
+      expect(validate(w!, String(r.width)).ok, `width ${r.width}`).toBe(true);
+      expect(validate(h!, String(r.height)).ok, `height ${r.height}`).toBe(true);
     }
-  });
-
-  it("offers only resolutions each pair actually accepts", () => {
-    for (const pair of RESOLUTION_PAIRS) {
-      const w = byId.get(pair.width)!;
-      const h = byId.get(pair.height)!;
-      for (const r of COMMON_RESOLUTIONS) {
-        expect(validate(w, String(r.width)).ok, `${pair.id} width ${r.width}`).toBe(true);
-        expect(validate(h, String(r.height)).ok, `${pair.id} height ${r.height}`).toBe(true);
-      }
-      if (pair.nativeValue !== undefined) {
-        expect(validate(w, pair.nativeValue).ok, `${pair.id} native width`).toBe(true);
-        expect(validate(h, pair.nativeValue).ok, `${pair.id} native height`).toBe(true);
-      }
-    }
-  });
-
-  it("does not list one setting under two pairs", () => {
-    const ids = RESOLUTION_PAIRS.flatMap((p) => [p.width, p.height]);
-    expect(new Set(ids).size).toBe(ids.length);
   });
 });
-

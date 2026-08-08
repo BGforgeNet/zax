@@ -85,51 +85,9 @@ export const ACTIONS: readonly Action[] = [
 ];
 
 /**
- * Width and height are never an independent pair of numbers - they are one decision about a screen size. Each
- * entry here is rendered as a single picker, and its two keys are hidden from the settings list so the same
- * choice is not offered twice in contradictory forms.
+ * Presets offered as a shortcut for the high-resolution patch's width/height pair. The engine accepts any size
+ * in range, so these never constrain the input.
  */
-export interface ResolutionPair {
-  id: string;
-  label: string;
-  help: string;
-  group: string;
-  width: string;
-  height: string;
-  /** Value written to both keys for the "leave it to the engine" option, where the pair supports one. */
-  nativeValue?: string;
-  /**
-   * Some other setting can raise this pair's minimum. The high-resolution patch's 2x scaling renders at double
-   * size, so anything below 1280x960 cannot be scaled and the patch rejects it.
-   */
-  minimumWhen?: { id: string; values: readonly string[]; width: number; height: number };
-  /** 2x scaling is part of the resolution decision, not a separate toggle that happens to constrain it. */
-  scaleToggle?: string;
-}
-
-export const RESOLUTION_PAIRS: readonly ResolutionPair[] = [
-  {
-    id: "game",
-    label: "Game resolution",
-    help: "The resolution Fallout renders at, from the high-resolution patch.",
-    group: "Other",
-    width: "hires.main.scr-width",
-    height: "hires.main.scr-height",
-    minimumWhen: { id: "hires.main.scale-2x", values: ["1"], width: 1280, height: 960 },
-    scaleToggle: "hires.main.scale-2x",
-  },
-  {
-    id: "sfall",
-    label: "sfall output resolution",
-    help: "What sfall scales the game to in DX9 modes. Leave it native unless you want a different output size.",
-    group: "Graphics",
-    width: "sfall.graphics.graphicswidth",
-    height: "sfall.graphics.graphicsheight",
-    nativeValue: "0",
-  },
-];
-
-/** Presets offered as a shortcut. The engine accepts any size in range, so these never constrain the input. */
 export const COMMON_RESOLUTIONS: ReadonlyArray<{ width: number; height: number; note?: string }> = [
   { width: 3840, height: 2160, note: "4K" },
   { width: 2560, height: 1440 },
