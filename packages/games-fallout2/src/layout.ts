@@ -1,4 +1,4 @@
-// Generated from the previous implementation's layout modules by .work/gen-layout.mjs. Do not edit by hand.
+// Generated from the previous implementation's layout modules by scripts/gen/gen-layout.mjs. Do not edit by hand.
 //
 // The tab, frame and control order the previous interface presented, so a user coming from it finds every
 // setting where they left it. What each setting IS lives in the catalog; this only says where it was shown.

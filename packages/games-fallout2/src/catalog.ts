@@ -1,4 +1,4 @@
-// Generated from the format definitions on the python branch by .work/gen-catalog.mjs. Do not edit by hand;
+// Generated from the previous implementation's format definitions by scripts/gen/gen-catalog.mjs. Do not edit by hand;
 // change the generator's tables and regenerate.
 
 import type { SettingDef } from "@zax/core";

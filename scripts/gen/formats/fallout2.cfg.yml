@@ -1,0 +1,208 @@
+zax:
+  path: fallout2.cfg
+  name: Game
+
+debug:
+  output_map_data_info:
+  show_load_info:
+  show_script_messages:
+  show_tile_num:
+
+preferences:
+  brightness:
+    type: float
+    float_base: 1000000
+    min: 1
+    max: 1.179993
+    name: Brightness
+  combat_difficulty:
+    name: Difficulty
+    display_type: radio
+    options:
+      - value: 0
+        name: Wimpy
+      - value: 1
+        name: Normal
+      - value: 2
+        name: Rough
+  combat_looks:
+    name: Looks
+  combat_messages:
+    name: Messages
+    display_type: radio
+    options:
+      - value: 0
+        name: Verbose
+      - value: 1
+        name: Brief
+  combat_speed:
+    name: Speed
+    type: int
+    min: 0
+    max: 50
+  combat_taunts:
+    name: Taunts
+  game_difficulty:
+    name: Difficulty
+    display_type: radio
+    options:
+      - value: 0
+        name: Easy
+      - value: 1
+        name: Normal
+      - value: 2
+        name: Hard
+  item_highlight:
+    name: Highlight items
+  language_filter:
+    name: Language filter
+  mouse_sensitivity:
+    name: Mouse sensitivity
+    type: float
+    min: 1
+    max: 2.5
+    float_base: 1000000
+  player_speedup:
+    name: Affect player speed
+  running:
+    name: Always run
+  subtitles:
+    name: Movie subtitles
+  target_highlight:
+    name: Highlight target
+    display_type: radio
+    options:
+      - value: 0
+        name: Off
+      - value: 1
+        name: On
+      - value: 2
+        name: Targeting only
+  text_base_delay:
+    type: float
+    min: 1
+    max: 6
+    float_base: 1000000
+    name: Floating text delay
+  text_line_delay:
+    type: float
+    min: 0
+    max: 2
+    float_base: 1000000
+  violence_level:
+    name: Violence level
+    display_type: dropdown
+    options:
+      - value: 0
+        name: None
+      - value: 1
+        name: Minimal
+      - value: 2
+        name: Normal
+      - value: 3
+        name: Maximum blood
+
+sound:
+  cache_size:
+    type: int
+    desc: Presumably, the buffer size for DirectX audio output
+    min: 0
+    max: 32767 # no idea if this is rignt, but need to set something
+  device:
+    display_type: dropdown
+    options:
+      - value: -1
+        name: Default
+      - value: 0
+        name: No sound
+      - value: 57368
+        name: Sound Blaster 16/AWE32
+        desc: Choose this for best sound quality in DOSBox and QEMU, if your hardware is good enough
+      - value: 57345
+        name: Sound Blaster Pro
+      - value: 57344
+        name: Sound Blaster 1
+        desc: Choose this for best mileage in DOSBox and QEMU
+      - value: 57376
+        name: Esoniq Soundscape
+        desc: Has no IRQ
+      - value: 57372
+        name: ESS Audiodrive
+        desc: Has no IRQ
+      - value: 57357
+        name: Microsoft Sound System
+        desc: Has no IRQ and never heard of this sound card
+      - value: 57386
+        name: Gravis Ultrasound Max
+        desc: Do not confuse with Gravis Ultrasound. This is not supported by DOSBox.
+      - value: 57382
+        name: Gravis Ultrasound
+        desc: Works in DOSBox, but with much stutter
+  dma:
+    type: int
+  initialize:
+  irq:
+    type: int
+  master_volume:
+    type: int
+    min: 1
+    max: 32767
+    name: Master
+  music:
+  music_path1:
+    type: string
+  music_path2:
+    type: string
+  music_volume:
+    type: int
+    min: 1
+    max: 32767
+    name: Music
+  port:
+    type: int
+  sndfx_volume:
+    type: int
+    min: 1
+    max: 32767
+    name: Effects
+  sounds:
+  speech:
+  speech_volume:
+    type: int
+    min: 1
+    max: 32767
+    name: Speech
+  debug:
+  debug_sfxc:
+
+system:
+  art_cache_size:
+    type: int
+  color_cycling:
+  critter_dat:
+    type: string
+  critter_patches:
+    type: string
+  cycle_speed_factor:
+    type: int
+  executable:
+    type: string
+  free_space:
+    desc: Minimal disk space that Fallout
+    type: int
+    min: 0
+    max: 2048000
+  hashing:
+  interrupt_walk:
+    desc: Allow to interrupt PC walking by issuing another command.
+  language:
+    type: string
+  master_dat:
+    type: string
+  master_patches:
+    type: string
+  scroll_lock:
+  splash:
+    type: int
+    min: 0
+    max: 5

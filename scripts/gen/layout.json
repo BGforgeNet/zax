@@ -1,0 +1,1478 @@
+[
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Speed",
+  "section": "Speed",
+  "key": "Enable",
+  "widget": "checkbox",
+  "order": 0
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Speed",
+  "section": "Speed",
+  "key": "SpeedMultiInitial",
+  "widget": "spin",
+  "order": 1
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "Graphics",
+  "key": "Mode",
+  "widget": "dropdown",
+  "order": 2
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "Graphics",
+  "key": "GraphicsWidth",
+  "widget": "spin",
+  "order": 3
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "Graphics",
+  "key": "GraphicsHeight",
+  "widget": "spin",
+  "order": 4
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "Graphics",
+  "key": "GPUBlt",
+  "widget": "dropdown",
+  "order": 5
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "Graphics",
+  "key": "AllowDShowMovies",
+  "widget": "dropdown",
+  "order": 6
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "Graphics",
+  "key": "FadeMultiplier",
+  "widget": "spin",
+  "order": 7
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Combat",
+  "section": "Misc",
+  "key": "DamageFormula",
+  "widget": "dropdown",
+  "order": 8
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Combat",
+  "section": "Misc",
+  "key": "SaveInCombatFix",
+  "widget": "dropdown",
+  "order": 9
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Combat",
+  "section": "Misc",
+  "key": "FastShotFix",
+  "widget": "dropdown",
+  "order": 10
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Combat",
+  "section": "Misc",
+  "key": "InventoryApCost",
+  "widget": "spin",
+  "order": 11
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Combat",
+  "section": "Misc",
+  "key": "QuickPocketsApCostReduction",
+  "widget": "spin",
+  "order": 12
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "UseFileSystemOverride",
+  "widget": "checkbox",
+  "order": 13
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "NPCAutoLevel",
+  "widget": "checkbox",
+  "order": 14
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "SingleCore",
+  "widget": "checkbox",
+  "order": 15
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "PlayIdleAnimOnReload",
+  "widget": "checkbox",
+  "order": 16
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "CorpseDeleteTime",
+  "widget": "spin",
+  "order": 17
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "ProcessorIdle",
+  "widget": "spin",
+  "order": 18
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "SkipOpeningMovies",
+  "widget": "dropdown",
+  "order": 19
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "SuperStimExploitFix",
+  "widget": "checkbox",
+  "order": 20
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "ExplosionsEmitLight",
+  "widget": "checkbox",
+  "order": 21
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "DontTurnOffSneakIfYouRun",
+  "widget": "checkbox",
+  "order": 22
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "UseWalkDistance",
+  "widget": "spin",
+  "order": 23
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Main",
+  "frame": "Misc",
+  "section": "Misc",
+  "key": "SkipLoadingGameSettings",
+  "widget": "dropdown",
+  "order": 24
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": null,
+  "section": "Interface",
+  "key": "ActionPointsBar",
+  "widget": "checkbox",
+  "order": 25
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Input",
+  "section": "Input",
+  "key": "UseScrollWheel",
+  "widget": "checkbox",
+  "order": 26
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Input",
+  "section": "Input",
+  "key": "MiddleMouse",
+  "widget": "qinput",
+  "order": 27
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Input",
+  "section": "Input",
+  "key": "ReverseMouseButtons",
+  "widget": "checkbox",
+  "order": 28
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Input",
+  "section": "Input",
+  "key": "ReloadWeaponKey",
+  "widget": "qinput",
+  "order": 29
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Input",
+  "section": "Input",
+  "key": "ItemFastMoveKey",
+  "widget": "qinput",
+  "order": 30
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Input",
+  "section": "Input",
+  "key": "FastMoveFromContainer",
+  "widget": "checkbox",
+  "order": 31
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Animation speed",
+  "section": "Misc",
+  "key": "CombatPanelAnimDelay",
+  "widget": "spin",
+  "order": 32
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Animation speed",
+  "section": "Misc",
+  "key": "DialogPanelAnimDelay",
+  "widget": "spin",
+  "order": 33
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Animation speed",
+  "section": "Misc",
+  "key": "PipboyTimeAnimDelay",
+  "widget": "spin",
+  "order": 34
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Animation speed",
+  "section": "Misc",
+  "key": "SpeedInterfaceCounterAnims",
+  "widget": "dropdown",
+  "order": 35
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Animation speed",
+  "section": "Misc",
+  "key": "InstantWeaponEquip",
+  "widget": "checkbox",
+  "order": 36
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Dialog",
+  "section": "Misc",
+  "key": "NumbersInDialogue",
+  "widget": "checkbox",
+  "order": 37
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Dialog",
+  "section": "Misc",
+  "key": "EnableMusicInDialogue",
+  "widget": "checkbox",
+  "order": 38
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Dialog",
+  "section": "Misc",
+  "key": "PartyMemberExtraInfo",
+  "widget": "checkbox",
+  "order": 39
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Inventory",
+  "section": "Misc",
+  "key": "StackEmptyWeapons",
+  "widget": "checkbox",
+  "order": 40
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Inventory",
+  "section": "Misc",
+  "key": "ReloadReserve",
+  "widget": "spin",
+  "order": 41
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Inventory",
+  "section": "Misc",
+  "key": "ItemCounterDefaultMax",
+  "widget": "checkbox",
+  "order": 42
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Inventory",
+  "section": "Misc",
+  "key": "DisplayBonusDamage",
+  "widget": "checkbox",
+  "order": 43
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Barter",
+  "section": "Misc",
+  "key": "FullItemDescInBarter",
+  "widget": "checkbox",
+  "order": 44
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Saves",
+  "section": "Misc",
+  "key": "ExtraSaveSlots",
+  "widget": "checkbox",
+  "order": 45
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Saves",
+  "section": "Misc",
+  "key": "AutoQuickSave",
+  "widget": "spin",
+  "order": 46
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "Saves",
+  "section": "Misc",
+  "key": "AutoQuickSavePage",
+  "widget": "spin",
+  "order": 47
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "PDA",
+  "section": "Misc",
+  "key": "DisplaySwiftLearnerExp",
+  "widget": "checkbox",
+  "order": 48
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "PDA",
+  "section": "Misc",
+  "key": "ActiveGeigerMsgs",
+  "widget": "checkbox",
+  "order": 49
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Interface",
+  "frame": "PDA",
+  "section": "Misc",
+  "key": "DisplayKarmaChanges",
+  "widget": "checkbox",
+  "order": 50
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Interface",
+  "key": "ExpandWorldMap",
+  "widget": "dropdown",
+  "order": 51
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Interface",
+  "key": "WorldMapTravelMarkers",
+  "widget": "checkbox",
+  "order": 52
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Interface",
+  "key": "WorldMapTerrainInfo",
+  "widget": "checkbox",
+  "order": 53
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Misc",
+  "key": "WorldMapTimeMod",
+  "widget": "spin",
+  "order": 54
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Misc",
+  "key": "WorldMapFPSPatch",
+  "widget": "checkbox",
+  "order": 55
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Misc",
+  "key": "WorldMapDelay2",
+  "widget": "spin",
+  "order": 56
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Misc",
+  "key": "WorldMapEncounterFix",
+  "widget": "checkbox",
+  "order": 57
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Misc",
+  "key": "WorldMapEncounterRate",
+  "widget": "spin",
+  "order": 58
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Worldmap",
+  "frame": null,
+  "section": "Misc",
+  "key": "WorldMapFontPatch",
+  "widget": "checkbox",
+  "order": 59
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Debug",
+  "frame": null,
+  "section": "Debugging",
+  "key": "DebugMode",
+  "widget": "dropdown",
+  "order": 60
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Debug",
+  "frame": null,
+  "section": "Debugging",
+  "key": "Init",
+  "widget": "checkbox",
+  "order": 61
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Debug",
+  "frame": null,
+  "section": "Debugging",
+  "key": "Hook",
+  "widget": "checkbox",
+  "order": 62
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Debug",
+  "frame": null,
+  "section": "Debugging",
+  "key": "Script",
+  "widget": "checkbox",
+  "order": 63
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Debug",
+  "frame": null,
+  "section": "Debugging",
+  "key": "Criticals",
+  "widget": "checkbox",
+  "order": 64
+ },
+ {
+  "file": "ddraw.ini",
+  "tab": "Debug",
+  "frame": null,
+  "section": "Debugging",
+  "key": "Fixes",
+  "widget": "checkbox",
+  "order": 65
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "MAIN",
+  "key": "GRAPHICS_MODE",
+  "widget": "dropdown",
+  "order": 0
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "MAIN",
+  "key": "SCALE_2X",
+  "widget": "checkbox",
+  "order": 1
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "EFFECTS",
+  "key": "IS_GRAY_SCALE",
+  "widget": "checkbox",
+  "order": 2
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "MAIN",
+  "key": "WINDOWED",
+  "widget": "radio",
+  "order": 3
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Graphics",
+  "section": "MAIN",
+  "key": "WINDOWED_FULLSCREEN",
+  "widget": "checkbox",
+  "order": 4
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Fullscreen",
+  "section": "MAIN",
+  "key": "COLOUR_BITS",
+  "widget": "dropdown",
+  "order": 5
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Fullscreen",
+  "section": "MAIN",
+  "key": "REFRESH_RATE",
+  "widget": "spin",
+  "order": 6
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Maps",
+  "section": "MAPS",
+  "key": "EDGE_CLIPPING_ON",
+  "widget": "checkbox",
+  "order": 7
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Maps",
+  "section": "MAPS",
+  "key": "IGNORE_MAP_EDGES",
+  "widget": "checkbox",
+  "order": 8
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Maps",
+  "section": "MAPS",
+  "key": "IGNORE_PLAYER_SCROLL_LIMITS",
+  "widget": "checkbox",
+  "order": 9
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Maps",
+  "section": "MAPS",
+  "key": "SCROLL_DIST_X",
+  "widget": "qinput",
+  "order": 10
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Maps",
+  "section": "MAPS",
+  "key": "SCROLL_DIST_Y",
+  "widget": "qinput",
+  "order": 11
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": null,
+  "section": "MAPS",
+  "key": "NumPathNodes",
+  "widget": "spin",
+  "order": 12
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Fog of war",
+  "section": "MAPS",
+  "key": "FOG_OF_WAR",
+  "widget": "checkbox",
+  "order": 13
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Fog of war",
+  "section": "MAPS",
+  "key": "FOG_LIGHT_LEVEL",
+  "widget": "spin",
+  "order": 14
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Delays",
+  "section": "OTHER_SETTINGS",
+  "key": "SPLASH_SCRN_TIME",
+  "widget": "spin",
+  "order": 15
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Main",
+  "frame": "Delays",
+  "section": "OTHER_SETTINGS",
+  "key": "FADE_TIME_MODIFIER",
+  "widget": "spin",
+  "order": 16
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": null,
+  "section": "MOVIES",
+  "key": "MOVIE_SIZE",
+  "widget": "radio",
+  "order": 17
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": null,
+  "section": "MAINMENU",
+  "key": "MAIN_MENU_SIZE",
+  "widget": "radio",
+  "order": 18
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": "HiRes menu backgronud",
+  "section": "MAINMENU",
+  "key": "USE_HIRES_IMAGES",
+  "widget": "checkbox",
+  "order": 19
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": "HiRes menu backgronud",
+  "section": "MAINMENU",
+  "key": "MENU_BG_OFFSET_X",
+  "widget": "spin",
+  "order": 20
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": "HiRes menu backgronud",
+  "section": "MAINMENU",
+  "key": "MENU_BG_OFFSET_Y",
+  "widget": "spin",
+  "order": 21
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": "HiRes menu backgronud",
+  "section": "MAINMENU",
+  "key": "SCALE_BUTTONS_AND_TEXT_MENU",
+  "widget": "checkbox",
+  "order": 22
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": null,
+  "section": "STATIC_SCREENS",
+  "key": "DEATH_SCRN_SIZE",
+  "widget": "radio",
+  "order": 23
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": null,
+  "section": "STATIC_SCREENS",
+  "key": "END_SLIDE_SIZE",
+  "widget": "radio",
+  "order": 24
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": null,
+  "section": "STATIC_SCREENS",
+  "key": "HELP_SCRN_SIZE",
+  "widget": "radio",
+  "order": 25
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Scaling",
+  "frame": null,
+  "section": "STATIC_SCREENS",
+  "key": "SPLASH_SCRN_SIZE",
+  "widget": "radio",
+  "order": 26
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Interface bar",
+  "section": "IFACE",
+  "key": "IFACE_BAR_MODE",
+  "widget": "radio",
+  "order": 27
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Interface bar",
+  "section": "IFACE",
+  "key": "IFACE_BAR_SIDE_ART",
+  "widget": "dropdown",
+  "order": 28
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Interface bar",
+  "section": "IFACE",
+  "key": "IFACE_BAR_SIDES_ORI",
+  "widget": "dropdown",
+  "order": 29
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Interface bar",
+  "section": "IFACE",
+  "key": "IFACE_BAR_WIDTH",
+  "widget": "spin",
+  "order": 30
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Dialog and barter",
+  "section": "OTHER_SETTINGS",
+  "key": "DIALOG_SCRN_BACKGROUND",
+  "widget": "checkbox",
+  "order": 31
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Dialog and barter",
+  "section": "OTHER_SETTINGS",
+  "key": "DIALOG_SCRN_ART_FIX",
+  "widget": "checkbox",
+  "order": 32
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Dialog and barter",
+  "section": "OTHER_SETTINGS",
+  "key": "BARTER_PC_INV_DROP_FIX",
+  "widget": "checkbox",
+  "order": 33
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Dialog and barter",
+  "section": "INPUT",
+  "key": "SCROLLWHEEL_FOCUS_PRIMARY_MENU",
+  "widget": "checkbox",
+  "order": 34
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Alternate ammo metre",
+  "section": "IFACE",
+  "key": "ALTERNATE_AMMO_METRE",
+  "widget": "dropdown",
+  "order": 35
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Alternate ammo metre",
+  "section": "IFACE",
+  "key": "ALTERNATE_AMMO_LIGHT",
+  "widget": "qinput",
+  "order": 36
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Interface",
+  "frame": "Alternate ammo metre",
+  "section": "IFACE",
+  "key": "ALTERNATE_AMMO_DARK",
+  "widget": "qinput",
+  "order": 37
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Advanced",
+  "frame": null,
+  "section": "OTHER_SETTINGS",
+  "key": "CD_CHECK",
+  "widget": "checkbox",
+  "order": 38
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Advanced",
+  "frame": "Troubleshooting",
+  "section": "INPUT",
+  "key": "ALT_MOUSE_INPUT",
+  "widget": "checkbox",
+  "order": 39
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Advanced",
+  "frame": "Troubleshooting",
+  "section": "INPUT",
+  "key": "EXTRA_WIN_MSG_CHECKS",
+  "widget": "checkbox",
+  "order": 40
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Advanced",
+  "frame": "Troubleshooting",
+  "section": "OTHER_SETTINGS",
+  "key": "CPU_USAGE_FIX",
+  "widget": "checkbox",
+  "order": 41
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Advanced",
+  "frame": "Troubleshooting",
+  "section": "OTHER_SETTINGS",
+  "key": "FADE_TIME_RECALCULATE_ON_FADE",
+  "widget": "checkbox",
+  "order": 42
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "MAIN",
+  "key": "f2_res_dat",
+  "widget": "qinput",
+  "order": 43
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "MAIN",
+  "key": "f2_res_patches",
+  "widget": "qinput",
+  "order": 44
+ },
+ {
+  "file": "f2_res.ini",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "MAIN",
+  "key": "UAC_AWARE",
+  "widget": "checkbox",
+  "order": 45
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "brightness",
+  "widget": "slider",
+  "order": 0
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "game_difficulty",
+  "widget": "radio",
+  "order": 1
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "item_highlight",
+  "widget": "checkbox",
+  "order": 2
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "language_filter",
+  "widget": "checkbox",
+  "order": 3
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "mouse_sensitivity",
+  "widget": "slider",
+  "order": 4
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "running",
+  "widget": "checkbox",
+  "order": 5
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "subtitles",
+  "widget": "checkbox",
+  "order": 6
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "text_base_delay",
+  "widget": "slider",
+  "order": 7
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": null,
+  "section": "preferences",
+  "key": "text_line_delay",
+  "widget": "slider",
+  "order": 8
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": "Sound volume",
+  "section": "sound",
+  "key": "master_volume",
+  "widget": "slider",
+  "order": 9
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": "Sound volume",
+  "section": "sound",
+  "key": "music_volume",
+  "widget": "slider",
+  "order": 10
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": "Sound volume",
+  "section": "sound",
+  "key": "sndfx_volume",
+  "widget": "slider",
+  "order": 11
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Preferences",
+  "frame": "Sound volume",
+  "section": "sound",
+  "key": "speech_volume",
+  "widget": "slider",
+  "order": 12
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Combat",
+  "frame": null,
+  "section": "preferences",
+  "key": "combat_difficulty",
+  "widget": "radio",
+  "order": 13
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Combat",
+  "frame": "Speed",
+  "section": "preferences",
+  "key": "combat_speed",
+  "widget": "slider",
+  "order": 14
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Combat",
+  "frame": "Speed",
+  "section": "preferences",
+  "key": "player_speedup",
+  "widget": "checkbox",
+  "order": 15
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Combat",
+  "frame": null,
+  "section": "preferences",
+  "key": "combat_looks",
+  "widget": "checkbox",
+  "order": 16
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Combat",
+  "frame": null,
+  "section": "preferences",
+  "key": "combat_messages",
+  "widget": "radio",
+  "order": 17
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Combat",
+  "frame": null,
+  "section": "preferences",
+  "key": "combat_taunts",
+  "widget": "checkbox",
+  "order": 18
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Combat",
+  "frame": null,
+  "section": "preferences",
+  "key": "target_highlight",
+  "widget": "radio",
+  "order": 19
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Combat",
+  "frame": null,
+  "section": "preferences",
+  "key": "violence_level",
+  "widget": "dropdown",
+  "order": 20
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "art_cache_size",
+  "widget": "spin",
+  "order": 21
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "color_cycling",
+  "widget": "checkbox",
+  "order": 22
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "critter_dat",
+  "widget": "qinput",
+  "order": 23
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "critter_patches",
+  "widget": "qinput",
+  "order": 24
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "cycle_speed_factor",
+  "widget": "spin",
+  "order": 25
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "executable",
+  "widget": "qinput",
+  "order": 26
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "free_space",
+  "widget": "spin",
+  "order": 27
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "hashing",
+  "widget": "checkbox",
+  "order": 28
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "interrupt_walk",
+  "widget": "checkbox",
+  "order": 29
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "language",
+  "widget": "qinput",
+  "order": 30
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "master_dat",
+  "widget": "qinput",
+  "order": 31
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "master_patches",
+  "widget": "qinput",
+  "order": 32
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "scroll_lock",
+  "widget": "checkbox",
+  "order": 33
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "System",
+  "section": "system",
+  "key": "splash",
+  "widget": "spin",
+  "order": 34
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "music",
+  "widget": "checkbox",
+  "order": 35
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "sounds",
+  "widget": "checkbox",
+  "order": 36
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "speech",
+  "widget": "checkbox",
+  "order": 37
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "music_path1",
+  "widget": "qinput",
+  "order": 38
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "music_path2",
+  "widget": "qinput",
+  "order": 39
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "cache_size",
+  "widget": "spin",
+  "order": 40
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "device",
+  "widget": "dropdown",
+  "order": 41
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "dma",
+  "widget": "qinput",
+  "order": 42
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "initialize",
+  "widget": "checkbox",
+  "order": 43
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "irq",
+  "widget": "qinput",
+  "order": 44
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Advanced",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "port",
+  "widget": "qinput",
+  "order": 45
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Debug",
+  "frame": "Main",
+  "section": "debug",
+  "key": "output_map_data_info",
+  "widget": "checkbox",
+  "order": 46
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Debug",
+  "frame": "Main",
+  "section": "debug",
+  "key": "show_load_info",
+  "widget": "checkbox",
+  "order": 47
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Debug",
+  "frame": "Main",
+  "section": "debug",
+  "key": "show_script_messages",
+  "widget": "checkbox",
+  "order": 48
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Debug",
+  "frame": "Main",
+  "section": "debug",
+  "key": "show_tile_num",
+  "widget": "checkbox",
+  "order": 49
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Debug",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "debug",
+  "widget": "checkbox",
+  "order": 50
+ },
+ {
+  "file": "fallout2.cfg",
+  "tab": "Debug",
+  "frame": "Sound",
+  "section": "sound",
+  "key": "debug_sfxc",
+  "widget": "checkbox",
+  "order": 51
+ }
+]

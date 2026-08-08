@@ -1,0 +1,379 @@
+zax:
+  path: ddraw.ini
+  name: sfall
+
+Speed:
+  Enable:
+  SpeedMultiInitial:
+    name: Game speed, %
+    type: int
+    min: 1 # arbitrary
+    max: 10000 # arbitrary
+
+Graphics:
+  Mode:
+    display_type: dropdown
+    options:
+      - value: 0
+        name: 8 bit fullscreen
+      - value: 4
+        name: DX9 fullscreen
+      - value: 5
+        name: DX9 windowed
+      - value: 6
+        name: DX9 fullscreen windowed
+        desc: Resolution in HiRes config should be set to the same aspect ratio as your desktop resolution
+
+  GraphicsWidth:
+    desc: If set to 0, use Fallout's native resolution
+    type: int
+    min: 0
+    max: 3840
+  GraphicsHeight:
+    desc: If set to 0, use Fallout's native resolution
+    type: int
+    min: 0
+    max: 2160
+
+  GPUBlt:
+    name: Palette conversion
+    display_type: dropdown
+    options:
+      - value: 0
+        name: Automatic
+      - value: 1
+        name: GPU
+      - value: 2
+        name: CPU
+
+  AllowDShowMovies:
+    display_type: dropdown
+    name: Alternative movie formats
+    desc: Requires DX9 graphics mode
+    options:
+      - value: 0
+        name: Disabled
+      - value: 1
+        name: Search for AVI
+      - value: 2
+        name: Force AVI to fit the screen width
+
+  FadeMultiplier:
+    name: Fade time modifier, %
+    desc: Default is 100. Decrease/increase this value to speed up/slow down fade effects.
+    type: int
+    min: 20
+    max: 1000
+
+Interface:
+  ActionPointsBar:
+    name: Expand the number of action points displayed on the interface bar
+    desc: The minimum supported version of High Resolution Patch is 4.1.8
+
+  ExpandWorldMap:
+    display_type: dropdown
+    desc: Requires High Resolution Patch v4.1.8 and a new WORLDMAP.frm file in art\intrface\ (included in sfall.dat), The resolution of hi-res patch must be set to at least 890x720
+    options:
+      - value: 0
+        name: Disabled
+      - value: 1
+        name: Expanded world map interface
+      - value: 2
+        name: Skip correcting the position of entrance markers on town maps
+
+  WorldMapTravelMarkers:
+    name: Draw a dotted line while traveling on the world map (similar to Fallout 1)
+
+  WorldMapTerrainInfo:
+    name: Display terrain type
+    desc: Display terrain types when hovering the cursor over the player's marker on the world map
+
+Input:
+  UseScrollWheel:
+    name: Mouse scroll on inventory, barter, and loot screens
+  MiddleMouse:
+    name: Bind middle mouse button to keypress
+    type: dx_key
+  ReverseMouseButtons:
+    name: Reverse mouse buttons
+  ReloadWeaponKey:
+    name: Reload weapon key
+    desc: A key to press to reload your currently equipped weapon or use the active item
+    type: dx_key
+  ItemFastMoveKey:
+    name: Item fast move key
+    desc: A key to hold down to let you move/drop a whole stack of items at once without the 'Move Items' window
+    type: dx_key
+  FastMoveFromContainer:
+    name: Skip "Move Items" window
+    desc: When loooting items and not holding down "Item fast move key". Requires ItemFastMoveKey to be enabled.
+
+Misc:
+  WorldMapTimeMod:
+    name: Travel time modifier, %
+    desc: How fast in game time passes while you're moving around the map screen without affecting encounter rate. 100 is normal speed, 0 stops time from passing.
+    type: int
+    min: 0
+    max: 1000 # arbitrary
+  WorldMapFPSPatch:
+    name: Enable speed control
+    desc: Use the Fallout 1 code to control world map speed
+  WorldMapDelay2:
+    name: Move speed (delay), ms
+    desc: Higher values cause slower movement. Default is 66 milliseconds.
+    type: int
+    min: 0
+    max: 1000 # arbitrary
+  WorldMapEncounterFix:
+    name: Make encounter rate independent of travel speed
+  WorldMapEncounterRate:
+    name: Encounter rate (delay)
+    desc: Higher values cause slower encounter rate
+    type: int
+    min: 0 # arbitrary
+    max: 100 # arbitrary
+
+  UseFileSystemOverride:
+    name: Enable filesystem override functions
+    desc: Required by some mods. Don't change if you don't know what's this for.
+
+  DamageFormula:
+    name: Combat damage formula
+    display_type: dropdown
+    options:
+      - value: 0
+        name: Vanilla
+      - value: 1
+        name: Glovz
+      - value: 2
+        name: Glovz + Damage Multiplier tweak
+      - value: 5
+        name: Haenlomal's YAAM
+
+  NPCAutoLevel:
+    name: NPC auto level
+    desc: All NPC party members automatically level up as soon as the player reaches the requirements
+
+  SingleCore:
+    name: Single CPU core
+    desc: Force Fallout not to use multiple processor cores even if they are available
+
+  SaveInCombatFix:
+    name: Saving in combat
+    desc: Even with this option enabled, it is still not advisable to save in combat.
+    display_type: dropdown
+    options:
+      - value: 0
+        name: Allowed (unsafe)
+      - value: 1
+        name: Only at the start of your turn (safer)
+      - value: 2
+        name: Forbidden (safest)
+
+  DisplayKarmaChanges:
+    name: Show karma changes
+    desc: Get notification of karma changes in the notification window
+
+  PlayIdleAnimOnReload:
+    name: Play "idle" animation on reload
+    desc: Force the PC to play the idle animation when reloading their weapon
+
+  CorpseDeleteTime:
+    type: int
+    min: 0
+    max: 13
+    desc: Delay in days before deleting corpses on a map after you leave
+    name: Corpse delete time, days
+
+  ProcessorIdle:
+    type: int
+    min: -1
+    max: 30
+    name: CPU idle, ms
+    desc: |
+      Number of milliseconds to idle each input loop to prevent 100% CPU use
+      -1: disable
+       0: idle only if other processes are waiting for processor time
+       Other value: milliseconds
+
+  SkipOpeningMovies:
+    name: Skip opening movies and splash screen
+    display_type: dropdown
+    options:
+      - value: 0
+        name: don't skip
+      - value: 1
+        name: skip movies
+      - value: 2
+        name: skip movies and splash
+
+  ExtraSaveSlots:
+    name: Additional pages of save slots
+
+  AutoQuickSave:
+    name: Number of quick saves to autorotate
+    type: int
+    min: 1
+    max: 10
+  AutoQuickSavePage:
+    name: Quick save autorotation page
+    desc: Set to 0 to disable.
+    type: int
+    min: 0
+    max: 1000
+
+  SpeedInterfaceCounterAnims:
+    name: Speed up the HP/AC counter animations
+    display_type: dropdown
+    options:
+      - value: 0
+        name: disabled
+      - value: 1
+        name: speed up
+      - value: 2
+        name: instant
+      - value: 3
+        name: instant even when switching to other controlled critters in combat
+
+  DisplayBonusDamage:
+    name: Display extra damage from Bonus HtH/Ranged Damage perks
+
+  FastShotFix:
+    name: Fast Shot behaviour
+    display_type: dropdown
+    options:
+      - value: 0
+        name: -1 AP cost for ranged weapons, aimed attacks are disabled
+      - value: 1
+        name: Aimed attacks are enabled for melee/unarmed weapons and HtH attacks
+      - value: 2
+        name: -1 AP cost to melee/unarmed weapons and HtH attacks
+      - value: 3
+        name: -1 AP cost for all weapons, aimed attacks are disabled
+
+  SuperStimExploitFix:
+    name: Prevent super stim exploit
+    desc: Prevents exploit with using super stims on a critter who is at full health
+
+  InventoryApCost:
+    name: AP cost for accessing inventory in combat
+    type: int
+    min: 0
+    max: 20 # arbitrary
+  QuickPocketsApCostReduction:
+    name: Quick Pockets perk AP reduction
+    type: int
+    min: 0
+    max: 20 # arbitrary
+
+  ExplosionsEmitLight:
+    name: Explosions and projectiles emit light
+
+  CombatPanelAnimDelay:
+    name: Combat panel animation time
+    type: int
+    min: 0
+    max: 65535
+  DialogPanelAnimDelay:
+    name: Dialog panel animations time
+    type: int
+    min: 0
+    max: 255
+  PipboyTimeAnimDelay:
+    name: Pipboy alarm clock animations time
+    type: int
+    min: 0
+    max: 127
+
+  StackEmptyWeapons:
+    name: Stack empty identical weapons
+    desc: (no matter what type of ammo was loaded before)
+
+  ReloadReserve:
+    name: Inventory reload behaviour
+    type: int
+    min: -1
+    max: 1000
+    desc: |
+      Changes the way weapon reloading works when you drag ammo onto a weapon in the inventory
+      -1: disable (vanilla behavior with the 'Move Items' window)
+       0: use all the ammo boxes to reload
+       1 or more: reserve the specified amount of ammo boxes and use all the rest to reload
+      If the amount of ammo boxes in the inventory is less than or equal to the reserve, only one box will be used
+  ItemCounterDefaultMax:
+    name: Default item counter to maximum
+    desc: Start the counter in the 'Move Items' window with maximum number, except in the barter screen
+
+  EnableMusicInDialogue:
+    name: Leave the music playing in dialogue with talking heads
+
+  DontTurnOffSneakIfYouRun:
+    name: Don't turn of sneak if you run
+    desc: Prevent the player from running while sneaking without Silent Running perk
+
+  UseWalkDistance:
+    name: Max "use" walk distance
+    desc: Max distance at which the player will switch from running to walking when trying to use objects
+    type: int
+    min: 0
+    max: 3
+
+  ActiveGeigerMsgs:
+    name: Display messages about radiation for the active geiger counter
+
+  InstantWeaponEquip:
+    name: Skip weapon equip/unequip animations
+
+  NumbersInDialogue:
+    name: Display numbered dialogue options
+
+  WorldMapFontPatch:
+    name: Use Fallout's normal text font instead of DOS-like font on the world map
+
+  FullItemDescInBarter:
+    name: Full item description in barter
+    desc: Display full item description for weapon/ammo in the barter screen
+
+  DisplaySwiftLearnerExp:
+    name: Display Swift Learner XP
+    desc: Display experience points with the bonus from Swift Learner perk when gained from non-scripted situations
+
+  PartyMemberExtraInfo:
+    name: Extra info about party members
+    desc: Display party member's current level/AC/addict flag on the combat control panel
+
+  SkipLoadingGameSettings:
+    name: Global game settings
+    desc: Fallout 2 stores some game preferences in savegames. This allows to skip loading game settings from saved games and use the same settings from fallout2.cfg always.
+    display_type: dropdown
+    options:
+      - value: 0
+        name: Load from saves
+      - value: 1
+        name: Load only difficulty from saves
+      - value: 2
+        name: Use global (preferred)
+
+Debugging:
+  DebugMode:
+    display_type: dropdown
+    options:
+      - value: 0
+        name: disable
+      - value: 1
+        name: screen
+      - value: 2
+        name: debug.log
+      - value: 3
+        name: screen and debug.log
+
+  Init:
+    name: Sfall initialization
+  Hook:
+    name: Hook scripts
+  Script:
+    name: Scripting
+  Criticals:
+    name: Critical table
+  Fixes:
+    name: Engine fixes

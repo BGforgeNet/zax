@@ -1,0 +1,270 @@
+zax:
+  path: f2_res.ini
+  name: HiRes
+
+MAIN:
+  UAC_AWARE: # UAC aware always disabled, to avoid searching for ini
+  GRAPHICS_MODE:
+    name: Mode
+    display_type: dropdown
+    options:
+      - value: 0
+        name: Resolution only
+        desc: Required for sfall's Graphic modes
+      - value: 1
+        name: Direct Draw 7
+      - value: 2
+        name: DirectX9
+  SCALE_2X:
+    name: Scale x2
+  SCR_WIDTH:
+    name: Resolution X
+    type: int
+    min: 640
+    max: 3840
+  SCR_HEIGHT:
+    name: Resolution Y
+    type: int
+    min: 480
+    max: 2160
+  COLOUR_BITS:
+    name: Color depth
+    display_type: dropdown
+    options:
+      - value: 8
+        name: '8'
+      - value: 16
+        name: '16'
+      - value: 32
+        name: '32'
+  REFRESH_RATE:
+    name: Monitor refresh rate
+    desc: Set 0 for driver default
+    type: int
+    min: 0
+    max: 240
+  WINDOWED:
+    name: Window mode
+    display_type: radio
+    options:
+      - value: 0
+        name: Fullscreen
+      - value: 1
+        name: Windowed
+  # WIN_DATA: # some voodoo, not touching
+  f2_res_dat:
+    type: string
+  f2_res_patches:
+    type: string
+  WINDOWED_FULLSCREEN:
+    name: Windowed fullscreen
+    desc: Borderless window
+
+INPUT:
+  ALT_MOUSE_INPUT:
+    name: Alternative mouse input
+    desc: Alternate mouse input control built into the hi-res patch. Disable to allow Sfall's mouse input functions to work.
+  EXTRA_WIN_MSG_CHECKS:
+    name: Fix for "NOT RESPONDING" error
+    desc: Enables extra Windows msg checks. Prevents the "NOT RESPONDING" error that may occur in windowed mode.
+  SCROLLWHEEL_FOCUS_PRIMARY_MENU:
+    name: Mouse wheel controls PC's item list by default
+    desc: On Inventory, Barter, Loot screens etc., mouse wheel control default to the PC's item list unless the cursor is hovering over another list.
+
+EFFECTS:
+  IS_GRAY_SCALE:
+    name: Grayscale
+
+# HI_RES_PANEL:
+#   DISPLAY_LIST_DESCENDING: # useless
+
+MOVIES:
+  MOVIE_SIZE:
+    name: Movies
+    display_type: radio
+    options:
+      - value: 0
+        name: Original
+      - value: 1
+        name: Stretch
+      - value: 2
+        name: Fill
+
+MAPS:
+  EDGE_CLIPPING_ON:
+    name: Hide area beyond map edges
+  IGNORE_MAP_EDGES:
+    name: Ignore Hi-Res map scroll edges
+  IGNORE_PLAYER_SCROLL_LIMITS:
+    name: Ignore scroll limits
+  SCROLL_DIST_X:
+    name: Scroll limit X
+    type: string
+    min: 480
+  SCROLL_DIST_Y:
+    name: Scroll limit Y
+    type: string
+    min: 400
+  NumPathNodes:
+    name: Path finding range
+    desc: Relative to original (=1)
+    type: int
+    min: 1
+    max: 20
+  FOG_OF_WAR:
+    name: Enable
+  FOG_LIGHT_LEVEL:
+    name: Light level
+    type: int
+    min: 0
+    max: 10
+  # ZOOM_LEVEL: # these are from dev build?
+  # IS_ZOOM_BOUND_BY_EDGES:
+
+IFACE:
+  IFACE_BAR_MODE:
+    name: Map window position
+    display_type: radio
+    options:
+      - value: 0
+        name: On top
+      - value: 1
+        name: Overlaps
+  IFACE_BAR_SIDE_ART:
+    name: Art
+    display_type: dropdown
+    options:
+      - value: 0
+        name: None
+      - value: 1
+        name: Metal
+      - value: 2
+        name: Leather
+  IFACE_BAR_SIDES_ORI:
+    name: Orientation
+    display_type: dropdown
+    options:
+      - value: 0
+        name: From bar to screen edge
+      - value: 1
+        name: From screen edge to bar
+  IFACE_BAR_WIDTH:
+    name: Width
+    type: int
+    min: 640
+    max: 1920
+  ALTERNATE_AMMO_METRE:
+    name: Mode
+    desc: The following settings set the palette offsets of particular colours used when this is set to Single colour.
+    display_type: dropdown
+    options:
+      - value: 0
+        name: Disabled
+      - value: 1
+        name: Single colour
+      - value: 2
+        name: Changing colour
+      - value: 3
+        name: Coloured sections
+  ALTERNATE_AMMO_LIGHT:
+    name: Main color
+    type: string
+  ALTERNATE_AMMO_DARK:
+    name: Dark color
+    type: string
+
+MAINMENU:
+  MAIN_MENU_SIZE:
+    name: Main menu
+    display_type: radio
+    options:
+      - value: 0
+        name: Original
+      - value: 1
+        name: Stretch
+      - value: 2
+        name: Fill
+  USE_HIRES_IMAGES:
+    name: Enable
+  SCALE_BUTTONS_AND_TEXT_MENU:
+    name: Scale buttons and text menu
+  MENU_BG_OFFSET_X:
+    name: Offset X
+    desc: Distance in pixels from the top button to Menu Background Graphic edge.
+    type: int
+    min: -1024
+    max: 1024
+  MENU_BG_OFFSET_Y:
+    name: Offset Y
+    desc: Distance in pixels from the top button to Menu Background Graphic edge.
+    min: -1024
+    max: 1024
+    type: int
+
+STATIC_SCREENS:
+  DEATH_SCRN_SIZE:
+    name: Death screen
+    display_type: radio
+    options:
+      - value: 0
+        name: Original
+      - value: 1
+        name: Stretch
+      - value: 2
+        name: Fill
+  END_SLIDE_SIZE:
+    name: End slides
+    display_type: radio
+    options:
+      - value: 0
+        name: Original
+      - value: 1
+        name: Stretch
+      - value: 2
+        name: Fill
+  HELP_SCRN_SIZE:
+    name: Help screen
+    display_type: radio
+    options:
+      - value: 0
+        name: Original
+      - value: 1
+        name: Stretch
+      - value: 2
+        name: Fill
+  SPLASH_SCRN_SIZE:
+    name: Splash screen
+    display_type: radio
+    options:
+      - value: 0
+        name: Original
+      - value: 1
+        name: Stretch
+      - value: 2
+        name: Fill
+
+OTHER_SETTINGS:
+  CD_CHECK:
+    name: CD check
+  DIALOG_SCRN_BACKGROUND:
+    name: Hide Map and Interface bar while viewing the Dialog screen
+  DIALOG_SCRN_ART_FIX:
+    name: Enable Continuum's new Dialog screen graphic
+  SPLASH_SCRN_TIME:
+    name: Splash screen time
+    type: int
+    min: 0
+    max: 10 # just a random value, have to put something here
+  CPU_USAGE_FIX:
+    name: Reduce CPU usage by allowing the system to go idle
+    desc: Should not be enabled if Sfall's "ProcessorIdle" setting is also enabled as this will likly cause slowdowns
+  BARTER_PC_INV_DROP_FIX:
+    name: Fix mouse selection rect for the PC's inventory on the barter window
+  FADE_TIME_MODIFIER:
+    name: Fade time modifier
+    type: int
+    min: 0
+    max: 100 # just a random value, have to put something here
+  FADE_TIME_RECALCULATE_ON_FADE:
+    name: Recalculate fade time length each time a transitional fade occurs
+    desc: May be useful if the length of transitional fade effects seems to randomly change between game restarts
