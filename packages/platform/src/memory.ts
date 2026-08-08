@@ -20,6 +20,7 @@ import type {
   Paths,
   Platform,
   ProcessLauncher,
+  Registry,
 } from "./index.js";
 
 /** Bytes for a string, one byte per code point. Lossless for the latin1 config files, and ASCII is ASCII. */
@@ -69,6 +70,8 @@ export interface MemoryOptions {
   downloads?: Readonly<Record<string, string | Uint8Array>>;
   /** What `archive.extract` produces, by archive path: file contents keyed by path inside the archive. */
   archives?: Readonly<Record<string, Readonly<Record<string, string | Uint8Array>>>>;
+  /** Registry values, by key and then by value name. Both are matched case-insensitively, as Windows does. */
+  registry?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 export class MemoryPlatform implements Platform {
@@ -78,6 +81,7 @@ export class MemoryPlatform implements Platform {
   readonly process: ProcessLauncher;
   readonly net: Network;
   readonly archive: Archive;
+  readonly registry: Registry;
 
   /** Everything the outside world was asked to do, in the order it was asked. */
   readonly launched: Array<{ program: string; args: readonly string[]; options?: LaunchOptions }> = [];
@@ -135,6 +139,15 @@ export class MemoryPlatform implements Platform {
         return found;
       },
       write: async (path, data) => this.put(normalize(path), data),
+      append: async (path, data) => {
+        const at = normalize(path);
+        const before = this.files.get(at);
+        if (!before) return this.put(at, data);
+        const joined = new Uint8Array(before.length + data.length);
+        joined.set(before);
+        joined.set(data, before.length);
+        this.put(at, joined);
+      },
       stat: async (path) => this.statOf(normalize(path)),
       list: async (path) => this.listOf(normalize(path)),
       mkdir: async (path) => this.makeDirs(normalize(path)),
@@ -144,6 +157,18 @@ export class MemoryPlatform implements Platform {
         this.put(normalize(to), found);
       },
       remove: async (path) => this.removeAt(normalize(path)),
+    };
+
+    this.registry = {
+      read: async (key, value) => {
+        const wantedKey = key.toLowerCase();
+        for (const [name, values] of Object.entries(options.registry ?? {})) {
+          if (name.toLowerCase() !== wantedKey) continue;
+          const wantedValue = value.toLowerCase();
+          for (const [held, data] of Object.entries(values)) if (held.toLowerCase() === wantedValue) return data;
+        }
+        return null;
+      },
     };
 
     this.process = {

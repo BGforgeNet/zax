@@ -150,14 +150,86 @@ export function setAlias(installs: readonly Install[], path: string, alias: stri
 }
 
 /**
- * Where an unattended scan looks, relative to each drive on Windows and to the Wine prefix elsewhere. Data
- * rather than code so the platform layer decides how to walk it and the list stays reviewable.
+ * Where an unattended scan looks, relative to each drive on Windows and to the home directory or a Wine prefix
+ * elsewhere. Data rather than code so the platform layer decides how to walk it and the list stays reviewable.
+ *
+ * Every one of these is only a store's default, which the user is free to change - the launchers that record
+ * where the game actually went are asked separately, and this list is what is left: retail copies, installs made
+ * by hand, and machines whose launcher is not running or not installed.
  */
 export const SCAN_LOCATIONS: readonly string[] = [
+  // GOG's offline installers use the first; Galaxy does not put games there.
   "GOG Games/Fallout 2",
+  "Program Files (x86)/GOG Galaxy/Games/Fallout 2",
+  // Steam's first library. Every other library is found through `libraryfolders.vdf` instead.
+  "Program Files (x86)/Steam/steamapps/common/Fallout 2",
+  // Epic, which gave the game away for a week in 2024 and so put it in a great many libraries.
+  "Program Files/Epic Games/Fallout 2",
+  // The Xbox app writes into a directory nothing may modify until the user enables mod support for the game,
+  // at which point it moves it to one of these.
+  "XboxGames/Fallout 2/Content",
+  "Program Files/ModifiableWindowsApps/Fallout 2",
+  // Heroic and Lutris, which is how a Linux machine usually holds a GOG or Epic copy.
+  "Games/Heroic/Fallout 2",
   "Games/Fallout 2",
   "Games/Fallout2",
-  "Program Files (x86)/Steam/steamapps/common/Fallout 2",
+];
+
+/**
+ * Where the Steam client itself may be, relative to a root. Only a starting point: whichever of these exists
+ * names every library on the machine, including ones on other drives.
+ */
+export const STEAM_LOCATIONS: readonly string[] = [
+  "Program Files (x86)/Steam",
+  "Program Files/Steam",
+  "Steam",
+  "SteamLibrary",
+  ".steam/steam",
+  ".steam/root",
+  ".local/share/Steam",
+  ".var/app/com.valvesoftware.Steam/data/Steam",
+];
+
+/** Fallout 2 on Steam. Names the manifest that says which folder this machine's copy sits in. */
+export const STEAM_APP_ID = "38410";
+
+/** Epic's per-game manifests, relative to a root. Each names the directory that game was installed into. */
+export const EPIC_MANIFEST_DIRECTORY = "ProgramData/Epic/EpicGamesLauncher/Data/Manifests";
+
+/** Where Steam records its own location, for an install that is not under any of `STEAM_LOCATIONS`. */
+export const STEAM_REGISTRY_KEY = { key: "HKCU\\Software\\Valve\\Steam", value: "SteamPath" };
+
+/** Where Epic records the directory its `Manifests` folder sits in. */
+export const EPIC_REGISTRY_KEY = {
+  key: "HKLM\\SOFTWARE\\WOW6432Node\\Epic Games\\EpicGamesLauncher",
+  value: "AppDataPath",
+};
+
+/**
+ * Where GOG records an install's directory, one key per product. Two of them because the store sells Fallout 2
+ * as a pack: which id an install registers under depends on which product was installed, and asking for a key
+ * that is not there costs nothing.
+ */
+export const GOG_REGISTRY_KEYS: readonly string[] = [
+  "HKLM\\SOFTWARE\\WOW6432Node\\GOG.com\\Games\\1440166436",
+  "HKLM\\SOFTWARE\\WOW6432Node\\GOG.com\\Games\\1440151285",
+];
+
+/**
+ * Directories the shallow search does not descend into, lowercased. Each is either large enough to spend the
+ * whole budget on its own or somewhere no game is installed, and none of them is where a user puts one.
+ */
+export const UNSEARCHABLE_DIRECTORIES: readonly string[] = [
+  "windows",
+  "winsxs",
+  "$recycle.bin",
+  "system volume information",
+  "recovery",
+  "appdata",
+  "node_modules",
+  "proc",
+  "sys",
+  "dev",
 ];
 
 export type Theme = "light" | "dark" | "system";

@@ -2,10 +2,11 @@
  * The platform, on a real machine. This is the only module in the project that imports Node built-ins.
  */
 
-import { spawn } from "node:child_process";
-import { copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { promisify } from "node:util";
 import { Worker } from "node:worker_threads";
 import { zipSync } from "fflate";
 import type {
@@ -18,6 +19,7 @@ import type {
   Platform,
 } from "@zax/platform";
 import { userDirectories } from "./paths.js";
+import { registryValue } from "./registry.js";
 
 const APP_NAME = "zax";
 
@@ -51,6 +53,11 @@ function kindOf(entry: { isFile(): boolean; isDirectory(): boolean }): FileKind 
  */
 const EXTRACT_WORKER = new URL("./extract-worker.cjs", import.meta.url);
 
+/** A wedged `reg` must not hold the scan that asked; there is nothing here worth waiting seconds for. */
+const REGISTRY_TIMEOUT_MS = 5_000;
+
+const runProgram = promisify(execFile);
+
 export function nodePlatform(): Platform {
   const os = process.platform;
   const home = homedir();
@@ -70,6 +77,10 @@ export function nodePlatform(): Platform {
         const partial = `${path}.zax-partial`;
         await writeFile(partial, bytes);
         await rename(partial, path);
+      },
+      append: async (path, bytes) => {
+        await mkdir(dirname(path), { recursive: true });
+        await appendFile(path, bytes);
       },
       stat: async (path): Promise<FileStat | null> => {
         try {
@@ -116,6 +127,24 @@ export function nodePlatform(): Platform {
           child.once("error", reject);
         });
         child.unref();
+      },
+    },
+
+    registry: {
+      read: async (key, value) => {
+        // Nothing to read off Windows, and spawning `reg` elsewhere would either fail or find some other program
+        // of that name. The null is the answer, not a failure to get one.
+        if (os !== "win32") return null;
+        try {
+          const { stdout } = await runProgram("reg", ["query", key, "/v", value], {
+            timeout: REGISTRY_TIMEOUT_MS,
+            windowsHide: true,
+          });
+          return registryValue(stdout, value);
+        } catch {
+          // `reg` exits non-zero for a key that is not there, which is the common case rather than a fault.
+          return null;
+        }
       },
     },
 

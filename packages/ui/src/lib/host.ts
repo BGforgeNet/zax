@@ -57,6 +57,9 @@ export const previewPlatform: Platform = (() => {
     fs: memory.fs,
     paths: memory.paths,
     archive: memory.archive,
+    // Answers nothing, which is the truth rather than a refusal: a browser has no registry, and "no such key"
+    // is what a scan does with every machine that has none of these launchers.
+    registry: memory.registry,
     // Nothing here can be simulated honestly: a recorded launch and an invented release both read as success.
     process: { launch: refuses, open: refuses },
     net: { fetchText: refuses, download: refuses },

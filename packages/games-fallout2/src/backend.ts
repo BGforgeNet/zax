@@ -117,7 +117,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     loadConfigFiles: (installPath) => loadConfigFiles(platform, installPath, [...CONFIG_FILES]),
     saveConfigFiles: (request) => saveConfigFiles(platform, request),
     identifyInstall: (path) => identifyInstall(platform, path),
-    scanForInstalls: (known) => scanForInstalls(platform, known),
+    scanForInstalls: (known) => scanForInstalls(platform, known, new Date()),
 
     installedSfallVersion: (install) => installedSfallVersion(platform, install),
     latestSfall: () => latestSfall(platform),

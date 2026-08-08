@@ -17,6 +17,7 @@ export {
 } from "./install.js";
 export { identifyInstall, scanForInstalls, scanRoots } from "./discovery.js";
 export { backupDirectory, debugDirectory, logFile, packageDirectory, temporaryDirectory } from "./directories.js";
+export { appendLog } from "./log.js";
 export { copyTree, listFilesRecursively } from "./fs.js";
 export { mergeIni, type MergeConflict, type MergeOutcome } from "./ini-merge.js";
 export { stamp } from "./stamp.js";

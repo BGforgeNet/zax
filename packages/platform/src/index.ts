@@ -32,6 +32,11 @@ export interface FileSystem {
   read(path: string): Promise<Uint8Array>;
   /** Creates parent directories as needed, so a caller never has to order the two calls. */
   write(path: string, bytes: Uint8Array): Promise<void>;
+  /**
+   * Adds to the end of a file, creating it and its parents when absent. Separate from `write` because the log is
+   * appended to a line at a time, and rewriting it whole per line makes its cost grow with its length.
+   */
+  append(path: string, bytes: Uint8Array): Promise<void>;
   /** Null rather than a rejection when the path does not exist - absence is an ordinary answer here. */
   stat(path: string): Promise<FileStat | null>;
   /** Rejects when the path is not a directory. */
@@ -93,6 +98,22 @@ export interface Archive {
   createZip(destination: string, entries: readonly ArchiveEntry[]): Promise<void>;
 }
 
+/**
+ * The Windows registry, which is where the launchers record what they installed and where. Part of the seam
+ * rather than a shell-out because reading it needs a program's output, and `ProcessLauncher` deliberately does
+ * not offer that - it starts things that outlive the call.
+ *
+ * Present on every platform and answering null off Windows, so a caller asks the same question everywhere
+ * instead of branching on the operating system before every read.
+ */
+export interface Registry {
+  /**
+   * A value under a key, or null when the key, the value or the registry itself is not there. Absence is the
+   * ordinary answer here: most machines have none of the keys ZAX asks about.
+   */
+  read(key: string, value: string): Promise<string | null>;
+}
+
 export interface Platform {
   readonly os: OperatingSystem;
   readonly fs: FileSystem;
@@ -100,4 +121,5 @@ export interface Platform {
   readonly process: ProcessLauncher;
   readonly net: Network;
   readonly archive: Archive;
+  readonly registry: Registry;
 }

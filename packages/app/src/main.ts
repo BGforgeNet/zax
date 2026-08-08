@@ -4,10 +4,9 @@
  */
 
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
-import { appendFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { logFile } from "@zax/core";
+import { appendLog } from "@zax/core";
 import { BACKEND_METHODS, createBackend, type Backend } from "@zax/fallout2";
 import { nodePlatform } from "@zax/platform-node";
 import { CHANNEL } from "./channel.js";
@@ -18,17 +17,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const DEV_SERVER = process.env["ZAX_DEV_SERVER"];
 
 const platform = nodePlatform();
-const LOG = logFile(platform);
 
 /** One line per event, in the file the interface's "open log" button points at. */
-async function logLine(text: string): Promise<void> {
-  try {
-    await mkdir(dirname(LOG), { recursive: true });
-    await appendFile(LOG, `${new Date().toISOString()} ${text}\n`);
-  } catch {
-    // Logging must never take the process down with it; there is nowhere left to report its own failure.
-  }
-}
+const logLine = (text: string): Promise<void> => appendLog(platform, text, new Date());
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? (error.stack ?? error.message) : String(error);
