@@ -22,21 +22,8 @@ export { mergeIni, type MergeConflict, type MergeOutcome } from "./ini-merge.js"
 export { stamp } from "./stamp.js";
 export { latestZax, type ZaxRelease } from "./updates.js";
 export { compareVersions } from "./version.js";
-export {
-  EMPTY_STATE,
-  ZAX_FILE_NAME,
-  loadState,
-  saveState,
-  type AppState,
-  type LoadedState,
-} from "./state.js";
-export {
-  EMPTY_ZAX_FILE,
-  formatZaxFile,
-  parseZaxFile,
-  type StoredInstall,
-  type ZaxFile,
-} from "./zax-file.js";
+export { EMPTY_STATE, ZAX_FILE_NAME, loadState, saveState, type AppState, type LoadedState } from "./state.js";
+export { EMPTY_ZAX_FILE, formatZaxFile, parseZaxFile, type StoredInstall, type ZaxFile } from "./zax-file.js";
 export {
   loadConfigFiles,
   saveConfigFiles,

@@ -130,7 +130,13 @@
           {/if}
         </div>
         {#if store.installMatches}
-          <button class="found" onclick={() => { store.settingsTab = "install"; store.query = ""; }}>Install</button>
+          <button
+            class="found"
+            onclick={() => {
+              store.settingsTab = "install";
+              store.query = "";
+            }}>Install</button
+          >
           <InstallPanel />
         {/if}
         {#each store.results as r, i (r.def.id)}
@@ -288,5 +294,4 @@
     color: var(--accent);
     text-decoration: underline;
   }
-
 </style>

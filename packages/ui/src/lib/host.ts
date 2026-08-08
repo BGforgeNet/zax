@@ -83,8 +83,7 @@ const supplied = typeof window === "undefined" ? undefined : window.zax;
 
 export const hostKind: HostKind = supplied ? "desktop" : "preview";
 // No picker in a browser, and a made-up path would name a folder nobody has.
-export const backend: Backend =
-  supplied ?? copyingArguments(createBackend(previewPlatform, { chooseFolder: refuses }));
+export const backend: Backend = supplied ?? copyingArguments(createBackend(previewPlatform, { chooseFolder: refuses }));
 
 /** True where an operation that leaves this page - a launch, a version check - cannot run. */
 export const isPreview = hostKind === "preview";

@@ -44,7 +44,10 @@ describe("round-trip", () => {
     // written in a legacy codepage. Decoding those as UTF-8 is irreversible, so the guard is synthesized.
     const bytes = Uint8Array.from([
       ...Buffer.from("[sound]\r\nmusic_path1=C:\\", "latin1"),
-      0xc8, 0xe3, 0xf0, 0xfb, // cp1251 for a Cyrillic directory name
+      0xc8,
+      0xe3,
+      0xf0,
+      0xfb, // cp1251 for a Cyrillic directory name
       ...Buffer.from("\\music\r\n", "latin1"),
     ]);
     const doc = IniDocument.parseBytes(bytes);
@@ -52,7 +55,9 @@ describe("round-trip", () => {
 
     // The high bytes survive an unrelated edit to the same file.
     doc.set("sound", "music_path2", "data/sound/music/");
-    expect(Buffer.from(doc.toBytes()).subarray(0, bytes.length - 2)).toEqual(Buffer.from(bytes).subarray(0, bytes.length - 2));
+    expect(Buffer.from(doc.toBytes()).subarray(0, bytes.length - 2)).toEqual(
+      Buffer.from(bytes).subarray(0, bytes.length - 2),
+    );
   });
 });
 

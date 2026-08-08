@@ -36,7 +36,9 @@ describe("reading zax.yml", () => {
   });
 
   it("drops Wine fields that are present but empty", () => {
-    expect(parseZaxFile("games:\n- path: /a\n  wine_prefix: ''\n  wine_debug: ''\n").installs).toEqual([{ path: "/a" }]);
+    expect(parseZaxFile("games:\n- path: /a\n  wine_prefix: ''\n  wine_debug: ''\n").installs).toEqual([
+      { path: "/a" },
+    ]);
   });
 
   it("throws when the YAML itself will not parse, rather than reporting an empty list", () => {

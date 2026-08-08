@@ -330,9 +330,7 @@ describe("a config file the install does not have", () => {
     await store.start();
 
     expect(store.hasFile("f2_res.ini")).toBe(false);
-    expect(store.isModified(PINNED), "a pinned value for an absent file would be written on the next save").toBe(
-      false,
-    );
+    expect(store.isModified(PINNED), "a pinned value for an absent file would be written on the next save").toBe(false);
     expect(store.modifiedCount, "nothing else is pending either").toBe(0);
   });
 });

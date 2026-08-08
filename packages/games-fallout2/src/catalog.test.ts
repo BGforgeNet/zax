@@ -75,12 +75,23 @@ describe("catalog", () => {
     // unit anywhere else would be an inference presented as a measurement - a fade duration labelled "%" was
     // exactly that.
     const stated = new Set([
-      "hires.main.refresh-rate", "hires.main.scr-width", "hires.main.scr-height", "hires.iface.iface-bar-width",
-      "sfall.graphics.graphicswidth", "sfall.graphics.graphicsheight", "sfall.speed.speedmultiinitial",
-      "sfall.graphics.fademultiplier", "sfall.misc.corpsedeletetime", "sfall.misc.processoridle",
-      "sfall.misc.worldmaptimemod", "sfall.misc.worldmapdelay2", "hires.other-settings.splash-scrn-time",
-      "hires.mainmenu.menu-bg-offset-x", "hires.mainmenu.menu-bg-offset-y",
-      "game.sound.cache-size", "game.system.art-cache-size",
+      "hires.main.refresh-rate",
+      "hires.main.scr-width",
+      "hires.main.scr-height",
+      "hires.iface.iface-bar-width",
+      "sfall.graphics.graphicswidth",
+      "sfall.graphics.graphicsheight",
+      "sfall.speed.speedmultiinitial",
+      "sfall.graphics.fademultiplier",
+      "sfall.misc.corpsedeletetime",
+      "sfall.misc.processoridle",
+      "sfall.misc.worldmaptimemod",
+      "sfall.misc.worldmapdelay2",
+      "hires.other-settings.splash-scrn-time",
+      "hires.mainmenu.menu-bg-offset-x",
+      "hires.mainmenu.menu-bg-offset-y",
+      "game.sound.cache-size",
+      "game.system.art-cache-size",
     ]);
     for (const s of SETTINGS) {
       if (s.kind.type !== "int" && s.kind.type !== "float") continue;
@@ -189,7 +200,10 @@ describe("gating rules", () => {
       expect(named.length, `${s.id} names no values`).toBeGreaterThan(0);
       for (const v of named) {
         if (controller.kind.type === "choice") {
-          expect(controller.kind.options.map((o) => o.value), `${s.id} <- ${v}`).toContain(v);
+          expect(
+            controller.kind.options.map((o) => o.value),
+            `${s.id} <- ${v}`,
+          ).toContain(v);
         }
         if (controller.kind.type === "bool") {
           expect([controller.kind.onValue, controller.kind.offValue], `${s.id} <- ${v}`).toContain(v);
@@ -263,4 +277,3 @@ describe("managed values", () => {
     expect(doc.get("MAIN", "UAC_AWARE")).toBe("1");
   });
 });
-

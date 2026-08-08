@@ -20,7 +20,6 @@
     else root.setAttribute("data-theme", store.theme);
   });
 
-
   // Ctrl/Cmd-F opens the tab that lists every setting and focuses its filter; the browser's own find would
   // search the rendered tab only. F2 renames the selected install, at the window rather than on the row.
   function onWindowKey(event: KeyboardEvent) {
@@ -39,7 +38,6 @@
 <div class="shell">
   <header class="top">
     <div class="brand">ZAX <span class="version">{VERSION}</span></div>
-
 
     <div class="spacer"></div>
 
@@ -141,7 +139,6 @@
     font-weight: 400;
     font-size: 12px;
   }
-
 
   .spacer {
     flex: 1;

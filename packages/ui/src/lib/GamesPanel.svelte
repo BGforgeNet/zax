@@ -84,11 +84,7 @@
         submit();
       }}
     >
-      <input
-        aria-label="Path to the game folder"
-        placeholder="Path to the game folder"
-        bind:value={candidate}
-      />
+      <input aria-label="Path to the game folder" placeholder="Path to the game folder" bind:value={candidate} />
       <div class="buttons">
         <button type="submit" disabled={candidate.trim() === ""}>Add</button>
         <!-- The picker belongs to the desktop shell; typing a path is what a browser is left with. -->

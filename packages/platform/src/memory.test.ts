@@ -81,7 +81,9 @@ describe("memory platform", () => {
   });
 
   it("extracts an archive into real files", async () => {
-    const platform = new MemoryPlatform({ archives: { "/tmp/sfall.7z": { "ddraw.dll": "MZ", "ddraw.ini": "[Main]" } } });
+    const platform = new MemoryPlatform({
+      archives: { "/tmp/sfall.7z": { "ddraw.dll": "MZ", "ddraw.ini": "[Main]" } },
+    });
     await platform.archive.extract("/tmp/sfall.7z", "/tmp/out");
     expect(platform.textAt("/tmp/out/ddraw.dll")).toBe("MZ");
     expect(platform.textAt("/tmp/out/ddraw.ini")).toBe("[Main]");

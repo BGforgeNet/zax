@@ -8,9 +8,7 @@
   // The previous interface offered a shorter list once 2x scaling was on, because scaling doubles the rendered
   // size and the smaller modes no longer fit.
   const scaled = $derived(store.valueOf("hires.main.scale-2x") === "1");
-  const options = $derived(
-    COMMON_RESOLUTIONS.filter((r) => !scaled || (r.width >= 1280 && r.height >= 960)),
-  );
+  const options = $derived(COMMON_RESOLUTIONS.filter((r) => !scaled || (r.width >= 1280 && r.height >= 960)));
 
   function choose(value: string) {
     if (value === "") return;

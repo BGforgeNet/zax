@@ -23,7 +23,13 @@ describe("matchesQuery", () => {
   it("matches choice option labels", () => {
     const d = def({
       label: "Window mode",
-      kind: { type: "choice", options: [{ value: "0", label: "Fullscreen" }, { value: "1", label: "Windowed" }] },
+      kind: {
+        type: "choice",
+        options: [
+          { value: "0", label: "Fullscreen" },
+          { value: "1", label: "Windowed" },
+        ],
+      },
     });
     expect(matchesQuery(d, "fullscreen")).toBe(true);
   });

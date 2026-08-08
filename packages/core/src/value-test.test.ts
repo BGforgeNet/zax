@@ -3,8 +3,12 @@ import { describeValueTest, matchesValueTest } from "./catalog.js";
 import type { SettingDef } from "./catalog.js";
 
 const def = (kind: SettingDef["kind"], label = "Controller"): SettingDef => ({
-  id: "x", file: "ddraw.ini", section: "Graphics", key: "Mode",
-  kind, label,
+  id: "x",
+  file: "ddraw.ini",
+  section: "Graphics",
+  key: "Mode",
+  kind,
+  label,
 });
 
 const mode = def({

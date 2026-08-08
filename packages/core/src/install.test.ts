@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  addInstall,
-  detectGameType,
-  displayName,
-  removeInstall,
-  setAlias,
-  withWine,
-  type Install,
-} from "./install.js";
+import { addInstall, detectGameType, displayName, removeInstall, setAlias, withWine, type Install } from "./install.js";
 
 const at = (path: string): Install => ({ path, type: "fallout2" });
 

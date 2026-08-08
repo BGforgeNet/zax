@@ -20,7 +20,6 @@ export const temporaryDirectory = (platform: Platform): string => platform.paths
  * what makes changing version again cost an extract rather than a download. Genuinely a cache: everything here
  * can be fetched again, which is why emptying it is offered.
  */
-export const packageDirectory = (platform: Platform): string =>
-  platform.paths.join(platform.paths.cache, "packages");
+export const packageDirectory = (platform: Platform): string => platform.paths.join(platform.paths.cache, "packages");
 
 export const logFile = (platform: Platform): string => platform.paths.join(platform.paths.cache, "zax.log");

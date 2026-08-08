@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { MemoryPlatform } from "@zax/platform/memory";
 import { library } from "./pe-fixture.js";
-import { installedSfallVersion, latestSfall, listSfallVersions, releaseUrl, sfallPackage, updateSfall } from "./sfall.js";
+import {
+  installedSfallVersion,
+  latestSfall,
+  listSfallVersions,
+  releaseUrl,
+  sfallPackage,
+  updateSfall,
+} from "./sfall.js";
 import type { Install } from "@zax/core";
 
 const INSTALL: Install = { path: "/games/one", type: "fallout2" };

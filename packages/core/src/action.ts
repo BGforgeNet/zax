@@ -4,7 +4,6 @@
  * writes to.
  */
 
-
 /**
  * Where an action is offered. Declared on the action rather than listed by the panel that shows it: a panel
  * holding its own list of ids silently drops any action added afterwards, which is how one of these came to

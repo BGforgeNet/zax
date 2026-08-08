@@ -42,9 +42,7 @@ describe("scanning", () => {
 
   it("finds an install at a known location under the home directory", async () => {
     const platform = new MemoryPlatform({ home: "/home/t", files: install("/home/t/GOG Games/Fallout 2", "upu.dat") });
-    expect(await scanForInstalls(platform, [])).toEqual([
-      { path: "/home/t/GOG Games/Fallout 2", type: "fallout2upu" },
-    ]);
+    expect(await scanForInstalls(platform, [])).toEqual([{ path: "/home/t/GOG Games/Fallout 2", type: "fallout2upu" }]);
   });
 
   it("finds an install inside the Wine prefix, which is where a Windows build lives", async () => {

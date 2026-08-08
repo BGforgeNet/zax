@@ -26,11 +26,11 @@ export async function latestZax(platform: Platform): Promise<ZaxRelease> {
   if (version === "") throw new Error("The release feed did not name a version.");
 
   const assets = Array.isArray(body.assets) ? body.assets : [];
-  const named = assets
-    .filter((asset): asset is { name: string; browser_download_url: string } =>
+  const named = assets.filter(
+    (asset): asset is { name: string; browser_download_url: string } =>
       typeof (asset as { name?: unknown }).name === "string" &&
       typeof (asset as { browser_download_url?: unknown }).browser_download_url === "string",
-    );
+  );
 
   // One build per platform, told apart by extension: the Windows one is an .exe and the other is not.
   const windows = platform.os === "windows";

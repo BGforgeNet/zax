@@ -3,8 +3,12 @@ import { validate } from "./validate.js";
 import type { SettingDef } from "./catalog.js";
 
 const def = (kind: SettingDef["kind"]): SettingDef => ({
-  id: "x", file: "ddraw.ini", section: "Graphics", key: "GraphicsWidth",
-  kind, label: "Graphics width",
+  id: "x",
+  file: "ddraw.ini",
+  section: "Graphics",
+  key: "GraphicsWidth",
+  kind,
+  label: "Graphics width",
 });
 
 describe("numeric sanitization", () => {
@@ -39,7 +43,13 @@ describe("numeric sanitization", () => {
 
 describe("choice and scale", () => {
   it("rejects a value outside the declared options", () => {
-    const mode = def({ type: "choice", options: [{ value: "0", label: "Off" }, { value: "4", label: "DX9" }] });
+    const mode = def({
+      type: "choice",
+      options: [
+        { value: "0", label: "Off" },
+        { value: "4", label: "DX9" },
+      ],
+    });
     expect(validate(mode, "4").ok).toBe(true);
     expect(validate(mode, "9").ok).toBe(false);
   });

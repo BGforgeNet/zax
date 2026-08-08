@@ -28,7 +28,9 @@
 
 <div class="missing" role="status">
   <span>
-    {file === "f2_res.ini" ? hires : (WHAT[file] ?? "This file is not in the game folder, so its settings cannot be edited.")}
+    {file === "f2_res.ini"
+      ? hires
+      : (WHAT[file] ?? "This file is not in the game folder, so its settings cannot be edited.")}
   </span>
   {#if file === "ddraw.ini"}
     <button

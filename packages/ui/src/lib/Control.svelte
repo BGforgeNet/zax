@@ -61,9 +61,9 @@
     {/each}
   </div>
 {:else if def.kind.type === "choice"}
-  <select value={value} onchange={(e) => store.set(def.id, e.currentTarget.value)} aria-label={def.label}>
+  <select {value} onchange={(e) => store.set(def.id, e.currentTarget.value)} aria-label={def.label}>
     {#if !def.kind.options.some((o) => o.value === value)}
-      <option value={value}>{value === "" ? "(unset)" : value}</option>
+      <option {value}>{value === "" ? "(unset)" : value}</option>
     {/if}
     {#each def.kind.options as option (option.value)}
       <option value={option.value} title={option.help ?? ""}>{option.label}</option>
@@ -86,7 +86,8 @@
       oninput={(e) => store.set(def.id, format(Number(e.currentTarget.value), kind.type))}
     />
     <!-- Rounded for reading; the file keeps whatever precision it already had until the slider is moved. -->
-    <span class="readout">{Number.isFinite(now) ? round(now, kind.type) : value}{kind.unit ? ` ${kind.unit}` : ""}</span>
+    <span class="readout">{Number.isFinite(now) ? round(now, kind.type) : value}{kind.unit ? ` ${kind.unit}` : ""}</span
+    >
   </div>
 {:else if def.kind.type === "scale"}
   {@const max = def.kind.max}
@@ -109,7 +110,7 @@
     <input
       type="number"
       class="num"
-      value={value}
+      {value}
       min={kind.min}
       max={kind.max}
       placeholder="default"
@@ -133,7 +134,7 @@
     type="text"
     class="text"
     class:path={def.kind.type === "text" && def.kind.path}
-    value={value}
+    {value}
     placeholder="default"
     aria-label={def.label}
     oninput={(e) => store.set(def.id, e.currentTarget.value)}

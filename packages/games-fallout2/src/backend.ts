@@ -85,7 +85,6 @@ export interface Backend {
   wipe(which: OwnDirectory): Promise<void>;
 }
 
-
 /**
  * What only the window's own shell can do. Kept out of the platform interface because it is not a capability of
  * the machine but of whatever is presenting the interface, and a browser has none.
@@ -96,7 +95,11 @@ export interface Shell {
 
 export function createBackend(platform: Platform, shell: Shell): Backend {
   const own = (which: OwnDirectory) =>
-    which === "backup" ? backupDirectory(platform) : which === "debug" ? debugDirectory(platform) : packageDirectory(platform);
+    which === "backup"
+      ? backupDirectory(platform)
+      : which === "debug"
+        ? debugDirectory(platform)
+        : packageDirectory(platform);
 
   return {
     chooseFolder: () => shell.chooseFolder(),

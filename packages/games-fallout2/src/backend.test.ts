@@ -105,7 +105,8 @@ describe("the operations", () => {
 });
 
 /** A compile-time check that the list is exactly the interface's keys, not merely a subset of them. */
-const _covers: Record<keyof Backend, true> = Object.fromEntries(
-  BACKEND_METHODS.map((name) => [name, true]),
-) as Record<keyof Backend, true>;
+const _covers: Record<keyof Backend, true> = Object.fromEntries(BACKEND_METHODS.map((name) => [name, true])) as Record<
+  keyof Backend,
+  true
+>;
 void _covers;

@@ -50,14 +50,7 @@ describe("choosing what to attach", () => {
 describe("creating the package", () => {
   it("collects the configs, the library and the logs, and leaves the game data out", async () => {
     const contents = await packaged(installed({ "/games/one/sfall-log.txt": "log" }));
-    expect(contents).toEqual([
-      "ddraw.dll",
-      "debug.log",
-      "f2_res.ini",
-      "fallout2.cfg",
-      "game.txt",
-      "sfall-log.txt",
-    ]);
+    expect(contents).toEqual(["ddraw.dll", "debug.log", "f2_res.ini", "fallout2.cfg", "game.txt", "sfall-log.txt"]);
   });
 
   it("writes the archive under the debug directory, named for when it was made", async () => {

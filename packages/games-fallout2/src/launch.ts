@@ -32,7 +32,10 @@ export function planLaunch(os: OperatingSystem, install: Install, sfallVersion: 
   const overrides =
     sfallVersion === null
       ? {}
-      : { WINEDLLOVERRIDES: compareVersions(sfallVersion, NATIVE_AND_BUILTIN_FROM) < 0 ? "ddraw.dll=n" : "ddraw.dll=n,b" };
+      : {
+          WINEDLLOVERRIDES:
+            compareVersions(sfallVersion, NATIVE_AND_BUILTIN_FROM) < 0 ? "ddraw.dll=n" : "ddraw.dll=n,b",
+        };
 
   return {
     program: "wine",

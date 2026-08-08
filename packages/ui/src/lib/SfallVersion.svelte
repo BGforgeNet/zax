@@ -43,13 +43,19 @@
       </button>
       <button
         disabled={!store.sfallOutdated || store.busy !== null}
-        title={store.sfallOutdated ? "Replace the installed sfall, keeping your settings" : "Nothing newer has been found"}
+        title={store.sfallOutdated
+          ? "Replace the installed sfall, keeping your settings"
+          : "Nothing newer has been found"}
         onclick={() => void store.updateSfall()}
       >
         Update
       </button>
       <!-- Going back matters as much as going forward: mods pin particular sfall versions. -->
-      <button disabled={isPreview || !store.install || store.busy !== null} title={isPreview ? OUTSIDE : null} onclick={open}>
+      <button
+        disabled={isPreview || !store.install || store.busy !== null}
+        title={isPreview ? OUTSIDE : null}
+        onclick={open}
+      >
         Change version
       </button>
     </span>
@@ -75,8 +81,8 @@
           <button onclick={() => (changing = false)}>Cancel</button>
         </span>
         <span class="help">
-          Files a newer release added are left in place. Settings are merged against what the installed version
-          shipped, so defaults you never changed follow the release you move to.
+          Files a newer release added are left in place. Settings are merged against what the installed version shipped,
+          so defaults you never changed follow the release you move to.
         </span>
       </span>
     {/if}

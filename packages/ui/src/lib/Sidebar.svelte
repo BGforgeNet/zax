@@ -12,12 +12,7 @@
 <aside class="sidebar">
   <div class="tabbar">
     <div class="tabs" role="tablist">
-      <button
-        role="tab"
-        class="tab"
-        aria-selected={store.panel === "games"}
-        onclick={() => (store.panel = "games")}
-      >
+      <button role="tab" class="tab" aria-selected={store.panel === "games"} onclick={() => (store.panel = "games")}>
         Games
         <span class="count">{store.installs.length}</span>
       </button>

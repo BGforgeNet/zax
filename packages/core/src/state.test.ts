@@ -77,7 +77,11 @@ describe("saving application state", () => {
 
   it("does not write the detected type, which is read from the directory each time", async () => {
     const platform = new MemoryPlatform({ home: "/home/t" });
-    await saveState(platform, { installs: [{ path: "/games/one", type: "fallout2rpu" }], unavailable: [], theme: "system" });
+    await saveState(platform, {
+      installs: [{ path: "/games/one", type: "fallout2rpu" }],
+      unavailable: [],
+      theme: "system",
+    });
     expect(platform.textAt(`${CONFIG}/zax.yml`)).not.toContain("fallout2rpu");
   });
 

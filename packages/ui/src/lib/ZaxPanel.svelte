@@ -21,7 +21,11 @@
     {#if store.zaxLatest}<strong>{store.zaxLatest}</strong>{:else}<span class="unknown">not checked</span>{/if}
   </p>
   <div class="buttons">
-    <button disabled={isPreview || store.busy !== null} title={isPreview ? OUTSIDE : null} onclick={() => void store.checkZaxVersion()}>
+    <button
+      disabled={isPreview || store.busy !== null}
+      title={isPreview ? OUTSIDE : null}
+      onclick={() => void store.checkZaxVersion()}
+    >
       Check
     </button>
     <!-- ZAX does not replace its own running binary; the release page is where the new one comes from. -->
