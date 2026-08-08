@@ -55,6 +55,10 @@ linux:
     - tar.gz
   category: Utility
   synopsis: Configuration and mod manager for Fallout 2
+  # Names the installed entry after `desktopName` in package.json, which is also what Electron reports as its
+  # app_id - a desktop that cannot match the two shows a running window as a second, unnamed application. This
+  # becomes the default in electron-builder 27.
+  syncDesktopName: true
 
 mac:
   target:
