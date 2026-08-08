@@ -11,6 +11,7 @@
     "check": "tsc -p tsconfig.json && pnpm --filter @zax/ui exec svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
+    "verify:chokidar": "node scripts/verify-chokidar.mjs",
     "desktop": "pnpm --filter @zax/app build && pnpm --filter @zax/app start"
   },
   "devDependencies": {
