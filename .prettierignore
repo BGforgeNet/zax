@@ -1,0 +1,10 @@
+# Generated modules keep their generator's one-setting-per-line output; reformatting them is churn the next
+# regeneration undoes. They stay linted - only formatting is excluded.
+packages/games-fallout2/src/catalog.ts
+packages/games-fallout2/src/layout.ts
+# Machine-emitted extraction snapshots, and format definitions kept byte-identical to their python-branch source.
+scripts/gen/layout.json
+scripts/gen/py-layout.json
+scripts/gen/formats/
+pnpm-lock.yaml
+.work/
