@@ -33,6 +33,7 @@ import {
 import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
 import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
+import { installedHiresVersion } from "./hires.js";
 import { planLaunch } from "./launch.js";
 import {
   installedSfallVersion,
@@ -74,6 +75,8 @@ export interface Backend {
   latestSfall(): Promise<SfallRelease>;
   updateSfall(install: Install, version: string): Promise<SfallUpdate>;
   listSfallVersions(): Promise<readonly string[]>;
+  /** Read only: nothing here installs the hi-res patch, so this reports what is there and stops. */
+  installedHiresVersion(install: Install): Promise<string | null>;
   latestZax(): Promise<ZaxRelease>;
   listSaves(install: Install): Promise<readonly string[]>;
   createDebugPackage(install: Install, saves: readonly string[]): Promise<DebugPackage>;
@@ -117,6 +120,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     latestSfall: () => latestSfall(platform),
     updateSfall: (install, version) => updateSfall(platform, install, version),
     listSfallVersions: () => listSfallVersions(platform),
+    installedHiresVersion: (install) => installedHiresVersion(platform, install),
     latestZax: () => latestZax(platform),
 
     listSaves: (install) => listSaves(platform, install),

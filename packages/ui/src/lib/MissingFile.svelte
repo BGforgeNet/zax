@@ -14,14 +14,22 @@
   */
   const WHAT: Record<string, string> = {
     "ddraw.ini": "sfall is not installed, so these settings are not in effect and cannot be edited.",
-    "f2_res.ini":
-      "The High Resolution Patch is not installed, so these settings are not in effect and cannot be edited.",
     "fallout2.cfg": "The game has not written its configuration file yet. It does that the first time it runs.",
   };
+
+  // The patch's own library is what says whether it is there, so a config file missing beside an installed
+  // patch is a different situation from one missing because nothing installed it.
+  const hires = $derived(
+    store.hiresInstalled
+      ? `The High Resolution Patch ${store.hiresInstalled} is installed, but its f2_res.ini is not in the game folder.`
+      : "The High Resolution Patch is not installed, so these settings are not in effect and cannot be edited.",
+  );
 </script>
 
 <div class="missing" role="status">
-  <span>{WHAT[file] ?? "This file is not in the game folder, so its settings cannot be edited."}</span>
+  <span>
+    {file === "f2_res.ini" ? hires : (WHAT[file] ?? "This file is not in the game folder, so its settings cannot be edited.")}
+  </span>
   {#if file === "ddraw.ini"}
     <button
       disabled={isPreview || store.busy !== null}

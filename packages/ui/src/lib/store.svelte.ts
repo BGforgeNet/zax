@@ -148,6 +148,8 @@ class Store {
 
   sfallInstalled = $state<string | null>(null);
   sfallLatest = $state<SfallRelease | null>(null);
+  /** The hi-res patch's version, or null when the install does not have it. There is no latest to compare. */
+  hiresInstalled = $state<string | null>(null);
   zaxLatest = $state<string | null>(null);
 
   /**
@@ -205,10 +207,11 @@ class Store {
     this.loaded = true;
   }
 
-  /** Rereads the selected install: its config files and which sfall it has. */
+  /** Rereads the selected install: its config files and which sfall and hi-res patch it has. */
   private async readInstall(): Promise<void> {
     const install = this.install;
     this.sfallInstalled = null;
+    this.hiresInstalled = null;
     if (!install) {
       this.contents = {};
       this.index();
@@ -219,6 +222,7 @@ class Store {
     this.index();
     this.overrides = this.managedOverrides();
     this.sfallInstalled = await backend.installedSfallVersion(install);
+    this.hiresInstalled = await backend.installedHiresVersion(install);
   }
 
   /** Runs one outward-facing operation, reporting whatever it fails with rather than swallowing it. */

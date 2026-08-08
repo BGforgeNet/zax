@@ -2,6 +2,7 @@
   import { LAYOUT, SETTINGS } from "@zax/fallout2";
   import BugReportPanel from "./BugReportPanel.svelte";
   import FixesPanel from "./FixesPanel.svelte";
+  import HiresVersion from "./HiresVersion.svelte";
   import LayoutNodes from "./LayoutNodes.svelte";
   import SettingRow from "./SettingRow.svelte";
   import InstallPanel from "./InstallPanel.svelte";
@@ -148,6 +149,14 @@
         <!-- The settings stay on screen when their file is absent; the rows themselves refuse input. -->
         {#if store.install && !store.hasFile(file.file)}
           <MissingFile file={file.file} />
+        {/if}
+        <!--
+          The hi-res patch's version, which the previous interface never showed and so has no place in the
+          generated layout. It goes where sfall's does - the top of the file's first tab - rather than above
+          every tab, and only once there is an f2_res.ini to say anything about.
+        -->
+        {#if file.file === "f2_res.ini" && tab === file.tabs[0]?.title && store.hasFile(file.file)}
+          <HiresVersion />
         {/if}
         <LayoutNodes {items} />
       {:else if store.settingsTab === "trouble"}

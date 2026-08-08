@@ -25,6 +25,7 @@ export const BACKEND_METHODS = [
   "latestSfall",
   "updateSfall",
   "listSfallVersions",
+  "installedHiresVersion",
   "latestZax",
   "listSaves",
   "createDebugPackage",

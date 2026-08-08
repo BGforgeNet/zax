@@ -20,8 +20,7 @@ import {
 } from "@zax/core";
 import type { Install } from "@zax/core";
 import type { Platform } from "@zax/platform";
-import { NtExecutable, NtExecutableResource } from "pe-library";
-import { Resource } from "resedit";
+import { installedLibraryVersion } from "./pe-version.js";
 
 /** sfall is a DirectDraw wrapper: it ships as this DLL, and its version is the DLL's own. */
 export const SFALL_LIBRARY = "ddraw.dll";
@@ -55,32 +54,9 @@ export async function listSfallVersions(platform: Platform): Promise<readonly st
   return [...seen].sort((a, b) => compareVersions(b, a));
 }
 
-/**
- * The version recorded in the DLL's own resources, or null when the file is not a PE image with one - which is
- * also the answer for an install with no sfall at all. The caller reports "unknown" rather than guessing.
- */
-export function readSfallVersion(library: Uint8Array): string | null {
-  try {
-    const image = library.buffer.slice(library.byteOffset, library.byteOffset + library.byteLength) as ArrayBuffer;
-    const resources = NtExecutableResource.from(NtExecutable.from(image, { ignoreCert: true }));
-    for (const info of Resource.VersionInfo.fromEntries(resources.entries)) {
-      for (const language of info.getAllLanguagesForStringValues()) {
-        const version = info.getStringValues(language)["FileVersion"];
-        if (version) return version.trim();
-      }
-    }
-    return null;
-  } catch {
-    // A file that is not a PE image, or one without a version resource. Either way there is nothing to report.
-    return null;
-  }
-}
-
 /** The installed version, or null when the install has no sfall. */
-export async function installedSfallVersion(platform: Platform, install: Install): Promise<string | null> {
-  const path = platform.paths.join(install.path, SFALL_LIBRARY);
-  if ((await platform.fs.stat(path))?.kind !== "file") return null;
-  return readSfallVersion(await platform.fs.read(path));
+export function installedSfallVersion(platform: Platform, install: Install): Promise<string | null> {
+  return installedLibraryVersion(platform, install, SFALL_LIBRARY);
 }
 
 /**

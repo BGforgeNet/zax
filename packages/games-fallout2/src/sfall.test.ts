@@ -1,69 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { MemoryPlatform } from "@zax/platform/memory";
-import { NtExecutable, NtExecutableResource } from "pe-library";
-import { Resource } from "resedit";
-import {
-  installedSfallVersion,
-  latestSfall,
-  listSfallVersions,
-  readSfallVersion,
-  releaseUrl,
-  sfallPackage,
-  updateSfall,
-} from "./sfall.js";
+import { library } from "./pe-fixture.js";
+import { installedSfallVersion, latestSfall, listSfallVersions, releaseUrl, sfallPackage, updateSfall } from "./sfall.js";
 import type { Install } from "@zax/core";
-
-/**
- * A PE32 image carrying nothing but a version resource. Built here rather than vendored because a real
- * `ddraw.dll` is nearly a megabyte, and what the reader has to get right is the resource, not the code.
- */
-function library(values: Record<string, string>): Uint8Array {
-  const stub = new ArrayBuffer(0x400);
-  const view = new DataView(stub);
-  const bytes = new Uint8Array(stub);
-  bytes.set([0x4d, 0x5a]); // MZ
-  view.setUint32(0x3c, 0x80, true); // where the PE header starts
-  const pe = 0x80;
-  bytes.set([0x50, 0x45, 0, 0], pe); // PE\0\0
-  view.setUint16(pe + 4, 0x014c, true); // i386
-  view.setUint16(pe + 20, 224, true); // size of the PE32 optional header
-  view.setUint16(pe + 22, 0x2102, true); // a 32-bit executable DLL
-  const optional = pe + 24;
-  view.setUint16(optional, 0x10b, true); // PE32
-  view.setUint32(optional + 28, 0x1000, true); // base of code
-  view.setUint32(optional + 32, 0x10000000, true); // image base
-  view.setUint32(optional + 36, 0x1000, true); // section alignment
-  view.setUint32(optional + 40, 0x200, true); // file alignment
-  view.setUint32(optional + 56, 0x2000, true); // size of image
-  view.setUint32(optional + 60, 0x400, true); // size of headers
-  view.setUint16(optional + 68, 2, true); // GUI subsystem
-  view.setUint32(optional + 92, 16, true); // number of data directories
-
-  const image = NtExecutable.from(stub, { ignoreCert: true });
-  const resources = NtExecutableResource.from(image);
-  const info = Resource.VersionInfo.createEmpty();
-  info.setStringValues({ lang: 1033, codepage: 0 }, values);
-  info.outputToResourceEntries(resources.entries);
-  resources.outputResource(image);
-  return new Uint8Array(image.generate());
-}
 
 const INSTALL: Install = { path: "/games/one", type: "fallout2" };
 const FEED = "https://sourceforge.net/projects/sfall/best_release.json";
 
 describe("reading the installed version", () => {
-  it("reads it from the library's own version resource", () => {
-    expect(readSfallVersion(library({ FileVersion: "4.5", ProductName: "sfall" }))).toBe("4.5");
-  });
-
-  it("reports nothing for a file that is not a library at all", () => {
-    expect(readSfallVersion(new TextEncoder().encode("this is not a DLL"))).toBeNull();
-  });
-
-  it("reports nothing for a library that records no version", () => {
-    expect(readSfallVersion(library({ ProductName: "something else" }))).toBeNull();
-  });
-
   it("reports nothing for an install with no sfall, which is a normal install", async () => {
     const platform = new MemoryPlatform({ files: { "/games/one/fallout2.exe": "MZ" } });
     expect(await installedSfallVersion(platform, INSTALL)).toBeNull();
