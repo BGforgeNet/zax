@@ -3,6 +3,7 @@
  */
 
 import { execFile, spawn } from "node:child_process";
+import { statSync } from "node:fs";
 import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -18,7 +19,7 @@ import type {
   OperatingSystem,
   Platform,
 } from "@zax/platform";
-import { userDirectories } from "./paths.js";
+import { applicationDirectories } from "./paths.js";
 import { registryValue } from "./registry.js";
 
 const APP_NAME = "zax";
@@ -58,10 +59,19 @@ const REGISTRY_TIMEOUT_MS = 5_000;
 
 const runProgram = promisify(execFile);
 
+/** Synchronous because it decides where this process reads its own settings from, before anything else runs. */
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 export function nodePlatform(): Platform {
   const os = process.platform;
   const home = homedir();
-  const { config, cache } = userDirectories(os, process.env, home, APP_NAME);
+  const { config, cache } = applicationDirectories(os, process.env, home, APP_NAME, process.execPath, isDirectory);
 
   return {
     os: operatingSystem(os),

@@ -59,7 +59,9 @@ await new Promise((resolve, reject) => {
   const child = spawn(
     "pnpm",
     ["--filter", "@zax/ui", "exec", "vite", "build", "--outDir", join(dist, "renderer"), "--emptyOutDir"],
-    { stdio: "inherit", cwd: join(here, "../..") },
+    // On Windows pnpm is a `.cmd`, which `spawn` cannot execute without a shell - it looks for an extensionless
+    // file and fails with ENOENT. The arguments here are fixed, so a shell adds no injection surface.
+    { stdio: "inherit", cwd: join(here, "../.."), shell: process.platform === "win32" },
   );
   child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`The interface build exited with ${code}`))));
   child.on("error", reject);

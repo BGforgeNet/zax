@@ -1,6 +1,6 @@
 # ZAX
 
-[![Build status](https://github.com/BGforgeNet/ZAX/workflows/build/badge.svg)](https://github.com/BGforgeNet/ZAX/actions?query=workflow%3Abuild) <a href="#"><img align="right" src="https://raw.githubusercontent.com/BGforgeNet/zax/master/docs/zax.png" width="45%" alt="ZAX screenshot" title="ZAX screenshot"/></a>
+[![CI status](https://github.com/BGforgeNet/zax/actions/workflows/ci.yml/badge.svg)](https://github.com/BGforgeNet/zax/actions/workflows/ci.yml) <a href="#"><img align="right" src="https://raw.githubusercontent.com/BGforgeNet/zax/master/docs/zax.png" width="45%" alt="ZAX screenshot" title="ZAX screenshot"/></a>
 [![Patreon](https://img.shields.io/badge/Patreon-donate-FF424D?logo=Patreon&labelColor=141518)](https://www.patreon.com/BGforge)
 
 [![Telegram](https://img.shields.io/badge/telegram-join%20%20%20%20%E2%9D%B1%E2%9D%B1%E2%9D%B1-darkorange?logo=telegram)](https://t.me/bgforge)
@@ -27,4 +27,5 @@ Download `zax.exe` from the [latest release page](https://github.com/BGforgeNet/
 ### Info
 
 - [Forums](https://forums.bgforge.net/viewforum.php?f=34)
+- [Building](docs/building.md)
 - [Changelog](docs/changelog.md)

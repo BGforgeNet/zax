@@ -2,6 +2,11 @@ node_modules/
 dist/
 tmp/
 
+# The distributables electron-builder writes. A portable copy's `data` directory sits beside its executable, so
+# one made from a checkout lands under here or under node_modules, and needs no pattern of its own - which is
+# just as well, since `data` is what a Fallout install calls its own content directory.
+release/
+
 # Scratch: the extraction scripts and fetched upstream sources the catalog generators read.
 .work/
 

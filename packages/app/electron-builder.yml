@@ -1,0 +1,62 @@
+# What a distributable copy of ZAX is made of.
+#
+# Every target here is portable: there is no installer, because there is nothing to install. ZAX has no file
+# associations, no protocol handler, no service and nothing needing administrator rights - it edits files in a
+# game folder the user points it at. An installer would buy a start menu entry and an uninstall record, and cost
+# a privileged step and a machine the user cannot carry on a stick.
+
+appId: net.bgforge.zax
+productName: ZAX
+# Without this the binary is named after the package - `@zax/app` sanitised into `@zaxapp`, which is what a user
+# would see in a process list and on a launcher.
+executableName: zax
+
+directories:
+  buildResources: build
+  output: release
+
+# An include pattern replaces the default rather than adding to it, so this is the whole list. `package.json` and
+# the production dependency graph are included regardless - which is why the workspace packages sit in
+# devDependencies: esbuild bundles them into `dist`, and as production dependencies they would ship a second,
+# dead copy of their TypeScript sources.
+files:
+  - dist/**
+  - package.json
+
+# Both of these are reached by path at runtime rather than imported, and a path inside the archive is not a path
+# the operating system can open: the worker is started with `new Worker(url)`, and 7z-wasm loads its `.wasm` from
+# beside its own module. Left packed, both fail only when a user first extracts an archive.
+asarUnpack:
+  - "**/node_modules/7z-wasm/**"
+  - "**/extract-worker.cjs"
+
+# Nothing here is a native module - the one piece of native code is WebAssembly, which needs no rebuild.
+npmRebuild: false
+
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+
+win:
+  # `zip` is the one that genuinely runs in place; `portable` is a single executable that unpacks itself into a
+  # temporary directory on first launch, which is as close to one file as an application carrying Chromium gets.
+  target:
+    - zip
+    - portable
+
+portable:
+  # Keyed to the version rather than to each launch, so a copy unpacks once and starts immediately after that.
+  unpackDirName: ZAX-${version}
+  requestExecutionLevel: user
+
+linux:
+  # An AppImage is the only genuinely single file of the three: the kernel mounts it in place rather than
+  # unpacking it anywhere.
+  target:
+    - AppImage
+    - tar.gz
+  category: Utility
+  synopsis: Configuration and mod manager for Fallout 2
+
+mac:
+  target:
+    - zip
+  category: public.app-category.utilities

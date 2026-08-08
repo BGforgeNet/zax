@@ -5,6 +5,9 @@ packages:
 allowBuilds:
   esbuild: true
   electron: true
+  # Reached through electron-builder, and only used by its Squirrel.Windows target. Nothing here builds an
+  # installer of any kind, so the Squirrel binary its install script downloads would never be run.
+  electron-winstaller: false
 
 # Anything not named above that wants a lifecycle script fails the install rather than being skipped with a
 # warning, so granting one stays a decision somebody made.
@@ -13,6 +16,13 @@ strictDepBuilds: true
 # Refuses a version whose trust evidence - provenance, signing - is weaker than an earlier release's, which is
 # what a publish from a stolen credential looks like.
 trustPolicy: no-downgrade
+
+# semver backported a ReDoS fix to its 5.x and 6.x lines on 2023-07-10, three days after 7.5.4 shipped with
+# provenance, so the old lines read as a downgrade of a package that never had it. Pinned to those exact
+# versions rather than the package, so a semver published without provenance tomorrow still fails.
+trustPolicyExclude:
+  - semver@5.7.2
+  - semver@6.3.1
 
 # svelte-check asks for chokidar ^4.0.1, whose 4.0.2 and 4.0.3 were hand-published without provenance and will
 # never be re-released; 5.0.0 restores it. Its one break is being ESM-only, which svelte-check loads fine.

@@ -31,3 +31,44 @@ jobs:
       # The chokidar override puts svelte-check on a major its authors do not test against, and only watch mode
       # loads it - which the single-pass `pnpm check` above never enters.
       - run: pnpm verify:chokidar
+
+  # Packaging is its own gate: the tests run the sources, and none of them would notice a file left out of the
+  # archive, a path that only resolves in a checkout, or a target that stopped building on one platform. Three
+  # runners because each produces a distributable only that platform can make.
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.electron-builder-cache
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.4.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: pnpm
+      # The Electron runtime is a 130-200 MB download per platform, and it changes only when the pin does.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/.electron-builder-cache
+          key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # Unlike the verify job this one runs install scripts: esbuild's binary is what builds the shell.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @zax/app package
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zax-${{ runner.os }}
+          # Named rather than a wildcard, so electron-builder's own metadata files stay out and a target that
+          # silently stopped producing anything fails the step instead of uploading nothing.
+          path: |
+            packages/app/release/*.zip
+            packages/app/release/*.exe
+            packages/app/release/*.AppImage
+            packages/app/release/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
