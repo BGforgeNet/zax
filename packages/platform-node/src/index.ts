@@ -3,11 +3,11 @@
  */
 
 import { spawn } from "node:child_process";
-import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { Worker } from "node:worker_threads";
 import { zipSync } from "fflate";
-import SevenZip from "7z-wasm";
 import type {
   ArchiveEntry,
   DirEntry,
@@ -20,6 +20,9 @@ import type {
 import { userDirectories } from "./paths.js";
 
 const APP_NAME = "zax";
+
+/** A hung mirror without this leaves the interface's busy state stuck with no failure to show. */
+const FETCH_TIMEOUT_MS = 30_000;
 
 function operatingSystem(os: NodeJS.Platform): OperatingSystem {
   if (os === "win32") return "windows";
@@ -39,15 +42,14 @@ function kindOf(entry: { isFile(): boolean; isDirectory(): boolean }): FileKind 
 }
 
 /**
- * 7-Zip compiled to WebAssembly, loaded on first use. sfall ships its releases as `.7z` and nothing in Node
- * reads that format; a WebAssembly build keeps this to one portable artifact rather than a native binary per
- * platform that then has to survive being packaged.
+ * 7-Zip compiled to WebAssembly - sfall ships its releases as `.7z` and nothing in Node reads that format; a
+ * WebAssembly build keeps this to one portable artifact rather than a native binary per platform that then has
+ * to survive being packaged. It runs in a worker because its `callMain` is synchronous CPU work: on the
+ * Electron main process it would stall IPC and window events for the whole extraction. A fresh worker per call
+ * trades a moment of WASM instantiation for never sharing mutable emscripten filesystem state between runs.
+ * The worker is a plain `.cjs` file loaded by path; the app's build step copies it beside the bundle.
  */
-let sevenZip: Promise<Awaited<ReturnType<typeof SevenZip>>> | undefined;
-function loadSevenZip() {
-  sevenZip ??= SevenZip({ print: () => {}, printErr: () => {} });
-  return sevenZip;
-}
+const EXTRACT_WORKER = new URL("./extract-worker.cjs", import.meta.url);
 
 export function nodePlatform(): Platform {
   const os = process.platform;
@@ -63,7 +65,11 @@ export function nodePlatform(): Platform {
       read: (path) => readFile(path),
       write: async (path, bytes) => {
         await mkdir(dirname(path), { recursive: true });
-        await writeFile(path, bytes);
+        // Written beside the target and renamed over it: a crash mid-write must not leave a truncated file,
+        // because one of these files is the user's install list.
+        const partial = `${path}.zax-partial`;
+        await writeFile(partial, bytes);
+        await rename(partial, path);
       },
       stat: async (path): Promise<FileStat | null> => {
         try {
@@ -115,12 +121,12 @@ export function nodePlatform(): Platform {
 
     net: {
       fetchText: async (url) => {
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
         if (!response.ok) throw new Error(`${url} returned ${response.status} ${response.statusText}`);
         return response.text();
       },
       download: async (url, destination) => {
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
         if (!response.ok) throw new Error(`${url} returned ${response.status} ${response.statusText}`);
         await mkdir(dirname(destination), { recursive: true });
         await writeFile(destination, new Uint8Array(await response.arrayBuffer()));
@@ -130,27 +136,15 @@ export function nodePlatform(): Platform {
     archive: {
       extract: async (archive, destination) => {
         await mkdir(destination, { recursive: true });
-        const sz = await loadSevenZip();
-        // Both sides are mounted as host directories rather than copied through the WebAssembly heap, so a
-        // large archive does not have to fit in memory twice.
-        const inside = "/zax-in";
-        const outside = "/zax-out";
-        sz.FS.mkdir(inside);
-        sz.FS.mkdir(outside);
-        sz.FS.mount(sz.NODEFS, { root: dirname(archive) }, inside);
-        sz.FS.mount(sz.NODEFS, { root: destination }, outside);
-        try {
-          sz.FS.chdir(outside);
-          // Emscripten's `callMain` returns the program's exit status; 7z-wasm's declaration says `void`.
-          const code = sz.callMain(["x", `${inside}/${basename(archive)}`, "-y"]) as unknown as number;
-          if (code !== 0) throw new Error(`Could not extract ${archive}: 7-Zip exited with ${code}`);
-        } finally {
-          sz.FS.chdir("/");
-          sz.FS.unmount(inside);
-          sz.FS.unmount(outside);
-          sz.FS.rmdir(inside);
-          sz.FS.rmdir(outside);
-        }
+        const worker = new Worker(EXTRACT_WORKER, { workerData: { archive, destination } });
+        // Resolve-once: whichever of the three arrives first decides, and the rest fall on a settled promise.
+        const outcome = await new Promise<{ code: number } | { error: string }>((resolve) => {
+          worker.once("message", resolve);
+          worker.once("error", (error) => resolve({ error: error instanceof Error ? error.message : String(error) }));
+          worker.once("exit", (status) => resolve({ error: `the extraction worker exited with ${status}` }));
+        }).finally(() => void worker.terminate());
+        if ("error" in outcome) throw new Error(`Could not extract ${archive}: ${outcome.error}`);
+        if (outcome.code !== 0) throw new Error(`Could not extract ${archive}: 7-Zip exited with ${outcome.code}`);
       },
 
       createZip: async (destination, entries: readonly ArchiveEntry[]) => {

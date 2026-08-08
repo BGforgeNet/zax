@@ -233,7 +233,8 @@ class Store {
     try {
       this.notice = await work();
     } catch (error) {
-      this.notice = { kind: "problem", text: `${what} failed: ${(error as Error).message}` };
+      const reason = error instanceof Error ? error.message : String(error);
+      this.notice = { kind: "problem", text: `${what} failed: ${reason}` };
     } finally {
       this.busy = null;
     }

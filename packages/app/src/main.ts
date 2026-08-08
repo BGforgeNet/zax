@@ -4,8 +4,10 @@
  */
 
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { appendFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { logFile } from "@zax/core";
 import { BACKEND_METHODS, createBackend, type Backend } from "@zax/fallout2";
 import { nodePlatform } from "@zax/platform-node";
 import { CHANNEL } from "./channel.js";
@@ -15,13 +17,39 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** Where the interface is served from: the built files beside this one, or the dev server when one is given. */
 const DEV_SERVER = process.env["ZAX_DEV_SERVER"];
 
+const platform = nodePlatform();
+const LOG = logFile(platform);
+
+/** One line per event, in the file the interface's "open log" button points at. */
+async function logLine(text: string): Promise<void> {
+  try {
+    await mkdir(dirname(LOG), { recursive: true });
+    await appendFile(LOG, `${new Date().toISOString()} ${text}\n`);
+  } catch {
+    // Logging must never take the process down with it; there is nowhere left to report its own failure.
+  }
+}
+
+const describeError = (error: unknown): string =>
+  error instanceof Error ? (error.stack ?? error.message) : String(error);
+
+// A crash with no window leaves nothing to read; these lines are the only trace a bug report can carry.
+process.on("uncaughtException", (error) => void logLine(`uncaught: ${describeError(error)}`));
+process.on("unhandledRejection", (reason) => void logLine(`unhandled rejection: ${describeError(reason)}`));
+
 function register(backend: Backend): void {
   const callable = backend as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
   ipcMain.handle(CHANNEL, async (_event, method: string, args: unknown[]) => {
     // Only the named operations, and only by exact name: a renderer asking for anything else gets an error
     // rather than a lookup on the object's prototype.
     if (!(BACKEND_METHODS as readonly string[]).includes(method)) throw new Error(`Unknown operation: ${method}`);
-    return callable[method]!(...args);
+    try {
+      return await callable[method]!(...args);
+    } catch (error) {
+      // The renderer's notice shows the message; the log keeps the stack, which the notice cannot carry.
+      void logLine(`${method} failed: ${describeError(error)}`);
+      throw error;
+    }
   });
 }
 
@@ -82,7 +110,7 @@ else {
   });
 
   void app.whenReady().then(() => {
-    register(createBackend(nodePlatform(), { chooseFolder }));
+    register(createBackend(platform, { chooseFolder }));
     createWindow();
     // macOS keeps the application running with no windows; clicking the dock icon opens one again.
     app.on("activate", () => {

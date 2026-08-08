@@ -50,7 +50,11 @@ export function releaseUrl(version: string): string {
 export async function listSfallVersions(platform: Platform): Promise<readonly string[]> {
   const feed = await platform.net.fetchText(RELEASE_LIST);
   const seen = new Set<string>();
-  for (const match of feed.matchAll(/sfall_(\d[^< "]*?)\.7z/g)) if (match[1]) seen.add(match[1]);
+  for (const match of feed.matchAll(/sfall_(\d[^< "]*?)\.7z/g)) {
+    // The name comes out of a feed; the shape check keeps a crafted entry from ever becoming a path segment
+    // in `sfallPackage`.
+    if (match[1] && /^\d[\d.a-z]*$/i.test(match[1])) seen.add(match[1]);
+  }
   return [...seen].sort((a, b) => compareVersions(b, a));
 }
 
@@ -68,7 +72,11 @@ export async function latestSfall(platform: Platform): Promise<SfallRelease> {
   const release = (body as { release?: { filename?: unknown; url?: unknown } }).release;
   const filename = typeof release?.filename === "string" ? release.filename : "";
   const url = typeof release?.url === "string" ? release.url : "";
-  const version = filename.split("_").pop()?.replace(/\.[^.]+$/, "") ?? "";
+  const version =
+    filename
+      .split("_")
+      .pop()
+      ?.replace(/\.[^.]+$/, "") ?? "";
   if (version === "" || url === "") throw new Error("The sfall release feed did not name a release.");
   return { version, url };
 }

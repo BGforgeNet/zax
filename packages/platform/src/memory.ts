@@ -1,7 +1,8 @@
 /**
  * The platform, in memory. Domain tests run against this so they exercise the real code paths without a
  * filesystem, a network or a child process, and so a failing test names a domain defect rather than a fixture
- * that was not cleaned up.
+ * that was not cleaned up. It is also the production platform of the browser preview, which seeds one with
+ * bundled fixtures and refuses the operations a browser cannot perform.
  *
  * Everything the outside world would have done is recorded instead: launches, downloads, opened paths and
  * archives written. Asserting on those records is how a test checks an effect that has no return value.

@@ -47,7 +47,8 @@ export async function loadState(platform: Platform): Promise<LoadedState> {
   try {
     stored = parseZaxFile(utf8.decode(await platform.fs.read(path)));
   } catch (error) {
-    return { state: EMPTY_STATE, problem: `${path} could not be read: ${(error as Error).message}` };
+    const reason = error instanceof Error ? error.message : String(error);
+    return { state: EMPTY_STATE, problem: `${path} could not be read: ${reason}` };
   }
 
   const installs: Install[] = [];

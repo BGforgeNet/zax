@@ -7,7 +7,7 @@
  */
 
 import { build } from "esbuild";
-import { rm, mkdir } from "node:fs/promises";
+import { copyFile, rm, mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -21,8 +21,10 @@ const dist = join(here, "dist");
 const common = {
   bundle: true,
   platform: "node",
-  target: "node22",
+  // The Node line Electron 43 embeds.
+  target: "node24",
   external: ["electron", "7z-wasm"],
+  sourcemap: true,
   logLevel: "warning",
 };
 
@@ -40,6 +42,10 @@ await build({
     js: "import { createRequire as zaxCreateRequire } from 'node:module';\nconst require = zaxCreateRequire(import.meta.url);",
   },
 });
+// The extraction worker is loaded by path at runtime rather than imported, so the bundler never sees it; it is
+// copied beside the bundle, where the main process's `new URL` resolution expects it.
+await copyFile(join(here, "../platform-node/src/extract-worker.cjs"), join(dist, "extract-worker.cjs"));
+
 // The preload bundles whole: a sandboxed one has no module resolution of its own. It imports only the list of
 // operation names, whose module has no runtime imports, so this stays a few lines.
 await build({

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GAME_TYPES, displayName } from "@zax/core";
+  import { GAME_TYPES } from "@zax/core";
   import { store } from "./store.svelte.js";
 
   // Written on commit rather than per keystroke: each write is a rewrite of the state file on disk.
