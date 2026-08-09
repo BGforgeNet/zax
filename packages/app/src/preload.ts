@@ -9,8 +9,8 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
-import { BACKEND_METHODS } from "@zax/fallout2/backend-methods";
-import type { Backend, OperationProgress } from "@zax/fallout2";
+import { fromMethods } from "@zax/fallout2/backend-methods";
+import type { OperationProgress } from "@zax/fallout2";
 import { CHANNEL, GLOBAL, PROGRESS_CHANNEL, PROGRESS_GLOBAL } from "./channel.js";
 
 /**
@@ -25,13 +25,11 @@ function unwrapped(error: unknown): Error {
   return new Error(cut ? text.slice(cut[0].length) : text);
 }
 
-const backend = Object.fromEntries(
-  BACKEND_METHODS.map((method) => [
-    method,
+const backend = fromMethods(
+  (method) =>
     (...args: unknown[]) =>
       ipcRenderer.invoke(CHANNEL, method, args).catch((error: unknown) => Promise.reject(unwrapped(error))),
-  ]),
-) as unknown as Backend;
+);
 
 contextBridge.exposeInMainWorld(GLOBAL, backend);
 

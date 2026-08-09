@@ -22,12 +22,12 @@ import {
 } from "@zax/core";
 import {
   ACTIONS,
-  BACKEND_METHODS,
   CONFIG_FILES,
   SETTINGS,
   describePlace,
   hiddenIds,
   placesById,
+  wrapMethods,
   type Backend,
   type MachineDescription,
   type OpenTarget,
@@ -48,15 +48,13 @@ import { backend as host, isPreview, progressSource } from "./host.js";
  * Electron's serializer rejects it, so nothing short of checking this directly catches a regression here.
  */
 export function unwrapArguments(backend: Backend): Backend {
-  const callable = backend as unknown as Record<string, (...args: unknown[]) => unknown>;
-  const unwrapped = Object.fromEntries(
-    // Called rather than passed by reference: the compiler rewrites `$state.snapshot(x)`, not a bare mention.
-    BACKEND_METHODS.map((name) => [
-      name,
-      (...args: unknown[]) => callable[name]!(...args.map((arg) => $state.snapshot(arg))),
-    ]),
+  // Called rather than passed by reference: the compiler rewrites `$state.snapshot(x)`, not a bare mention.
+  return wrapMethods(
+    backend,
+    (call) =>
+      (...args: unknown[]) =>
+        call(...args.map((arg) => $state.snapshot(arg))),
   );
-  return unwrapped as unknown as Backend;
 }
 
 const backend: Backend = unwrapArguments(host);

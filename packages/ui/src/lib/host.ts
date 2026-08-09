@@ -10,7 +10,7 @@
 
 import type { Platform } from "@zax/platform";
 import { MemoryPlatform } from "@zax/platform/memory";
-import { BACKEND_METHODS, createBackend, type Backend, type OperationProgress } from "@zax/fallout2";
+import { createBackend, wrapMethods, type Backend, type OperationProgress } from "@zax/fallout2";
 
 import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
@@ -81,12 +81,12 @@ export const previewPlatform: Platform = (() => {
  * Otherwise the cheap host would be laxer than the expensive one, which is the wrong way round.
  */
 function copyingArguments(backend: Backend): Backend {
-  const callable = backend as unknown as Record<string, (...args: unknown[]) => unknown>;
-  const copied = Object.fromEntries(
-    BACKEND_METHODS.map((name) => [name, (...args: unknown[]) => callable[name]!(...structuredClone(args))]),
+  return wrapMethods(
+    backend,
+    (call) =>
+      (...args: unknown[]) =>
+        call(...structuredClone(args)),
   );
-  // Built from the method list rather than declared, so its shape is the interface's by construction.
-  return copied as unknown as Backend;
 }
 
 const supplied = typeof window === "undefined" ? undefined : window.zax;

@@ -15,7 +15,7 @@ export {
 } from "./sfall.js";
 export { HIRES_LIBRARY, installedHiresVersion } from "./hires.js";
 export { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
-export { BACKEND_METHODS, type BackendMethod } from "./backend-methods.js";
+export { BACKEND_METHODS, fromMethods, wrapMethods, type BackendMethod } from "./backend-methods.js";
 export {
   RELEASES_PAGE,
   createBackend,
