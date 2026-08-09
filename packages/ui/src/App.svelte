@@ -4,7 +4,7 @@
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
   import { store } from "./lib/store.svelte.js";
-  import { VERSION } from "./lib/version.js";
+  import { BUILD } from "./lib/version.js";
 
   // Reading the state file and the selected install's config files is the first thing that happens, and it is
   // a filesystem read, so the interface renders its empty shape until it lands rather than blocking on it.
@@ -37,7 +37,7 @@
 
 <div class="shell">
   <header class="top">
-    <div class="brand">ZAX <span class="version">{VERSION}</span></div>
+    <div class="brand">ZAX <span class="version">{BUILD}</span></div>
 
     <div class="spacer"></div>
 
