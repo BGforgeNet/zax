@@ -237,7 +237,7 @@ describe("saving", () => {
 
     await store.save();
 
-    expect(store.notice?.kind).toBe("done");
+    expect(store.notice, "a save that worked has nothing to report").toBeNull();
     expect(store.isModified(MUSIC), "a saved edit is no longer pending").toBe(false);
     // Read back through a fresh start, which is the only proof the value reached the file.
     await store.start();
@@ -269,11 +269,16 @@ describe("saving", () => {
   });
 
   test("keeps a copy of what it replaced", async () => {
+    // Earlier tests in this file back up into the same directory, and its name is only accurate to the second,
+    // so the ground is cleared first and whatever is there afterwards belongs to this save.
+    await previewPlatform.fs.remove(store.paths.backup);
     store.set(MUSIC, "0");
     await store.save();
-    const backup = store.notice?.text.match(/preview\/cache\/backup\/[\d_-]+/)?.[0];
-    expect(backup, "the save reports where the previous copy went").toBeDefined();
-    expect(new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${backup}/fallout2.cfg`))).toBe(fallout2cfg);
+
+    const kept = await previewPlatform.fs.list(store.paths.backup);
+    expect(kept, "a save leaves the previous copy behind").toHaveLength(1);
+    const copy = `${store.paths.backup}/${kept[0]!.name}/fallout2.cfg`;
+    expect(new TextDecoder("latin1").decode(await previewPlatform.fs.read(copy))).toBe(fallout2cfg);
   });
 });
 
@@ -404,7 +409,7 @@ describe("autosave", () => {
     expect(store.baselineOf(MUSIC)).toBe(wanted);
   });
 
-  test("says nothing on success, so an autosave cannot bury the last real notice", async () => {
+  test("says nothing on success, like any other save", async () => {
     await store.setAutosave(true);
     store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
     await settle();

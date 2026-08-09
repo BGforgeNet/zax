@@ -584,7 +584,7 @@ class Store {
     // off inside that window means the user does not want it written.
     if (!on) this.cancelAutosave();
     await this.persist();
-    if (on && this.modifiedCount > 0) await this.save({ quiet: true });
+    if (on && this.modifiedCount > 0) await this.save();
   }
 
   /*
@@ -616,8 +616,7 @@ class Store {
       this.scheduleAutosave();
       return;
     }
-    // Quiet on success: a notice per edit would replace whatever the last real operation reported.
-    if (this.modifiedCount > 0 || this.pendingChanges().length > 0) await this.save({ quiet: true });
+    if (this.modifiedCount > 0 || this.pendingChanges().length > 0) await this.save();
   }
 
   /** Opens the shell's directory picker and adds what comes back. Cancelling adds nothing and says nothing. */
@@ -668,7 +667,7 @@ class Store {
     return out;
   }
 
-  async save(options?: { quiet?: boolean }): Promise<void> {
+  async save(): Promise<void> {
     const install = this.install;
     if (!install) return;
     await this.run("Saving", async () => {
@@ -685,8 +684,8 @@ class Store {
         };
       }
       await this.readInstall();
-      if (outcome.files.length === 0 || options?.quiet === true) return null;
-      return { kind: "done", text: `Saved ${outcome.files.join(", ")}. Previous copies are in ${outcome.backup}.` };
+      // A save that worked says so by clearing the unsaved chip; only the refusal above is worth a banner.
+      return null;
     });
   }
 
