@@ -25,6 +25,9 @@ jobs:
       # Install scripts only fetch the Electron and esbuild binaries, which the typecheck and the tests never
       # run; skipping them keeps the job to the packages it actually loads.
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      # The trust policy in pnpm-workspace.yaml judges a version's provenance at install time; nothing there
+      # re-checks published advisories, which is what this reads the lockfile against.
+      - run: pnpm audit
       - run: pnpm check
       - run: pnpm lint
       - run: pnpm test
