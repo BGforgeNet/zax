@@ -296,3 +296,22 @@ describe("listing the versions available", () => {
     expect(await listSfallVersions(platform)).toEqual(["4.5"]);
   });
 });
+
+describe("a version that could not have come from the listing", () => {
+  // The version reaches these functions across the process boundary, not only from the curated dropdown, and
+  // it becomes a path segment and a URL. A traversal-shaped one must die here, not resolve somewhere.
+  it("is refused before an update touches anything", async () => {
+    const platform = new MemoryPlatform({ files: {} });
+    await expect(updateSfall(platform, INSTALL, "../4.5")).rejects.toThrow('Not an sfall version: "../4.5"');
+  });
+
+  it("is refused before it names a cache file", async () => {
+    const platform = new MemoryPlatform({ files: {} });
+    await expect(sfallPackage(platform, "a/../../b")).rejects.toThrow("Not an sfall version");
+  });
+
+  it("is refused before it names a kept defaults file", async () => {
+    const platform = new MemoryPlatform({ files: {} });
+    await expect(sfallDefaults(platform, "..")).rejects.toThrow("Not an sfall version");
+  });
+});

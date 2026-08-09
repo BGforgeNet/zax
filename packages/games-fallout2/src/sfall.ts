@@ -44,6 +44,17 @@ export function releaseUrl(version: string): string {
 }
 
 /**
+ * The shape every release name has. Checked wherever a version is about to become a path segment or a URL,
+ * not only when one is read out of the feed: the interface hands versions across the process boundary, and
+ * that caller is not the curated list.
+ */
+const VERSION_SHAPE = /^\d[\d.a-z]*$/i;
+
+function assertVersionShape(version: string): void {
+  if (!VERSION_SHAPE.test(version)) throw new Error(`Not an sfall version: "${version}"`);
+}
+
+/**
  * The versions available to change to, newest first. Read from the file listing rather than the release feed,
  * which names one: the listing is capped at its most recent 100 files, so this is not the whole history.
  */
@@ -51,9 +62,7 @@ export async function listSfallVersions(platform: Platform): Promise<readonly st
   const feed = await platform.net.fetchText(RELEASE_LIST);
   const seen = new Set<string>();
   for (const match of feed.matchAll(/sfall_(\d[^< "]*?)\.7z/g)) {
-    // The name comes out of a feed; the shape check keeps a crafted entry from ever becoming a path segment
-    // in `sfallPackage`.
-    if (match[1] && /^\d[\d.a-z]*$/i.test(match[1])) seen.add(match[1]);
+    if (match[1] && VERSION_SHAPE.test(match[1])) seen.add(match[1]);
   }
   return [...seen].sort((a, b) => compareVersions(b, a));
 }
@@ -124,6 +133,7 @@ async function isArchive(platform: Platform, path: string): Promise<boolean> {
  * at extraction, where the message would be about 7-Zip's exit status instead of about the mirror.
  */
 export async function sfallPackage(platform: Platform, version: string, options?: SfallProgress): Promise<string> {
+  assertVersionShape(version);
   const path = platform.paths.join(packageDirectory(platform), `sfall-${version}.7z`);
   if (await isArchive(platform, path)) return path;
   // Something is there but it is not an archive, so it came from an answer that was not the file.
@@ -194,6 +204,8 @@ export async function sfallDefaults(
   version: string,
   options?: SfallProgress,
 ): Promise<IniDocument | null> {
+  // Before the try below: a malformed version is a caller error to surface, not a missing base to absorb.
+  assertVersionShape(version);
   const { join } = platform.paths;
   const kept = defaultsPath(platform, version);
   if ((await platform.fs.stat(kept))?.kind === "file") return IniDocument.parseBytes(await platform.fs.read(kept));
@@ -226,6 +238,8 @@ export async function updateSfall(
   now: Date = new Date(),
   options?: SfallProgress,
 ): Promise<SfallUpdate> {
+  // This is what the process boundary calls, so the shape is checked here too, not only in the path builders.
+  assertVersionShape(version);
   const { join } = platform.paths;
   const at = stamp(now);
   const work = join(temporaryDirectory(platform), `sfall-${at}`);
