@@ -15,7 +15,7 @@ export {
   type Theme,
   type WineConfig,
 } from "./install.js";
-export { identifyInstall, scanForInstalls, scanRoots } from "./discovery.js";
+export { identifyInstall, scanForInstalls } from "./discovery.js";
 export { backupDirectory, debugDirectory, logFile, packageDirectory, temporaryDirectory } from "./directories.js";
 export { appendLog } from "./log.js";
 export { copyTree, listFilesRecursively } from "./fs.js";
@@ -24,7 +24,7 @@ export { stamp } from "./stamp.js";
 export { latestZax, type ZaxRelease } from "./updates.js";
 export { compareVersions } from "./version.js";
 export { EMPTY_STATE, ZAX_FILE_NAME, loadState, saveState, type AppState, type LoadedState } from "./state.js";
-export { EMPTY_ZAX_FILE, formatZaxFile, parseZaxFile, type StoredInstall, type ZaxFile } from "./zax-file.js";
+export { type StoredInstall } from "./zax-file.js";
 export {
   loadConfigFiles,
   saveConfigFiles,
