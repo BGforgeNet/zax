@@ -71,6 +71,10 @@ const HIDDEN = hiddenIds();
 
 const CURATED = new Map(SETTINGS.map((s) => [`${s.file}|${s.section}|${s.key}`.toLowerCase(), s]));
 
+// Built once for the same reason as the maps above: the layout tab asks for a definition once per node on
+// every render, and a scan of the catalog per ask multiplies out on exactly the render that draws all of it.
+const BY_ID = new Map(SETTINGS.map((s) => [s.id, s]));
+
 /**
  * Every setting search can reach, with its address and the text matched against, built once at load. None of
  * it depends on anything that changes at runtime, and rebuilding it per query meant lowercasing 164 strings
@@ -359,7 +363,7 @@ class Store {
   }
 
   defOf(id: string): SettingDef | undefined {
-    return SETTINGS.find((s) => s.id === id);
+    return BY_ID.get(id);
   }
 
   /**
