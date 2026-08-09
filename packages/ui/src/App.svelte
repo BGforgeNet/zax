@@ -55,11 +55,10 @@
 
     <div class="spacer"></div>
 
-    {#if store.modifiedCount > 0}
-      <span class="chip">{store.modifiedCount} unsaved</span>
-    {:else}
-      <span class="chip muted">No changes</span>
-    {/if}
+    <!-- The shell hands a web link to the browser rather than following it, so this needs no operation of its own. -->
+    <span class="powered">
+      Powered by <a href="https://bgforge.net/" target="_blank" rel="noreferrer">BGforge</a>
+    </span>
   </header>
 
   <!--
@@ -154,6 +153,25 @@
     font-size: 12px;
   }
 
+  /*
+    Dimmer than the brand but not the faint the version uses: that tone is under 4.5:1 on both palettes, which
+    the half of this someone is meant to click should not be.
+  */
+  .powered {
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  /* Underlined rather than colour alone, so the link half is the visible one before anyone hovers it. */
+  .powered a {
+    color: inherit;
+    text-underline-offset: 2px;
+  }
+
+  .powered a:hover {
+    color: var(--accent);
+  }
+
   .spacer {
     flex: 1;
   }
@@ -189,21 +207,6 @@
     .dot {
       animation: none;
     }
-  }
-
-  .chip {
-    border: 1px solid var(--modified);
-    color: var(--modified);
-    background: var(--modified-soft);
-    border-radius: 999px;
-    padding: 3px 11px;
-    font-size: 12.5px;
-  }
-
-  .chip.muted {
-    border-color: var(--border);
-    color: var(--text-faint);
-    background: none;
   }
 
   /* The gutter is the same one the header and the notice inset by, so all three share one left edge. */

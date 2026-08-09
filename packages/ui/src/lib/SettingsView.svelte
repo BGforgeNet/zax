@@ -198,8 +198,15 @@
         Play
       </button>
       {#if store.modifiedCount > 0}
-        <span class="pending">{store.modifiedCount} unsaved</span>
         <button class="link" onclick={() => store.revertAll()}>Revert all</button>
+      {/if}
+
+      <!-- Status rather than an action, so it sits away from the buttons at the far end of their own bar. -->
+      <div class="spacer"></div>
+      {#if store.modifiedCount > 0}
+        <span class="chip">{store.modifiedCount} unsaved</span>
+      {:else}
+        <span class="chip muted">No changes</span>
       {/if}
     </div>
   </main>
@@ -296,11 +303,6 @@
     opacity: 0.55;
   }
 
-  .pending {
-    color: var(--modified);
-    font-size: 12.5px;
-  }
-
   .link {
     background: none;
     border: none;
@@ -308,5 +310,25 @@
     font-size: 12.5px;
     color: var(--accent);
     text-decoration: underline;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .chip {
+    border: 1px solid var(--modified);
+    color: var(--modified);
+    background: var(--modified-soft);
+    border-radius: 999px;
+    padding: 3px 11px;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
+  .chip.muted {
+    border-color: var(--border);
+    color: var(--text-faint);
+    background: none;
   }
 </style>
