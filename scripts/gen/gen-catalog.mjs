@@ -4,6 +4,7 @@
  */
 import fs from "node:fs";
 import { createRequire } from "node:module";
+import { idFor } from "./ids.mjs";
 // yaml is @zax/core's dependency; the repo root carries none of its own, so resolve it through that package.
 const YAML = createRequire(new URL("../../packages/core/", import.meta.url))("yaml");
 
@@ -259,17 +260,6 @@ const PATHS = new Set([
   "f2_res_dat",
   "f2_res_patches",
 ]);
-
-const slugPrefix = { "fallout2.cfg": "game", "f2_res.ini": "hires", "ddraw.ini": "sfall" };
-
-function idFor(file, section, key) {
-  const norm = (s) =>
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-  return `${slugPrefix[file]}.${norm(section)}.${norm(key)}`;
-}
 
 function kindFor(item, key) {
   if (SCALE_MAX[key]) return { type: "scale", max: SCALE_MAX[key] };

@@ -5,14 +5,7 @@
  * A setting can lose its place in the layout without ceasing to exist, and the reverse would be a defect.
  */
 import fs from "node:fs";
-
-const slugPrefix = { "fallout2.cfg": "game", "f2_res.ini": "hires", "ddraw.ini": "sfall" };
-const norm = (s) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-const idFor = (file, section, key) => `${slugPrefix[file]}.${norm(section)}.${norm(key)}`;
+import { idFor } from "./ids.mjs";
 
 /*
   Hidden beyond what the previous interface hid. `free_space` is read, stored and written back by fallout2-ce
