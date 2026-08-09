@@ -7,9 +7,10 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { appendLog } from "@zax/core";
-import { BACKEND_METHODS, createBackend, type Backend } from "@zax/fallout2";
+import { createBackend, type Backend } from "@zax/fallout2";
 import { nodePlatform } from "@zax/platform-node";
 import { CHANNEL, PROGRESS_CHANNEL } from "./channel.js";
+import { createDispatch, describeError } from "./dispatch.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -27,27 +28,13 @@ function logLine(text: string): Promise<void> {
   return appendLog(platform, text, new Date());
 }
 
-const describeError = (error: unknown): string =>
-  error instanceof Error ? (error.stack ?? error.message) : String(error);
-
 // A crash with no window leaves nothing to read; these lines are the only trace a bug report can carry.
 process.on("uncaughtException", (error) => void logLine(`uncaught: ${describeError(error)}`));
 process.on("unhandledRejection", (reason) => void logLine(`unhandled rejection: ${describeError(reason)}`));
 
 function register(backend: Backend): void {
-  const callable = backend as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
-  ipcMain.handle(CHANNEL, async (_event, method: string, args: unknown[]) => {
-    // Only the named operations, and only by exact name: a renderer asking for anything else gets an error
-    // rather than a lookup on the object's prototype.
-    if (!(BACKEND_METHODS as readonly string[]).includes(method)) throw new Error(`Unknown operation: ${method}`);
-    try {
-      return await callable[method]!(...args);
-    } catch (error) {
-      // The renderer's notice shows the message; the log keeps the stack, which the notice cannot carry.
-      void logLine(`${method} failed: ${describeError(error)}`);
-      throw error;
-    }
-  });
+  const dispatch = createDispatch(backend, (line) => void logLine(line));
+  ipcMain.handle(CHANNEL, (_event, method: string, args: unknown[]) => dispatch(method, args));
 }
 
 /**
