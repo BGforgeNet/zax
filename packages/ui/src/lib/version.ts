@@ -14,8 +14,10 @@ export const VERSION: string = version;
 declare const __ZAX_COMMIT__: string;
 
 /*
-  What the interface shows. A build that is not a release shows its commit instead of the version, because the
-  version would name a release the build is not - the whole point of the label is telling a bug reporter which
-  code they are running. The comparison against the latest release still uses VERSION, which is a version.
+  What the interface shows. A build that is not a release carries the commit as a pre-release suffix -
+  `0.8.0-c295f20` - so the label still says which release it is working towards and still sorts against the
+  others, while naming the code a bug reporter is actually running. It is a display string: the comparison
+  against the latest release uses VERSION, and a suffixed one would read as older than the release it precedes.
 */
-export const BUILD: string = typeof __ZAX_COMMIT__ === "string" && __ZAX_COMMIT__ !== "" ? __ZAX_COMMIT__ : version;
+export const BUILD: string =
+  typeof __ZAX_COMMIT__ === "string" && __ZAX_COMMIT__ !== "" ? `${version}-${__ZAX_COMMIT__}` : version;
