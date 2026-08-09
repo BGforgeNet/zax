@@ -49,11 +49,11 @@
     >
       Check
     </button>
-    <!-- ZAX does not replace its own running binary; the release page is where the new one comes from. -->
+    <!-- ZAX does not replace its own running binary; the release is where the new one comes from. -->
     <button
       disabled={!outdated || isPreview}
-      title={outdated ? "Open the release page" : "Nothing newer has been found"}
-      onclick={() => void store.open("releases")}
+      title={outdated ? "Open the download for this machine" : "Nothing newer has been found"}
+      onclick={() => void store.open("download")}
     >
       Download latest
     </button>

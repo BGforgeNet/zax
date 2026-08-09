@@ -57,7 +57,7 @@ export interface MachineDescription {
 export type OwnDirectory = "backup" | "debug" | "packages";
 
 /** Somewhere the desktop's own handler is asked to open. Named for the same reason. */
-export type OpenTarget = OwnDirectory | "log" | "releases";
+export type OpenTarget = OwnDirectory | "log" | "download";
 
 export const RELEASES_PAGE = "https://github.com/BGforgeNet/zax/releases/latest";
 
@@ -169,7 +169,13 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     },
 
     open: async (target) => {
-      if (target === "releases") return platform.process.open(RELEASES_PAGE);
+      if (target === "download") {
+        // Resolved here rather than named by the interface: a renderer that could give the address would be
+        // handing an argument to the system's own opener. The page when the feed cannot be reached - a user who
+        // pressed a download button was going there anyway, and it needs no request to name.
+        const release = await latestZax(platform).catch(() => ({ url: RELEASES_PAGE }));
+        return platform.process.open(release.url);
+      }
       if (target === "log") return platform.process.open(logFile(platform));
       return platform.process.open(own(target));
     },

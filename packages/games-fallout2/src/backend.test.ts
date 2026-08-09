@@ -73,14 +73,35 @@ describe("the operations", () => {
   it("opens its own directories by name, so a caller cannot ask for another path", async () => {
     const platform = ready();
     const backend = createBackend(platform, noShell);
-    for (const target of ["backup", "debug", "packages", "log", "releases"] as const) await backend.open(target);
+    for (const target of ["backup", "debug", "packages", "log"] as const) await backend.open(target);
     expect(platform.opened).toEqual([
       "/home/t/.cache/zax/backup",
       "/home/t/.cache/zax/debug",
       "/home/t/.cache/zax/packages",
       "/home/t/.cache/zax/zax.log",
-      RELEASES_PAGE,
     ]);
+  });
+
+  it("opens the build for this machine, resolved here so the interface never names a URL", async () => {
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      responses: {
+        "https://api.github.com/repos/BGforgeNet/zax/releases/latest": JSON.stringify({
+          tag_name: "v0.9",
+          html_url: "https://example/page",
+          assets: [{ name: "zax", browser_download_url: "https://example/zax" }],
+        }),
+      },
+    });
+    await createBackend(platform, noShell).open("download");
+    expect(platform.opened).toEqual(["https://example/zax"]);
+  });
+
+  it("falls back to the release page when the feed cannot be reached", async () => {
+    // No responses seeded, so the request fails the way an offline machine's does.
+    const platform = new MemoryPlatform({ home: "/home/t" });
+    await createBackend(platform, noShell).open("download");
+    expect(platform.opened).toEqual([RELEASES_PAGE]);
   });
 
   it("empties a directory and leaves it there, so the path it shows stays valid", async () => {
