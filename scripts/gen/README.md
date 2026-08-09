@@ -19,3 +19,6 @@ Run from the repo root, in this order (each later step reads the earlier one's o
 
 The generators' hand-maintained tables (labels, help rewrites, bounds, gates, conflicts) are the place to change
 a setting's presentation; editing the generated modules directly is lost on the next regeneration.
+
+CI reruns steps 3 and 4 on every push and fails on any difference from the committed modules, so a hand edit of
+generated output - or a generator change committed without its regeneration - cannot land quietly.

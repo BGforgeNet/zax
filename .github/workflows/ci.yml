@@ -34,6 +34,12 @@ jobs:
       # The chokidar override puts svelte-check on a major its authors do not test against, and only watch mode
       # loads it - which the single-pass `pnpm check` above never enters.
       - run: pnpm verify:chokidar
+      # The generated modules must be what their generators produce. The tests read the committed output, so a
+      # hand edit - or a generator change nobody regenerated for - passes every one of them.
+      - run: |
+          node scripts/gen/gen-catalog.mjs
+          node scripts/gen/gen-layout.mjs
+          git diff --exit-code packages/games-fallout2/src/catalog.ts packages/games-fallout2/src/layout.ts
 
   # Packaging is its own gate: the tests run the sources, and none of them would notice a file left out of the
   # archive, a path that only resolves in a checkout, or a target that stopped building on one platform. Three
