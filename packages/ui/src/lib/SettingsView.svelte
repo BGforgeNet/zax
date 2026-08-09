@@ -41,10 +41,17 @@
           onclick={() => (store.settingsTab = f.file)}
         >
           {f.label}
-          {#if store.modifiedInFile(f.file) > 0}
-            <!-- Hidden from the accessible name, which is the tab's label - the count belongs in the tooltip. -->
-            <span class="dot" aria-hidden="true" title="{store.modifiedInFile(f.file)} unsaved"></span>
-          {/if}
+          <!--
+            Always in the markup, shown or not: appearing on the first edit would widen the tab and shove every
+            tab after it sideways while the pointer is still over one. Hidden from the accessible name, which is
+            the tab's label - the count belongs in the tooltip.
+          -->
+          <span
+            class="dot"
+            class:unsaved={store.modifiedInFile(f.file) > 0}
+            aria-hidden="true"
+            title={store.modifiedInFile(f.file) > 0 ? `${store.modifiedInFile(f.file)} unsaved` : null}
+          ></span>
         </button>
       {/each}
       <!-- Always shown, unlike the Wine tab it replaced: an install has an alias on every platform. -->
@@ -174,9 +181,11 @@
 
     <!-- Both sat under the settings tabs in the previous interface, not in the window chrome. -->
     <div class="footer">
+      <!-- Disabled rather than hidden under autosave: a button that vanished would move Play under the pointer. -->
       <button
         class="primary"
-        disabled={!store.install || store.modifiedCount === 0 || store.busy !== null}
+        disabled={store.autosave || !store.install || store.modifiedCount === 0 || store.busy !== null}
+        title={store.autosave ? "Autosave is on - every change is written as it is made" : null}
         onclick={() => void store.save()}
       >
         {store.busy === "Saving" ? "Saving..." : "Save"}
@@ -244,11 +253,17 @@
     color: var(--text-faint);
   }
 
+  /* Holds its space in every tab; only its ink toggles, so the strip never re-lays-out on an edit. */
   .dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--modified);
+    visibility: hidden;
+  }
+
+  .dot.unsaved {
+    visibility: visible;
   }
 
   .footer {

@@ -20,9 +20,10 @@ export interface AppState {
    */
   unavailable: readonly StoredInstall[];
   theme: Theme;
+  autosave: boolean;
 }
 
-export const EMPTY_STATE: AppState = { installs: [], unavailable: [], theme: "system" };
+export const EMPTY_STATE: AppState = { installs: [], unavailable: [], theme: "system", autosave: false };
 
 export interface LoadedState {
   state: AppState;
@@ -66,7 +67,7 @@ export async function loadState(platform: Platform): Promise<LoadedState> {
     }
   }
 
-  return { state: { installs, unavailable, theme: stored.theme } };
+  return { state: { installs, unavailable, theme: stored.theme, autosave: stored.autosave } };
 }
 
 export async function saveState(platform: Platform, state: AppState): Promise<void> {
@@ -78,6 +79,6 @@ export async function saveState(platform: Platform, state: AppState): Promise<vo
     })),
     ...state.unavailable,
   ];
-  const text = formatZaxFile({ ...EMPTY_ZAX_FILE, installs: stored, theme: state.theme });
+  const text = formatZaxFile({ ...EMPTY_ZAX_FILE, installs: stored, theme: state.theme, autosave: state.autosave });
   await platform.fs.write(zaxFilePath(platform), new TextEncoder().encode(text));
 }

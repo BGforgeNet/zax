@@ -334,3 +334,51 @@ describe("a config file the install does not have", () => {
     expect(store.modifiedCount, "nothing else is pending either").toBe(0);
   });
 });
+
+/*
+  Autosave is glue: nothing it does is visible in a single call, and the parts that can go wrong are the timer
+  and the guard around it. Real timers rather than fake ones, because what is under test is that the write
+  happens on its own - a faked clock would prove only that the callback was registered.
+*/
+describe("autosave", () => {
+  const MUSIC = "game.sound.music";
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 900));
+
+  test("writes an edit without a save, once the run of edits stops", async () => {
+    const before = store.baselineOf(MUSIC);
+    const wanted = before === "1" ? "0" : "1";
+    await store.setAutosave(true);
+
+    store.set(MUSIC, wanted);
+    expect(store.isModified(MUSIC), "still pending the moment the edit is made").toBe(true);
+    await settle();
+
+    // Read back through a fresh start, which is the only proof the value reached the file.
+    await store.start();
+    expect(store.baselineOf(MUSIC)).toBe(wanted);
+  });
+
+  test("says nothing on success, so an autosave cannot bury the last real notice", async () => {
+    await store.setAutosave(true);
+    store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
+    await settle();
+    expect(store.notice).toBeNull();
+  });
+
+  test("turning it off cancels the write its own edit scheduled", async () => {
+    const before = store.baselineOf(MUSIC);
+    await store.setAutosave(true);
+    store.set(MUSIC, before === "1" ? "0" : "1");
+    // Inside the coalescing window: the user changed their mind before the write went out.
+    await store.setAutosave(false);
+    await settle();
+
+    expect(store.isModified(MUSIC), "the edit is still pending, waiting for Save").toBe(true);
+    await store.start();
+    expect(store.baselineOf(MUSIC), "and nothing reached the file").toBe(before);
+  });
+
+  test("stays off unless asked, so no install is written to by opening the application", () => {
+    expect(store.autosave).toBe(false);
+  });
+});

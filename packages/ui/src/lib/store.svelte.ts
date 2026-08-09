@@ -59,6 +59,12 @@ export function unwrapArguments(backend: Backend): Backend {
 
 const backend: Backend = unwrapArguments(host);
 
+/*
+  Long enough that a slider drag or a series of quick edits lands as one write, short enough that a user who
+  changed one thing and looked away sees it saved. Each save rewrites a config file and copies the old one.
+*/
+const AUTOSAVE_DELAY = 400;
+
 // Built once: the layout does not change at runtime, and every search result needs a lookup in it.
 const PLACES = placesById();
 const HIDDEN = hiddenIds();
@@ -136,6 +142,8 @@ class Store {
   installs = $state<readonly Install[]>([]);
   selectedInstall = $state<string>("");
   theme = $state<Theme>("system");
+  /** Whether an edit is written as it is made. Off by default: writing to a game folder is opt-in. */
+  autosave = $state(false);
   overrides = $state<Record<string, string>>({});
 
   /** Contents of the selected install's config files, exactly as they were read. */
@@ -201,6 +209,7 @@ class Store {
     this.installs = state.installs;
     this.unavailable = state.unavailable;
     this.theme = state.theme;
+    this.autosave = state.autosave;
     this.selectedInstall = state.installs[0]?.path ?? "";
     if (problem) this.notice = { kind: "problem", text: problem };
     await this.readInstall();
@@ -241,7 +250,12 @@ class Store {
   }
 
   private async persist(): Promise<void> {
-    await backend.saveState({ installs: this.installs, unavailable: this.unavailable, theme: this.theme });
+    await backend.saveState({
+      installs: this.installs,
+      unavailable: this.unavailable,
+      theme: this.theme,
+      autosave: this.autosave,
+    });
   }
 
   /** Writes every target of an action in one step, so it lands as a single user-visible change. */
@@ -252,6 +266,7 @@ class Store {
       else next[id] = want;
     }
     this.overrides = next;
+    this.scheduleAutosave();
   }
 
   actionApplied(action: Action): boolean {
@@ -329,16 +344,19 @@ class Store {
       return;
     }
     this.overrides = { ...this.overrides, [id]: value };
+    this.scheduleAutosave();
   }
 
   revert(id: string): void {
     const { [id]: _dropped, ...rest } = this.overrides;
     this.overrides = rest;
+    this.scheduleAutosave();
   }
 
   revertAll(): void {
     // Pinned values are ZAX policy rather than a user edit, so reverting restores them instead of dropping them.
     this.overrides = this.managedOverrides();
+    this.scheduleAutosave();
   }
 
   get modifiedCount(): number {
@@ -475,6 +493,49 @@ class Store {
     await this.persist();
   }
 
+  /** Turning it on writes what is already pending, so the setting and the files agree immediately. */
+  async setAutosave(on: boolean): Promise<void> {
+    this.autosave = on;
+    // A write scheduled by the last edit belongs to the setting that was on when it happened: turning autosave
+    // off inside that window means the user does not want it written.
+    if (!on) this.cancelAutosave();
+    await this.persist();
+    if (on && this.modifiedCount > 0) await this.save({ quiet: true });
+  }
+
+  /*
+    Autosave coalesces rather than writing per change: dragging a slider emits a change per pixel, and each
+    write rewrites a config file and takes a backup copy. A pending save also has to wait for one already
+    running - `run` drops a second call while busy, which would silently lose the newest edit.
+  */
+  private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private scheduleAutosave(): void {
+    if (!this.autosave) return;
+    if (this.autosaveTimer !== null) clearTimeout(this.autosaveTimer);
+    this.autosaveTimer = setTimeout(() => {
+      this.autosaveTimer = null;
+      void this.autosaveNow();
+    }, AUTOSAVE_DELAY);
+  }
+
+  private cancelAutosave(): void {
+    if (this.autosaveTimer === null) return;
+    clearTimeout(this.autosaveTimer);
+    this.autosaveTimer = null;
+  }
+
+  private async autosaveNow(): Promise<void> {
+    // Checked again here rather than only at schedule time: a rescheduled write can outlive the setting.
+    if (!this.autosave) return;
+    if (this.busy !== null) {
+      this.scheduleAutosave();
+      return;
+    }
+    // Quiet on success: a notice per edit would replace whatever the last real operation reported.
+    if (this.modifiedCount > 0 || this.pendingChanges().length > 0) await this.save({ quiet: true });
+  }
+
   /** Opens the shell's directory picker and adds what comes back. Cancelling adds nothing and says nothing. */
   async browseForInstall(): Promise<void> {
     const chosen = await backend.chooseFolder();
@@ -523,7 +584,7 @@ class Store {
     return out;
   }
 
-  async save(): Promise<void> {
+  async save(options?: { quiet?: boolean }): Promise<void> {
     const install = this.install;
     if (!install) return;
     await this.run("Saving", async () => {
@@ -540,7 +601,7 @@ class Store {
         };
       }
       await this.readInstall();
-      if (outcome.files.length === 0) return null;
+      if (outcome.files.length === 0 || options?.quiet === true) return null;
       return { kind: "done", text: `Saved ${outcome.files.join(", ")}. Previous copies are in ${outcome.backup}.` };
     });
   }

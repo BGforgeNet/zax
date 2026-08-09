@@ -18,12 +18,30 @@ describe("reading zax.yml", () => {
         { path: "/home/t/Games/Fallout 2 RPU" },
       ],
       theme: "dark",
+      autosave: false,
     });
   });
 
   it("treats an empty or absent games list as no installs rather than failing", () => {
-    expect(parseZaxFile("theme: light")).toEqual({ installs: [], theme: "light" });
-    expect(parseZaxFile("")).toEqual({ installs: [], theme: "system" });
+    expect(parseZaxFile("theme: light")).toEqual({ installs: [], theme: "light", autosave: false });
+    expect(parseZaxFile("")).toEqual({ installs: [], theme: "system", autosave: false });
+  });
+
+  /*
+    A file written before autosave existed has no such key, and one a user hand-edited may have anything in it.
+    Both have to read as off: turning it on by accident writes to a game folder without being asked.
+  */
+  it("reads autosave as off unless the file says true", () => {
+    expect(parseZaxFile("autosave: true").autosave).toBe(true);
+    expect(parseZaxFile("autosave: false").autosave).toBe(false);
+    expect(parseZaxFile("games: []").autosave).toBe(false);
+    expect(parseZaxFile("autosave: yes-please").autosave).toBe(false);
+    expect(parseZaxFile('autosave: "true"').autosave).toBe(false);
+  });
+
+  it("round-trips autosave through a write and a read", () => {
+    const written = formatZaxFile({ installs: [{ path: "/a" }], theme: "system", autosave: true });
+    expect(parseZaxFile(written).autosave).toBe(true);
   });
 
   it("falls back to the system theme when the file names one that no longer exists", () => {
@@ -55,6 +73,7 @@ describe("writing zax.yml", () => {
     const text = formatZaxFile({
       installs: [{ path: "/a", wine: { prefix: "/p", debug: "-all" } }],
       theme: "light",
+      autosave: false,
     });
     expect(text).toContain("wine_prefix: /p");
     expect(text).toContain("wine_debug: -all");
@@ -62,22 +81,26 @@ describe("writing zax.yml", () => {
   });
 
   it("omits Wine keys an install does not have, rather than writing them blank", () => {
-    expect(formatZaxFile({ installs: [{ path: "/a" }], theme: "system" })).not.toContain("wine_");
+    expect(formatZaxFile({ installs: [{ path: "/a" }], theme: "system", autosave: false })).not.toContain("wine_");
   });
 
   it("keeps an alias the user chose across a round trip", () => {
-    const text = formatZaxFile({ installs: [{ path: "/a", alias: "My playthrough" }], theme: "system" });
+    const text = formatZaxFile({
+      installs: [{ path: "/a", alias: "My playthrough" }],
+      theme: "system",
+      autosave: false,
+    });
     expect(text).toContain("alias: My playthrough");
     expect(parseZaxFile(text).installs).toEqual([{ path: "/a", alias: "My playthrough" }]);
   });
 
   it("writes no alias for an install left at its type's name, so it follows the type", () => {
-    expect(formatZaxFile({ installs: [{ path: "/a" }], theme: "system" })).not.toContain("alias:");
+    expect(formatZaxFile({ installs: [{ path: "/a" }], theme: "system", autosave: false })).not.toContain("alias:");
     expect(parseZaxFile("games:\n- path: /a\n  alias: '   '\n").installs).toEqual([{ path: "/a" }]);
   });
 
   it("sorts by path, so the file does not reorder itself between saves", () => {
-    const text = formatZaxFile({ installs: [{ path: "/b" }, { path: "/a" }], theme: "system" });
+    const text = formatZaxFile({ installs: [{ path: "/b" }, { path: "/a" }], theme: "system", autosave: false });
     expect(text.indexOf("/a")).toBeLessThan(text.indexOf("/b"));
   });
 });
@@ -86,13 +109,13 @@ describe("long paths", () => {
   const long = "/home/tester/some/deeply/nested/place/for/games/GOG Games/Fallout 2 with the restoration project";
 
   it("keeps an install path on one line, since people hand-edit this file", () => {
-    const text = formatZaxFile({ installs: [{ path: long }], theme: "system" });
+    const text = formatZaxFile({ installs: [{ path: long }], theme: "system", autosave: false });
     expect(text).toContain(`- path: ${long}\n`);
   });
 
   it("reads back what it wrote", () => {
-    expect(parseZaxFile(formatZaxFile({ installs: [{ path: long }], theme: "system" })).installs).toEqual([
-      { path: long },
-    ]);
+    expect(
+      parseZaxFile(formatZaxFile({ installs: [{ path: long }], theme: "system", autosave: false })).installs,
+    ).toEqual([{ path: long }]);
   });
 });

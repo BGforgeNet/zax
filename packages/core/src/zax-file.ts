@@ -20,12 +20,14 @@ export interface StoredInstall {
 export interface ZaxFile {
   installs: readonly StoredInstall[];
   theme: Theme;
+  /** Whether an edit is written as it is made, rather than waiting for the Save button. */
+  autosave: boolean;
 }
 
 const THEMES: readonly string[] = ["light", "dark", "system"];
 
 /** The empty state, which is also what a first run has. */
-export const EMPTY_ZAX_FILE: ZaxFile = { installs: [], theme: "system" };
+export const EMPTY_ZAX_FILE: ZaxFile = { installs: [], theme: "system", autosave: false };
 
 function trimmed(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -59,7 +61,12 @@ export function parseZaxFile(text: string): ZaxFile {
   }
 
   const theme = record["theme"];
-  return { installs, theme: typeof theme === "string" && THEMES.includes(theme) ? (theme as Theme) : "system" };
+  return {
+    installs,
+    theme: typeof theme === "string" && THEMES.includes(theme) ? (theme as Theme) : "system",
+    // Anything but a true written by this application means off: the safe reading of a hand-edited file.
+    autosave: record["autosave"] === true,
+  };
 }
 
 /**
@@ -77,5 +84,5 @@ export function formatZaxFile(state: ZaxFile): string {
     }));
   // Unwrapped: the emitter folds a long scalar across lines by default, which is lossless but splits an install
   // path over two lines in a file people hand-edit.
-  return stringify({ games, theme: state.theme }, { lineWidth: 0 });
+  return stringify({ games, theme: state.theme, autosave: state.autosave }, { lineWidth: 0 });
 }
