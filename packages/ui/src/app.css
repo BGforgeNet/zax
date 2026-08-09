@@ -236,8 +236,9 @@ button {
 .list .row {
   display: grid;
   /* The notes track is bounded rather than 1fr: as a fraction it absorbed every surplus pixel, which on a tab
-     whose settings carry no help text left the row's whole right half blank. */
-  grid-template-columns: minmax(0, 19rem) minmax(0, 16rem) minmax(0, 22rem);
+     whose settings carry no help text left the row's whole right half blank. The surplus goes to the last
+     track instead, which is what carries the revert link to the row's right edge. */
+  grid-template-columns: minmax(0, 19rem) minmax(0, 16rem) minmax(0, 22rem) 1fr;
   column-gap: 16px;
   align-items: baseline;
   padding: 6px var(--gutter);
@@ -323,12 +324,15 @@ button {
   padding: 0 4px;
 }
 
-.list .row .was {
-  font-size: 11.5px;
-  color: var(--modified);
-}
-
+/*
+  Pinned to the last track of the first line. Auto-placement would not do it: the notes span the full width
+  below 950px, so a link declared after them lands on a line of its own and makes an edited row taller than
+  every other. `-2 / -1` is the last track whether there are three of them or four.
+*/
 .list .row .revert {
+  grid-row: 1;
+  grid-column: -2 / -1;
+  justify-self: end;
   background: none;
   border: none;
   padding: 0;
@@ -367,8 +371,10 @@ button {
 /* Below this the three tracks no longer fit, so the notes drop to their own line under the label and control. */
 @media (max-width: 950px) {
   .list .row {
-    /* The control track keeps its width so the controls stay a column rather than a ragged right edge. */
-    grid-template-columns: minmax(0, 1fr) 16rem;
+    /* The control track keeps its width so the controls stay a column rather than a ragged right edge. The
+       last track is fixed rather than sized to its content: as `auto` it was wide only on the rows carrying a
+       revert link, which moved those rows' controls out of line with every other. */
+    grid-template-columns: minmax(0, 1fr) 16rem 3.5rem;
   }
 
   .list .row .notes {

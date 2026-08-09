@@ -14,7 +14,6 @@
   }: { def: SettingDef; nested?: boolean; where?: string; onGo?: () => void; control?: string } = $props();
 
   const modified = $derived(store.isModified(def.id));
-  const baseline = $derived(store.baselineOf(def.id));
   const value = $derived(store.valueOf(def.id));
   const validation = $derived(validate(def, value));
   const sentinel = $derived(sentinelLabel(def, value));
@@ -39,18 +38,18 @@
     {:else if where}
       <span class="badge" title={origin}>{where}</span>
     {/if}
-    {#if modified}
-      <span class="was">was {baseline === undefined ? "unset" : displayValue(def, baseline)}</span>
-      <button class="revert" onclick={() => store.revert(def.id)}>revert</button>
-    {/if}
   </div>
 
   <div class="control">
     {#if managed}
       <span class="pinned">{displayValue(def, managed.value)}</span>
     {:else}
-      <!-- A fieldset so one attribute disables whichever control this row draws. -->
-      <fieldset class="controls" disabled={unavailable}>
+      <!--
+        A fieldset so one attribute disables whichever control this row draws. A gated setting is disabled as
+        well as dimmed: the game ignores it until its controller is set, so an edit here would write a value
+        that does nothing, and the note beside it says which control to reach for instead.
+      -->
+      <fieldset class="controls" disabled={unavailable || inert}>
         <Control {def} {control} />
       </fieldset>
     {/if}
@@ -75,6 +74,11 @@
     {#if sentinel}<span class="sentinel">{sentinel}</span>{/if}
     {#if !validation.ok}<span class="invalid" role="alert">{validation.reason}</span>{/if}
   </div>
+
+  <!-- At the row's end rather than beside the label: the row's colour already says it changed, this undoes it. -->
+  {#if modified}
+    <button class="revert" onclick={() => store.revert(def.id)}>revert</button>
+  {/if}
 </div>
 
 <style>
