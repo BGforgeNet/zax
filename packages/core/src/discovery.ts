@@ -5,7 +5,8 @@
  * Every store lets the user put the game somewhere else, so a list of default paths can only ever be a guess.
  * Where a launcher records what it did - Steam's library list, Epic's manifests, GOG's registry keys - the scan
  * asks it and learns the real directory; the default paths are the fallback for retail copies and for anything
- * installed by hand, and a shallow search catches folders whose names nobody predicted.
+ * installed by hand, and a shallow search catches folders whose names nobody predicted. One conversion installs
+ * inside another install, so the installs themselves are a source too, asked once the rest have answered.
  *
  * Whatever a source proposes is only a candidate: one gate, `identifyInstall`, decides what is really an install,
  * so a new source cannot invent a way for something to qualify.
@@ -15,6 +16,7 @@ import type { DirEntry, Platform } from "@zax/platform";
 import { appendLog } from "./log.js";
 import {
   EPIC_MANIFEST_DIRECTORY,
+  FO1IN2_DIRECTORY,
   GOG_REGISTRY_KEYS,
   SCAN_LOCATIONS,
   STEAM_APP_ID,
@@ -309,6 +311,21 @@ async function fromSearch(scan: Scan, roots: readonly string[]): Promise<Candida
   return out;
 }
 
+/**
+ * Fallout et tu, which lives in a folder inside a Fallout 2 install rather than anywhere a launcher or a
+ * default path would name. Installs already on the list are asked as well as the ones just found: the mod is
+ * normally installed long after the game it sits in was added, and a scan that only looked inside new installs
+ * would never find it on the machine of anyone who had already used ZAX.
+ */
+async function fromInstalls(scan: Scan, installs: readonly string[]): Promise<Candidate[]> {
+  const out: Candidate[] = [];
+  for (const path of installs) {
+    const found = await resolve(scan, path, FO1IN2_DIRECTORY);
+    if (found) out.push({ path: found, source: "inside an install" });
+  }
+  return out;
+}
+
 /** Two spellings of one directory are one install, on the filesystems that do not distinguish them. */
 function dedupeKey(platform: Platform, path: string): string {
   const at = path.replace(/[\\/]+$/, "");
@@ -317,8 +334,8 @@ function dedupeKey(platform: Platform, path: string): string {
 
 /**
  * Installs found on this machine and not already on the list, in the order the sources are asked: the launchers
- * that know where they put things first, then the defaults, then the search. The order is what decides which
- * source a directory is credited to in the log when more than one proposes it.
+ * that know where they put things first, then the defaults, then the search, then inside the installs. The
+ * order is what decides which source a directory is credited to in the log when more than one proposes it.
  */
 export async function scanForInstalls(
   platform: Platform,
@@ -341,20 +358,27 @@ export async function scanForInstalls(
   const found: Install[] = [];
   const credited: string[] = [];
 
-  for (const candidate of candidates) {
-    const key = dedupeKey(platform, candidate.path);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const type = await identifyInstall(platform, candidate.path);
-    if (type === null) continue;
-    found.push({ path: candidate.path, type });
-    credited.push(`${candidate.path} (${candidate.source}, ${type})`);
-  }
+  const consider = async (proposed: readonly Candidate[]): Promise<void> => {
+    for (const candidate of proposed) {
+      const key = dedupeKey(platform, candidate.path);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const type = await identifyInstall(platform, candidate.path);
+      if (type === null) continue;
+      found.push({ path: candidate.path, type });
+      credited.push(`${candidate.path} (${candidate.source}, ${type})`);
+    }
+  };
+
+  await consider(candidates);
+  // Last, because it is the one source whose directories are not known until every other has answered.
+  const nested = await fromInstalls(scan, [...known.map((one) => one.path), ...found.map((one) => one.path)]);
+  await consider(nested);
 
   for (const note of scan.notes) await appendLog(platform, `scan: ${note}`, now);
   await appendLog(
     platform,
-    `scan: ${roots.length} roots, ${candidates.length} candidates, ${found.length} new${
+    `scan: ${roots.length} roots, ${candidates.length + nested.length} candidates, ${found.length} new${
       credited.length ? `: ${credited.join("; ")}` : ""
     }`,
     now,

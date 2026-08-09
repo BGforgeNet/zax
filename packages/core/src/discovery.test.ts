@@ -8,6 +8,14 @@ function install(root: string, marker?: "rpu.dat" | "upu.dat"): Record<string, s
   return { [`${root}/fallout2.exe`]: "MZ", ...(marker ? { [`${root}/mods/${marker}`]: "" } : {}) };
 }
 
+/**
+ * Fallout et tu's own folder, which is a game directory in its own right. `fo1_base` is a directory rather
+ * than a file, unlike the other mods' markers, so it is written with something inside it.
+ */
+function fo1in2(root: string): Record<string, string> {
+  return { [`${root}/Fallout2.exe`]: "MZ", [`${root}/mods/fo1_base/fo1_base.dat`]: "" };
+}
+
 /** The clock is an argument to the scan, so the lines it logs are the same on every run. */
 const AT = new Date("2026-01-01T00:00:00.000Z");
 
@@ -245,6 +253,42 @@ describe("searching below the roots", () => {
   it("skips the directories a search has no business walking", async () => {
     const platform = new MemoryPlatform({ os: "windows", files: install("C:/Windows/Fallout 2") });
     expect(await paths(platform)).toEqual([]);
+  });
+});
+
+describe("looking inside an install, which is where Fallout et tu goes", () => {
+  it("finds the mod under an install the same scan just found, and reports both", async () => {
+    const platform = new MemoryPlatform({
+      os: "windows",
+      files: { ...install("C:/GOG Games/Fallout 2"), ...fo1in2("C:/GOG Games/Fallout 2/Fallout1in2") },
+    });
+    expect(await scan(platform)).toEqual([
+      { path: "C:/GOG Games/Fallout 2", type: "fallout2" },
+      { path: "C:/GOG Games/Fallout 2/Fallout1in2", type: "fo1in2" },
+    ]);
+  });
+
+  it("finds it under an install already on the list, which is where it is usually installed", async () => {
+    // Nothing else reaches it: two levels of search stop at the install, and no launcher records the mod.
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      files: { ...install("/home/t/Games/Fallout 2"), ...fo1in2("/home/t/Games/Fallout 2/Fallout1in2") },
+    });
+    const known = [{ path: "/home/t/Games/Fallout 2", type: "fallout2" as const }];
+    expect(await scan(platform, known)).toEqual([{ path: "/home/t/Games/Fallout 2/Fallout1in2", type: "fo1in2" }]);
+  });
+
+  it("matches the folder whatever its casing, and reports the spelling on disk", async () => {
+    const platform = new MemoryPlatform({
+      os: "windows",
+      files: { ...install("C:/Games/Fallout 2"), ...fo1in2("C:/Games/Fallout 2/fallout1in2") },
+    });
+    expect(await paths(platform)).toEqual(["C:/Games/Fallout 2", "C:/Games/Fallout 2/fallout1in2"]);
+  });
+
+  it("looks in an install that holds no mod without reporting anything for it", async () => {
+    const platform = new MemoryPlatform({ os: "windows", files: install("C:/Games/Fallout 2") });
+    expect(await paths(platform)).toEqual(["C:/Games/Fallout 2"]);
   });
 });
 

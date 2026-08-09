@@ -44,6 +44,12 @@ describe("detecting an install", () => {
     expect(detectGameType(["fallout2.exe", "rp-changelog.txt"], [])).toBe("fallout2rp");
   });
 
+  it("names Fallout et tu from its core mod, which is all that tells it from a stock layout", () => {
+    // Its own folder is a whole game directory: the same executable, its own sfall, its own config files.
+    const root = ["Fallout2.exe", "ddraw.ini", "f2_res.ini", "sfall.dat"];
+    expect(detectGameType(root, ["fo1_base", "fo1_interface", "mods_order.txt"])).toBe("fo1in2");
+  });
+
   it("is still vanilla when nothing marks a patch", () => {
     expect(detectGameType(["fallout2.exe", "master.dat", "readme.rtf"], [])).toBe("fallout2");
   });

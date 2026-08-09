@@ -10,8 +10,10 @@
  * The four patched types are two pairs, and the distinction is not cosmetic: killap's Unofficial Patch and
  * Restoration Project patch `data/` in place, while the Updated forks that descend from them are separate mods
  * distributed as a `mods/*.dat`. Calling either one "the unofficial patch" mislabels the other.
+ *
+ * `fo1in2` is not a fifth patch but a different game: Fallout 1 rebuilt on this engine, in its own directory.
  */
-export type GameType = "fallout2" | "fallout2up" | "fallout2rp" | "fallout2upu" | "fallout2rpu";
+export type GameType = "fallout2" | "fallout2up" | "fallout2rp" | "fallout2upu" | "fallout2rpu" | "fo1in2";
 
 /** `name` is the install's default display name; `label` says the same thing in full, for the tooltip. */
 export const GAME_TYPES: Readonly<Record<GameType, { name: string; label: string; badge: string }>> = {
@@ -35,6 +37,11 @@ export const GAME_TYPES: Readonly<Record<GameType, { name: string; label: string
     name: "Restoration Project Updated",
     label: "Fallout 2 with the Restoration Project Updated",
     badge: "rpu",
+  },
+  fo1in2: {
+    name: "Fallout et tu",
+    label: "Fallout 1 in the Fallout 2 engine",
+    badge: "fo1in2",
   },
 };
 
@@ -71,9 +78,13 @@ export function detectGameType(rootEntries: readonly string[], modEntries: reado
   const root = new Set(rootEntries.map((f) => f.toLowerCase()));
   if (!root.has("fallout2.exe")) return null;
 
-  // The Updated forks first: each descends from a killap patch and can carry the files that identify it, so
-  // testing killap's markers first would report the ancestor.
   const mods = new Set(modEntries.map((f) => f.toLowerCase()));
+  // Fallout et tu replaces the game rather than patching it, and ships no marker of its own in the root it
+  // shares with a stock Fallout 2 layout. Its core mod is what names it.
+  if (mods.has("fo1_base")) return "fo1in2";
+
+  // The Updated forks next: each descends from a killap patch and can carry the files that identify it, so
+  // testing killap's markers first would report the ancestor.
   if (mods.has("rpu.dat")) return "fallout2rpu";
   if (mods.has("upu.dat")) return "fallout2upu";
 
@@ -174,6 +185,14 @@ export const SCAN_LOCATIONS: readonly string[] = [
   "Games/Fallout 2",
   "Games/Fallout2",
 ];
+
+/**
+ * The folder Fallout et tu is unpacked into, inside a Fallout 2 install - the game it converts is required, and
+ * its `master.dat` is what the mod reads. Nothing that looks for a Fallout 2 install reaches it: the launchers
+ * name the install itself, and the shallow search stops at the level that install sits on, so it is looked for
+ * under each install the scan knows about instead.
+ */
+export const FO1IN2_DIRECTORY = "Fallout1in2";
 
 /**
  * Where the Steam client itself may be, relative to a root. Only a starting point: whichever of these exists
