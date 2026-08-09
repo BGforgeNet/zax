@@ -1,6 +1,7 @@
 <script lang="ts">
   import { DEBUG_PACKAGE_CONTENTS } from "@zax/fallout2";
   import ActionCard from "./ActionCard.svelte";
+  import Dialog from "./Dialog.svelte";
   import { store } from "./store.svelte.js";
 
   const enableDebug = $derived(store.actionById("debug.enable"));
@@ -13,6 +14,11 @@
   */
   let slots = $state<readonly string[]>([]);
   let chosen = $state<string[]>([]);
+  let picking = $state(false);
+  let filter = $state("");
+
+  // Case-insensitive substring, which is what a slot name is: a label the player typed, not a path to parse.
+  const matching = $derived(slots.filter((slot) => slot.toLowerCase().includes(filter.trim().toLowerCase())));
 
   $effect(() => {
     // Re-read when the selected install changes: another install's slots are not this one's.
@@ -50,17 +56,44 @@
     <li>
       <div class="step">
         <span>Collect the logs and your setup into one archive.</span>
-        {#if slots.length > 0}
-          <fieldset class="saves">
-            <legend>Savegames to attach</legend>
-            {#each slots as slot (slot)}
+        <!--
+          Behind a dialog rather than inline: an install can carry hundreds of slots, and listing them here put
+          the button that does the work below the fold behind a wall of checkboxes.
+        -->
+        <button class="picker" disabled={slots.length === 0} onclick={() => (picking = true)}>
+          {#if slots.length === 0}
+            No savegames found
+          {:else if chosen.length === 0}
+            Choose savegames ({slots.length})
+          {:else}
+            {chosen.length} of {slots.length} savegames
+          {/if}
+        </button>
+        <Dialog open={picking} title="Savegames to attach" dismiss={() => (picking = false)}>
+          <input
+            class="filter"
+            type="text"
+            placeholder="Filter by name"
+            aria-label="Filter savegames by name"
+            bind:value={filter}
+          />
+          <div class="slots">
+            {#each matching as slot (slot)}
               <label>
                 <input type="checkbox" checked={chosen.includes(slot)} onchange={() => toggle(slot)} />
                 {slot}
               </label>
+            {:else}
+              <p class="none">Nothing matches "{filter}".</p>
             {/each}
-          </fieldset>
-        {/if}
+          </div>
+          {#snippet footer()}
+            <!-- Acts on what the filter is showing, which is what "all" means with a filter in the box. -->
+            <button onclick={() => (chosen = [...new Set([...chosen, ...matching])])}>Select all</button>
+            <button onclick={() => (chosen = chosen.filter((one) => !matching.includes(one)))}>Select none</button>
+            <button onclick={() => (picking = false)}>Done</button>
+          {/snippet}
+        </Dialog>
         <button
           class="package"
           disabled={!store.install || store.busy !== null}
@@ -149,28 +182,53 @@
     opacity: 0.6;
   }
 
-  .saves {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 14px;
-    margin: 0;
-    border: 1px solid var(--border);
+  .picker {
+    align-self: flex-start;
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
     border-radius: 6px;
-    padding: 4px 12px 8px;
+    padding: 3px 11px;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  .picker:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .filter {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    padding: 4px 8px;
+    color: var(--text);
+    font-size: 12.5px;
+  }
+
+  /* Columns rather than one per line: slot names are short and uniform, so a wall of rows wastes the width. */
+  .slots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: 4px 14px;
     font-size: 12.5px;
     color: var(--text-dim);
   }
 
-  .saves legend {
-    padding: 0 4px;
-    font-size: 11px;
-    color: var(--text-faint);
-  }
-
-  .saves label {
+  .slots label {
     display: flex;
     align-items: center;
     gap: 5px;
+    overflow-wrap: anywhere;
+  }
+
+  .none {
+    margin: 0;
+    color: var(--text-faint);
+    font-size: 12.5px;
   }
 
   .contents {
