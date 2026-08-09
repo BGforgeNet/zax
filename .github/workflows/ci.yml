@@ -2,6 +2,10 @@ name: ci
 
 on:
   push:
+    # Naming branches leaves tags out. A release tag runs the release workflow, which builds the same three
+    # platforms itself, and the commit a tag points at ran this workflow when its branch was pushed - so the
+    # unfiltered trigger only ever built every release twice.
+    branches: ["**"]
   pull_request:
 
 permissions:
