@@ -1,28 +1,30 @@
 # ZAX
 
-[![CI status](https://github.com/BGforgeNet/zax/actions/workflows/ci.yml/badge.svg)](https://github.com/BGforgeNet/zax/actions/workflows/ci.yml) <a href="#"><img align="right" src="https://raw.githubusercontent.com/BGforgeNet/zax/master/docs/zax.png" width="45%" alt="ZAX screenshot" title="ZAX screenshot"/></a>
+[![CI status](https://github.com/BGforgeNet/zax/actions/workflows/ci.yml/badge.svg)](https://github.com/BGforgeNet/zax/actions/workflows/ci.yml)
 [![Patreon](https://img.shields.io/badge/Patreon-donate-FF424D?logo=Patreon&labelColor=141518)](https://www.patreon.com/BGforge)
 
 [![Telegram](https://img.shields.io/badge/telegram-join%20%20%20%20%E2%9D%B1%E2%9D%B1%E2%9D%B1-darkorange?logo=telegram)](https://t.me/bgforge)
 [![Discord](https://img.shields.io/discord/420268540700917760?logo=discord&label=discord&color=blue&logoColor=FEE75C)](https://discord.gg/4Yqfggm)
 [![IRC](https://img.shields.io/badge/%23IRC-join%20%20%20%20%E2%9D%B1%E2%9D%B1%E2%9D%B1-darkorange)](https://bgforge.net/irc)
 
-ZAX is a Fallout 2 game manager. Its purpose is to unify and simplify game and mods configuration. It should work with any game based on Fallout 2 engine.
+ZAX is a configuration and mod manager for Fallout 2 engine games. It unifies game and mod settings in one
+interface, updates sfall, and packages debug info for bug reports. It should work with any game based on the
+Fallout 2 engine.
 
 ### Installation
 
-#### Windows
+The current version has no packaged release yet. Until one ships, run it from a checkout - see
+[Building](docs/building.md):
 
-Download `zax.exe` from the [latest release page](https://github.com/BGforgeNet/zax/releases/latest) and launch it.
+```bash
+pnpm install
+pnpm desktop
+```
 
-#### Linux / Mac / other
+`pnpm --filter @zax/app package` produces distributables for the platform you are on.
 
-- There's a x64 [binary](https://github.com/BGforgeNet/zax/releases/latest) for Linux.
-- ZAX is also available in PyPi:
-  ```bash
-  pip3 install zax
-  zax
-  ```
+The [releases page](https://github.com/BGforgeNet/zax/releases) still carries the earlier Python-based versions,
+up to 0.7.
 
 ### Info
 
