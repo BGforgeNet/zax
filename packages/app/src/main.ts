@@ -77,7 +77,9 @@ function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 860,
-    minWidth: 700,
+    // The interface drops the sidebar below 820 viewport pixels because the settings pane is at its minimum
+    // there - and with it goes the only way to switch installs. The floor keeps the window out of that band.
+    minWidth: 840,
     minHeight: 520,
     // Shown once it has something to draw, so the window does not flash empty on a slow first paint.
     show: false,
