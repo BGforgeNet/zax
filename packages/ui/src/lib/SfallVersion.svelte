@@ -59,9 +59,13 @@
         Change version
       </button>
     </span>
-    {#if store.sfallOutdated}
-      <span class="help">Your settings are carried into the new ddraw.ini, and replaced files are backed up.</span>
-    {/if}
+    <!--
+      Kept in the layout whether or not it applies: a check that finds a newer release, or an update that
+      clears one, would otherwise grow or shrink this row and move every row under it.
+    -->
+    <span class="help carried" class:applies={store.sfallOutdated}>
+      Your settings are carried into the new ddraw.ini, and replaced files are backed up.
+    </span>
     {#if changing}
       <span class="change">
         <select aria-label="sfall version" bind:value={wanted} disabled={store.sfallVersions.length === 0}>
@@ -99,6 +103,14 @@
     display: flex;
     gap: 8px;
     margin-top: 2px;
+  }
+
+  .carried {
+    visibility: hidden;
+  }
+
+  .carried.applies {
+    visibility: visible;
   }
 
   .change {

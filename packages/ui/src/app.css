@@ -176,11 +176,15 @@ button {
   background: var(--panel-alt);
 }
 
+/*
+  Selection changes no metric. A heavier weight is wider than the same text at regular, so selecting a tab
+  resized it and shifted every tab after it along the strip. The background, border and text colour carry the
+  state on their own.
+*/
 .tab[aria-selected="true"] {
   background: var(--bg);
   border-color: var(--border);
   color: var(--text);
-  font-weight: 600;
 }
 
 .tab .count {
@@ -215,10 +219,10 @@ button {
   color: var(--text-dim);
 }
 
+/* Colour and the underline carry it, for the same reason the tab above changes no metric. */
 .subtab[aria-selected="true"] {
   color: var(--accent);
   border-bottom-color: var(--accent);
-  font-weight: 550;
 }
 
 /*
