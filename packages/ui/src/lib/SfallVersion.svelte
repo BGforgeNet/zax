@@ -4,6 +4,7 @@
     update button. The installed one is read from ddraw.dll and needs no network; the latest one does, which is
     the half the browser preview cannot do.
   */
+  import Dialog from "./Dialog.svelte";
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
 
@@ -66,32 +67,36 @@
     <span class="help carried" class:applies={store.sfallOutdated}>
       Your settings are carried into the new ddraw.ini, and replaced files are backed up.
     </span>
-    {#if changing}
-      <span class="change">
-        <select aria-label="sfall version" bind:value={wanted} disabled={store.sfallVersions.length === 0}>
-          {#each store.sfallVersions as version (version)}
-            <option value={version}>{version}{version === store.sfallInstalled ? " (installed)" : ""}</option>
-          {:else}
-            <option value="">Reading the list...</option>
-          {/each}
-        </select>
-        <span class="buttons">
-          <button
-            disabled={wanted === "" || wanted === store.sfallInstalled || store.busy !== null}
-            onclick={() => void store.changeSfall(wanted, `Changing sfall to ${wanted}`).then(() => (changing = false))}
-          >
-            Apply
-          </button>
-          <button onclick={() => (changing = false)}>Cancel</button>
-        </span>
-        <span class="help">
-          Files a newer release added are left in place. Settings are merged against what the installed version shipped,
-          so defaults you never changed follow the release you move to.
-        </span>
-      </span>
-    {/if}
   </div>
 </div>
+
+<!--
+  In a dialog rather than inside the row: opened in place it grew the row and pushed every setting below it
+  down. A dialog is drawn in the top layer, so it costs the page no height and nothing can clip it - which an
+  absolutely positioned panel could not promise inside the scrolling settings pane.
+-->
+<Dialog open={changing} title="Change the sfall version" dismiss={() => (changing = false)}>
+  <select class="pick" aria-label="sfall version" bind:value={wanted} disabled={store.sfallVersions.length === 0}>
+    {#each store.sfallVersions as version (version)}
+      <option value={version}>{version}{version === store.sfallInstalled ? " (installed)" : ""}</option>
+    {:else}
+      <option value="">Reading the list...</option>
+    {/each}
+  </select>
+  <p class="explain">
+    Files a newer release added are left in place. Settings are merged against what the installed version shipped, so
+    defaults you never changed follow the release you move to.
+  </p>
+  {#snippet footer()}
+    <button onclick={() => (changing = false)}>Cancel</button>
+    <button
+      disabled={wanted === "" || wanted === store.sfallInstalled || store.busy !== null}
+      onclick={() => void store.changeSfall(wanted, `Changing sfall to ${wanted}`).then(() => (changing = false))}
+    >
+      Apply
+    </button>
+  {/snippet}
+</Dialog>
 
 <style>
   .unknown {
@@ -113,21 +118,21 @@
     visibility: visible;
   }
 
-  .change {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-    margin-top: 6px;
-  }
-
-  .change select {
-    background: var(--panel);
+  .pick {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--bg);
     border: 1px solid var(--border-strong);
     border-radius: 5px;
-    padding: 2px 6px;
+    padding: 4px 7px;
     color: var(--text);
-    font-size: 12px;
+    font-size: 12.5px;
+  }
+
+  .explain {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    color: var(--text-dim);
   }
 
   .buttons button {
