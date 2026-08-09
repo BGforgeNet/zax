@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesQuery, type SettingDef } from "./catalog.js";
+import { searchText, type SettingDef } from "./catalog.js";
 
 const def = (over: Partial<SettingDef>): SettingDef => ({
   id: "x",
@@ -11,16 +11,17 @@ const def = (over: Partial<SettingDef>): SettingDef => ({
   ...over,
 });
 
-describe("matchesQuery", () => {
-  it("matches on label, key, section, file and help", () => {
-    expect(matchesQuery(def({}), "resolution x")).toBe(true);
-    expect(matchesQuery(def({}), "scr_width")).toBe(true);
-    expect(matchesQuery(def({}), "main")).toBe(true);
-    expect(matchesQuery(def({}), "f2_res")).toBe(true);
-    expect(matchesQuery(def({ help: "Sets the horizontal size" }), "horizontal")).toBe(true);
+describe("searchText", () => {
+  it("carries label, key, section, file and help, lowercased", () => {
+    const text = searchText(def({ help: "Sets the horizontal size" }));
+    expect(text).toContain("resolution x");
+    expect(text).toContain("scr_width");
+    expect(text).toContain("main");
+    expect(text).toContain("f2_res");
+    expect(text).toContain("horizontal");
   });
 
-  it("matches choice option labels", () => {
+  it("carries choice option labels", () => {
     const d = def({
       label: "Window mode",
       kind: {
@@ -31,17 +32,13 @@ describe("matchesQuery", () => {
         ],
       },
     });
-    expect(matchesQuery(d, "fullscreen")).toBe(true);
+    expect(searchText(d)).toContain("fullscreen");
   });
 
-  it("does not match on the source component label", () => {
-    // "High resolution" as a group would otherwise make every setting in that file match "resolution",
-    // burying the few settings the search is actually for.
+  it("carries nothing beyond those fields", () => {
+    // The group label ("High resolution") stays out of SettingDef and out of this text: including it made
+    // every setting of that file match a search for "resolution", burying the few settings actually about it.
     const unrelated = def({ label: "Grayscale", key: "IS_GRAY_SCALE", section: "EFFECTS" });
-    expect(matchesQuery(unrelated, "resolution")).toBe(false);
-  });
-
-  it("treats an empty query as matching everything", () => {
-    expect(matchesQuery(def({}), "   ")).toBe(true);
+    expect(searchText(unrelated)).not.toContain("resolution");
   });
 });

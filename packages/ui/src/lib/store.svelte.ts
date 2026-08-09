@@ -6,6 +6,7 @@ import {
   isApplied,
   matchesValueTest,
   removeInstall,
+  searchText,
   setAlias,
   withWine,
   type Action,
@@ -83,7 +84,7 @@ const SEARCHABLE: ReadonlyArray<{ def: SettingDef; place: Place; where: string; 
     // A pinned value is drawn even where the layout hides it, so it stays findable for the same reason.
     if (!place || (HIDDEN.has(def.id) && !def.managed)) return [];
     const where = describePlace(place);
-    const hay = `${def.label} ${def.key} ${def.section} ${def.file} ${def.help ?? ""} ${where}`.toLowerCase();
+    const hay = `${searchText(def)} ${where.toLowerCase()}`;
     return [{ def, place, where, hay }];
   },
 );

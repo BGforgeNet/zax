@@ -148,6 +148,14 @@ describe("search", () => {
     store.query = "";
   });
 
+  test("finds a setting by one of its choice option labels", () => {
+    // "DirectX9" appears only as an option label of the graphics mode choice - its label, key and address say
+    // nothing about DirectX - so this passes only while option labels are part of the searched text.
+    store.query = "directx9";
+    expect(store.results.map((r) => r.def.id)).toContain("hires.main.graphics-mode");
+    store.query = "";
+  });
+
   test("going to a result selects the tab it lives on and drops the query", () => {
     store.query = "worldmap";
     const first = store.results[0]!;

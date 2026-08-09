@@ -172,16 +172,15 @@ export function displayValue(def: SettingDef, raw: string | undefined): string {
 }
 
 /**
- * Free-text search over the fields a user would plausibly type.
+ * The text a search matches against - the fields a user would plausibly type, lowercased once so callers can
+ * index it ahead of time instead of rebuilding it per query.
  *
  * `group` is deliberately excluded. It labels the source component ("High resolution"), so including it made
  * every one of that file's settings match a search for "resolution" - a whole file of noise burying the handful
  * of settings actually about resolution. `file` already covers searching by origin.
  */
-export function matchesQuery(def: SettingDef, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (q === "") return true;
-  const haystack = [def.label, def.key, def.section, def.file, def.help ?? ""].join(" ").toLowerCase();
-  if (haystack.includes(q)) return true;
-  return def.kind.type === "choice" && def.kind.options.some((o) => o.label.toLowerCase().includes(q));
+export function searchText(def: SettingDef): string {
+  const fields = [def.label, def.key, def.section, def.file, def.help ?? ""];
+  if (def.kind.type === "choice") fields.push(...def.kind.options.map((o) => o.label));
+  return fields.join(" ").toLowerCase();
 }
