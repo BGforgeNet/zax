@@ -8,19 +8,20 @@
  * archives written. Asserting on those records is how a test checks an effect that has no return value.
  */
 
-import type {
-  Archive,
-  ArchiveEntry,
-  DirEntry,
-  FileStat,
-  FileSystem,
-  LaunchOptions,
-  Network,
-  OperatingSystem,
-  Paths,
-  Platform,
-  ProcessLauncher,
-  Registry,
+import {
+  NetworkError,
+  type Archive,
+  type ArchiveEntry,
+  type DirEntry,
+  type FileStat,
+  type FileSystem,
+  type LaunchOptions,
+  type Network,
+  type OperatingSystem,
+  type Paths,
+  type Platform,
+  type ProcessLauncher,
+  type Registry,
 } from "./index.js";
 
 /** Bytes for a string, one byte per code point. Lossless for the latin1 config files, and ASCII is ASCII. */
@@ -88,7 +89,7 @@ export class MemoryPlatform implements Platform {
   readonly opened: string[] = [];
   readonly fetched: string[] = [];
   readonly downloaded: Array<{ url: string; destination: string }> = [];
-  readonly extracted: Array<{ archive: string; destination: string }> = [];
+  readonly extracted: Array<{ archive: string; destination: string; only?: readonly string[] }> = [];
   /**
    * Archives written, each with what was in it at the time. The contents are captured rather than looked up
    * later because an archive routinely outlives the scratch files that went into it.
@@ -184,23 +185,31 @@ export class MemoryPlatform implements Platform {
       fetchText: async (url) => {
         this.fetched.push(url);
         const body = this.responses[url];
-        if (body === undefined) throw new Error(`No canned response for ${url}`);
+        // A URL with no canned response stands for a host that is not there, which is what the real one
+        // reports as well - so a test of the offline path gets the same error type the interface handles.
+        if (body === undefined) throw new NetworkError("offline", url, `No canned response for ${url}`);
         return body;
       },
-      download: async (url, destination) => {
+      download: async (url, destination, options) => {
         this.downloaded.push({ url, destination });
         const payload = this.payloads[url];
-        if (payload === undefined) throw new Error(`No canned download for ${url}`);
-        this.put(normalize(destination), typeof payload === "string" ? bytes(payload) : payload);
+        if (payload === undefined) throw new NetworkError("offline", url, `No canned download for ${url}`);
+        const data = typeof payload === "string" ? bytes(payload) : payload;
+        // Reported in one go rather than in pieces: there is nothing here to be slow, and a caller that draws
+        // progress should still see it reach the end.
+        options?.onProgress?.({ received: data.length, total: data.length });
+        this.put(normalize(destination), data);
       },
     };
 
     this.archive = {
-      extract: async (archive, destination) => {
-        this.extracted.push({ archive, destination });
+      extract: async (archive, destination, options) => {
+        this.extracted.push({ archive, destination, ...(options?.only ? { only: [...options.only] } : {}) });
         const inside = this.contents[normalize(archive)] ?? this.contents[archive];
         if (!inside) throw new Error(`No canned contents for ${archive}`);
+        const wanted = options?.only;
         for (const [name, content] of Object.entries(inside)) {
+          if (wanted && !wanted.includes(name)) continue;
           this.put(normalize(`${destination}/${name}`), typeof content === "string" ? bytes(content) : content);
         }
       },

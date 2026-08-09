@@ -21,8 +21,10 @@ const { dirname, basename } = require("node:path");
   sz.FS.mount(sz.NODEFS, { root: dirname(workerData.archive) }, inside);
   sz.FS.mount(sz.NODEFS, { root: workerData.destination }, outside);
   sz.FS.chdir(outside);
+  // Named files only when the caller asked for some; 7-Zip treats no names as "everything".
+  const wanted = workerData.only ?? [];
   // Emscripten's `callMain` returns the program's exit status; 7z-wasm's declaration says `void`.
-  const code = sz.callMain(["x", `${inside}/${basename(workerData.archive)}`, "-y"]);
+  const code = sz.callMain(["x", `${inside}/${basename(workerData.archive)}`, "-y", ...wanted]);
   parentPort.postMessage({ code: typeof code === "number" ? code : 0 });
 })().catch((error) => {
   parentPort.postMessage({ error: error instanceof Error ? error.message : String(error) });

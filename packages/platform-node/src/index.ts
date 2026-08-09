@@ -9,18 +9,27 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { Worker } from "node:worker_threads";
-import { zipSync } from "fflate";
-import type {
-  ArchiveEntry,
-  DirEntry,
-  FileKind,
-  FileStat,
-  LaunchOptions,
-  OperatingSystem,
-  Platform,
+import {
+  NetworkError,
+  type ArchiveEntry,
+  type DirEntry,
+  type FileKind,
+  type FileStat,
+  type LaunchOptions,
+  type OperatingSystem,
+  type Platform,
 } from "@zax/platform";
+import { downloadFile, type AttemptNote } from "./download.js";
 import { applicationDirectories } from "./paths.js";
 import { registryValue } from "./registry.js";
+
+/**
+ * What the shell wants told about work that happens out of sight. A failed download is the one thing a bug
+ * report cannot reconstruct from the interface, so the shell passes a sink for it here.
+ */
+export interface PlatformOptions {
+  log?: (line: string) => void;
+}
 
 const APP_NAME = "zax";
 
@@ -54,6 +63,25 @@ function kindOf(entry: { isFile(): boolean; isDirectory(): boolean }): FileKind 
  */
 const EXTRACT_WORKER = new URL("./extract-worker.cjs", import.meta.url);
 
+/**
+ * Zipping runs off the main process for the same reason: fflate compresses synchronously, which measured
+ * 850 ms of frozen window on a debug package carrying 24 MB of saves.
+ */
+const ZIP_WORKER = new URL("./zip-worker.cjs", import.meta.url);
+
+/**
+ * Runs one throwaway worker and answers with its message, or with why there was not one. Resolve-once:
+ * whichever of the three arrives first decides, and the rest fall on an already-settled promise.
+ */
+async function inWorker<T>(script: URL, what: string, workerData: unknown): Promise<T | { error: string }> {
+  const worker = new Worker(script, { workerData });
+  return new Promise<T | { error: string }>((resolve) => {
+    worker.once("message", resolve);
+    worker.once("error", (error) => resolve({ error: error instanceof Error ? error.message : String(error) }));
+    worker.once("exit", (status) => resolve({ error: `the ${what} worker exited with ${status}` }));
+  }).finally(() => void worker.terminate());
+}
+
 /** A wedged `reg` must not hold the scan that asked; there is nothing here worth waiting seconds for. */
 const REGISTRY_TIMEOUT_MS = 5_000;
 
@@ -68,10 +96,17 @@ function isDirectory(path: string): boolean {
   }
 }
 
-export function nodePlatform(): Platform {
+export function nodePlatform(options: PlatformOptions = {}): Platform {
   const os = process.platform;
   const home = homedir();
   const { config, cache } = applicationDirectories(os, process.env, home, APP_NAME, process.execPath, isDirectory);
+
+  /** One line per attempt, so a report from a user on a poor connection says which part failed and how far it got. */
+  const noteDownload = (note: AttemptNote): void => {
+    const size = note.total === null ? `${note.received} bytes` : `${note.received}/${note.total} bytes`;
+    const resumed = note.resumedFrom > 0 ? `, resumed from ${note.resumedFrom}` : "";
+    options.log?.(`download ${note.outcome}: ${note.url} attempt ${note.attempt}, ${size} in ${note.ms}ms${resumed}`);
+  };
 
   return {
     os: operatingSystem(os),
@@ -160,37 +195,57 @@ export function nodePlatform(): Platform {
 
     net: {
       fetchText: async (url) => {
-        const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-        if (!response.ok) throw new Error(`${url} returned ${response.status} ${response.statusText}`);
+        // A feed is a few kilobytes, so a deadline on the whole request is the right shape here - unlike a
+        // download, where it would fail a slow link that is still making progress.
+        let response: Response;
+        try {
+          response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+        } catch (error) {
+          const kind = (error as { name?: string }).name === "TimeoutError" ? "timeout" : "offline";
+          const host = (() => {
+            try {
+              return new URL(url).host;
+            } catch {
+              return url;
+            }
+          })();
+          const reason =
+            kind === "timeout"
+              ? `${host} did not answer in time.`
+              : `${host} could not be reached - check the network connection.`;
+          throw new NetworkError(kind, url, reason, { cause: error });
+        }
+        if (!response.ok) {
+          const detail = `${response.status} ${response.statusText}`.trim();
+          throw new NetworkError("status", url, `${new URL(url).host} answered with ${detail}.`, {
+            status: response.status,
+          });
+        }
         return response.text();
       },
-      download: async (url, destination) => {
-        const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-        if (!response.ok) throw new Error(`${url} returned ${response.status} ${response.statusText}`);
-        await mkdir(dirname(destination), { recursive: true });
-        await writeFile(destination, new Uint8Array(await response.arrayBuffer()));
-      },
+      download: (url, destination, options) => downloadFile(url, destination, { ...options, note: noteDownload }),
     },
 
     archive: {
-      extract: async (archive, destination) => {
+      extract: async (archive, destination, options) => {
         await mkdir(destination, { recursive: true });
-        const worker = new Worker(EXTRACT_WORKER, { workerData: { archive, destination } });
-        // Resolve-once: whichever of the three arrives first decides, and the rest fall on a settled promise.
-        const outcome = await new Promise<{ code: number } | { error: string }>((resolve) => {
-          worker.once("message", resolve);
-          worker.once("error", (error) => resolve({ error: error instanceof Error ? error.message : String(error) }));
-          worker.once("exit", (status) => resolve({ error: `the extraction worker exited with ${status}` }));
-        }).finally(() => void worker.terminate());
+        const outcome = await inWorker<{ code: number }>(EXTRACT_WORKER, "extraction", {
+          archive,
+          destination,
+          // Spread rather than passed through: a readonly array from the caller may be a reactive proxy by
+          // the time it gets here, and the structured clone into the worker refuses one.
+          only: options?.only ? [...options.only] : [],
+        });
         if ("error" in outcome) throw new Error(`Could not extract ${archive}: ${outcome.error}`);
         if (outcome.code !== 0) throw new Error(`Could not extract ${archive}: 7-Zip exited with ${outcome.code}`);
       },
 
       createZip: async (destination, entries: readonly ArchiveEntry[]) => {
-        const contents: Record<string, Uint8Array> = {};
-        for (const entry of entries) contents[entry.name] = await readFile(entry.source);
-        await mkdir(dirname(destination), { recursive: true });
-        await writeFile(destination, zipSync(contents, { level: 6 }));
+        const outcome = await inWorker<{ ok: true }>(ZIP_WORKER, "zip", {
+          destination,
+          entries: entries.map((entry) => ({ source: entry.source, name: entry.name })),
+        });
+        if ("error" in outcome) throw new Error(`Could not write ${destination}: ${outcome.error}`);
       },
     },
   };

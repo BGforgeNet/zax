@@ -9,17 +9,23 @@ import { dirname, join } from "node:path";
 import { appendLog } from "@zax/core";
 import { BACKEND_METHODS, createBackend, type Backend } from "@zax/fallout2";
 import { nodePlatform } from "@zax/platform-node";
-import { CHANNEL } from "./channel.js";
+import { CHANNEL, PROGRESS_CHANNEL } from "./channel.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** Where the interface is served from: the built files beside this one, or the dev server when one is given. */
 const DEV_SERVER = process.env["ZAX_DEV_SERVER"];
 
-const platform = nodePlatform();
+// The platform reports what it did out of sight - failed and resumed downloads above all, which are the one
+// thing a bug report from a poor connection cannot reconstruct from the interface. It can be handed `logLine`
+// before the line below because a function declaration is hoisted, and `platform` is only read when one is
+// written rather than when the sink is passed.
+const platform = nodePlatform({ log: (line) => void logLine(line) });
 
 /** One line per event, in the file the interface's "open log" button points at. */
-const logLine = (text: string): Promise<void> => appendLog(platform, text, new Date());
+function logLine(text: string): Promise<void> {
+  return appendLog(platform, text, new Date());
+}
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -136,7 +142,17 @@ else {
   });
 
   void app.whenReady().then(() => {
-    register(createBackend(platform, { chooseFolder }));
+    register(
+      createBackend(platform, {
+        chooseFolder,
+        // To whichever window is open. Sent rather than returned because the interface needs it while the
+        // operation is still running, and a reply only arrives once it has finished.
+        report: (progress) => {
+          const [window] = BrowserWindow.getAllWindows();
+          if (window && !window.isDestroyed()) window.webContents.send(PROGRESS_CHANNEL, progress);
+        },
+      }),
+    );
     createWindow();
     // macOS keeps the application running with no windows; clicking the dock icon opens one again.
     app.on("activate", () => {

@@ -10,16 +10,23 @@
 
 import type { Platform } from "@zax/platform";
 import { MemoryPlatform } from "@zax/platform/memory";
-import { BACKEND_METHODS, createBackend, type Backend } from "@zax/fallout2";
+import { BACKEND_METHODS, createBackend, type Backend, type OperationProgress } from "@zax/fallout2";
 
 import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
 import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
 
+/** How the interface hears about a long operation's progress, whichever host it is talking to. */
+export interface ProgressSource {
+  subscribe(listener: (progress: OperationProgress) => void): void;
+}
+
 declare global {
   interface Window {
     /** Installed by the desktop build's preload script. Absent in a browser. */
     zax?: Backend;
+    /** Its companion, carrying the one thing that travels the other way. */
+    zaxProgress?: ProgressSource;
   }
 }
 
@@ -85,8 +92,28 @@ function copyingArguments(backend: Backend): Backend {
 const supplied = typeof window === "undefined" ? undefined : window.zax;
 
 export const hostKind: HostKind = supplied ? "desktop" : "preview";
+
+/**
+ * The preview's own progress, built here rather than refused: the backend it runs is in this process, so it
+ * can report exactly as the desktop's does. Which means the interface's progress display is exercised by the
+ * preview and by its tests, instead of only existing on the build that is hardest to drive.
+ */
+const previewListeners: Array<(progress: OperationProgress) => void> = [];
+
 // No picker in a browser, and a made-up path would name a folder nobody has.
-export const backend: Backend = supplied ?? copyingArguments(createBackend(previewPlatform, { chooseFolder: refuses }));
+export const backend: Backend =
+  supplied ??
+  copyingArguments(
+    createBackend(previewPlatform, {
+      chooseFolder: refuses,
+      report: (progress) => previewListeners.forEach((listener) => listener(progress)),
+    }),
+  );
+
+// Guarded the same way `supplied` is: this module is loaded by tests that run with no window at all.
+export const progressSource: ProgressSource = (typeof window === "undefined" ? undefined : window.zaxProgress) ?? {
+  subscribe: (listener) => previewListeners.push(listener),
+};
 
 /** True where an operation that leaves this page - a launch, a version check - cannot run. */
 export const isPreview = hostKind === "preview";

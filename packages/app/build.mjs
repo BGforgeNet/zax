@@ -42,9 +42,21 @@ await build({
     js: "import { createRequire as zaxCreateRequire } from 'node:module';\nconst require = zaxCreateRequire(import.meta.url);",
   },
 });
-// The extraction worker is loaded by path at runtime rather than imported, so the bundler never sees it; it is
-// copied beside the bundle, where the main process's `new URL` resolution expects it.
+// Both workers are loaded by path at runtime rather than imported, so the bundler never sees them through the
+// main entry point; each lands beside the bundle, where `new URL` resolution expects it.
+//
+// They are treated differently because of what they need at runtime. The extraction worker is copied as it is:
+// its one dependency stays external, for the reason `common` gives. The zip worker is bundled, because fflate
+// reaches it through the workspace packages, which ship as devDependencies - so nothing would resolve
+// `require("fflate")` in a packaged copy, and a plain copy would work everywhere except a distributable.
 await copyFile(join(here, "../platform-node/src/extract-worker.cjs"), join(dist, "extract-worker.cjs"));
+
+await build({
+  ...common,
+  entryPoints: [join(here, "../platform-node/src/zip-worker.cjs")],
+  outfile: join(dist, "zip-worker.cjs"),
+  format: "cjs",
+});
 
 // The preload bundles whole: a sandboxed one has no module resolution of its own. It imports only the list of
 // operation names, whose module has no runtime imports, so this stays a few lines.

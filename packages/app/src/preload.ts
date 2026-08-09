@@ -10,11 +10,35 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { BACKEND_METHODS } from "@zax/fallout2/backend-methods";
-import type { Backend } from "@zax/fallout2";
-import { CHANNEL, GLOBAL } from "./channel.js";
+import type { Backend, OperationProgress } from "@zax/fallout2";
+import { CHANNEL, GLOBAL, PROGRESS_CHANNEL, PROGRESS_GLOBAL } from "./channel.js";
+
+/**
+ * Electron prefixes a rejected call's message with the channel it came over - "Error invoking remote method
+ * 'zax:call': ..." - which the interface would otherwise show to the user in front of the real reason. The
+ * messages this application throws are written to be read, so the wrapper is taken back off here, at the one
+ * place that put it on.
+ */
+function unwrapped(error: unknown): Error {
+  const text = error instanceof Error ? error.message : String(error);
+  const cut = /^Error invoking remote method '[^']*':\s*(?:\w*Error:\s*)?/.exec(text);
+  return new Error(cut ? text.slice(cut[0].length) : text);
+}
 
 const backend = Object.fromEntries(
-  BACKEND_METHODS.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(CHANNEL, method, args)]),
+  BACKEND_METHODS.map((method) => [
+    method,
+    (...args: unknown[]) =>
+      ipcRenderer.invoke(CHANNEL, method, args).catch((error: unknown) => Promise.reject(unwrapped(error))),
+  ]),
 ) as unknown as Backend;
 
 contextBridge.exposeInMainWorld(GLOBAL, backend);
+
+// Separate from the backend because it is not one of the operations - see the note on `PROGRESS_GLOBAL`. The
+// listener is wrapped rather than passed on, so nothing from the page is ever handed to `ipcRenderer` itself.
+contextBridge.exposeInMainWorld(PROGRESS_GLOBAL, {
+  subscribe: (listener: (progress: OperationProgress) => void) => {
+    ipcRenderer.on(PROGRESS_CHANNEL, (_event, progress: OperationProgress) => listener(progress));
+  },
+});

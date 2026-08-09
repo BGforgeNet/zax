@@ -29,6 +29,7 @@ files:
 asarUnpack:
   - "**/node_modules/7z-wasm/**"
   - "**/extract-worker.cjs"
+  - "**/zip-worker.cjs"
 
 # Nothing here is a native module - the one piece of native code is WebAssembly, which needs no rebuild.
 npmRebuild: false

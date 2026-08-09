@@ -19,7 +19,7 @@ import {
   type MergeConflict,
 } from "@zax/core";
 import type { Install } from "@zax/core";
-import type { Platform } from "@zax/platform";
+import type { DownloadOptions, Platform } from "@zax/platform";
 import { installedLibraryVersion } from "./pe-version.js";
 
 /** sfall is a DirectDraw wrapper: it ships as this DLL, and its version is the DLL's own. */
@@ -93,26 +93,119 @@ export interface SfallUpdate {
   removed: readonly { section: string; key: string }[];
 }
 
-/** The cached archive for a version, downloaded if this is the first time it is asked for. */
-export async function sfallPackage(platform: Platform, version: string): Promise<string> {
+/**
+ * What a long sfall operation reports as it runs. The download carries byte counts because its length is
+ * knowable; the steps after it only say what they are doing, which is enough to keep a proportion stuck at
+ * 100% from reading as a hang.
+ */
+export interface SfallProgress extends DownloadOptions {
+  onStep?: (step: string) => void;
+}
+
+/**
+ * Every 7z archive begins with these bytes. Worth checking because two of the ways a mirror misbehaves are
+ * invisible to the transport: an error page served with a 200, and a chunked body that stops early without
+ * having declared a length. Both write a file that exists, which is all the cache used to ask for.
+ */
+const SEVEN_ZIP_MAGIC = [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c];
+
+async function isArchive(platform: Platform, path: string): Promise<boolean> {
+  const found = await platform.fs.stat(path);
+  if (found?.kind !== "file" || found.size < SEVEN_ZIP_MAGIC.length) return false;
+  const head = await platform.fs.read(path);
+  return SEVEN_ZIP_MAGIC.every((byte, at) => head[at] === byte);
+}
+
+/**
+ * The cached archive for a version, downloaded if this is the first time it is asked for.
+ *
+ * What is on disk is checked rather than assumed, in both directions: a cached file that is not an archive is
+ * discarded instead of being handed out for ever, and a fresh download that is not one fails here rather than
+ * at extraction, where the message would be about 7-Zip's exit status instead of about the mirror.
+ */
+export async function sfallPackage(platform: Platform, version: string, options?: SfallProgress): Promise<string> {
   const path = platform.paths.join(packageDirectory(platform), `sfall-${version}.7z`);
-  if ((await platform.fs.stat(path))?.kind === "file") return path;
-  await platform.net.download(releaseUrl(version), path);
+  if (await isArchive(platform, path)) return path;
+  // Something is there but it is not an archive, so it came from an answer that was not the file.
+  await platform.fs.remove(path);
+
+  // Named here rather than by the caller: an update fetches two archives - this release and the one its
+  // merge compares against - and labelling both with the release's version reads as the download restarting.
+  options?.onStep?.(`Downloading sfall ${version}`);
+
+  await platform.net.download(releaseUrl(version), path, options);
+  if (!(await isArchive(platform, path))) {
+    await platform.fs.remove(path);
+    throw new Error(
+      `What ${new URL(releaseUrl(version)).host} sent for sfall ${version} was not an archive - the mirror may have answered with an error page. Trying again may reach a different one.`,
+    );
+  }
   return path;
+}
+
+/** sfall's own settings file, which is both what the merge works on and the only file a base is read from. */
+const DDRAW_INI = "ddraw.ini";
+
+/**
+ * Extracts a release, and throws away the cached archive if it will not open. An archive can begin with the
+ * right bytes and still be truncated - a chunked body that ended early is not detectable until something tries
+ * to read it - and a cache keyed on existence would hand the same broken file to every attempt after this one.
+ */
+async function extractPackage(
+  platform: Platform,
+  version: string,
+  destination: string,
+  options?: SfallProgress,
+  only?: readonly string[],
+): Promise<void> {
+  const archive = await sfallPackage(platform, version, options);
+  try {
+    await platform.archive.extract(archive, destination, only ? { only } : undefined);
+  } catch (error) {
+    await platform.fs.remove(archive);
+    throw error;
+  }
+}
+
+/** Where a version's own `ddraw.ini` is kept once it has been seen, so no later update has to fetch it again. */
+function defaultsPath(platform: Platform, version: string): string {
+  return platform.paths.join(packageDirectory(platform), "defaults", `ddraw-${version}.ini`);
+}
+
+/**
+ * Keeps what a release ships as its `ddraw.ini`. Called while the release is unpacked and before the merge
+ * rewrites that file in place, because this is the pristine copy - the next update from this version reads it
+ * as the merge base and needs no second archive at all.
+ */
+async function rememberDefaults(platform: Platform, version: string, from: string): Promise<void> {
+  if ((await platform.fs.stat(from))?.kind !== "file") return;
+  await platform.fs.copy(from, defaultsPath(platform, version));
 }
 
 /**
  * What a version shipped as its own `ddraw.ini`, or null when that version's archive cannot be had. This is the
  * base a merge compares against: without it there is no telling a chosen setting from an untouched one.
+ *
+ * Read from the copy kept when that version was installed where there is one. Otherwise the archive is fetched
+ * and only this one file is taken out of it - the whole release used to be unpacked and deleted to read 44 KB.
  */
-export async function sfallDefaults(platform: Platform, version: string): Promise<IniDocument | null> {
+export async function sfallDefaults(
+  platform: Platform,
+  version: string,
+  options?: SfallProgress,
+): Promise<IniDocument | null> {
   const { join } = platform.paths;
+  const kept = defaultsPath(platform, version);
+  if ((await platform.fs.stat(kept))?.kind === "file") return IniDocument.parseBytes(await platform.fs.read(kept));
+
   const work = join(temporaryDirectory(platform), `sfall-defaults-${version}`);
   try {
-    await platform.archive.extract(await sfallPackage(platform, version), work);
-    const ini = join(work, "ddraw.ini");
+    await extractPackage(platform, version, work, options, [DDRAW_INI]);
+    const ini = join(work, DDRAW_INI);
     if ((await platform.fs.stat(ini))?.kind !== "file") return null;
-    return IniDocument.parseBytes(await platform.fs.read(ini));
+    const content = await platform.fs.read(ini);
+    await platform.fs.write(kept, content);
+    return IniDocument.parseBytes(content);
   } catch {
     // An archive that will not download or will not open is a missing base, not a failed update: the merge
     // falls back to carrying every value across, which is what it did before any of this existed.
@@ -131,6 +224,7 @@ export async function updateSfall(
   install: Install,
   version: string,
   now: Date = new Date(),
+  options?: SfallProgress,
 ): Promise<SfallUpdate> {
   const { join } = platform.paths;
   const at = stamp(now);
@@ -138,12 +232,17 @@ export async function updateSfall(
   const unpacked = join(work, "unpacked");
 
   try {
-    await platform.archive.extract(await sfallPackage(platform, version), unpacked);
+    await extractPackage(platform, version, unpacked, options);
+    // Before the merge, which rewrites this file in place: what is on disk now is what the release ships, and
+    // that is what the next update from this version needs as its base.
+    await rememberDefaults(platform, version, join(unpacked, DDRAW_INI));
 
     // The version being replaced, read before anything is written over it.
     const previous = await installedSfallVersion(platform, install);
-    const merge = await mergeSettings(platform, install, unpacked, previous);
+    options?.onStep?.("Merging your settings");
+    const merge = await mergeSettings(platform, install, unpacked, previous, options);
 
+    options?.onStep?.("Backing up the files being replaced");
     const incoming = await listFilesRecursively(platform, unpacked);
     const replaced: string[] = [];
     const backup = join(backupDirectory(platform), at);
@@ -154,6 +253,7 @@ export async function updateSfall(
       replaced.push(file);
     }
 
+    options?.onStep?.(`Installing sfall ${version}`);
     await copyTree(platform, unpacked, install.path);
     return {
       version,
@@ -180,15 +280,16 @@ async function mergeSettings(
   install: Install,
   unpacked: string,
   previous: string | null,
+  options?: SfallProgress,
 ): Promise<{ conflicts: readonly MergeConflict[]; removed: readonly { section: string; key: string }[] }> {
   const { join } = platform.paths;
   const empty = { conflicts: [], removed: [] };
-  const mine = join(install.path, "ddraw.ini");
-  const theirs = join(unpacked, "ddraw.ini");
+  const mine = join(install.path, DDRAW_INI);
+  const theirs = join(unpacked, DDRAW_INI);
   if ((await platform.fs.stat(mine))?.kind !== "file") return empty;
   if ((await platform.fs.stat(theirs))?.kind !== "file") return empty;
 
-  const base = previous === null ? null : await sfallDefaults(platform, previous);
+  const base = previous === null ? null : await sfallDefaults(platform, previous, options);
   const outcome = mergeIni(
     IniDocument.parseBytes(await platform.fs.read(theirs)),
     IniDocument.parseBytes(await platform.fs.read(mine)),

@@ -150,6 +150,8 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    /* Takes the rest of the row so the badge has an edge to sit against, and the path has the full width. */
+    flex: 1;
     min-width: 0;
   }
 
@@ -174,6 +176,8 @@
   }
 
   .badge {
+    /* Against the far edge rather than beside the name, which read as part of it however long the name was. */
+    margin-left: auto;
     font-family: var(--mono);
     font-size: 10px;
     background: var(--panel);

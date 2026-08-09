@@ -79,6 +79,21 @@ describe("installs", () => {
 });
 
 describe("search", () => {
+  test("answers the same rows for one query, and different rows when it changes", () => {
+    // The tab that draws these reads `results` once per row, so the getter holds its last answer. That is
+    // only safe while a changed query still recomputes, which is what the second half checks.
+    store.query = "worldmap";
+    const first = store.results;
+    expect(store.results, "the same query is not recomputed").toBe(first);
+
+    store.query = "sound";
+    expect(store.results).not.toBe(first);
+    expect(store.results.every((r) => `${r.def.label} ${r.def.key} ${r.where}`.toLowerCase().includes("sound"))).toBe(
+      true,
+    );
+    store.query = "";
+  });
+
   test("reaches settings on tabs other than the one on screen", () => {
     store.settingsTab = "fallout2.cfg";
     store.query = "worldmap";
@@ -317,15 +332,38 @@ describe("crossing the process boundary", () => {
   });
 });
 
-describe("a config file the install does not have", () => {
+describe("a value ZAX pins", () => {
   const PINNED = "hires.main.uac-aware";
+  const onDisk = async () => {
+    const raw = await previewPlatform.fs.read(`${PREVIEW_INSTALL}/f2_res.ini`);
+    return [...raw].map((b) => String.fromCharCode(b)).join("");
+  };
 
-  test("pins its value while the file is there", () => {
-    // The seeded fixture ships UAC_AWARE=1, which ZAX pins off - so it starts as a pending change.
-    expect(store.isModified(PINNED)).toBe(true);
+  /*
+    The seeded fixture ships UAC_AWARE=1 and ZAX pins it off. It used to sit as a pending change, which left
+    the install permanently reading "1 unsaved" with nothing the user had done to account for it.
+  */
+  test("is written on load rather than counted as an unsaved change", async () => {
+    expect(store.valueOf(PINNED)).toBe("0");
+    expect(store.isModified(PINNED)).toBe(false);
+    expect(store.modifiedCount, "a fresh install reads as saved").toBe(0);
+    // The file itself, not just what the interface reports about it.
+    expect(await onDisk()).toContain("UAC_AWARE=0");
   });
 
-  test("queues nothing once it is gone, so saving cannot create the file", async () => {
+  test("is written whether or not autosave is on, since it is not the user's edit", async () => {
+    await store.setAutosave(false);
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/f2_res.ini`, bytes(f2resini));
+    expect(await onDisk(), "back to the fixture's own value").toContain("UAC_AWARE=1");
+
+    await store.start();
+
+    expect(store.autosave).toBe(false);
+    expect(await onDisk()).toContain("UAC_AWARE=0");
+    expect(store.modifiedCount).toBe(0);
+  });
+
+  test("queues nothing once its file is gone, so saving cannot create the file", async () => {
     await previewPlatform.fs.remove(`${PREVIEW_INSTALL}/f2_res.ini`);
     await store.start();
 
@@ -380,5 +418,35 @@ describe("autosave", () => {
 
   test("stays off unless asked, so no install is written to by opening the application", () => {
     expect(store.autosave).toBe(false);
+  });
+});
+
+describe("a long operation", () => {
+  test("reports its step and proportion while it runs, and nothing once it has stopped", async () => {
+    expect(store.progressText, "nothing is running").toBeNull();
+
+    // What the backend reports as a download advances. Delivered through the same subscription the desktop
+    // build uses - the preview builds one over its own in-process backend.
+    store.busy = "Updating sfall";
+    store.progress = { step: "Downloading sfall 4.5", received: 440_000, total: 880_000 };
+    expect(store.progressText).toBe("Downloading sfall 4.5 - 50% of 0.8 MB");
+
+    // A step with no length says what it is doing and claims no proportion it cannot know.
+    store.progress = { step: "Merging your settings" };
+    expect(store.progressText).toBe("Merging your settings");
+
+    store.busy = null;
+    store.progress = null;
+    expect(store.progressText).toBeNull();
+  });
+
+  test("says a second request was refused rather than dropping it in silence", async () => {
+    // A click during an update used to do nothing at all, which reads as a broken button rather than a busy
+    // application - and these operations run for minutes on a poor connection.
+    store.busy = "Updating sfall";
+    await store.scan();
+
+    expect(store.notice).toEqual({ kind: "problem", text: "Updating sfall is still running - wait for it to finish." });
+    store.busy = null;
   });
 });

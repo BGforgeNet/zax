@@ -30,11 +30,12 @@ import {
   type Backend,
   type MachineDescription,
   type OpenTarget,
+  type OperationProgress,
   type OwnDirectory,
   type Place,
   type SfallRelease,
 } from "@zax/fallout2";
-import { backend as host, isPreview } from "./host.js";
+import { backend as host, isPreview, progressSource } from "./host.js";
 
 /**
  * Every argument is unwrapped before it leaves the interface. The store holds its state in reactive proxies,
@@ -70,6 +71,22 @@ const PLACES = placesById();
 const HIDDEN = hiddenIds();
 
 const CURATED = new Map(SETTINGS.map((s) => [`${s.file}|${s.section}|${s.key}`.toLowerCase(), s]));
+
+/**
+ * Every setting search can reach, with its address and the text matched against, built once at load. None of
+ * it depends on anything that changes at runtime, and rebuilding it per query meant lowercasing 164 strings
+ * on every keystroke.
+ */
+const SEARCHABLE: ReadonlyArray<{ def: SettingDef; place: Place; where: string; hay: string }> = SETTINGS.flatMap(
+  (def) => {
+    const place = PLACES.get(def.id);
+    // A pinned value is drawn even where the layout hides it, so it stays findable for the same reason.
+    if (!place || (HIDDEN.has(def.id) && !def.managed)) return [];
+    const where = describePlace(place);
+    const hay = `${def.label} ${def.key} ${def.section} ${def.file} ${def.help ?? ""} ${where}`.toLowerCase();
+    return [{ def, place, where, hay }];
+  },
+);
 
 /**
  * Every key the config files actually contain. The catalog curates 166 of them; sfall's ddraw.ini alone holds
@@ -152,7 +169,21 @@ class Store {
   loaded = $state(false);
   /** The operation in progress, for disabling the controls that would start a second one. */
   busy = $state<string | null>(null);
+  /**
+   * How far that operation has got, when it is the kind that can say. Cleared with the operation, so nothing
+   * is left reading 100% after the thing it was measuring has finished.
+   */
+  progress = $state<OperationProgress | null>(null);
   notice = $state<Notice | null>(null);
+
+  /** The step and, where the length is known, the proportion - for one line under the operation's name. */
+  get progressText(): string | null {
+    const at = this.progress;
+    if (!at) return null;
+    if (at.received === undefined || at.total === undefined || at.total === null || at.total === 0) return at.step;
+    const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
+    return `${at.step} - ${Math.floor((at.received / at.total) * 100)}% of ${mb(at.total)} MB`;
+  }
 
   sfallInstalled = $state<string | null>(null);
   sfallLatest = $state<SfallRelease | null>(null);
@@ -168,6 +199,12 @@ class Store {
 
   /** Read once at startup: which machine this is and where its own directories are. */
   private machine = $state<MachineDescription | null>(null);
+
+  /** The last search and what it produced - see `results`. Plain, not a rune, on purpose. */
+  private cachedResults: {
+    query: string;
+    rows: ReadonlyArray<{ def: SettingDef; place: Place; where: string }>;
+  } | null = null;
 
   /**
    * The values on disk, and every key the files actually hold. Computed when an install is read rather than
@@ -187,9 +224,9 @@ class Store {
   }
 
   /**
-   * Values ZAX pins regardless of what the file says. UAC_AWARE=1 makes the high-resolution patch read its
-   * settings from roaming appdata instead of the game folder, so leaving it on means editing an ini the patch
-   * never reads. They start as pending changes so the user sees them rather than having them applied invisibly.
+   * Values ZAX pins regardless of what the file says, and which the file does not already carry. UAC_AWARE=1
+   * makes the high-resolution patch read its settings from roaming appdata instead of the game folder, so
+   * leaving it on means editing an ini the patch never reads. `applyPins` is what writes them.
    */
   private managedOverrides(): Record<string, string> {
     const out: Record<string, string> = {};
@@ -204,6 +241,13 @@ class Store {
 
   /** Reads the machine's own description and state file, then the selected install. Runs once, at startup. */
   async start(): Promise<void> {
+    // Before anything that could report: a subscription taken out afterwards would miss the first steps of
+    // whatever is already running.
+    progressSource.subscribe((progress) => {
+      // Only while something is running. A message that outlives its operation - one still in flight when the
+      // call failed - would otherwise sit under an idle interface saying work was going on.
+      if (this.busy !== null) this.progress = progress;
+    });
     this.machine = await backend.describe();
     const { state, problem } = await backend.loadState();
     this.installs = state.installs;
@@ -229,14 +273,47 @@ class Store {
     }
     this.contents = await backend.loadConfigFiles(install.path);
     this.index();
-    this.overrides = this.managedOverrides();
+    this.overrides = await this.applyPins(install.path);
     this.sfallInstalled = await backend.installedSfallVersion(install);
     this.hiresInstalled = await backend.installedHiresVersion(install);
   }
 
+  /**
+   * Writes the pinned values, and answers with whatever would not take.
+   *
+   * A pin is ZAX's own, not the user's, so it is written on sight rather than queued behind the Save button and
+   * counted as an unsaved change - which left every install permanently one edit behind with nothing the user
+   * had done to explain it. The setting still shows its pinned value and the reason for it, which is where a
+   * user sees a pin; the unsaved count is for their own edits. Written whatever `autosave` says, for the same
+   * reason: the setting governs edits, and this is not one.
+   *
+   * A pin that does not take is returned as a pending change, so it is visible rather than silently retried on
+   * every read - and so this cannot write in a loop against a file that will not hold the value.
+   */
+  private async applyPins(installPath: string): Promise<Record<string, string>> {
+    const wanted = this.managedOverrides();
+    if (Object.keys(wanted).length === 0) return {};
+
+    const outcome = await backend.saveConfigFiles({
+      installPath,
+      original: this.contents,
+      changes: this.pendingChanges(wanted),
+    });
+    if (!outcome.ok) return wanted;
+
+    this.contents = await backend.loadConfigFiles(installPath);
+    this.index();
+    return this.managedOverrides();
+  }
+
   /** Runs one outward-facing operation, reporting whatever it fails with rather than swallowing it. */
   private async run(what: string, work: () => Promise<Notice | null>): Promise<void> {
-    if (this.busy !== null) return;
+    if (this.busy !== null) {
+      // Said rather than dropped. These operations can run for minutes on a poor connection, and a click that
+      // does nothing at all reads as the button being broken rather than as the application being busy.
+      this.notice = { kind: "problem", text: `${this.busy} is still running - wait for it to finish.` };
+      return;
+    }
     this.busy = what;
     this.notice = null;
     try {
@@ -246,6 +323,7 @@ class Store {
       this.notice = { kind: "problem", text: `${what} failed: ${reason}` };
     } finally {
       this.busy = null;
+      this.progress = null;
     }
   }
 
@@ -368,23 +446,26 @@ class Store {
    * searching is to find a setting whose tab you do not know. Each carries its address, since the row has been
    * lifted out of the tab that would otherwise say where it lives.
    */
-  get results(): Array<{ def: SettingDef; place: Place; where: string }> {
+  get results(): ReadonlyArray<{ def: SettingDef; place: Place; where: string }> {
     const q = this.query.trim().toLowerCase();
+    // Held against the query it was computed for. This is a plain getter, so every read re-runs it, and the
+    // tab that draws the results reads it once per row - 164 full passes over the catalog to draw one list,
+    // repeated on every keystroke. The field is deliberately not reactive: `query` above is what the
+    // component depends on, and making the cache itself a rune would loop.
+    if (this.cachedResults?.query === q) return this.cachedResults.rows;
+
     // No query lists everything: the tab this feeds is the whole catalog in one place, and searching narrows
     // it rather than being the only way to see anything at all.
     // Every word has to appear somewhere, not the phrase in one field: a label carries no frame or tab words
     // any more, so "interface bar width" is spread across the address and the label and matches neither alone.
     const terms = q === "" ? [] : q.split(/\s+/);
-    const out: Array<{ def: SettingDef; place: Place; where: string }> = [];
-    for (const def of SETTINGS) {
-      const place = PLACES.get(def.id);
-      // A pinned value is drawn even where the layout hides it, so it stays findable for the same reason.
-      if (!place || (HIDDEN.has(def.id) && !def.managed)) continue;
-      const where = describePlace(place);
-      const hay = `${def.label} ${def.key} ${def.section} ${def.file} ${def.help ?? ""} ${where}`.toLowerCase();
-      if (terms.every((t) => hay.includes(t))) out.push({ def, place, where });
-    }
-    return out;
+    const rows = SEARCHABLE.filter((one) => terms.every((t) => one.hay.includes(t))).map(({ def, place, where }) => ({
+      def,
+      place,
+      where,
+    }));
+    this.cachedResults = { query: q, rows };
+    return rows;
   }
 
   /**
@@ -574,10 +655,10 @@ class Store {
     });
   }
 
-  /** Every pending edit, as the keys they write. */
-  private pendingChanges(): ConfigChange[] {
+  /** Values to write, as the keys they write. The queued edits unless another set is named. */
+  private pendingChanges(values: Record<string, string> = this.overrides): ConfigChange[] {
     const out: ConfigChange[] = [];
-    for (const [id, value] of Object.entries(this.overrides)) {
+    for (const [id, value] of Object.entries(values)) {
       const def = SETTINGS.find((s) => s.id === id) ?? this.discovered.find((s) => s.id === id);
       if (def) out.push({ file: def.file, section: def.section, key: def.key, value });
     }
@@ -637,11 +718,21 @@ class Store {
 
   /** Versions that can be changed to, read on demand: it is a second request nobody needs until they ask. */
   sfallVersions = $state<readonly string[]>([]);
+  /**
+   * Whether the list has been asked for and answered. Separate from the list being empty, because a feed that
+   * answered with nothing is not the same as one that has not answered yet - and with only the array to go on,
+   * the dialog said "Reading the list..." for ever after a mirror returned an empty page.
+   */
+  sfallVersionsRead = $state(false);
 
   async loadSfallVersions(): Promise<void> {
     if (this.sfallVersions.length > 0) return;
     await this.run("Reading the sfall versions", async () => {
       this.sfallVersions = await backend.listSfallVersions();
+      this.sfallVersionsRead = true;
+      if (this.sfallVersions.length === 0) {
+        return { kind: "problem", text: "The release listing named no versions. It may be worth trying again." };
+      }
       return null;
     });
   }

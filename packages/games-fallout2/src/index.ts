@@ -22,6 +22,7 @@ export {
   createBackend,
   type Backend,
   type MachineDescription,
+  type OperationProgress,
   type OpenTarget,
   type OwnDirectory,
 } from "./backend.js";

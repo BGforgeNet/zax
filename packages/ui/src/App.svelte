@@ -39,6 +39,20 @@
   <header class="top">
     <div class="brand">ZAX <span class="version">{BUILD}</span></div>
 
+    <!--
+      What is running, for every operation rather than only the ones whose own button changes label. An sfall
+      update is minutes of work on a poor connection, and the buttons that start it are in a panel the user may
+      well have scrolled away from - without this the whole window simply sat there.
+
+      Between the brand and the spacer, so appearing and disappearing does not move the chip on the right.
+    -->
+    {#if store.busy}
+      <span class="working" role="status">
+        <span class="dot" aria-hidden="true"></span>
+        {store.progressText ?? store.busy}
+      </span>
+    {/if}
+
     <div class="spacer"></div>
 
     {#if store.modifiedCount > 0}
@@ -142,6 +156,39 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .working {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  /*
+    A pulse rather than a spinner: it says the same thing with no rotation to keep smooth, and it is the one
+    part of this that still moves while the main thread is busy laying out a long settings list.
+  */
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.25;
+    }
+  }
+
+  /* Motion is decoration here - the text beside it already says what is happening. */
+  @media (prefers-reduced-motion: reduce) {
+    .dot {
+      animation: none;
+    }
   }
 
   .chip {

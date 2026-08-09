@@ -86,14 +86,48 @@ export interface Backend {
 }
 
 /**
+ * How far a long operation has got, in the words the interface shows. A plain object with plain fields because
+ * it crosses a process boundary on the desktop: anything richer would arrive mangled or not at all.
+ */
+export interface OperationProgress {
+  /** What is happening now - "Downloading sfall 4.5". */
+  step: string;
+  /** Bytes so far and bytes expected, when the step is a transfer and the server said how big it is. */
+  received?: number;
+  total?: number | null;
+}
+
+/**
  * What only the window's own shell can do. Kept out of the platform interface because it is not a capability of
  * the machine but of whatever is presenting the interface, and a browser has none.
  */
 export interface Shell {
   chooseFolder(): Promise<string | null>;
+  /**
+   * Where progress goes. Optional: a host that has nowhere to show it simply does not pass one, and every
+   * operation below still runs.
+   */
+  report?(progress: OperationProgress): void;
 }
 
 export function createBackend(platform: Platform, shell: Shell): Backend {
+  /**
+   * Carries the step and the byte counts to the interface as one message. They arrive separately - the step
+   * from whichever part of the operation is starting, the counts from the transport, which knows nothing about
+   * what it is fetching - so the last step named is what a set of counts is reported under.
+   */
+  const reporting = () => {
+    let step = "";
+    return {
+      onStep: (named: string) => {
+        step = named;
+        shell.report?.({ step });
+      },
+      onProgress: ({ received, total }: { received: number; total: number | null }) =>
+        shell.report?.({ step, received, total }),
+    };
+  };
+
   const own = (which: OwnDirectory) =>
     which === "backup"
       ? backupDirectory(platform)
@@ -121,7 +155,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
 
     installedSfallVersion: (install) => installedSfallVersion(platform, install),
     latestSfall: () => latestSfall(platform),
-    updateSfall: (install, version) => updateSfall(platform, install, version),
+    updateSfall: (install, version) => updateSfall(platform, install, version, new Date(), reporting()),
     listSfallVersions: () => listSfallVersions(platform),
     installedHiresVersion: (install) => installedHiresVersion(platform, install),
     latestZax: () => latestZax(platform),

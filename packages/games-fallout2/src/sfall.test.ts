@@ -6,6 +6,7 @@ import {
   latestSfall,
   listSfallVersions,
   releaseUrl,
+  sfallDefaults,
   sfallPackage,
   updateSfall,
 } from "./sfall.js";
@@ -13,6 +14,16 @@ import type { Install } from "@zax/core";
 
 const INSTALL: Install = { path: "/games/one", type: "fallout2" };
 const FEED = "https://sourceforge.net/projects/sfall/best_release.json";
+
+/**
+ * A stand-in release archive. It begins with 7z's own magic because that is what `sfallPackage` checks for;
+ * a fixture of arbitrary bytes would land on the rejection path and prove nothing about the update it is
+ * named for.
+ */
+function archiveBytes(label: string): Uint8Array {
+  const magic = [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c];
+  return new Uint8Array([...magic, ...[...label].map((c) => c.charCodeAt(0) & 0xff)]);
+}
 
 describe("reading the installed version", () => {
   it("reports nothing for an install with no sfall, which is a normal install", async () => {
@@ -72,7 +83,7 @@ describe("updating", () => {
           "mods/sfall-mods.ini": "[mods]\r\n",
         },
       },
-      downloads: { [releaseUrl("4.5")]: "archive bytes" },
+      downloads: { [releaseUrl("4.5")]: archiveBytes("release 4.5") },
     });
   }
 
@@ -134,9 +145,55 @@ describe("updating", () => {
 
   it("does not download a version it already has", async () => {
     const platform = ready();
-    await platform.fs.write(PACKAGE, new TextEncoder().encode("already here"));
+    await platform.fs.write(PACKAGE, archiveBytes("already here"));
     expect(await sfallPackage(platform, "4.5")).toBe(PACKAGE);
     expect(platform.downloaded).toEqual([]);
+  });
+});
+
+/**
+ * A mirror can answer with something that is not the file and still look like success: an error page served
+ * with a 200, or a chunked body that stops early having declared no length. Both used to be written into the
+ * cache, which was keyed on the file merely existing - so one bad answer broke that version permanently.
+ */
+describe("an answer that is not the archive it was meant to be", () => {
+  const PACKAGE = "/home/t/.cache/zax/packages/sfall-4.5.7z";
+
+  const withDownload = (payload: string | Uint8Array) =>
+    new MemoryPlatform({
+      home: "/home/t",
+      files: { "/games/one/fallout2.exe": "MZ" },
+      archives: { [PACKAGE]: { "ddraw.dll": "new sfall" } },
+      downloads: { [releaseUrl("4.5")]: payload },
+    });
+
+  it("refuses an error page, and caches nothing", async () => {
+    const platform = withDownload("<html>Mirror temporarily unavailable</html>");
+
+    await expect(sfallPackage(platform, "4.5")).rejects.toThrow(/was not an archive/);
+    expect(platform.fileAt(PACKAGE), "keeping it would break this version for good").toBeUndefined();
+  });
+
+  it("replaces a cached file that is not an archive instead of handing it out again", async () => {
+    const platform = withDownload(archiveBytes("release 4.5"));
+    // What a previous bad answer would have left behind.
+    await platform.fs.write(PACKAGE, new TextEncoder().encode("<html>not an archive</html>"));
+
+    expect(await sfallPackage(platform, "4.5")).toBe(PACKAGE);
+    expect(platform.downloaded, "the bad copy is discarded and the real one fetched").toHaveLength(1);
+    expect(platform.fileAt(PACKAGE)).toEqual(archiveBytes("release 4.5"));
+  });
+
+  it("throws away an archive that will not open, so the next attempt fetches it again", async () => {
+    // Right magic, nothing readable inside - which is what a body truncated after its first bytes looks like.
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      files: { "/games/one/fallout2.exe": "MZ", [PACKAGE]: archiveBytes("truncated") },
+      downloads: { [releaseUrl("4.5")]: archiveBytes("truncated") },
+    });
+
+    await expect(updateSfall(platform, INSTALL, "4.5", new Date(2026, 7, 5))).rejects.toThrow();
+    expect(platform.fileAt(PACKAGE), "a cache keyed on existence would fail the same way for ever").toBeUndefined();
   });
 });
 
@@ -161,7 +218,7 @@ describe("merging against what the installed version shipped", () => {
         [OLD]: { "ddraw.ini": "[Main]\r\nUntouched=1\r\nChosen=1\r\nRetired=1\r\n" },
         [NEW]: { "ddraw.dll": "new sfall", "ddraw.ini": "[Main]\r\nUntouched=2\r\nChosen=1\r\n" },
       },
-      downloads: { [releaseUrl("4.4")]: "old archive", [releaseUrl("4.5")]: "new archive" },
+      downloads: { [releaseUrl("4.4")]: archiveBytes("release 4.4"), [releaseUrl("4.5")]: archiveBytes("release 4.5") },
     });
   }
 
@@ -183,6 +240,28 @@ describe("merging against what the installed version shipped", () => {
 
     expect(platform.textAt("/games/one/ddraw.ini")).toContain("Untouched=7");
     expect(result.conflicts).toEqual([{ section: "Main", key: "Untouched", mine: "7", theirs: "2" }]);
+  });
+
+  it("keeps what a release ships, so the next update from it needs no second archive", async () => {
+    const platform = ready("[Main]\r\nUntouched=1\r\nChosen=9\r\nRetired=1\r\n");
+    await updateSfall(platform, INSTALL, "4.5", AT);
+    const fetched = platform.downloaded.length;
+
+    // 4.5 is what the install now runs, so it is the base the next update compares against. It was on disk
+    // while this update ran, and keeping it is what turns that into no download at all.
+    const base = await sfallDefaults(platform, "4.5");
+    expect(base?.get("Main", "Untouched")).toBe("2");
+    expect(platform.downloaded, "the base was already on hand").toHaveLength(fetched);
+  });
+
+  it("takes only its settings file out of an archive it does have to fetch for a base", async () => {
+    const platform = ready("[Main]\r\nUntouched=1\r\nChosen=9\r\nRetired=1\r\n");
+    await updateSfall(platform, INSTALL, "4.5", AT);
+
+    // Unpacking the whole of 4.4 to read one file is what this used to cost.
+    const forBase = platform.extracted.filter((one) => one.archive === OLD);
+    expect(forBase).toHaveLength(1);
+    expect(forBase[0]?.only).toEqual(["ddraw.ini"]);
   });
 
   it("falls back to keeping every value when the installed version is unknown", async () => {

@@ -80,9 +80,60 @@ export interface ProcessLauncher {
   open(target: string): Promise<void>;
 }
 
+/**
+ * Why a network operation failed. Carried so a caller can say which of these happened rather than passing on
+ * whatever the runtime called it - every one of them arrives from `fetch` as the single word "failed".
+ */
+export type NetworkFailure =
+  /** The host did not resolve, or refused the connection. Usually no network at all. */
+  | "offline"
+  /** Nothing arrived for long enough that the transfer was abandoned. */
+  | "timeout"
+  /** The server answered, with something other than success. */
+  | "status"
+  /** The body ended before the length the server declared. */
+  | "incomplete";
+
+/**
+ * A network failure with its cause named. The message is written for the user, because it is the one that
+ * reaches them: an Electron channel carries an error's message across processes and drops its class and its
+ * fields, so anything a caller in the interface needs has to be in the text.
+ */
+export class NetworkError extends Error {
+  /** The response status, when there was a response at all. Decides whether trying again is worth anything. */
+  readonly status: number | undefined;
+
+  constructor(
+    readonly kind: NetworkFailure,
+    readonly url: string,
+    message: string,
+    options?: { cause?: unknown; status?: number },
+  ) {
+    super(message, options);
+    this.name = "NetworkError";
+    this.status = options?.status;
+  }
+}
+
+/** How far a download has got. `total` is null when the server declared no length. */
+export interface DownloadProgress {
+  received: number;
+  total: number | null;
+}
+
+export interface DownloadOptions {
+  /** Called as the body arrives, for an interface that shows how far along a long download is. */
+  onProgress?: (progress: DownloadProgress) => void;
+}
+
 export interface Network {
   fetchText(url: string): Promise<string>;
-  download(url: string, destination: string): Promise<void>;
+  /**
+   * Writes the whole body at the destination, or rejects with a `NetworkError`. Complete is part of the
+   * contract: a body that stops short of its declared length is a failure here rather than a short file the
+   * caller has to think to check.
+   */
+  download(url: string, destination: string, options?: DownloadOptions): Promise<void>;
 }
 
 /** One file to put in an archive: where it is now, and the path it should have inside. */
@@ -91,9 +142,17 @@ export interface ArchiveEntry {
   name: string;
 }
 
+export interface ExtractOptions {
+  /**
+   * Names inside the archive to extract, instead of all of them. Reading one file out of a release is most of
+   * what this is asked for, and unpacking the rest to delete it is work nobody wanted.
+   */
+  only?: readonly string[];
+}
+
 export interface Archive {
-  /** Extracts an archive whole. The format is decided by the implementation from the file itself. */
-  extract(archive: string, destination: string): Promise<void>;
+  /** Extracts an archive. The format is decided by the implementation from the file itself. */
+  extract(archive: string, destination: string, options?: ExtractOptions): Promise<void>;
   /** Writes a zip. Only the debug package creates archives, and a zip is what a bug report can attach. */
   createZip(destination: string, entries: readonly ArchiveEntry[]): Promise<void>;
 }

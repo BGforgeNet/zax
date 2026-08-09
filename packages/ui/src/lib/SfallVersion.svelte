@@ -35,12 +35,16 @@
       {#if store.sfallLatest}{store.sfallLatest.version}{:else}<span class="unknown">not checked</span>{/if}
     </span>
     <span class="buttons">
+      <!--
+        Each says what it is doing while it does it, as the Save and Scan buttons do. These are the slowest
+        operations in the application and were the only ones that changed nothing at all when pressed.
+      -->
       <button
         disabled={isPreview || store.busy !== null}
         title={isPreview ? OUTSIDE : null}
         onclick={() => void store.checkSfallVersion()}
       >
-        Check
+        {store.busy === "Checking for a newer sfall" ? "Checking..." : "Check"}
       </button>
       <button
         disabled={!store.sfallOutdated || store.busy !== null}
@@ -49,7 +53,7 @@
           : "Nothing newer has been found"}
         onclick={() => void store.updateSfall()}
       >
-        Update
+        {store.busy === "Updating sfall" ? "Updating..." : "Update"}
       </button>
       <!-- Going back matters as much as going forward: mods pin particular sfall versions. -->
       <button
@@ -57,7 +61,7 @@
         title={isPreview ? OUTSIDE : null}
         onclick={open}
       >
-        Change version
+        {store.busy === "Reading the sfall versions" ? "Reading..." : "Change version"}
       </button>
     </span>
     <!--
@@ -80,7 +84,9 @@
     {#each store.sfallVersions as version (version)}
       <option value={version}>{version}{version === store.sfallInstalled ? " (installed)" : ""}</option>
     {:else}
-      <option value="">Reading the list...</option>
+      <!-- An answered request that named nothing is not a request still in flight; saying so is the whole
+           difference between "wait a moment" and "this will not arrive". -->
+      <option value="">{store.sfallVersionsRead ? "No versions found" : "Reading the list..."}</option>
     {/each}
   </select>
   <p class="explain">
@@ -93,7 +99,7 @@
       disabled={wanted === "" || wanted === store.sfallInstalled || store.busy !== null}
       onclick={() => void store.changeSfall(wanted, `Changing sfall to ${wanted}`).then(() => (changing = false))}
     >
-      Apply
+      {store.busy === `Changing sfall to ${wanted}` ? "Applying..." : "Apply"}
     </button>
   {/snippet}
 </Dialog>
