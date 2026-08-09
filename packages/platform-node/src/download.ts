@@ -8,6 +8,10 @@
  * its declared length is a failure, not a truncated file the caller has to think to check. And an attempt
  * that died mid-transfer resumes where it stopped, because spending minutes of a poor connection and then
  * starting again from nothing is how a download never finishes at all.
+ *
+ * Hand-written although download libraries with resume and retry exist: the failure taxonomy here - offline
+ * vs timeout vs incomplete vs status, each with its own user-facing wording - is the point, and mapping a
+ * library's error surface back onto it would cost more than the mechanics being replaced.
  */
 
 import { createWriteStream } from "node:fs";
