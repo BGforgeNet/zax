@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import bgforgeLogo from "./assets/bgforge.png";
+  import zaxMark from "./assets/zax.svg";
   import NoInstall from "./lib/NoInstall.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
@@ -37,7 +39,11 @@
 
 <div class="shell">
   <header class="top">
-    <div class="brand">ZAX <span class="version">{BUILD}</span></div>
+    <!-- Decorative: the word beside it is the name, so a second one read out would only be a stutter. -->
+    <div class="brand">
+      <img class="mark" src={zaxMark} alt="" width="18" height="18" />
+      ZAX <span class="version">{BUILD}</span>
+    </div>
 
     <!--
       What is running, for every operation rather than only the ones whose own button changes label. An sfall
@@ -58,6 +64,7 @@
     <!-- The shell hands a web link to the browser rather than following it, so this needs no operation of its own. -->
     <span class="powered">
       Powered by <a href="https://bgforge.net/" target="_blank" rel="noreferrer">BGforge</a>
+      <img class="logo" src={bgforgeLogo} alt="" width="18" height="18" />
     </span>
   </header>
 
@@ -98,7 +105,11 @@
     display: flex;
     align-items: center;
     gap: 8px 12px;
-    padding: 9px var(--gutter);
+    /*
+      Indented past the gutter by the column's own border and the inset its tab strip adds, which puts the mark
+      here on the same left edge as the Games tab below it. Both ends, so the bar stays evenly padded.
+    */
+    padding: 9px calc(var(--gutter) + 1px + var(--tab-inset));
     background: var(--panel);
     border-bottom: 1px solid var(--border);
     flex: 0 0 auto;
@@ -111,8 +122,18 @@
   }
 
   .brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     font-weight: 650;
     letter-spacing: 0.02em;
+  }
+
+  /* Both marks sit on the text's own line rather than on the bar's, so neither drags the row taller. */
+  .mark,
+  .logo {
+    display: block;
+    flex: 0 0 auto;
   }
 
   .notice {
@@ -158,6 +179,9 @@
     the half of this someone is meant to click should not be.
   */
   .powered {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     color: var(--text-dim);
     font-size: 12px;
   }

@@ -47,7 +47,7 @@
 
   /* The shared strip centres its content on the pane's gutter, which is wrong in a 264px column. */
   .tabs {
-    padding-inline: 8px;
+    padding-inline: var(--tab-inset);
   }
 
   /* Below this the settings pane is at its own minimum and the column has to go, or the two would overlap. */

@@ -31,6 +31,13 @@
   --sidebar: 264px;
 
   /*
+    How far the column's tab strip sits inside the column's own border. Shared rather than written twice
+    because the top bar indents by it as well - that is what puts the mark in the bar on the same left edge as
+    the first tab below it, and a second copy would drift the two apart.
+  */
+  --tab-inset: 8px;
+
+  /*
     Both columns are centred as one block, so the surplus width becomes margin at the window's two edges rather
     than a gap opening between them. Measured against the shell, which is what holds both.
   */
