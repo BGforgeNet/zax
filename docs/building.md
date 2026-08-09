@@ -41,6 +41,19 @@ pnpm test    # the whole suite
 CI runs all three on every push, installing with `--ignore-scripts`, and then builds the distributables on Linux,
 Windows and macOS.
 
+## Icons
+
+`packages/ui/src/assets/zax.svg` is the source. The two PNGs beside it are generated and committed, so a build
+needs nothing installed to produce them:
+
+```bash
+pnpm gen:icons   # writes packages/ui/public/zax.png (256) and packages/app/build/icon.png (1024)
+```
+
+It rasterises through a headless Chromium, which it looks for on `PATH`; set `CHROME` to a binary if yours is
+elsewhere. Run it after editing the SVG and commit both PNGs with it - nothing in the build regenerates them,
+so an SVG changed on its own leaves the shipped icon at the previous drawing.
+
 ## Distributables
 
 ```bash

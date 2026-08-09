@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="ZAX">
+  <!--
+    The source the icon PNGs are generated from - see docs/building.md. A screen with no bezel around it: the
+    glass and its phosphor edge are the whole shape, which is what keeps it readable once it is 16px in a
+    taskbar. The rings are ZAX itself rather than a monitor: it is the machine you talk to, not the terminal
+    you talk through.
+  -->
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1f14" />
+      <stop offset="1" stop-color="#06120b" />
+    </linearGradient>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#000" opacity="0.22" />
+    </pattern>
+    <!--
+      The phosphor bloom. Without it the green reads as flat paint rather than as something lit. Kept tight:
+      at a wider radius it carried the outer ring up to the inner one's brightness, and the eye stopped
+      reading as concentric at all.
+    -->
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="0.8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="4" y="8" width="56" height="48" rx="10" fill="url(#glass)" stroke="#3cff8a" stroke-width="2.5" />
+  <rect x="4" y="8" width="56" height="48" rx="10" fill="url(#scan)" />
+
+  <!-- Outside the bloom, or it lights up to match the ring inside it and the two stop reading as separate. -->
+  <circle cx="32" cy="32" r="16" fill="none" stroke="#1c8a52" stroke-width="2.5" />
+
+  <g filter="url(#glow)">
+    <circle cx="32" cy="32" r="10" fill="none" stroke="#3cff8a" stroke-width="3.5" />
+    <circle cx="32" cy="32" r="3.6" fill="#3cff8a" />
+  </g>
+</svg>
