@@ -20,6 +20,10 @@ const bytes = (text: string) => {
   return out;
 };
 
+const ORDER_FILE = `${PREVIEW_INSTALL}/mods/mods_order.txt`;
+/** Captured on the first run, before any test has written to it, so the seed is not repeated here to drift. */
+let seededOrder: Uint8Array | null = null;
+
 beforeEach(async () => {
   const seeded = `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`;
   await previewPlatform.fs.write("preview/config/zax.yml", new TextEncoder().encode(seeded));
@@ -27,6 +31,8 @@ beforeEach(async () => {
   await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(fallout2cfg));
   await previewPlatform.fs.write(`${PREVIEW_INSTALL}/f2_res.ini`, bytes(f2resini));
   await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddrawini));
+  seededOrder ??= await previewPlatform.fs.read(ORDER_FILE);
+  await previewPlatform.fs.write(ORDER_FILE, seededOrder);
   await store.start();
 });
 
@@ -282,6 +288,108 @@ describe("saving", () => {
   });
 });
 
+describe("mods", () => {
+  const order = async () => new TextDecoder("latin1").decode(await previewPlatform.fs.read(ORDER_FILE));
+  const shown = () => store.mods.map((mod) => `${mod.enabled ? "+" : "-"}${mod.name}`);
+
+  test("lists what the order file names, then what the folder holds and it does not", () => {
+    expect(shown()).toEqual([
+      "+weapon_sounds.dat",
+      "-extra_music.dat",
+      "+hero_appearance",
+      "+old_patch.dat",
+      "-barter_prices.dat",
+    ]);
+    // The kinds are what makes a row's badge honest: a folder is not an archive, and an entry pointing at
+    // nothing is neither.
+    expect(store.mods.map((mod) => mod.kind)).toEqual(["dat", "dat", "folder", "missing", "dat"]);
+  });
+
+  test("counts the whole order as one unsaved change, however far a mod moves", () => {
+    const before = store.modifiedCount;
+    store.moveMod("hero_appearance", -1);
+    store.moveMod("hero_appearance", -1);
+    expect(shown()[0]).toBe("+hero_appearance");
+    expect(store.modifiedCount, "one file, written whole, is one change").toBe(before + 1);
+  });
+
+  test("moving refuses to run off either end rather than wrapping around", () => {
+    store.moveMod("weapon_sounds.dat", -1);
+    store.moveMod("barter_prices.dat", 1);
+    expect(store.modsChanged).toBe(false);
+  });
+
+  test("comments a mod out in place rather than dropping its line", async () => {
+    store.toggleMod("weapon_sounds.dat");
+    await store.save();
+
+    expect(store.notice, "a save that worked has nothing to report").toBeNull();
+    expect(await order()).toContain("; weapon_sounds.dat");
+    expect(shown()[0], "and it keeps its place in the order").toBe("-weapon_sounds.dat");
+  });
+
+  test("writes the shown order, so a mod the file never named becomes a line of its own", async () => {
+    store.toggleMod("extra_music.dat");
+    await store.save();
+
+    expect(await order()).toBe(
+      "; Loaded in this order - a mod further down overrides one above it.\n" +
+        "weapon_sounds.dat\nextra_music.dat\nhero_appearance\nold_patch.dat\n; barter_prices.dat\n",
+    );
+  });
+
+  test("forgetting a missing entry is the one thing that deletes a line", async () => {
+    store.forgetMod("old_patch.dat");
+    await store.save();
+
+    expect(await order()).not.toContain("old_patch.dat");
+    expect(shown()).not.toContain("+old_patch.dat");
+  });
+
+  /*
+    The order is written whole, so the second save is measured against a file the first one wrote. Reading the
+    text back is what makes that work; without it a save is refused as somebody else's edit - and only a second
+    save shows it, since the first is always measured against the file as it was read at startup.
+  */
+  test("a second save lands, rather than being refused as a foreign edit", async () => {
+    store.toggleMod("extra_music.dat");
+    await store.save();
+    expect(store.modsChanged, "the file just written is the new baseline").toBe(false);
+
+    store.moveMod("extra_music.dat", -1);
+    await store.save();
+
+    expect(store.notice).toBeNull();
+    // The header stays at the top of the file; the mod that moved passes under it.
+    expect(await order()).toContain("above it.\nextra_music.dat\nweapon_sounds.dat");
+  });
+
+  test("refuses and writes nothing when the file changed underneath the open window", async () => {
+    store.toggleMod("weapon_sounds.dat");
+    await previewPlatform.fs.write(ORDER_FILE, bytes("someone_else.dat\n"));
+
+    await store.save();
+
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.notice?.text).toContain("mods/mods_order.txt");
+    expect(await order(), "the other edit stands").toBe("someone_else.dat\n");
+    expect(store.modsChanged, "and this one is kept, so the user can decide").toBe(true);
+  });
+
+  test("reverting restores the order as it was read", () => {
+    store.toggleMod("hero_appearance");
+    store.moveMod("hero_appearance", -1);
+    store.revertAll();
+    expect(shown()).toEqual([
+      "+weapon_sounds.dat",
+      "-extra_music.dat",
+      "+hero_appearance",
+      "+old_patch.dat",
+      "-barter_prices.dat",
+    ]);
+  });
+});
+
 describe("adding an install", () => {
   test("refuses a directory that does not hold a game, naming it", async () => {
     await previewPlatform.fs.mkdir("/elsewhere/not-a-game");
@@ -383,6 +491,37 @@ describe("a value ZAX pins", () => {
     expect(store.hasFile("f2_res.ini")).toBe(false);
     expect(store.isModified(PINNED), "a pinned value for an absent file would be written on the next save").toBe(false);
     expect(store.modifiedCount, "nothing else is pending either").toBe(0);
+  });
+});
+
+/*
+  The two marks in the top bar. What they must not do is disagree with the dots on the tabs below them, and a
+  pinned value is exactly where they could: it sits in the overrides and belongs to no edit the user made.
+*/
+describe("the unsaved marks", () => {
+  const MUSIC = "game.sound.music";
+
+  test("the settings mark appears on an edit and clears on revert, in step with the file tab's dot", () => {
+    expect(store.settingsChanged, "a fresh install carries ZAX's pinned values and no edit").toBe(false);
+
+    store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
+
+    expect(store.settingsChanged).toBe(true);
+    expect(store.modifiedInFile("fallout2.cfg"), "and the tab under it is marked too").toBe(1);
+
+    store.revert(MUSIC);
+    expect(store.settingsChanged).toBe(false);
+  });
+
+  test("neither mark answers for the other's view", () => {
+    store.moveMod("hero_appearance", -1);
+    expect(store.modsChanged).toBe(true);
+    expect(store.settingsChanged, "a mod that moved is not a settings edit").toBe(false);
+
+    store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
+    store.revertAll();
+    expect(store.settingsChanged).toBe(false);
+    expect(store.modsChanged).toBe(false);
   });
 });
 

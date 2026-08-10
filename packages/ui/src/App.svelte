@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import bgforgeLogo from "./assets/bgforge.png";
   import zaxMark from "./assets/zax.svg";
+  import ModsView from "./lib/ModsView.svelte";
   import NoInstall from "./lib/NoInstall.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
@@ -46,6 +47,45 @@
     </div>
 
     <!--
+      Above the tab strips rather than beside them: settings are keys in config files and mods are what the
+      engine loads, so this is a change of subject rather than another tab of one. Both halves are always
+      offered - an install with no mods folder yet is exactly the one whose owner is about to add one.
+    -->
+    <div class="views" role="tablist">
+      <button
+        role="tab"
+        class="view"
+        aria-selected={store.view === "settings"}
+        onclick={() => (store.view = "settings")}
+      >
+        <!--
+          Ahead of the label rather than after it, which is what makes the pair symmetric: each half reserves
+          its mark on its own outer edge, so the two labels sit the same distance from the ends of the control.
+        -->
+        <span
+          class="dot"
+          class:unsaved={store.settingsChanged}
+          aria-hidden="true"
+          title={store.settingsChanged ? "Settings have unsaved changes" : null}
+        ></span>
+        Settings
+      </button>
+      <button role="tab" class="view" aria-selected={store.view === "mods"} onclick={() => (store.view = "mods")}>
+        Mods
+        <!--
+          Held in the markup shown or not, for the reason the settings tabs hold theirs: it must not resize.
+          Both halves carry one, which is what keeps the pair evenly padded whichever of them is marked.
+        -->
+        <span
+          class="dot"
+          class:unsaved={store.modsChanged}
+          aria-hidden="true"
+          title={store.modsChanged ? "The mod order has unsaved changes" : null}
+        ></span>
+      </button>
+    </div>
+
+    <!--
       What is running, for every operation rather than only the ones whose own button changes label. An sfall
       update is minutes of work on a poor connection, and the buttons that start it are in a panel the user may
       well have scrolled away from - without this the whole window simply sat there.
@@ -54,7 +94,7 @@
     -->
     {#if store.busy}
       <span class="working" role="status">
-        <span class="dot" aria-hidden="true"></span>
+        <span class="busy-dot" aria-hidden="true"></span>
         {store.progressText ?? store.busy}
       </span>
     {/if}
@@ -85,6 +125,8 @@
     <!-- Everything here acts on the selected install, so there is nothing to show until there is one. -->
     {#if store.loaded && !store.install}
       <NoInstall />
+    {:else if store.view === "mods"}
+      <ModsView />
     {:else}
       <SettingsView />
     {/if}
@@ -134,6 +176,54 @@
   .logo {
     display: block;
     flex: 0 0 auto;
+  }
+
+  /*
+    A segmented pair rather than the tab shape used below: those hang off the edge of the strip they sit on,
+    and there is no edge here to hang from. It reads as one control with two halves, which is what it is.
+  */
+  .views {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    background: var(--panel-alt);
+  }
+
+  .view {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    border-radius: 5px;
+    padding: 3px 13px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  .view:hover {
+    color: var(--text);
+  }
+
+  /* Selection changes no metric here either - weight would resize the half and shift the other one along. */
+  .view[aria-selected="true"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  /* Holds its space whether it is showing or not, so switching views never re-lays-out the bar. */
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--modified);
+    visibility: hidden;
+  }
+
+  .dot.unsaved {
+    visibility: visible;
   }
 
   .notice {
@@ -209,28 +299,15 @@
   }
 
   /*
-    A pulse rather than a spinner: it says the same thing with no rotation to keep smooth, and it is the one
-    part of this that still moves while the main thread is busy laying out a long settings list.
+    Still rather than animated: the text beside it names the operation and changes as it progresses, so motion
+    would add nothing the chip does not already say. Named apart from the tab's marker dot rather than sharing
+    its class - one `.dot` block silently took the other's size, colour and hidden state.
   */
-  .dot {
+  .busy-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
     background: var(--accent);
-    animation: pulse 1.1s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    50% {
-      opacity: 0.25;
-    }
-  }
-
-  /* Motion is decoration here - the text beside it already says what is happening. */
-  @media (prefers-reduced-motion: reduce) {
-    .dot {
-      animation: none;
-    }
   }
 
   /* The gutter is the same one the header and the notice inset by, so all three share one left edge. */

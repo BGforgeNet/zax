@@ -19,6 +19,8 @@ export const BACKEND_METHODS = [
   "saveState",
   "loadConfigFiles",
   "saveConfigFiles",
+  "loadMods",
+  "saveMods",
   "identifyInstall",
   "scanForInstalls",
   "installedSfallVersion",

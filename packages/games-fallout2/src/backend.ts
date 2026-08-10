@@ -32,6 +32,7 @@ import {
 } from "@zax/core";
 import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
+import { readMods, saveMods, type ModsSaveRequest, type ModsSnapshot } from "./mods.js";
 import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
 import { installedHiresVersion } from "./hires.js";
 import { planLaunch } from "./launch.js";
@@ -69,6 +70,9 @@ export interface Backend {
   saveState(state: AppState): Promise<void>;
   loadConfigFiles(installPath: string): Promise<ConfigFileContents>;
   saveConfigFiles(request: SaveRequest): Promise<SaveOutcome>;
+  /** sfall's mod load order, and what sits in the folder it orders. */
+  loadMods(install: Install): Promise<ModsSnapshot>;
+  saveMods(request: ModsSaveRequest): Promise<SaveOutcome>;
   identifyInstall(path: string): Promise<GameType | null>;
   scanForInstalls(known: readonly Install[]): Promise<readonly Install[]>;
   installedSfallVersion(install: Install): Promise<string | null>;
@@ -150,6 +154,8 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     saveState: (state) => saveState(platform, state),
     loadConfigFiles: (installPath) => loadConfigFiles(platform, installPath, [...CONFIG_FILES]),
     saveConfigFiles: (request) => saveConfigFiles(platform, request),
+    loadMods: (install) => readMods(platform, install),
+    saveMods: (request) => saveMods(platform, request),
     identifyInstall: (path) => identifyInstall(platform, path),
     scanForInstalls: (known) => scanForInstalls(platform, known, new Date()),
 

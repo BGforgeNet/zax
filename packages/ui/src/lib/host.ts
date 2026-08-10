@@ -55,6 +55,19 @@ export const previewPlatform: Platform = (() => {
       // they are the ones the install it came from has - a GOG game with killap's Unofficial Patch.
       [`${PREVIEW_INSTALL}/fallout2.exe`]: "",
       [`${PREVIEW_INSTALL}/up-changelog.txt`]: "",
+      /*
+        A mods folder covering every state the mods view has: one loaded, one commented out, one folder rather
+        than an archive, an entry whose file is gone, and one sitting in the folder that the order file never
+        names. None of these names is a marker `detectGameType` reads, or seeding them would relabel the
+        preview install as a different game.
+      */
+      [`${PREVIEW_INSTALL}/mods/mods_order.txt`]:
+        "; Loaded in this order - a mod further down overrides one above it.\n" +
+        "weapon_sounds.dat\n; extra_music.dat\nhero_appearance\nold_patch.dat\n",
+      [`${PREVIEW_INSTALL}/mods/weapon_sounds.dat`]: "",
+      [`${PREVIEW_INSTALL}/mods/extra_music.dat`]: "",
+      [`${PREVIEW_INSTALL}/mods/barter_prices.dat`]: "",
+      [`${PREVIEW_INSTALL}/mods/hero_appearance/art/critters/hmjmps.frm`]: "",
       "preview/config/zax.yml": `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`,
     },
   });

@@ -14,6 +14,19 @@ export {
   type SfallUpdate,
 } from "./sfall.js";
 export { HIRES_LIBRARY, installedHiresVersion } from "./hires.js";
+export {
+  MODS_DIRECTORY,
+  MODS_ORDER_FILE,
+  MODS_ORDER_PATH,
+  listMods,
+  readMods,
+  saveMods,
+  type Mod,
+  type ModKind,
+  type ModsDirEntry,
+  type ModsSaveRequest,
+  type ModsSnapshot,
+} from "./mods.js";
 export { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
 export { BACKEND_METHODS, fromMethods, wrapMethods, type BackendMethod } from "./backend-methods.js";
 export {

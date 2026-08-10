@@ -7,6 +7,8 @@
  * without ever being decoded as something it is not.
  */
 
+import { latin1, latin1Bytes, splitLines } from "./text.js";
+
 export type IniNode =
   | { kind: "blank"; raw: string }
   | { kind: "comment"; raw: string }
@@ -30,21 +32,6 @@ const SECTION_RE = /^(\s*)\[([^\]]*)\](\s*)$/;
 // separator inside a value (a path, a list) from being mistaken for one.
 const ENTRY_RE = /^(\s*)([^=\s][^=]*?)(\s*=\s*)(.*?)(\s+[;#].*?)?(\s*)$/;
 const COMMENT_RE = /^\s*[;#]/;
-
-/** Split into lines, each retaining its own terminator. A final line without one keeps an empty terminator. */
-function splitLines(text: string): Array<{ body: string; eol: string }> {
-  const out: Array<{ body: string; eol: string }> = [];
-  let start = 0;
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === "\n") {
-      const hasCr = i > start && text[i - 1] === "\r";
-      out.push({ body: text.slice(start, hasCr ? i - 1 : i), eol: hasCr ? "\r\n" : "\n" });
-      start = i + 1;
-    }
-  }
-  if (start < text.length) out.push({ body: text.slice(start), eol: "" });
-  return out;
-}
 
 const fold = (s: string) => s.toLowerCase();
 
@@ -101,9 +88,7 @@ export class IniDocument {
 
   /** Decode bytes as latin1 so the round-trip is byte-exact whatever the file's real encoding is. */
   static parseBytes(bytes: Uint8Array): IniDocument {
-    let s = "";
-    for (const b of bytes) s += String.fromCharCode(b);
-    return IniDocument.parse(s);
+    return IniDocument.parse(latin1(bytes));
   }
 
   get(section: string, key: string): string | undefined {
@@ -187,10 +172,7 @@ export class IniDocument {
   }
 
   toBytes(): Uint8Array {
-    const s = this.toString();
-    const out = new Uint8Array(s.length);
-    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff;
-    return out;
+    return latin1Bytes(this.toString());
   }
 
   private findEntry(section: string, key: string) {

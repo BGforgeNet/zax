@@ -23,13 +23,17 @@ import {
 import {
   ACTIONS,
   CONFIG_FILES,
+  MODS_ORDER_PATH,
   SETTINGS,
   describePlace,
   hiddenIds,
+  listMods,
   placesById,
   wrapMethods,
   type Backend,
   type MachineDescription,
+  type Mod,
+  type ModsSnapshot,
   type OpenTarget,
   type OperationProgress,
   type OwnDirectory,
@@ -134,6 +138,13 @@ export type SettingsTab = string;
  */
 export type Panel = "games" | "zax";
 
+/**
+ * What the main pane shows. The two are different subjects rather than two tabs of one - settings are keys in
+ * config files, mods are what the engine loads - so the switch between them sits above the tab strips both
+ * carry, not inside either.
+ */
+export type View = "settings" | "mods";
+
 /** Something that happened and the user needs told: a save, a refusal, a failure. */
 export interface Notice {
   kind: "done" | "problem";
@@ -145,6 +156,7 @@ export interface Notice {
  * "what did I change" and revert trivial, and it is the shape a saved profile will store.
  */
 class Store {
+  view = $state<View>("settings");
   panel = $state<Panel>("games");
   troubleTab = $state<TroubleTab>("report");
   /** Which Settings sub-tab: a config file, or "install". */
@@ -168,6 +180,13 @@ class Store {
 
   /** Contents of the selected install's config files, exactly as they were read. */
   contents = $state<ConfigFileContents>({});
+
+  /** The install's mods, in load order, with whatever the user has changed about it since it was read. */
+  mods = $state<readonly Mod[]>([]);
+  /** The same list as it was read, which is what makes "changed" a comparison rather than a flag to maintain. */
+  private modsBaseline = $state<readonly Mod[]>([]);
+  /** The order file as it was read, so a save can refuse one that changed underneath. */
+  private modsText: string | undefined = undefined;
   /** False until the first read of the state file and the selected install's config files has finished. */
   loaded = $state(false);
   /** The operation in progress, for disabling the controls that would start a second one. */
@@ -272,13 +291,26 @@ class Store {
       this.contents = {};
       this.index();
       this.overrides = {};
+      this.setMods({ text: undefined, present: [] });
       return;
     }
     this.contents = await backend.loadConfigFiles(install.path);
     this.index();
     this.overrides = await this.applyPins(install.path);
+    await this.readMods(install);
     this.sfallInstalled = await backend.installedSfallVersion(install);
     this.hiresInstalled = await backend.installedHiresVersion(install);
+  }
+
+  /** Rereads the mod order alone, which is what a save of it has to do to leave a fresh baseline behind. */
+  private async readMods(install: Install): Promise<void> {
+    this.setMods(await backend.loadMods(install));
+  }
+
+  private setMods(snapshot: ModsSnapshot): void {
+    this.modsText = snapshot.text;
+    this.mods = listMods(snapshot);
+    this.modsBaseline = this.mods;
   }
 
   /**
@@ -437,11 +469,49 @@ class Store {
   revertAll(): void {
     // Pinned values are ZAX policy rather than a user edit, so reverting restores them instead of dropping them.
     this.overrides = this.managedOverrides();
+    this.mods = this.modsBaseline;
     this.scheduleAutosave();
   }
 
+  /**
+   * The mod order counts as one unsaved change however much of it moved: it is one file, written whole, and
+   * counting rows would report a single drag past two neighbours as two edits.
+   */
   get modifiedCount(): number {
-    return Object.keys(this.overrides).length;
+    return Object.keys(this.overrides).length + (this.modsChanged ? 1 : 0);
+  }
+
+  get modsChanged(): boolean {
+    const now = this.mods;
+    const was = this.modsBaseline;
+    if (now.length !== was.length) return true;
+    return now.some((mod, i) => mod.name !== was[i]?.name || mod.enabled !== was[i]?.enabled);
+  }
+
+  /** Turns a mod on or off, which is the line being written or commented out in place. */
+  toggleMod(name: string): void {
+    this.mods = this.mods.map((mod) => (mod.name === name ? { ...mod, enabled: !mod.enabled } : mod));
+    this.scheduleAutosave();
+  }
+
+  /** Moves a mod one place, `by` being negative to load it earlier. Refuses to move one off either end. */
+  moveMod(name: string, by: number): void {
+    const from = this.mods.findIndex((mod) => mod.name === name);
+    const to = from + by;
+    if (from === -1 || to < 0 || to >= this.mods.length) return;
+    const next = [...this.mods];
+    next.splice(to, 0, ...next.splice(from, 1));
+    this.mods = next;
+    this.scheduleAutosave();
+  }
+
+  /**
+   * Drops an entry naming something no longer in the folder. Only offered for those: an entry whose mod is
+   * still there would come straight back on the next read, from the folder listing rather than the file.
+   */
+  forgetMod(name: string): void {
+    this.mods = this.mods.filter((mod) => mod.name !== name);
+    this.scheduleAutosave();
   }
 
   /**
@@ -510,6 +580,15 @@ class Store {
   /** Unsaved edits belonging to one config file, for the dot on its settings tab. */
   modifiedInFile(file: string): number {
     return SETTINGS.filter((s) => s.file === file && this.isModified(s.id)).length;
+  }
+
+  /**
+   * The view's own mark, on the same footing as `modsChanged`. Shares `isModified` with the per-file dots
+   * below it rather than counting override keys, so the two cannot come to disagree about what an edit is: a
+   * mark up here with none under it would only send the user looking for a tab that does not carry one.
+   */
+  get settingsChanged(): boolean {
+    return SETTINGS.some((s) => this.isModified(s.id));
   }
 
   actionById(id: string): Action | undefined {
@@ -671,6 +750,26 @@ class Store {
     const install = this.install;
     if (!install) return;
     await this.run("Saving", async () => {
+      // The mod order goes first, and a refusal there stops the save before anything has been written: both
+      // writes can be refused, and only this order lets one of the two refusals mean "nothing happened".
+      const savedMods = this.modsChanged;
+      if (savedMods) {
+        const written = await backend.saveMods({
+          installPath: install.path,
+          original: this.modsText,
+          mods: this.mods,
+        });
+        if (!written.ok) {
+          return {
+            kind: "problem",
+            text: `${MODS_ORDER_PATH} changed on disk since it was read. Nothing was written.`,
+          };
+        }
+        // Straight back off disk, so the file just written is what the next save is measured against rather
+        // than the text this one started from - which would refuse the following save as a foreign edit.
+        await this.readMods(install);
+      }
+
       const outcome = await backend.saveConfigFiles({
         installPath: install.path,
         original: this.contents,
@@ -678,9 +777,10 @@ class Store {
       });
       if (!outcome.ok) {
         // Rereading would silently drop the edits; the user decides, so the files are left as they are.
+        const mods = savedMods ? " The mod order was saved." : "";
         return {
           kind: "problem",
-          text: `${outcome.changed.join(" and ")} changed on disk since it was read. Nothing was written.`,
+          text: `${outcome.changed.join(" and ")} changed on disk since it was read. Nothing was written.${mods}`,
         };
       }
       await this.readInstall();

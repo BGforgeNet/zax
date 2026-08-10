@@ -10,6 +10,7 @@ import type { Platform } from "@zax/platform";
 import { backupDirectory } from "./directories.js";
 import { IniDocument } from "./ini.js";
 import { stamp } from "./stamp.js";
+import { latin1 } from "./text.js";
 
 /** One key to write. The catalog maps a setting id to this; core does not know what a setting is. */
 export interface ConfigChange {
@@ -93,10 +94,4 @@ export async function saveConfigFiles(
   }
 
   return { ok: true, files, backup };
-}
-
-function latin1(bytes: Uint8Array): string {
-  let text = "";
-  for (const byte of bytes) text += String.fromCharCode(byte);
-  return text;
 }
