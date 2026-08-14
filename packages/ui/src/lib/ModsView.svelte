@@ -30,6 +30,8 @@
         return `Installed: ${state.from}, newer than what the feed offers - a feed answering with an older release is worth distrusting.`;
       case "retry":
         return `An install of ${state.version} never finished.`;
+      case "unfollowed":
+        return "Installed. No feed follows this mod any more, so updates will not be offered.";
       case "blocked":
         return state.why;
     }
@@ -38,7 +40,7 @@
   /** Whether the row gets a Remove control: something of it is here, and its type permits removal. */
   function removable(offer: ModOffer): boolean {
     if (offer.type !== "pluggable") return false;
-    return ["installed", "upgrade", "downgrade", "install-over"].includes(offer.availability.kind);
+    return ["installed", "upgrade", "downgrade", "install-over", "unfollowed"].includes(offer.availability.kind);
   }
 
   /** A schema's sections, in the order the manifest declares them - the author's one lever over layout. */

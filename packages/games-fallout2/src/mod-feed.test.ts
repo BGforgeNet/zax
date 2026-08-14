@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { MemoryPlatform, type MemoryOptions } from "@zax/platform/memory";
 import type { Install } from "@zax/core";
-import { availability, fetchFeed, presentInMods, type ModContext, type ModRelease } from "./mod-feed.js";
+import {
+  availability,
+  fetchFeed,
+  listAvailableMods,
+  presentInMods,
+  type ModContext,
+  type ModRelease,
+} from "./mod-feed.js";
 
 const REPO = "BGforgeNet/FO2tweaks";
 const FEED = { repository: REPO, id: "fo2tweaks" };
@@ -177,6 +184,65 @@ describe("availability", () => {
     const bare: ModRelease = { manifest: parsed("").manifest, manifestText: "" };
     expect(availability(bare, context())).toMatchObject({ kind: "blocked" });
     expect(availability(bare, context({ record: recorded("14.7") }))).toEqual({ kind: "installed" });
+  });
+});
+
+describe("listAvailableMods", () => {
+  const install: Install = { path: "/games/fallout2", type: "fallout2" };
+
+  it("lists a recorded mod no feed follows, so Remove stays reachable after an id is retired", async () => {
+    const platform = new MemoryPlatform();
+    const record = {
+      path: install.path,
+      mods: [
+        {
+          id: "oldmod",
+          version: "3",
+          complete: true,
+          files: ["mods/oldmod.dat"],
+          manifest: 'spec: 1\nid: oldmod\nname: Old Mod\nversion: "3"\ngame: fallout2\n',
+          shipped: {},
+        },
+        {
+          // A snapshot this version cannot read still names the mod through the record's own fields.
+          id: "older",
+          version: "1",
+          complete: true,
+          files: ["mods/older.dat"],
+          manifest: "nonsense: [",
+          shipped: {},
+        },
+      ],
+    };
+    const listing = await listAvailableMods(platform, install, record, null);
+    const offer = listing.offers.find((one) => one.id === "oldmod");
+    expect(offer).toMatchObject({ name: "Old Mod", version: "3", type: "pluggable" });
+    expect(offer?.availability).toEqual({ kind: "unfollowed" });
+    expect(listing.offers.find((one) => one.id === "older")).toMatchObject({ name: "older", type: "pluggable" });
+    // The followed feed still gets its own row - here a failure, this network being empty.
+    expect(listing.failures.map((failure) => failure.id)).toEqual(["fo2tweaks"]);
+  });
+
+  it("offers retry, not removal, for a stranded install that never finished", async () => {
+    const platform = new MemoryPlatform();
+    const record = {
+      path: install.path,
+      mods: [
+        {
+          id: "oldmod",
+          version: "3",
+          complete: false,
+          files: ["mods/oldmod.dat"],
+          manifest: 'spec: 1\nid: oldmod\nname: Old Mod\nversion: "3"\ngame: fallout2\n',
+          shipped: {},
+        },
+      ],
+    };
+    const listing = await listAvailableMods(platform, install, record, null);
+    expect(listing.offers.find((one) => one.id === "oldmod")?.availability).toEqual({
+      kind: "retry",
+      version: "3",
+    });
   });
 });
 

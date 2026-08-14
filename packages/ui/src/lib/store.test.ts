@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { SETTINGS } from "@zax/fallout2";
 import { PREVIEW_INSTALL, previewPlatform } from "./host.js";
 import { store, unwrapArguments } from "./store.svelte.js";
-import { BACKEND_METHODS, type Backend } from "@zax/fallout2";
+import { BACKEND_METHODS, loadRecord, saveRecord, type Backend } from "@zax/fallout2";
 import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
 import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
@@ -641,6 +641,37 @@ describe("mod settings", () => {
     await store.openModIni("fo2tweaks", "mods/fo2tweaks.ini");
     expect(store.notice?.kind).toBe("problem");
     expect(store.notice?.text).toContain("desktop build");
+  });
+});
+
+describe("a mod no feed follows", () => {
+  test("is listed from the record, removable, and the listing survives the flow's own refresh", async () => {
+    const held = await loadRecord(previewPlatform, PREVIEW_INSTALL);
+    await saveRecord(previewPlatform, {
+      path: held.path,
+      mods: [
+        ...held.mods,
+        {
+          id: "oldmod",
+          version: "3",
+          complete: true,
+          files: ["mods/oldmod.dat"],
+          manifest: 'spec: 1\nid: oldmod\nname: Old Mod\nversion: "3"\ngame: fallout2\n',
+          shipped: {},
+        },
+      ],
+    });
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/mods/oldmod.dat`, bytes("DAT"));
+
+    await store.loadModOffers();
+    const offer = store.modListing?.offers.find((one) => one.id === "oldmod");
+    expect(offer?.availability).toEqual({ kind: "unfollowed" });
+
+    // Removing it also restores the seeded record, so the cases after this one see the install they expect.
+    await store.removeMod(offer!);
+    expect(store.notice?.kind).toBe("done");
+    expect(store.modListing, "the flow's closing refresh must survive its own busy gate").not.toBeNull();
+    expect(store.modListing?.offers.some((one) => one.id === "oldmod")).toBe(false);
   });
 });
 

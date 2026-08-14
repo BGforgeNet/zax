@@ -562,6 +562,15 @@ class Store {
     this.scheduleAutosave();
   }
 
+  /**
+   * The fetch itself, apart from `run`: a flow that just installed or removed refreshes from inside its own
+   * `run`, whose busy gate would refuse a nested one - and silently, leaving the tab claiming the feeds were
+   * never read.
+   */
+  private async refreshModOffers(install: Install): Promise<void> {
+    this.modListing = await backend.availableMods(install);
+  }
+
   /** Reads what the feeds offer this install. On demand rather than at startup - it costs the network. */
   async loadModOffers(): Promise<void> {
     const install = this.install;
@@ -570,7 +579,7 @@ class Store {
       return;
     }
     await this.run("Reading the mod feeds", async () => {
-      this.modListing = await backend.availableMods(install);
+      await this.refreshModOffers(install);
       return null;
     });
   }
@@ -612,7 +621,7 @@ class Store {
     await this.run(`Installing ${held.offer.name} ${held.offer.version}`, async () => {
       const outcome = await backend.installMod(install, held.offer.id);
       await this.readInstall();
-      await this.loadModOffers();
+      await this.refreshModOffers(install);
       const conflicts =
         outcome.conflicts.length > 0
           ? ` ${outcome.conflicts.length} setting(s) you had changed were kept over the release's new defaults.`
@@ -637,7 +646,7 @@ class Store {
     await this.run(`Removing ${offer.name}`, async () => {
       await backend.removeMod(install, offer.id);
       await this.readInstall();
-      await this.loadModOffers();
+      await this.refreshModOffers(install);
       return { kind: "done", text: `${offer.name} removed. Copies are in the backup folder.` };
     });
   }
@@ -664,7 +673,7 @@ class Store {
     await this.run(`Restoring before ${offer.name}`, async () => {
       await backend.restoreMod(install, offer.id);
       await this.readInstall();
-      await this.loadModOffers();
+      await this.refreshModOffers(install);
       return { kind: "done", text: `The install is back to what it was before ${offer.name}.` };
     });
   }

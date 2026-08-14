@@ -11,6 +11,7 @@
     "check": "tsc -p tsconfig.json && pnpm --filter @zax/ui exec svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
+    "check-manifest": "jiti scripts/check-manifest.mjs",
     "gen:icons": "node scripts/gen-icons.mjs",
     "verify:chokidar": "node scripts/verify-chokidar.mjs",
     "desktop": "pnpm --filter @zax/app build && pnpm --filter @zax/app start"
@@ -23,6 +24,7 @@
     "eslint-plugin-svelte": "^3.22.0",
     "fast-check": "^4.3.0",
     "globals": "^17.9.0",
+    "jiti": "^2.7.0",
     "prettier": "^3.9.6",
     "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.56.8",

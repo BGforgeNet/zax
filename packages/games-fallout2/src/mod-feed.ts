@@ -167,6 +167,8 @@ export type Availability =
   | { kind: "downgrade"; from: string }
   /** An install that never finished; the working directory decides between resume and restore. */
   | { kind: "retry"; version: string }
+  /** Recorded as installed while no known feed follows the id - still removable, never updatable. */
+  | { kind: "unfollowed" }
   | { kind: "blocked"; why: string };
 
 export interface ModContext {
@@ -276,6 +278,28 @@ export async function listAvailableMods(
     } catch (error) {
       failures.push({ ...feed, why: error instanceof Error ? error.message : String(error) });
     }
+  }
+
+  // Recorded but followed by no feed: an id retired from the list, or renamed upstream. The row is what keeps
+  // Remove reachable - the tab is otherwise feed-driven, and such a mod would be installed yet invisible.
+  const followed = new Set(MOD_FEEDS.map((feed) => feed.id));
+  for (const mod of record.mods) {
+    if (followed.has(mod.id)) continue;
+    let manifest: ModManifest | null = null;
+    try {
+      manifest = parseManifest(new TextEncoder().encode(mod.manifest));
+    } catch {
+      // An unreadable snapshot still names the mod through the record's own fields, and defaulting the type
+      // to removable is safe: uninstall re-reads the type itself, so a wrong guess costs a refused click.
+    }
+    offers.push({
+      id: mod.id,
+      name: manifest?.name ?? mod.id,
+      version: mod.version,
+      type: manifest?.type ?? "pluggable",
+      ...(manifest?.reason !== undefined ? { reason: manifest.reason } : {}),
+      availability: mod.complete ? { kind: "unfollowed" } : { kind: "retry", version: mod.version },
+    });
   }
   return { offers, failures };
 }
