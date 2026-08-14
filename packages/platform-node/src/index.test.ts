@@ -72,6 +72,42 @@ describe("node archives", () => {
     await platform.fs.write(at("not-an-archive.7z"), new TextEncoder().encode("this is not an archive"));
     await expect(platform.archive.extract(at("not-an-archive.7z"), at("nope"))).rejects.toThrow(/Could not extract/);
   }, 30_000);
+
+  it("lists an archive's entries with sizes, and flags a symlink entry", async () => {
+    // Built with fflate rather than shipped as a fixture: no ordinary tool writes a symlink into a zip, and
+    // the attack this listing exists to refuse arrives exactly as these Unix-mode bits.
+    const { zipSync } = await import("fflate");
+    const encode = (s: string) => new TextEncoder().encode(s);
+    const zipped = zipSync({
+      "mods/fo2tweaks.dat": [encode("payload"), {}],
+      "mods/escape": [encode("../../outside"), { os: 3, attrs: 0o120777 << 16 }],
+    });
+    await platform.fs.write(at("mod.zip"), zipped);
+
+    const entries = await platform.archive.list(at("mod.zip"));
+    const byName = new Map(entries.map((entry) => [entry.name, entry]));
+    expect(byName.get("mods/fo2tweaks.dat")).toEqual({ name: "mods/fo2tweaks.dat", kind: "file", size: 7 });
+    expect(byName.get("mods/escape")?.kind).toBe("link");
+  }, 30_000);
+
+  it("reports an unreadable archive from list the way extraction does", async () => {
+    await platform.fs.write(at("junk.zip"), new TextEncoder().encode("junk"));
+    await expect(platform.archive.list(at("junk.zip"))).rejects.toThrow(/Could not read/);
+  }, 30_000);
+});
+
+describe("node hashing", () => {
+  it("hashes a file to the published SHA-256 test vector", async () => {
+    await platform.fs.write(at("digest.bin"), new TextEncoder().encode("abc"));
+    // FIPS 180-2's own example for "abc", so a wrong algorithm or encoding cannot agree by accident.
+    expect(await platform.hash.sha256(at("digest.bin"))).toBe(
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    );
+  });
+
+  it("rejects hashing a path that is not there", async () => {
+    await expect(platform.hash.sha256(at("absent.bin"))).rejects.toThrow();
+  });
 });
 
 describe("node processes", () => {

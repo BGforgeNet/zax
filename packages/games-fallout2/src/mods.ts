@@ -53,6 +53,14 @@ export interface ModsSaveRequest {
 
 const fold = (s: string) => s.toLowerCase();
 
+/**
+ * Whether a name in `mods/` answers to a mod id - the id itself or `<id>.<ext>`, matched as the loader would.
+ * The one definition for a fact two flows judge: what presence displays as, and what a recordless uninstall
+ * deletes.
+ */
+export const answersToId = (name: string, id: string): boolean =>
+  fold(name) === fold(id) || fold(name).startsWith(`${fold(id)}.`);
+
 /** `findLastIndex` in the form this project's ES2022 target has. */
 function lastIndexWhere<T>(items: readonly T[], match: (item: T) => boolean): number {
   for (let i = items.length - 1; i >= 0; i--) if (match(items[i]!)) return i;

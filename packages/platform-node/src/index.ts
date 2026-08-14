@@ -3,7 +3,8 @@
  */
 
 import { execFile, spawn } from "node:child_process";
-import { statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { createReadStream, statSync } from "node:fs";
 import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -12,6 +13,7 @@ import { Worker } from "node:worker_threads";
 import {
   NetworkError,
   type ArchiveEntry,
+  type ArchiveEntryInfo,
   type DirEntry,
   type FileKind,
   type FileStat,
@@ -80,6 +82,45 @@ async function inWorker<T>(script: URL, what: string, workerData: unknown): Prom
     worker.once("error", (error) => resolve({ error: error instanceof Error ? error.message : String(error) }));
     worker.once("exit", (status) => resolve({ error: `the ${what} worker exited with ${status}` }));
   }).finally(() => void worker.terminate());
+}
+
+/**
+ * One entry from 7-Zip's `-slt` listing: field-per-line blocks, blank lines between entries. A symlink shows
+ * as a `Symbolic Link` field (tar) or a mode string starting `l` in `Attributes` (zip with Unix attributes);
+ * both spellings are folded to the one kind, since what a caller does with a link is refuse it.
+ */
+function listedEntry(fields: Readonly<Record<string, string>>): ArchiveEntryInfo | null {
+  const name = fields["Path"];
+  if (name === undefined) return null;
+  const attributes = fields["Attributes"] ?? "";
+  const link = fields["Symbolic Link"] !== undefined || /(^|\s)l[rwxst-]{9}$/.test(attributes);
+  const kind = link
+    ? "link"
+    : fields["Folder"] === "+" || /(^|\s)D/.test(attributes.split(" ")[0] ?? "")
+      ? "dir"
+      : "file";
+  const size = Number(fields["Size"]);
+  return { name: name.replace(/\\/g, "/"), kind, size: Number.isFinite(size) ? size : 0 };
+}
+
+function parseListing(lines: readonly string[]): ArchiveEntryInfo[] {
+  const entries: ArchiveEntryInfo[] = [];
+  let fields: Record<string, string> = {};
+  const flush = () => {
+    const entry = listedEntry(fields);
+    if (entry) entries.push(entry);
+    fields = {};
+  };
+  for (const line of lines) {
+    if (line.trim() === "") {
+      flush();
+      continue;
+    }
+    const cut = line.indexOf(" = ");
+    if (cut !== -1) fields[line.slice(0, cut)] = line.slice(cut + 3);
+  }
+  flush();
+  return entries;
 }
 
 /** A wedged `reg` must not hold the scan that asked; there is nothing here worth waiting seconds for. */
@@ -240,6 +281,16 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
         if (outcome.code !== 0) throw new Error(`Could not extract ${archive}: 7-Zip exited with ${outcome.code}`);
       },
 
+      list: async (archive) => {
+        const outcome = await inWorker<{ code: number; lines: string[] }>(EXTRACT_WORKER, "listing", {
+          archive,
+          list: true,
+        });
+        if ("error" in outcome) throw new Error(`Could not read ${archive}: ${outcome.error}`);
+        if (outcome.code !== 0) throw new Error(`Could not read ${archive}: 7-Zip exited with ${outcome.code}`);
+        return parseListing(outcome.lines);
+      },
+
       createZip: async (destination, entries: readonly ArchiveEntry[]) => {
         const outcome = await inWorker<{ ok: true }>(ZIP_WORKER, "zip", {
           destination,
@@ -247,6 +298,19 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
         });
         if ("error" in outcome) throw new Error(`Could not write ${destination}: ${outcome.error}`);
       },
+    },
+
+    hash: {
+      // Streamed rather than read whole: the largest thing this hashes is a downloaded mod archive, and RPU's
+      // runs to a gigabyte.
+      sha256: (path) =>
+        new Promise<string>((resolve, reject) => {
+          const digest = createHash("sha256");
+          createReadStream(path)
+            .on("error", reject)
+            .on("data", (chunk) => digest.update(chunk))
+            .on("end", () => resolve(digest.digest("hex")));
+        }),
     },
   };
 }

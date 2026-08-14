@@ -2,12 +2,12 @@
   import { COMMON_RESOLUTIONS } from "@zax/fallout2";
   import { store } from "./store.svelte.js";
 
-  const WIDTH = "hires.main.scr-width";
-  const HEIGHT = "hires.main.scr-height";
+  const WIDTH = "hires.MAIN.SCR_WIDTH";
+  const HEIGHT = "hires.MAIN.SCR_HEIGHT";
 
   // The previous interface offered a shorter list once 2x scaling was on, because scaling doubles the rendered
   // size and the smaller modes no longer fit.
-  const scaled = $derived(store.valueOf("hires.main.scale-2x") === "1");
+  const scaled = $derived(store.valueOf("hires.MAIN.SCALE_2X") === "1");
   const options = $derived(COMMON_RESOLUTIONS.filter((r) => !scaled || (r.width >= 1280 && r.height >= 960)));
 
   function choose(value: string) {

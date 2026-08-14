@@ -10,7 +10,7 @@
 
 import type { Platform } from "@zax/platform";
 import { MemoryPlatform } from "@zax/platform/memory";
-import { createBackend, wrapMethods, type Backend, type OperationProgress } from "@zax/fallout2";
+import { createBackend, saveRecord, wrapMethods, type Backend, type OperationProgress } from "@zax/fallout2";
 
 import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
@@ -41,6 +41,73 @@ function refuses(): never {
   throw new Error(PREVIEW_REASON);
 }
 
+/*
+  An installed mod for the preview, so the settings-schema surface exists somewhere file-shaped. The keys,
+  values and help lines are FO2tweaks' own, taken from its published ini; the schema is a hand-written sample
+  of what its release would carry, including the real cross-file gate its readme states (damage_mod requires
+  sfall's DamageFormula at 0).
+*/
+const PREVIEW_MOD_INI =
+  "[main]\n" +
+  "; don't penalize scoped weapons chance to hit at close range\n" +
+  "no_scope_penalty=1\n" +
+  "; Automatically open/walk through unlocked doors when not in combat\n" +
+  "autodoors=1\n" +
+  "; Limit max knockback distance in hexes. -1 is vanilla (unlimited). 0 is no knockback at all.\n" +
+  "max_knockback=-1\n" +
+  "; AP/JHP damage mod. You must set DamageFormula=0 in ddraw.ini for this component to work correctly.\n" +
+  "damage_mod=1\n" +
+  "\n" +
+  "[run_speed]\n" +
+  "; You can enable run speed increase for the Chosen, party, or both.\n" +
+  "dude=1\n" +
+  "party=1\n";
+
+const PREVIEW_MOD_MANIFEST = `spec: 1
+id: fo2tweaks
+name: FO2tweaks
+version: "14.7"
+game: fallout2
+settings:
+  main.no_scope_penalty:
+    kind: bool
+    default: 1
+    label: No scope penalty
+    help: Don't penalize scoped weapons chance to hit at close range.
+  main.autodoors:
+    kind: choice
+    options:
+      - { value: 0, label: "Off" }
+      - { value: 1, label: "Open" }
+      - { value: 2, label: "Open and close" }
+    default: 1
+    label: Automatic doors
+    help: Walk through unlocked doors without clicking, outside combat.
+  main.max_knockback:
+    kind: int
+    min: -1
+    sentinels: { "-1": "Vanilla (unlimited)", "0": "No knockback" }
+    default: -1
+    label: Max knockback
+    help: Limit knockback distance in hexes.
+  main.damage_mod:
+    kind: bool
+    default: 1
+    label: AP/JHP damage mod
+    help: Needs sfall's DamageFormula at 0 to work correctly.
+    gated-by: { id: sfall.Misc.DamageFormula, is: [0] }
+  run_speed.dude:
+    kind: bool
+    default: 1
+    label: The Chosen One
+    help: Increase run speed for the player when wearing armor.
+  run_speed.party:
+    kind: bool
+    default: 1
+    label: Party members
+    help: Increase run speed for party members.
+`;
+
 /** The in-memory disk the preview edits. Exported so tests can reseed it between cases. */
 export const previewPlatform: Platform = (() => {
   const memory = new MemoryPlatform({
@@ -68,6 +135,9 @@ export const previewPlatform: Platform = (() => {
       [`${PREVIEW_INSTALL}/mods/extra_music.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/barter_prices.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/hero_appearance/art/critters/hmjmps.frm`]: "",
+      // An ini alone, no dat: the settings surface exists without adding a row the load-order fixtures above
+      // were built around.
+      [`${PREVIEW_INSTALL}/mods/fo2tweaks.ini`]: PREVIEW_MOD_INI,
       "preview/config/zax.yml": `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`,
     },
   });
@@ -77,6 +147,7 @@ export const previewPlatform: Platform = (() => {
     fs: memory.fs,
     paths: memory.paths,
     archive: memory.archive,
+    hash: memory.hash,
     // Answers nothing, which is the truth rather than a refusal: a browser has no registry, and "no such key"
     // is what a scan does with every machine that has none of these launchers.
     registry: memory.registry,
@@ -85,6 +156,23 @@ export const previewPlatform: Platform = (() => {
     net: { fetchText: refuses, download: refuses },
   };
 })();
+
+// The record is what makes the seeded ini an installed mod rather than clutter. Written through the real
+// writer so the preview holds a record the desktop build could have made, and awaited so nothing can read
+// the preview before it exists.
+await saveRecord(previewPlatform, {
+  path: PREVIEW_INSTALL,
+  mods: [
+    {
+      id: "fo2tweaks",
+      version: "14.7",
+      complete: true,
+      files: ["mods/fo2tweaks.ini"],
+      manifest: PREVIEW_MOD_MANIFEST,
+      shipped: { "mods/fo2tweaks.ini": PREVIEW_MOD_INI },
+    },
+  ],
+});
 
 /**
  * Puts every argument through the same copy the desktop build's channel does, so an argument that could not

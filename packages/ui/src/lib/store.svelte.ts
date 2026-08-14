@@ -33,6 +33,11 @@ import {
   type Backend,
   type MachineDescription,
   type Mod,
+  type ModInstallPlan,
+  type ModListing,
+  type ModOffer,
+  type ModSetting,
+  type ModSettingsGroup,
   type ModsSnapshot,
   type OpenTarget,
   type OperationProgress,
@@ -145,6 +150,9 @@ export type Panel = "games" | "zax";
  */
 export type View = "settings" | "mods";
 
+/** The Mods view's own tabs: getting mods, ordering them, and configuring them are three different jobs. */
+export type ModsTab = "installation" | "order" | "settings";
+
 /** Something that happened and the user needs told: a save, a refusal, a failure. */
 export interface Notice {
   kind: "done" | "problem";
@@ -180,6 +188,22 @@ class Store {
 
   /** Contents of the selected install's config files, exactly as they were read. */
   contents = $state<ConfigFileContents>({});
+
+  /**
+   * What the feeds offer this install, or null before the first read. Read when asked rather than at
+   * startup: it costs the network, and the Mods view is where the answer means anything.
+   */
+  modListing = $state<ModListing | null>(null);
+  /** A resolved install plan awaiting the user's word, with the offer it belongs to. */
+  modPlan = $state<{ offer: ModOffer; plan: ModInstallPlan } | null>(null);
+  /** The installed mods' settings schemas, rendered with the same per-kind controls the catalog gets. */
+  modSettings = $state<readonly ModSettingsGroup[]>([]);
+  /** Which of the Mods view's tabs is showing. */
+  modsTab = $state<ModsTab>("installation");
+  /** The selected section sub-tab within each mod's settings, kept per mod as `fileTab` is per file. */
+  modSectionTab = $state<Record<string, string>>({});
+  /** The same schemas by entry id - what value lookup, gates and pending changes resolve through. */
+  private modById = new Map<string, ModSetting>();
 
   /** The install's mods, in load order, with whatever the user has changed about it since it was read. */
   mods = $state<readonly Mod[]>([]);
@@ -238,10 +262,14 @@ class Store {
   discovered = $state<SettingDef[]>([]);
 
   private index(): void {
-    const documents = Object.fromEntries(CONFIG_FILES.map((f) => [f, IniDocument.parse(this.contents[f] ?? "")]));
+    const modDefs = [...this.modById.values()];
+    // The mods' ini files parse alongside the engine's; `discover` still walks CONFIG_FILES alone, so the
+    // raw every-key view never extends to mod inis - the schema is their whole surface, by design.
+    const files = [...new Set<string>([...CONFIG_FILES, ...modDefs.map((s) => s.file)])];
+    const documents = Object.fromEntries(files.map((f) => [f, IniDocument.parse(this.contents[f] ?? "")]));
     const valueOf = (s: SettingDef) => documents[s.file]?.get(s.section, s.key);
     this.discovered = discover(documents);
-    this.baseline = Object.fromEntries(SETTINGS.map((s) => [s.id, valueOf(s)]));
+    this.baseline = Object.fromEntries([...SETTINGS, ...modDefs].map((s) => [s.id, valueOf(s)]));
     this.rawBaseline = Object.fromEntries(this.discovered.map((s) => [s.id, valueOf(s)]));
   }
 
@@ -287,14 +315,22 @@ class Store {
     const install = this.install;
     this.sfallInstalled = null;
     this.hiresInstalled = null;
+    // Another install's offers would be wrong here, and a held plan doubly so; the view re-asks on demand.
+    this.modListing = null;
+    this.modPlan = null;
     if (!install) {
       this.contents = {};
+      this.modSettings = [];
+      this.modById = new Map();
       this.index();
       this.overrides = {};
       this.setMods({ text: undefined, present: [] });
       return;
     }
     this.contents = await backend.loadConfigFiles(install.path);
+    // Before the index, which folds the schemas' values into the baseline the controls read.
+    this.modSettings = await backend.modSettings(install);
+    this.modById = new Map(this.modSettings.flatMap((group) => group.settings.map((s) => [s.id, s])));
     this.index();
     this.overrides = await this.applyPins(install.path);
     await this.readMods(install);
@@ -395,7 +431,7 @@ class Store {
   }
 
   defOf(id: string): SettingDef | undefined {
-    return BY_ID.get(id);
+    return BY_ID.get(id) ?? this.modById.get(id);
   }
 
   /**
@@ -412,7 +448,9 @@ class Store {
    */
   gateOf(def: SettingDef): { active: boolean; controller: SettingDef; wants: string } | null {
     if (!def.gatedBy) return null;
-    const controller = SETTINGS.find((s) => s.id === def.gatedBy!.id);
+    // Through `defOf` rather than the catalog alone: a mod setting may gate on a sibling of its own schema,
+    // or across files on a catalog id - the manifest validator has already refused anything else.
+    const controller = this.defOf(def.gatedBy.id);
     if (!controller) return null;
     return {
       active: matchesValueTest(controller, this.valueOf(controller.id), def.gatedBy),
@@ -488,6 +526,16 @@ class Store {
     return now.some((mod, i) => mod.name !== was[i]?.name || mod.enabled !== was[i]?.enabled);
   }
 
+  /** Unsaved edits among the installed mods' settings, for the dot on their own tab. */
+  get modSettingsChanged(): boolean {
+    return [...this.modById.keys()].some((id) => this.isModified(id));
+  }
+
+  /** The Mods view's own mark: the order, or any of the installed mods' settings, holds an unsaved edit. */
+  get modsViewChanged(): boolean {
+    return this.modsChanged || this.modSettingsChanged;
+  }
+
   /** Turns a mod on or off, which is the line being written or commented out in place. */
   toggleMod(name: string): void {
     this.mods = this.mods.map((mod) => (mod.name === name ? { ...mod, enabled: !mod.enabled } : mod));
@@ -512,6 +560,113 @@ class Store {
   forgetMod(name: string): void {
     this.mods = this.mods.filter((mod) => mod.name !== name);
     this.scheduleAutosave();
+  }
+
+  /** Reads what the feeds offer this install. On demand rather than at startup - it costs the network. */
+  async loadModOffers(): Promise<void> {
+    const install = this.install;
+    if (!install) {
+      this.modListing = null;
+      return;
+    }
+    await this.run("Reading the mod feeds", async () => {
+      this.modListing = await backend.availableMods(install);
+      return null;
+    });
+  }
+
+  /**
+   * The one refusal every mod flow starts with: nothing runs over unsaved edits. Broader than the files a
+   * plan touches, on purpose - the flow rewrites the order file and may merge inis, and "save or revert
+   * first" is a clearer contract than a per-file argument about which edit was safe.
+   */
+  private modFlowRefusal(): Notice | null {
+    if (this.modsChanged || this.modifiedCount > 0) {
+      return { kind: "problem", text: "There are unsaved edits - save or revert them before changing mods." };
+    }
+    return null;
+  }
+
+  /** Downloads and verifies a release, then holds its resolved plan up for the user's word. */
+  async prepareMod(offer: ModOffer): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    const refusal = this.modFlowRefusal();
+    if (refusal) {
+      this.notice = refusal;
+      return;
+    }
+    await this.run(`Preparing ${offer.name} ${offer.version}`, async () => {
+      const plan = await backend.planMod(install, offer.id);
+      this.modPlan = { offer, plan };
+      return null;
+    });
+  }
+
+  /** The confirmed plan is executed; the plan dialog closes either way, the working directory persists. */
+  async confirmModInstall(): Promise<void> {
+    const held = this.modPlan;
+    const install = this.install;
+    this.modPlan = null;
+    if (!held || !install) return;
+    await this.run(`Installing ${held.offer.name} ${held.offer.version}`, async () => {
+      const outcome = await backend.installMod(install, held.offer.id);
+      await this.readInstall();
+      await this.loadModOffers();
+      const conflicts =
+        outcome.conflicts.length > 0
+          ? ` ${outcome.conflicts.length} setting(s) you had changed were kept over the release's new defaults.`
+          : "";
+      return { kind: "done", text: `${held.offer.name} ${outcome.version} installed.${conflicts}` };
+    });
+  }
+
+  /** Cancelling the plan keeps the working directory, so a later attempt resumes rather than re-downloads. */
+  dismissModPlan(): void {
+    this.modPlan = null;
+  }
+
+  async removeMod(offer: ModOffer): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    const refusal = this.modFlowRefusal();
+    if (refusal) {
+      this.notice = refusal;
+      return;
+    }
+    await this.run(`Removing ${offer.name}`, async () => {
+      await backend.removeMod(install, offer.id);
+      await this.readInstall();
+      await this.loadModOffers();
+      return { kind: "done", text: `${offer.name} removed. Copies are in the backup folder.` };
+    });
+  }
+
+  /** Opens one of an installed mod's own inis - the route to the sections its schema does not cover. */
+  async openModIni(modId: string, file: string): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    await this.run("Opening the file", async () => {
+      await backend.openModFile(install, modId, file);
+      return null;
+    });
+  }
+
+  /** Unwinds an install that never finished, from the working directory's copies. */
+  async restoreMod(offer: ModOffer): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    const refusal = this.modFlowRefusal();
+    if (refusal) {
+      this.notice = refusal;
+      return;
+    }
+    await this.run(`Restoring before ${offer.name}`, async () => {
+      await backend.restoreMod(install, offer.id);
+      await this.readInstall();
+      await this.loadModOffers();
+      return { kind: "done", text: `The install is back to what it was before ${offer.name}.` };
+    });
   }
 
   /**
@@ -740,7 +895,7 @@ class Store {
   private pendingChanges(values: Record<string, string> = this.overrides): ConfigChange[] {
     const out: ConfigChange[] = [];
     for (const [id, value] of Object.entries(values)) {
-      const def = SETTINGS.find((s) => s.id === id) ?? this.discovered.find((s) => s.id === id);
+      const def = SETTINGS.find((s) => s.id === id) ?? this.modById.get(id) ?? this.discovered.find((s) => s.id === id);
       if (def) out.push({ file: def.file, section: def.section, key: def.key, value });
     }
     return out;

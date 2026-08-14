@@ -39,27 +39,27 @@ describe("catalog", () => {
     // drawn, or a cap this project chose. Every other upper bound in the source is asserted nowhere, and one
     // we cannot account for rejects values the engine accepts.
     const accounted = new Set([
-      "hires.maps.numpathnodes", // "20=40000(max)"
-      "hires.maps.fog-light-level", // "between 0-10"
-      "sfall.misc.combatpanelanimdelay", // 65535
-      "sfall.misc.dialogpanelanimdelay", // 255
-      "sfall.misc.pipboytimeanimdelay", // 127
+      "hires.MAPS.NumPathNodes", // "20=40000(max)"
+      "hires.MAPS.FOG_LIGHT_LEVEL", // "between 0-10"
+      "sfall.Misc.CombatPanelAnimDelay", // 65535
+      "sfall.Misc.DialogPanelAnimDelay", // 255
+      "sfall.Misc.PipboyTimeAnimDelay", // 127
       "game.preferences.brightness",
-      "game.preferences.mouse-sensitivity",
-      "game.preferences.text-base-delay",
-      "game.preferences.text-line-delay",
-      "game.preferences.combat-speed",
-      "sfall.misc.autoquicksave", // sfall's ddraw.ini: "valid range: 1..10"
-      "sfall.misc.autoquicksavepage", // sfall's ddraw.ini: "valid range: 0..99"
-      "hires.main.refresh-rate", // capped by choice
-      "hires.main.scr-width",
-      "hires.main.scr-height",
-      "sfall.graphics.graphicswidth",
-      "sfall.graphics.graphicsheight",
-      "sfall.misc.corpsedeletetime", // sfall: "the timer (in days) ... valid range: 0..13"
-      "sfall.misc.usewalkdistance", // sfall: "valid range: 0..3"
-      "sfall.misc.worldmapdelay2", // sfall: "Default is 66 milliseconds, and the maximum is 150"
-      "game.sound.cache-size", // fallout2-ce rejects >= 0x40000
+      "game.preferences.mouse_sensitivity",
+      "game.preferences.text_base_delay",
+      "game.preferences.text_line_delay",
+      "game.preferences.combat_speed",
+      "sfall.Misc.AutoQuickSave", // sfall's ddraw.ini: "valid range: 1..10"
+      "sfall.Misc.AutoQuickSavePage", // sfall's ddraw.ini: "valid range: 0..99"
+      "hires.MAIN.REFRESH_RATE", // capped by choice
+      "hires.MAIN.SCR_WIDTH",
+      "hires.MAIN.SCR_HEIGHT",
+      "sfall.Graphics.GraphicsWidth",
+      "sfall.Graphics.GraphicsHeight",
+      "sfall.Misc.CorpseDeleteTime", // sfall: "the timer (in days) ... valid range: 0..13"
+      "sfall.Misc.UseWalkDistance", // sfall: "valid range: 0..3"
+      "sfall.Misc.WorldMapDelay2", // sfall: "Default is 66 milliseconds, and the maximum is 150"
+      "game.sound.cache_size", // fallout2-ce rejects >= 0x40000
       "game.system.splash", // fallout2-ce wraps the index at SPLASH_COUNT, which is 10
     ]);
     for (const s of SETTINGS) {
@@ -75,23 +75,23 @@ describe("catalog", () => {
     // unit anywhere else would be an inference presented as a measurement - a fade duration labelled "%" was
     // exactly that.
     const stated = new Set([
-      "hires.main.refresh-rate",
-      "hires.main.scr-width",
-      "hires.main.scr-height",
-      "hires.iface.iface-bar-width",
-      "sfall.graphics.graphicswidth",
-      "sfall.graphics.graphicsheight",
-      "sfall.speed.speedmultiinitial",
-      "sfall.graphics.fademultiplier",
-      "sfall.misc.corpsedeletetime",
-      "sfall.misc.processoridle",
-      "sfall.misc.worldmaptimemod",
-      "sfall.misc.worldmapdelay2",
-      "hires.other-settings.splash-scrn-time",
-      "hires.mainmenu.menu-bg-offset-x",
-      "hires.mainmenu.menu-bg-offset-y",
-      "game.sound.cache-size",
-      "game.system.art-cache-size",
+      "hires.MAIN.REFRESH_RATE",
+      "hires.MAIN.SCR_WIDTH",
+      "hires.MAIN.SCR_HEIGHT",
+      "hires.IFACE.IFACE_BAR_WIDTH",
+      "sfall.Graphics.GraphicsWidth",
+      "sfall.Graphics.GraphicsHeight",
+      "sfall.Speed.SpeedMultiInitial",
+      "sfall.Graphics.FadeMultiplier",
+      "sfall.Misc.CorpseDeleteTime",
+      "sfall.Misc.ProcessorIdle",
+      "sfall.Misc.WorldMapTimeMod",
+      "sfall.Misc.WorldMapDelay2",
+      "hires.OTHER_SETTINGS.SPLASH_SCRN_TIME",
+      "hires.MAINMENU.MENU_BG_OFFSET_X",
+      "hires.MAINMENU.MENU_BG_OFFSET_Y",
+      "game.sound.cache_size",
+      "game.system.art_cache_size",
     ]);
     for (const s of SETTINGS) {
       if (s.kind.type !== "int" && s.kind.type !== "float") continue;
@@ -216,12 +216,12 @@ describe("gating rules", () => {
     // Both dependencies survived the port as a sentence and nothing else, so the control rendered fully live
     // while its own help said it needed something else.
     const gateOf = (id: string) => SETTINGS.find((s) => s.id === id)?.gatedBy;
-    expect(gateOf("sfall.graphics.allowdshowmovies")).toEqual({
-      id: "sfall.graphics.mode",
+    expect(gateOf("sfall.Graphics.AllowDShowMovies")).toEqual({
+      id: "sfall.Graphics.Mode",
       is: ["4", "5", "6"],
     });
-    expect(gateOf("sfall.input.fastmovefromcontainer")).toEqual({
-      id: "sfall.input.itemfastmovekey",
+    expect(gateOf("sfall.Input.FastMoveFromContainer")).toEqual({
+      id: "sfall.Input.ItemFastMoveKey",
       isNot: ["0"],
     });
   });
@@ -248,8 +248,8 @@ describe("conflicts", () => {
   });
 
   it("warns about the idle-twice pairing rather than gating either half of it", () => {
-    const fix = SETTINGS.find((s) => s.id === "hires.other-settings.cpu-usage-fix")!;
-    const other = SETTINGS.find((s) => s.id === "sfall.misc.processoridle")!;
+    const fix = SETTINGS.find((s) => s.id === "hires.OTHER_SETTINGS.CPU_USAGE_FIX")!;
+    const other = SETTINGS.find((s) => s.id === "sfall.Misc.ProcessorIdle")!;
     expect(fix.conflictsWith?.id).toBe(other.id);
     // The two components each idle the process on their own, so neither disables the other and neither may be
     // expressed as a gate - which is the whole reason this mechanism exists alongside gatedBy.

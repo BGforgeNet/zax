@@ -59,7 +59,10 @@
     {#if def.help}<span class="help">{def.help}</span>{/if}
     {#if managed}<span class="note">{managed.reason}</span>{/if}
     {#if inert && gate && !nested}
-      <span class="gate">needs {gate.controller.label} = {gate.wants}</span>
+      <!-- A controller in another file carries its address inline - the one exemption from the same-tab rule. -->
+      <span class="gate"
+        >needs {gate.controller.label}{gate.controller.file !== def.file ? ` (${gate.controller.file})` : ""} = {gate.wants}</span
+      >
     {:else if inert && gate}
       <span class="gate">needs {gate.wants} above</span>
     {/if}

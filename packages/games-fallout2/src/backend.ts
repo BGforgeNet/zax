@@ -32,6 +32,18 @@ import {
 } from "@zax/core";
 import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
+import { insideMods, parseManifest, type ModSetting } from "./manifest.js";
+import { MOD_FEEDS, fetchFeed, listAvailableMods, type ModListing } from "./mod-feed.js";
+import {
+  applyModInstall,
+  planModInstall,
+  restoreModInstall,
+  uninstallMod,
+  type ModInstallOutcome,
+  type ModInstallPlan,
+  type ModRemoval,
+} from "./mod-install.js";
+import { loadRecord, reconcileRecord } from "./records.js";
 import { readMods, saveMods, type ModsSaveRequest, type ModsSnapshot } from "./mods.js";
 import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
 import { installedHiresVersion } from "./hires.js";
@@ -62,6 +74,15 @@ export type OpenTarget = OwnDirectory | "log" | "download";
 
 export const RELEASES_PAGE = "https://github.com/BGforgeNet/zax/releases/latest";
 
+/** One installed mod's configuration surface: who it belongs to, and the schema its record carries. */
+export interface ModSettingsGroup {
+  modId: string;
+  name: string;
+  /** The ini files the schema describes - what the open-the-file affordance opens. */
+  files: readonly string[];
+  settings: readonly ModSetting[];
+}
+
 export interface Backend {
   describe(): Promise<MachineDescription>;
   /** A directory the user picked, or null if they cancelled. The picker belongs to the shell, not the page. */
@@ -73,6 +94,21 @@ export interface Backend {
   /** sfall's mod load order, and what sits in the folder it orders. */
   loadMods(install: Install): Promise<ModsSnapshot>;
   saveMods(request: ModsSaveRequest): Promise<SaveOutcome>;
+  /** Every known mod against this install: what it is, and what can be done with it here. */
+  availableMods(install: Install): Promise<ModListing>;
+  /** Downloads and verifies a mod's newest release, answering the resolved plan the confirmation shows. */
+  planMod(install: Install, modId: string): Promise<ModInstallPlan>;
+  installMod(install: Install, modId: string): Promise<ModInstallOutcome>;
+  /** Unwinds an install that never finished; the working directory holds everything it puts back. */
+  restoreMod(install: Install, modId: string): Promise<void>;
+  removeMod(install: Install, modId: string): Promise<ModRemoval>;
+  /** The installed mods' settings schemas, rendered by the same per-kind controls the catalog uses. */
+  modSettings(install: Install): Promise<readonly ModSettingsGroup[]>;
+  /**
+   * Hands one of an installed mod's own files to the desktop's opener - the route to the sections a schema
+   * does not cover. Bounded to files the mod's record declares, so a renderer cannot name another.
+   */
+  openModFile(install: Install, modId: string, file: string): Promise<void>;
   identifyInstall(path: string): Promise<GameType | null>;
   scanForInstalls(known: readonly Install[]): Promise<readonly Install[]>;
   installedSfallVersion(install: Install): Promise<string | null>;
@@ -139,6 +175,36 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         ? debugDirectory(platform)
         : packageDirectory(platform);
 
+  /** The feed release for a mod the interface named - never data the renderer supplied. */
+  const releaseForMod = async (modId: string) => {
+    const feed = MOD_FEEDS.find((entry) => entry.id === modId);
+    if (!feed) throw new Error(`No known feed carries "${modId}".`);
+    return fetchFeed(platform, feed);
+  };
+
+  /** The settings schemas the install's records carry. A snapshot a newer spec wrote is skipped, not fatal. */
+  const installedModSettings = async (installPath: string): Promise<ModSettingsGroup[]> => {
+    const groups: ModSettingsGroup[] = [];
+    for (const mod of (await loadRecord(platform, installPath)).mods) {
+      if (!mod.complete) continue;
+      try {
+        const manifest = parseManifest(new TextEncoder().encode(mod.manifest));
+        // A mod without a schema gets no configuration surface - the schema is the convention.
+        if (manifest.settings.length === 0) continue;
+        groups.push({
+          modId: manifest.id,
+          name: manifest.name,
+          files: [...new Set(manifest.settings.map((setting) => setting.file))],
+          settings: manifest.settings,
+        });
+      } catch {
+        // The mod stays installed and listed; only its configuration surface is missing, as it is for any
+        // mod without a schema.
+      }
+    }
+    return groups;
+  };
+
   return {
     chooseFolder: () => shell.chooseFolder(),
 
@@ -152,10 +218,49 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
 
     loadState: () => loadState(platform),
     saveState: (state) => saveState(platform, state),
-    loadConfigFiles: (installPath) => loadConfigFiles(platform, installPath, [...CONFIG_FILES]),
+    loadConfigFiles: async (installPath) => {
+      // The installed mods' settings files load through the same lossless path the engine's files do, so the
+      // interface's guard-and-backup behaviour is one mechanism, not two.
+      const names = new Set<string>(CONFIG_FILES);
+      for (const group of await installedModSettings(installPath)) for (const file of group.files) names.add(file);
+      return loadConfigFiles(platform, installPath, [...names]);
+    },
     saveConfigFiles: (request) => saveConfigFiles(platform, request),
     loadMods: (install) => readMods(platform, install),
     saveMods: (request) => saveMods(platform, request),
+
+    availableMods: async (install) => {
+      const record = await reconcileRecord(platform, await loadRecord(platform, install.path));
+      const sfall = await installedSfallVersion(platform, install);
+      return listAvailableMods(platform, install, record, sfall);
+    },
+    planMod: async (install, modId) => planModInstall(platform, install, await releaseForMod(modId), reporting()),
+    installMod: async (install, modId) => {
+      const release = await releaseForMod(modId);
+      const progress = reporting();
+      // Re-planned rather than trusting a plan the renderer held: the directory may have moved on since the
+      // confirmation, and the plan is cheap against the already-verified archive.
+      const plan = await planModInstall(platform, install, release, progress);
+      return applyModInstall(platform, install, release, plan, progress, new Date());
+    },
+    restoreMod: (install, modId) => restoreModInstall(platform, install, modId),
+    removeMod: (install, modId) => uninstallMod(platform, install, modId, new Date()),
+    modSettings: (install) => installedModSettings(install.path),
+    openModFile: async (install, modId, file) => {
+      const mod = (await loadRecord(platform, install.path)).mods.find((held) => held.id === modId);
+      if (!mod) throw new Error(`Nothing of "${modId}" is recorded for this install.`);
+      // Bounded to the files the record itself declares - its state snapshots and its schema's files.
+      const allowed = new Set(Object.keys(mod.shipped));
+      try {
+        for (const setting of parseManifest(new TextEncoder().encode(mod.manifest)).settings) {
+          allowed.add(setting.file);
+        }
+      } catch {
+        // An unreadable snapshot narrows what may be opened; it does not widen anything.
+      }
+      if (!allowed.has(file) || !insideMods(file)) throw new Error(`"${file}" is not one of ${modId}'s files.`);
+      return platform.process.open(platform.paths.join(install.path, ...file.split("/")));
+    },
     identifyInstall: (path) => identifyInstall(platform, path),
     scanForInstalls: (known) => scanForInstalls(platform, known, new Date()),
 

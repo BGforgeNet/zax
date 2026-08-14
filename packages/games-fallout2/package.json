@@ -12,6 +12,7 @@
     "@zax/core": "workspace:*",
     "@zax/platform": "workspace:*",
     "pe-library": "2.0.1",
-    "resedit": "3.0.2"
+    "resedit": "3.0.2",
+    "yaml": "2.9.0"
   }
 }

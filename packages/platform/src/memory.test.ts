@@ -105,4 +105,38 @@ describe("memory platform", () => {
     expect(paths.basename("/game/mods/rpu.dat")).toBe("rpu.dat");
     expect(paths.config).toBe("/home/tester/.config/zax");
   });
+
+  it("lists a canned archive from its contents, every entry a file with its size", async () => {
+    const platform = new MemoryPlatform({
+      archives: { "/downloads/mod.zip": { "mods/fo2tweaks.dat": "payload", "mods/fo2tweaks.ini": "[main]" } },
+    });
+    expect(await platform.archive.list("/downloads/mod.zip")).toEqual([
+      { name: "mods/fo2tweaks.dat", kind: "file", size: 7 },
+      { name: "mods/fo2tweaks.ini", kind: "file", size: 6 },
+    ]);
+    expect(platform.listed).toEqual(["/downloads/mod.zip"]);
+  });
+
+  it("prefers a canned listing, which is how a hostile declaration differs from the contents", async () => {
+    const platform = new MemoryPlatform({
+      archives: { "/downloads/mod.zip": { "mods/a.dat": "x" } },
+      listings: { "/downloads/mod.zip": [{ name: "mods/a.dat", kind: "link", size: 10_000_000_000 }] },
+    });
+    expect(await platform.archive.list("/downloads/mod.zip")).toEqual([
+      { name: "mods/a.dat", kind: "link", size: 10_000_000_000 },
+    ]);
+  });
+
+  it("rejects listing an archive nothing canned, as the real one rejects an unreadable file", async () => {
+    const platform = new MemoryPlatform();
+    await expect(platform.archive.list("/downloads/absent.zip")).rejects.toThrow(/No canned contents/);
+  });
+
+  it("hashes a file to the published SHA-256 test vector, agreeing with the Node platform", async () => {
+    const platform = new MemoryPlatform({ files: { "/downloads/digest.bin": "abc" } });
+    expect(await platform.hash.sha256("/downloads/digest.bin")).toBe(
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    );
+    await expect(platform.hash.sha256("/downloads/absent.bin")).rejects.toThrow(/No such file/);
+  });
 });

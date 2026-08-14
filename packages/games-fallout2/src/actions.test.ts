@@ -88,8 +88,8 @@ describe("applied detection", () => {
 describe("curated surface", () => {
   it("offers only resolutions the preset targets actually accept", () => {
     // The same two ids the presets dropdown writes; validated here because the dropdown itself never checks.
-    const w = byId.get("hires.main.scr-width");
-    const h = byId.get("hires.main.scr-height");
+    const w = byId.get("hires.MAIN.SCR_WIDTH");
+    const h = byId.get("hires.MAIN.SCR_HEIGHT");
     expect(w).toBeDefined();
     expect(h).toBeDefined();
     // One control writes both keys at once, so they have to belong to the same file.

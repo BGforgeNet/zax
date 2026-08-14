@@ -21,8 +21,10 @@ const bytes = (text: string) => {
 };
 
 const ORDER_FILE = `${PREVIEW_INSTALL}/mods/mods_order.txt`;
+const MOD_INI = `${PREVIEW_INSTALL}/mods/fo2tweaks.ini`;
 /** Captured on the first run, before any test has written to it, so the seed is not repeated here to drift. */
 let seededOrder: Uint8Array | null = null;
+let seededModIni: Uint8Array | null = null;
 
 beforeEach(async () => {
   const seeded = `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`;
@@ -33,14 +35,16 @@ beforeEach(async () => {
   await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddrawini));
   seededOrder ??= await previewPlatform.fs.read(ORDER_FILE);
   await previewPlatform.fs.write(ORDER_FILE, seededOrder);
+  seededModIni ??= await previewPlatform.fs.read(MOD_INI);
+  await previewPlatform.fs.write(MOD_INI, seededModIni);
   await store.start();
 });
 
 test("starts on the seeded install with its config files read", () => {
   expect(store.installs.map((one) => one.path)).toEqual([PREVIEW_INSTALL]);
   // Read from the fixture rather than defaulted: everything below distinguishes a value from its absence.
-  expect(store.baselineOf("sfall.misc.processoridle")).toBe("-1");
-  expect(store.baselineOf("hires.other-settings.cpu-usage-fix")).toBe("0");
+  expect(store.baselineOf("sfall.Misc.ProcessorIdle")).toBe("-1");
+  expect(store.baselineOf("hires.OTHER_SETTINGS.CPU_USAGE_FIX")).toBe("0");
 });
 
 describe("installs", () => {
@@ -146,11 +150,11 @@ describe("search", () => {
   test("does not offer a result the tab it lives on will not show", () => {
     // free_space is placed but hidden, so a result for it would carry a "go to" that lands nowhere.
     store.query = "free space";
-    expect(store.results.map((r) => r.def.id)).not.toContain("game.system.free-space");
+    expect(store.results.map((r) => r.def.id)).not.toContain("game.system.free_space");
 
     // A pinned value is drawn even where the layout hides it, so it stays findable.
     store.query = "uac";
-    expect(store.results.map((r) => r.def.id)).toContain("hires.main.uac-aware");
+    expect(store.results.map((r) => r.def.id)).toContain("hires.MAIN.UAC_AWARE");
     store.query = "";
   });
 
@@ -158,7 +162,7 @@ describe("search", () => {
     // "DirectX9" appears only as an option label of the graphics mode choice - its label, key and address say
     // nothing about DirectX - so this passes only while option labels are part of the searched text.
     store.query = "directx9";
-    expect(store.results.map((r) => r.def.id)).toContain("hires.main.graphics-mode");
+    expect(store.results.map((r) => r.def.id)).toContain("hires.MAIN.GRAPHICS_MODE");
     store.query = "";
   });
 
@@ -179,55 +183,55 @@ describe("gates", () => {
     store.revertAll();
     // The fixture never writes the binding, so the gate starts closed on an absent value rather than on a
     // listed one - the case a values-list gate could not express at all.
-    expect(store.gateOf(def("sfall.input.fastmovefromcontainer"))?.active).toBe(false);
+    expect(store.gateOf(def("sfall.Input.FastMoveFromContainer"))?.active).toBe(false);
 
-    store.set("sfall.input.itemfastmovekey", "30");
-    expect(store.gateOf(def("sfall.input.fastmovefromcontainer"))?.active).toBe(true);
+    store.set("sfall.Input.ItemFastMoveKey", "30");
+    expect(store.gateOf(def("sfall.Input.FastMoveFromContainer"))?.active).toBe(true);
 
-    store.set("sfall.input.itemfastmovekey", "0");
-    expect(store.gateOf(def("sfall.input.fastmovefromcontainer"))?.active).toBe(false);
+    store.set("sfall.Input.ItemFastMoveKey", "0");
+    expect(store.gateOf(def("sfall.Input.FastMoveFromContainer"))?.active).toBe(false);
     store.revertAll();
   });
 
   test("the merged resolution keys carry the gate the pair control has to render", () => {
     store.revertAll();
     // The pair renders one control over two keys, so it reads the gate off a member rather than off itself.
-    expect(store.gateOf(def("sfall.graphics.graphicswidth"))?.active).toBe(false);
-    store.set("sfall.graphics.mode", "4");
-    expect(store.gateOf(def("sfall.graphics.graphicswidth"))?.active).toBe(true);
+    expect(store.gateOf(def("sfall.Graphics.GraphicsWidth"))?.active).toBe(false);
+    store.set("sfall.Graphics.Mode", "4");
+    expect(store.gateOf(def("sfall.Graphics.GraphicsWidth"))?.active).toBe(true);
     store.revertAll();
   });
 });
 
 describe("conflicts", () => {
-  const fix = () => SETTINGS.find((s) => s.id === "hires.other-settings.cpu-usage-fix")!;
+  const fix = () => SETTINGS.find((s) => s.id === "hires.OTHER_SETTINGS.CPU_USAGE_FIX")!;
 
   test("stays quiet until both settings are in the states that clash", () => {
     store.revertAll();
     // The fixture ships both off: CPU_USAGE_FIX=0 and ProcessorIdle=-1.
     expect(store.conflictOf(fix())).toBeNull();
 
-    store.set("hires.other-settings.cpu-usage-fix", "1");
+    store.set("hires.OTHER_SETTINGS.CPU_USAGE_FIX", "1");
     expect(store.conflictOf(fix()), "one side alone is not a clash").toBeNull();
 
-    store.set("sfall.misc.processoridle", "0");
-    expect(store.conflictOf(fix())?.other.id).toBe("sfall.misc.processoridle");
+    store.set("sfall.Misc.ProcessorIdle", "0");
+    expect(store.conflictOf(fix())?.other.id).toBe("sfall.Misc.ProcessorIdle");
 
     // Backing either side out clears it again.
-    store.set("sfall.misc.processoridle", "-1");
+    store.set("sfall.Misc.ProcessorIdle", "-1");
     expect(store.conflictOf(fix())).toBeNull();
     store.revertAll();
   });
 
   test("warns on both halves, not only the one carrying the declaration", () => {
     store.revertAll();
-    const idle = SETTINGS.find((s) => s.id === "sfall.misc.processoridle")!;
+    const idle = SETTINGS.find((s) => s.id === "sfall.Misc.ProcessorIdle")!;
     expect(idle.conflictsWith, "the declaration sits on the other half").toBeUndefined();
 
-    store.set("hires.other-settings.cpu-usage-fix", "1");
-    store.set("sfall.misc.processoridle", "0");
+    store.set("hires.OTHER_SETTINGS.CPU_USAGE_FIX", "1");
+    store.set("sfall.Misc.ProcessorIdle", "0");
     // Someone who reaches this setting first would otherwise flip it with no warning at all.
-    expect(store.conflictOf(idle)?.other.id).toBe("hires.other-settings.cpu-usage-fix");
+    expect(store.conflictOf(idle)?.other.id).toBe("hires.OTHER_SETTINGS.CPU_USAGE_FIX");
     store.revertAll();
     expect(store.conflictOf(idle)).toBeNull();
   });
@@ -454,7 +458,7 @@ describe("crossing the process boundary", () => {
 });
 
 describe("a value ZAX pins", () => {
-  const PINNED = "hires.main.uac-aware";
+  const PINNED = "hires.MAIN.UAC_AWARE";
   const onDisk = async () => {
     const raw = await previewPlatform.fs.read(`${PREVIEW_INSTALL}/f2_res.ini`);
     return [...raw].map((b) => String.fromCharCode(b)).join("");
@@ -600,5 +604,75 @@ describe("a long operation", () => {
 
     expect(store.notice).toEqual({ kind: "problem", text: "Updating sfall is still running - wait for it to finish." });
     store.busy = null;
+  });
+});
+
+describe("mod settings", () => {
+  test("an installed mod's schema loads with its values read from its own ini", () => {
+    expect(store.modSettings.map((group) => group.name)).toEqual(["FO2tweaks"]);
+    expect(store.modSettings[0]?.files).toEqual(["mods/fo2tweaks.ini"]);
+    expect(store.valueOf("fo2tweaks.main.autodoors")).toBe("1");
+    expect(store.valueOf("fo2tweaks.main.max_knockback")).toBe("-1");
+  });
+
+  test("an edit saves through the lossless path: one line changes, the comments stay", async () => {
+    store.set("fo2tweaks.main.autodoors", "2");
+    expect(store.modsViewChanged, "the Mods view carries the unsaved mark for it").toBe(true);
+    await store.save();
+
+    const written = new TextDecoder().decode(await previewPlatform.fs.read(MOD_INI));
+    expect(written).toContain("autodoors=2");
+    expect(written, "the file's own comments are its documentation and survive the write").toContain(
+      "; Automatically open/walk through unlocked doors when not in combat",
+    );
+    expect(store.isModified("fo2tweaks.main.autodoors"), "the file just written is the new baseline").toBe(false);
+    expect(store.valueOf("fo2tweaks.main.autodoors")).toBe("2");
+  });
+
+  test("a cross-file gate resolves its controller in the catalog, not the mod's own schema", () => {
+    const def = store.modSettings[0]?.settings.find((s) => s.id === "fo2tweaks.main.damage_mod");
+    const gate = store.gateOf(def!);
+    expect(gate?.controller.id).toBe("sfall.Misc.DamageFormula");
+    // Active exactly when the install's ddraw.ini holds the value the gate names - read, not assumed.
+    expect(gate?.active).toBe(store.valueOf("sfall.Misc.DamageFormula") === "0");
+  });
+
+  test("opening the mod's own file refuses in the preview, with the reason named", async () => {
+    await store.openModIni("fo2tweaks", "mods/fo2tweaks.ini");
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.notice?.text).toContain("desktop build");
+  });
+});
+
+describe("mod flows and unsaved edits", () => {
+  test("nothing installs over unsaved edits - the flow refuses before anything runs", async () => {
+    store.set("fo2tweaks.main.autodoors", "2");
+    const offer = {
+      id: "fo2tweaks",
+      name: "FO2tweaks",
+      version: "15",
+      type: "pluggable" as const,
+      availability: { kind: "upgrade" as const, from: "14.7" },
+    };
+    await store.prepareMod(offer);
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.notice?.text).toContain("unsaved");
+    expect(store.modPlan, "no plan was prepared").toBeNull();
+    store.revert("fo2tweaks.main.autodoors");
+  });
+
+  test("restore refuses over unsaved edits too - it rewrites the same files the other flows do", async () => {
+    store.set("fo2tweaks.main.autodoors", "2");
+    const offer = {
+      id: "fo2tweaks",
+      name: "FO2tweaks",
+      version: "14.7",
+      type: "pluggable" as const,
+      availability: { kind: "retry" as const, version: "14.7" },
+    };
+    await store.restoreMod(offer);
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.notice?.text).toContain("unsaved");
+    store.revert("fo2tweaks.main.autodoors");
   });
 });

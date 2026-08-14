@@ -28,12 +28,48 @@ export {
   type ModsSnapshot,
 } from "./mods.js";
 export { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
+export {
+  MANIFEST_BYTE_CAP,
+  MANIFEST_NAME,
+  insideMods,
+  parseManifest,
+  type ModManifest,
+  type ModSetting,
+  type RefuseRule,
+} from "./manifest.js";
+export { loadRecord, reconcileRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
+export {
+  MOD_FEEDS,
+  availability,
+  fetchFeed,
+  listAvailableMods,
+  presentInMods,
+  type Availability,
+  type ModContext,
+  type ModFeed,
+  type ModListing,
+  type ModOffer,
+  type ModRelease,
+} from "./mod-feed.js";
+export {
+  applyModInstall,
+  planModInstall,
+  refusalFor,
+  restoreModInstall,
+  uninstallMod,
+  type ModInstallOutcome,
+  type ModInstallPlan,
+  type ModProgress,
+  type ModRemoval,
+  type PlannedFile,
+} from "./mod-install.js";
 export { BACKEND_METHODS, fromMethods, wrapMethods, type BackendMethod } from "./backend-methods.js";
 export {
   RELEASES_PAGE,
   createBackend,
   type Backend,
   type MachineDescription,
+  type ModSettingsGroup,
   type OperationProgress,
   type OpenTarget,
   type OwnDirectory,

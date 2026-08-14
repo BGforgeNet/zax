@@ -68,8 +68,8 @@ describe("layout", () => {
   it("keeps the nine sliders as sliders", () => {
     const sliders = placed.flatMap((n) => (n.kind === "setting" && n.control === "slider" ? [n.id] : []));
     expect(sliders).toContain("game.preferences.brightness");
-    expect(sliders).toContain("game.preferences.mouse-sensitivity");
-    expect(sliders).toContain("game.sound.master-volume");
+    expect(sliders).toContain("game.preferences.mouse_sensitivity");
+    expect(sliders).toContain("game.sound.master_volume");
     expect(sliders.length).toBe(9);
   });
 
@@ -107,11 +107,11 @@ describe("layout", () => {
       // By value, not just presence: a slider with the wrong ceiling passes an existence check, which is how
       // an upstream splash range of 5 survived one. These are fallout2-ce's own preference-table bounds.
       const RANGES: Record<string, [number, number]> = {
-        "game.preferences.combat-speed": [0, 50],
-        "game.preferences.text-base-delay": [1, 6],
-        "game.preferences.text-line-delay": [0, 2],
+        "game.preferences.combat_speed": [0, 50],
+        "game.preferences.text_base_delay": [1, 6],
+        "game.preferences.text_line_delay": [0, 2],
         "game.preferences.brightness": [1, 1.17999267578125],
-        "game.preferences.mouse-sensitivity": [1, 2.5],
+        "game.preferences.mouse_sensitivity": [1, 2.5],
       };
       const want = RANGES[n.id];
       expect(want, `${n.id} is a slider with no recorded range`).toBeDefined();
@@ -124,9 +124,9 @@ describe("layout", () => {
     // by name: a check that merely counted hidden settings would pass on the wrong three.
     const hidden = placed.flatMap((n) => (n.kind === "setting" && n.hidden ? [n.id] : []));
     expect(hidden.sort()).toEqual([
-      "game.preferences.text-line-delay", // the previous interface hid it
-      "game.system.free-space", // fallout2-ce reads it and never uses it
-      "hires.main.uac-aware", // the previous interface hid it; ZAX pins the value
+      "game.preferences.text_line_delay", // the previous interface hid it
+      "game.system.free_space", // fallout2-ce reads it and never uses it
+      "hires.MAIN.UAC_AWARE", // the previous interface hid it; ZAX pins the value
     ]);
   });
 

@@ -142,6 +142,17 @@ export interface ArchiveEntry {
   name: string;
 }
 
+/** One entry of an archive's directory, read without extracting anything. */
+export interface ArchiveEntryInfo {
+  /** The path inside the archive, `/`-separated as archives store it. */
+  name: string;
+  /** Links are named so a caller can refuse them - an entry that plants a link and then writes through it is
+   * the classic installer escape, and extraction is too late to find out. */
+  kind: "file" | "dir" | "link";
+  /** Declared uncompressed bytes. A declaration to judge - a decompression bomb lies here - not a fact. */
+  size: number;
+}
+
 export interface ExtractOptions {
   /**
    * Names inside the archive to extract, instead of all of them. Reading one file out of a release is most of
@@ -153,8 +164,18 @@ export interface ExtractOptions {
 export interface Archive {
   /** Extracts an archive. The format is decided by the implementation from the file itself. */
   extract(archive: string, destination: string, options?: ExtractOptions): Promise<void>;
+  /**
+   * The archive's directory: every entry with its declared size, links flagged. What a mod install's
+   * preflight judges - size ceilings, entry counts, link refusal - before anything is extracted.
+   */
+  list(archive: string): Promise<readonly ArchiveEntryInfo[]>;
   /** Writes a zip. Only the debug package creates archives, and a zip is what a bug report can attach. */
   createZip(destination: string, entries: readonly ArchiveEntry[]): Promise<void>;
+}
+
+export interface Hashing {
+  /** Lowercase hex SHA-256 of the file at a path - what a release asset's stated digest is checked against. */
+  sha256(path: string): Promise<string>;
 }
 
 /**
@@ -180,5 +201,6 @@ export interface Platform {
   readonly process: ProcessLauncher;
   readonly net: Network;
   readonly archive: Archive;
+  readonly hash: Hashing;
   readonly registry: Registry;
 }

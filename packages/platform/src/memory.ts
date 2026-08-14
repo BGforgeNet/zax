@@ -12,9 +12,11 @@ import {
   NetworkError,
   type Archive,
   type ArchiveEntry,
+  type ArchiveEntryInfo,
   type DirEntry,
   type FileStat,
   type FileSystem,
+  type Hashing,
   type LaunchOptions,
   type Network,
   type OperatingSystem,
@@ -71,6 +73,11 @@ export interface MemoryOptions {
   downloads?: Readonly<Record<string, string | Uint8Array>>;
   /** What `archive.extract` produces, by archive path: file contents keyed by path inside the archive. */
   archives?: Readonly<Record<string, Readonly<Record<string, string | Uint8Array>>>>;
+  /**
+   * Canned `archive.list` answers, for archives whose declared directory must differ from their contents - a
+   * bombed size declaration, a symlink entry. An archive with none is listed from its `archives` contents.
+   */
+  listings?: Readonly<Record<string, readonly ArchiveEntryInfo[]>>;
   /** Registry values, by key and then by value name. Both are matched case-insensitively, as Windows does. */
   registry?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
@@ -82,6 +89,7 @@ export class MemoryPlatform implements Platform {
   readonly process: ProcessLauncher;
   readonly net: Network;
   readonly archive: Archive;
+  readonly hash: Hashing;
   readonly registry: Registry;
 
   /** Everything the outside world was asked to do, in the order it was asked. */
@@ -90,6 +98,7 @@ export class MemoryPlatform implements Platform {
   readonly fetched: string[] = [];
   readonly downloaded: Array<{ url: string; destination: string }> = [];
   readonly extracted: Array<{ archive: string; destination: string; only?: readonly string[] }> = [];
+  readonly listed: string[] = [];
   /**
    * Archives written, each with what was in it at the time. The contents are captured rather than looked up
    * later because an archive routinely outlives the scratch files that went into it.
@@ -106,6 +115,7 @@ export class MemoryPlatform implements Platform {
   private readonly responses: Record<string, string>;
   private readonly payloads: Record<string, string | Uint8Array>;
   private readonly contents: Record<string, Readonly<Record<string, string | Uint8Array>>>;
+  private readonly listings: Record<string, readonly ArchiveEntryInfo[]>;
   /** Advanced by one on each write, so a rewritten file is detectably newer without a real clock. */
   private clock = 1_700_000_000_000;
 
@@ -117,6 +127,7 @@ export class MemoryPlatform implements Platform {
     this.responses = { ...options.responses };
     this.payloads = { ...options.downloads };
     this.contents = { ...options.archives };
+    this.listings = { ...options.listings };
 
     for (const dir of options.dirs ?? []) this.makeDirs(normalize(dir));
     for (const [path, content] of Object.entries(options.files ?? {})) {
@@ -213,6 +224,15 @@ export class MemoryPlatform implements Platform {
           this.put(normalize(`${destination}/${name}`), typeof content === "string" ? bytes(content) : content);
         }
       },
+      list: async (archive) => {
+        this.listed.push(archive);
+        const canned = this.listings[normalize(archive)] ?? this.listings[archive];
+        if (canned) return canned;
+        const inside = this.contents[normalize(archive)] ?? this.contents[archive];
+        if (!inside) throw new Error(`No canned contents for ${archive}`);
+        return Object.entries(inside).map(([name, content]) => ({ name, kind: "file", size: content.length }));
+      },
+
       createZip: async (destination, entries) => {
         const contents: Record<string, string> = {};
         for (const entry of entries) {
@@ -222,6 +242,17 @@ export class MemoryPlatform implements Platform {
         }
         this.zipped.push({ destination, entries, contents });
         this.put(normalize(destination), bytes(entries.map((e) => e.name).join("\n")));
+      },
+    };
+
+    this.hash = {
+      // WebCrypto rather than a Node built-in: this class is also the browser preview's production platform.
+      sha256: async (path) => {
+        const found = this.files.get(normalize(path));
+        if (!found) throw new Error(`No such file: ${path}`);
+        // Copied: WebCrypto's types want a plain ArrayBuffer view, which a stored slice may not be.
+        const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(found));
+        return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
       },
     };
   }

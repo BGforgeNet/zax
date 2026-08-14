@@ -78,9 +78,9 @@
         -->
         <span
           class="dot"
-          class:unsaved={store.modsChanged}
+          class:unsaved={store.modsViewChanged}
           aria-hidden="true"
-          title={store.modsChanged ? "The mod order has unsaved changes" : null}
+          title={store.modsViewChanged ? "Mods have unsaved changes" : null}
         ></span>
       </button>
     </div>

@@ -40,22 +40,22 @@ export const LAYOUT: readonly LayoutFile[] = [
      },
      {
       "kind": "setting",
-      "id": "game.preferences.game-difficulty",
+      "id": "game.preferences.game_difficulty",
       "control": "radio"
      },
      {
       "kind": "setting",
-      "id": "game.preferences.item-highlight",
+      "id": "game.preferences.item_highlight",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "game.preferences.language-filter",
+      "id": "game.preferences.language_filter",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "game.preferences.mouse-sensitivity",
+      "id": "game.preferences.mouse_sensitivity",
       "control": "slider"
      },
      {
@@ -70,12 +70,12 @@ export const LAYOUT: readonly LayoutFile[] = [
      },
      {
       "kind": "setting",
-      "id": "game.preferences.text-base-delay",
+      "id": "game.preferences.text_base_delay",
       "control": "slider"
      },
      {
       "kind": "setting",
-      "id": "game.preferences.text-line-delay",
+      "id": "game.preferences.text_line_delay",
       "control": "slider",
       "hidden": true
      },
@@ -85,22 +85,22 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "game.sound.master-volume",
+        "id": "game.sound.master_volume",
         "control": "slider"
        },
        {
         "kind": "setting",
-        "id": "game.sound.music-volume",
+        "id": "game.sound.music_volume",
         "control": "slider"
        },
        {
         "kind": "setting",
-        "id": "game.sound.sndfx-volume",
+        "id": "game.sound.sndfx_volume",
         "control": "slider"
        },
        {
         "kind": "setting",
-        "id": "game.sound.speech-volume",
+        "id": "game.sound.speech_volume",
         "control": "slider"
        }
       ]
@@ -112,7 +112,7 @@ export const LAYOUT: readonly LayoutFile[] = [
     "items": [
      {
       "kind": "setting",
-      "id": "game.preferences.combat-difficulty",
+      "id": "game.preferences.combat_difficulty",
       "control": "radio"
      },
      {
@@ -121,39 +121,39 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "game.preferences.combat-speed",
+        "id": "game.preferences.combat_speed",
         "control": "slider"
        },
        {
         "kind": "setting",
-        "id": "game.preferences.player-speedup",
+        "id": "game.preferences.player_speedup",
         "control": "checkbox"
        }
       ]
      },
      {
       "kind": "setting",
-      "id": "game.preferences.combat-looks",
+      "id": "game.preferences.combat_looks",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "game.preferences.combat-messages",
+      "id": "game.preferences.combat_messages",
       "control": "radio"
      },
      {
       "kind": "setting",
-      "id": "game.preferences.combat-taunts",
+      "id": "game.preferences.combat_taunts",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "game.preferences.target-highlight",
+      "id": "game.preferences.target_highlight",
       "control": "radio"
      },
      {
       "kind": "setting",
-      "id": "game.preferences.violence-level",
+      "id": "game.preferences.violence_level",
       "control": "dropdown"
      }
     ]
@@ -167,27 +167,27 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "game.system.art-cache-size",
+        "id": "game.system.art_cache_size",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "game.system.color-cycling",
+        "id": "game.system.color_cycling",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "game.system.critter-dat",
+        "id": "game.system.critter_dat",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "game.system.critter-patches",
+        "id": "game.system.critter_patches",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "game.system.cycle-speed-factor",
+        "id": "game.system.cycle_speed_factor",
         "control": "spin"
        },
        {
@@ -197,7 +197,7 @@ export const LAYOUT: readonly LayoutFile[] = [
        },
        {
         "kind": "setting",
-        "id": "game.system.free-space",
+        "id": "game.system.free_space",
         "control": "spin",
         "hidden": true
        },
@@ -208,7 +208,7 @@ export const LAYOUT: readonly LayoutFile[] = [
        },
        {
         "kind": "setting",
-        "id": "game.system.interrupt-walk",
+        "id": "game.system.interrupt_walk",
         "control": "checkbox"
        },
        {
@@ -218,17 +218,17 @@ export const LAYOUT: readonly LayoutFile[] = [
        },
        {
         "kind": "setting",
-        "id": "game.system.master-dat",
+        "id": "game.system.master_dat",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "game.system.master-patches",
+        "id": "game.system.master_patches",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "game.system.scroll-lock",
+        "id": "game.system.scroll_lock",
         "control": "checkbox"
        },
        {
@@ -259,17 +259,17 @@ export const LAYOUT: readonly LayoutFile[] = [
        },
        {
         "kind": "setting",
-        "id": "game.sound.music-path1",
+        "id": "game.sound.music_path1",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "game.sound.music-path2",
+        "id": "game.sound.music_path2",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "game.sound.cache-size",
+        "id": "game.sound.cache_size",
         "control": "spin"
        },
        {
@@ -310,22 +310,22 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "game.debug.output-map-data-info",
+        "id": "game.debug.output_map_data_info",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "game.debug.show-load-info",
+        "id": "game.debug.show_load_info",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "game.debug.show-script-messages",
+        "id": "game.debug.show_script_messages",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "game.debug.show-tile-num",
+        "id": "game.debug.show_tile_num",
         "control": "checkbox"
        }
       ]
@@ -341,7 +341,7 @@ export const LAYOUT: readonly LayoutFile[] = [
        },
        {
         "kind": "setting",
-        "id": "game.sound.debug-sfxc",
+        "id": "game.sound.debug_sfxc",
         "control": "checkbox"
        }
       ]
@@ -363,27 +363,27 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.main.graphics-mode",
+        "id": "hires.MAIN.GRAPHICS_MODE",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "hires.main.scale-2x",
+        "id": "hires.MAIN.SCALE_2X",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.effects.is-gray-scale",
+        "id": "hires.EFFECTS.IS_GRAY_SCALE",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.main.windowed",
+        "id": "hires.MAIN.WINDOWED",
         "control": "radio"
        },
        {
         "kind": "setting",
-        "id": "hires.main.windowed-fullscreen",
+        "id": "hires.MAIN.WINDOWED_FULLSCREEN",
         "control": "checkbox"
        },
        {
@@ -392,12 +392,12 @@ export const LAYOUT: readonly LayoutFile[] = [
         "items": [
          {
           "kind": "setting",
-          "id": "hires.main.colour-bits",
+          "id": "hires.MAIN.COLOUR_BITS",
           "control": "dropdown"
          },
          {
           "kind": "setting",
-          "id": "hires.main.refresh-rate",
+          "id": "hires.MAIN.REFRESH_RATE",
           "control": "spin"
          }
         ]
@@ -412,12 +412,12 @@ export const LAYOUT: readonly LayoutFile[] = [
          },
          {
           "kind": "setting",
-          "id": "hires.main.scr-width",
+          "id": "hires.MAIN.SCR_WIDTH",
           "control": "spin"
          },
          {
           "kind": "setting",
-          "id": "hires.main.scr-height",
+          "id": "hires.MAIN.SCR_HEIGHT",
           "control": "spin"
          }
         ]
@@ -430,34 +430,34 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.maps.edge-clipping-on",
+        "id": "hires.MAPS.EDGE_CLIPPING_ON",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.maps.ignore-map-edges",
+        "id": "hires.MAPS.IGNORE_MAP_EDGES",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.maps.ignore-player-scroll-limits",
+        "id": "hires.MAPS.IGNORE_PLAYER_SCROLL_LIMITS",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.maps.scroll-dist-x",
+        "id": "hires.MAPS.SCROLL_DIST_X",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "hires.maps.scroll-dist-y",
+        "id": "hires.MAPS.SCROLL_DIST_Y",
         "control": "qinput"
        }
       ]
      },
      {
       "kind": "setting",
-      "id": "hires.maps.numpathnodes",
+      "id": "hires.MAPS.NumPathNodes",
       "control": "spin"
      },
      {
@@ -466,12 +466,12 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.maps.fog-of-war",
+        "id": "hires.MAPS.FOG_OF_WAR",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.maps.fog-light-level",
+        "id": "hires.MAPS.FOG_LIGHT_LEVEL",
         "control": "spin"
        }
       ]
@@ -482,12 +482,12 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.other-settings.splash-scrn-time",
+        "id": "hires.OTHER_SETTINGS.SPLASH_SCRN_TIME",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "hires.other-settings.fade-time-modifier",
+        "id": "hires.OTHER_SETTINGS.FADE_TIME_MODIFIER",
         "control": "spin"
        }
       ]
@@ -499,12 +499,12 @@ export const LAYOUT: readonly LayoutFile[] = [
     "items": [
      {
       "kind": "setting",
-      "id": "hires.movies.movie-size",
+      "id": "hires.MOVIES.MOVIE_SIZE",
       "control": "radio"
      },
      {
       "kind": "setting",
-      "id": "hires.mainmenu.main-menu-size",
+      "id": "hires.MAINMENU.MAIN_MENU_SIZE",
       "control": "radio"
      },
      {
@@ -513,44 +513,44 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.mainmenu.use-hires-images",
+        "id": "hires.MAINMENU.USE_HIRES_IMAGES",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.mainmenu.menu-bg-offset-x",
+        "id": "hires.MAINMENU.MENU_BG_OFFSET_X",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "hires.mainmenu.menu-bg-offset-y",
+        "id": "hires.MAINMENU.MENU_BG_OFFSET_Y",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "hires.mainmenu.scale-buttons-and-text-menu",
+        "id": "hires.MAINMENU.SCALE_BUTTONS_AND_TEXT_MENU",
         "control": "checkbox"
        }
       ]
      },
      {
       "kind": "setting",
-      "id": "hires.static-screens.death-scrn-size",
+      "id": "hires.STATIC_SCREENS.DEATH_SCRN_SIZE",
       "control": "radio"
      },
      {
       "kind": "setting",
-      "id": "hires.static-screens.end-slide-size",
+      "id": "hires.STATIC_SCREENS.END_SLIDE_SIZE",
       "control": "radio"
      },
      {
       "kind": "setting",
-      "id": "hires.static-screens.help-scrn-size",
+      "id": "hires.STATIC_SCREENS.HELP_SCRN_SIZE",
       "control": "radio"
      },
      {
       "kind": "setting",
-      "id": "hires.static-screens.splash-scrn-size",
+      "id": "hires.STATIC_SCREENS.SPLASH_SCRN_SIZE",
       "control": "radio"
      }
     ]
@@ -564,22 +564,22 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.iface.iface-bar-mode",
+        "id": "hires.IFACE.IFACE_BAR_MODE",
         "control": "radio"
        },
        {
         "kind": "setting",
-        "id": "hires.iface.iface-bar-side-art",
+        "id": "hires.IFACE.IFACE_BAR_SIDE_ART",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "hires.iface.iface-bar-sides-ori",
+        "id": "hires.IFACE.IFACE_BAR_SIDES_ORI",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "hires.iface.iface-bar-width",
+        "id": "hires.IFACE.IFACE_BAR_WIDTH",
         "control": "spin"
        }
       ]
@@ -590,22 +590,22 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.other-settings.dialog-scrn-background",
+        "id": "hires.OTHER_SETTINGS.DIALOG_SCRN_BACKGROUND",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.other-settings.dialog-scrn-art-fix",
+        "id": "hires.OTHER_SETTINGS.DIALOG_SCRN_ART_FIX",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.other-settings.barter-pc-inv-drop-fix",
+        "id": "hires.OTHER_SETTINGS.BARTER_PC_INV_DROP_FIX",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.input.scrollwheel-focus-primary-menu",
+        "id": "hires.INPUT.SCROLLWHEEL_FOCUS_PRIMARY_MENU",
         "control": "checkbox"
        }
       ]
@@ -616,17 +616,17 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.iface.alternate-ammo-metre",
+        "id": "hires.IFACE.ALTERNATE_AMMO_METRE",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "hires.iface.alternate-ammo-light",
+        "id": "hires.IFACE.ALTERNATE_AMMO_LIGHT",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "hires.iface.alternate-ammo-dark",
+        "id": "hires.IFACE.ALTERNATE_AMMO_DARK",
         "control": "qinput"
        }
       ]
@@ -638,7 +638,7 @@ export const LAYOUT: readonly LayoutFile[] = [
     "items": [
      {
       "kind": "setting",
-      "id": "hires.other-settings.cd-check",
+      "id": "hires.OTHER_SETTINGS.CD_CHECK",
       "control": "checkbox"
      },
      {
@@ -647,22 +647,22 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.input.alt-mouse-input",
+        "id": "hires.INPUT.ALT_MOUSE_INPUT",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.input.extra-win-msg-checks",
+        "id": "hires.INPUT.EXTRA_WIN_MSG_CHECKS",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.other-settings.cpu-usage-fix",
+        "id": "hires.OTHER_SETTINGS.CPU_USAGE_FIX",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "hires.other-settings.fade-time-recalculate-on-fade",
+        "id": "hires.OTHER_SETTINGS.FADE_TIME_RECALCULATE_ON_FADE",
         "control": "checkbox"
        }
       ]
@@ -673,17 +673,17 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "hires.main.f2-res-dat",
+        "id": "hires.MAIN.f2_res_dat",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "hires.main.f2-res-patches",
+        "id": "hires.MAIN.f2_res_patches",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "hires.main.uac-aware",
+        "id": "hires.MAIN.UAC_AWARE",
         "control": "checkbox",
         "hidden": true
        }
@@ -728,12 +728,12 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.speed.enable",
+        "id": "sfall.Speed.Enable",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.speed.speedmultiinitial",
+        "id": "sfall.Speed.SpeedMultiInitial",
         "control": "spin"
        }
       ]
@@ -744,32 +744,32 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.graphics.mode",
+        "id": "sfall.Graphics.Mode",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "sfall.graphics.graphicswidth",
+        "id": "sfall.Graphics.GraphicsWidth",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.graphics.graphicsheight",
+        "id": "sfall.Graphics.GraphicsHeight",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.graphics.gpublt",
+        "id": "sfall.Graphics.GPUBlt",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "sfall.graphics.allowdshowmovies",
+        "id": "sfall.Graphics.AllowDShowMovies",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "sfall.graphics.fademultiplier",
+        "id": "sfall.Graphics.FadeMultiplier",
         "control": "spin"
        }
       ]
@@ -780,27 +780,27 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.misc.damageformula",
+        "id": "sfall.Misc.DamageFormula",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.saveincombatfix",
+        "id": "sfall.Misc.SaveInCombatFix",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.fastshotfix",
+        "id": "sfall.Misc.FastShotFix",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.inventoryapcost",
+        "id": "sfall.Misc.InventoryApCost",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.quickpocketsapcostreduction",
+        "id": "sfall.Misc.QuickPocketsApCostReduction",
         "control": "spin"
        }
       ]
@@ -811,62 +811,62 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.misc.usefilesystemoverride",
+        "id": "sfall.Misc.UseFileSystemOverride",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.npcautolevel",
+        "id": "sfall.Misc.NPCAutoLevel",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.singlecore",
+        "id": "sfall.Misc.SingleCore",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.playidleanimonreload",
+        "id": "sfall.Misc.PlayIdleAnimOnReload",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.corpsedeletetime",
+        "id": "sfall.Misc.CorpseDeleteTime",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.processoridle",
+        "id": "sfall.Misc.ProcessorIdle",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.skipopeningmovies",
+        "id": "sfall.Misc.SkipOpeningMovies",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.superstimexploitfix",
+        "id": "sfall.Misc.SuperStimExploitFix",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.explosionsemitlight",
+        "id": "sfall.Misc.ExplosionsEmitLight",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.dontturnoffsneakifyourun",
+        "id": "sfall.Misc.DontTurnOffSneakIfYouRun",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.usewalkdistance",
+        "id": "sfall.Misc.UseWalkDistance",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.skiploadinggamesettings",
+        "id": "sfall.Misc.SkipLoadingGameSettings",
         "control": "dropdown"
        }
       ]
@@ -878,7 +878,7 @@ export const LAYOUT: readonly LayoutFile[] = [
     "items": [
      {
       "kind": "setting",
-      "id": "sfall.interface.actionpointsbar",
+      "id": "sfall.Interface.ActionPointsBar",
       "control": "checkbox"
      },
      {
@@ -887,32 +887,32 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.input.usescrollwheel",
+        "id": "sfall.Input.UseScrollWheel",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.input.middlemouse",
+        "id": "sfall.Input.MiddleMouse",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "sfall.input.reversemousebuttons",
+        "id": "sfall.Input.ReverseMouseButtons",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.input.reloadweaponkey",
+        "id": "sfall.Input.ReloadWeaponKey",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "sfall.input.itemfastmovekey",
+        "id": "sfall.Input.ItemFastMoveKey",
         "control": "qinput"
        },
        {
         "kind": "setting",
-        "id": "sfall.input.fastmovefromcontainer",
+        "id": "sfall.Input.FastMoveFromContainer",
         "control": "checkbox"
        }
       ]
@@ -923,27 +923,27 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.misc.combatpanelanimdelay",
+        "id": "sfall.Misc.CombatPanelAnimDelay",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.dialogpanelanimdelay",
+        "id": "sfall.Misc.DialogPanelAnimDelay",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.pipboytimeanimdelay",
+        "id": "sfall.Misc.PipboyTimeAnimDelay",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.speedinterfacecounteranims",
+        "id": "sfall.Misc.SpeedInterfaceCounterAnims",
         "control": "dropdown"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.instantweaponequip",
+        "id": "sfall.Misc.InstantWeaponEquip",
         "control": "checkbox"
        }
       ]
@@ -954,17 +954,17 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.misc.numbersindialogue",
+        "id": "sfall.Misc.NumbersInDialogue",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.enablemusicindialogue",
+        "id": "sfall.Misc.EnableMusicInDialogue",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.partymemberextrainfo",
+        "id": "sfall.Misc.PartyMemberExtraInfo",
         "control": "checkbox"
        }
       ]
@@ -975,22 +975,22 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.misc.stackemptyweapons",
+        "id": "sfall.Misc.StackEmptyWeapons",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.reloadreserve",
+        "id": "sfall.Misc.ReloadReserve",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.itemcounterdefaultmax",
+        "id": "sfall.Misc.ItemCounterDefaultMax",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.displaybonusdamage",
+        "id": "sfall.Misc.DisplayBonusDamage",
         "control": "checkbox"
        }
       ]
@@ -1001,7 +1001,7 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.misc.fullitemdescinbarter",
+        "id": "sfall.Misc.FullItemDescInBarter",
         "control": "checkbox"
        }
       ]
@@ -1012,17 +1012,17 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.misc.extrasaveslots",
+        "id": "sfall.Misc.ExtraSaveSlots",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.autoquicksave",
+        "id": "sfall.Misc.AutoQuickSave",
         "control": "spin"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.autoquicksavepage",
+        "id": "sfall.Misc.AutoQuickSavePage",
         "control": "spin"
        }
       ]
@@ -1033,17 +1033,17 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
-        "id": "sfall.misc.displayswiftlearnerexp",
+        "id": "sfall.Misc.DisplaySwiftLearnerExp",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.activegeigermsgs",
+        "id": "sfall.Misc.ActiveGeigerMsgs",
         "control": "checkbox"
        },
        {
         "kind": "setting",
-        "id": "sfall.misc.displaykarmachanges",
+        "id": "sfall.Misc.DisplayKarmaChanges",
         "control": "checkbox"
        }
       ]
@@ -1055,47 +1055,47 @@ export const LAYOUT: readonly LayoutFile[] = [
     "items": [
      {
       "kind": "setting",
-      "id": "sfall.interface.expandworldmap",
+      "id": "sfall.Interface.ExpandWorldMap",
       "control": "dropdown"
      },
      {
       "kind": "setting",
-      "id": "sfall.interface.worldmaptravelmarkers",
+      "id": "sfall.Interface.WorldMapTravelMarkers",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "sfall.interface.worldmapterraininfo",
+      "id": "sfall.Interface.WorldMapTerrainInfo",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "sfall.misc.worldmaptimemod",
+      "id": "sfall.Misc.WorldMapTimeMod",
       "control": "spin"
      },
      {
       "kind": "setting",
-      "id": "sfall.misc.worldmapfpspatch",
+      "id": "sfall.Misc.WorldMapFPSPatch",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "sfall.misc.worldmapdelay2",
+      "id": "sfall.Misc.WorldMapDelay2",
       "control": "spin"
      },
      {
       "kind": "setting",
-      "id": "sfall.misc.worldmapencounterfix",
+      "id": "sfall.Misc.WorldMapEncounterFix",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "sfall.misc.worldmapencounterrate",
+      "id": "sfall.Misc.WorldMapEncounterRate",
       "control": "spin"
      },
      {
       "kind": "setting",
-      "id": "sfall.misc.worldmapfontpatch",
+      "id": "sfall.Misc.WorldMapFontPatch",
       "control": "checkbox"
      }
     ]
@@ -1105,32 +1105,32 @@ export const LAYOUT: readonly LayoutFile[] = [
     "items": [
      {
       "kind": "setting",
-      "id": "sfall.debugging.debugmode",
+      "id": "sfall.Debugging.DebugMode",
       "control": "dropdown"
      },
      {
       "kind": "setting",
-      "id": "sfall.debugging.init",
+      "id": "sfall.Debugging.Init",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "sfall.debugging.hook",
+      "id": "sfall.Debugging.Hook",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "sfall.debugging.script",
+      "id": "sfall.Debugging.Script",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "sfall.debugging.criticals",
+      "id": "sfall.Debugging.Criticals",
       "control": "checkbox"
      },
      {
       "kind": "setting",
-      "id": "sfall.debugging.fixes",
+      "id": "sfall.Debugging.Fixes",
       "control": "checkbox"
      }
     ]
