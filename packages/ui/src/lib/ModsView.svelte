@@ -71,6 +71,16 @@
         return null;
     }
   }
+
+  /**
+   * The install button names the phase it is in while it runs, the way the sfall panel's buttons do. Both
+   * phases are its own work: the download the plan needs, then the install the confirmed plan performs.
+   */
+  function installButtonLabel(offer: ModOffer): string | null {
+    if (store.modWorking(offer.id, "prepare")) return "Preparing...";
+    if (store.modWorking(offer.id, "install")) return "Installing...";
+    return installLabel(offer);
+  }
 </script>
 
 <!-- One shape for both directions: the down button rotates it, so the two arrows cannot drift apart. -->
@@ -170,15 +180,17 @@
               <div class="offer-actions">
                 {#if installLabel(offer) !== null}
                   <button class="primary" disabled={store.busy !== null} onclick={() => void store.prepareMod(offer)}>
-                    {installLabel(offer)}
+                    {installButtonLabel(offer)}
                   </button>
                 {/if}
                 {#if offer.availability.kind === "retry"}
-                  <button disabled={store.busy !== null} onclick={() => void store.restoreMod(offer)}>Restore</button>
+                  <button disabled={store.busy !== null} onclick={() => void store.restoreMod(offer)}>
+                    {store.modWorking(offer.id, "restore") ? "Restoring..." : "Restore"}
+                  </button>
                 {/if}
                 {#if removable(offer)}
                   <button class="danger" disabled={store.busy !== null} onclick={() => void store.removeMod(offer)}>
-                    Remove
+                    {store.modWorking(offer.id, "remove") ? "Removing..." : "Remove"}
                   </button>
                 {/if}
               </div>

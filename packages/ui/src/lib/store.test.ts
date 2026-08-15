@@ -707,3 +707,25 @@ describe("mod flows and unsaved edits", () => {
     store.revert("fo2tweaks.main.autodoors");
   });
 });
+
+describe("a running mod flow", () => {
+  test("marks the control that started it, and clears the mark however the flow ends", async () => {
+    const offer = {
+      id: "fo2tweaks",
+      name: "FO2tweaks",
+      version: "14.7",
+      type: "pluggable" as const,
+      availability: { kind: "retry" as const, version: "14.7" },
+    };
+    // Nothing of this one is waiting to be restored, so the flow fails - the harder case for the clearing: a
+    // row left marked would sit there claiming to work with nothing running behind it.
+    const running = store.restoreMod(offer);
+    expect(store.modWorking("fo2tweaks", "restore"), "the control that started it says so").toBe(true);
+    expect(store.modWorking("fo2tweaks", "remove"), "and no other control on the row does").toBe(false);
+    expect(store.modWorking("oldmod", "restore"), "nor the same control on another row").toBe(false);
+
+    await running;
+    expect(store.notice?.kind, "the failure is still reported").toBe("problem");
+    expect(store.modWorking("fo2tweaks", "restore"), "and the mark went with the operation").toBe(false);
+  });
+});

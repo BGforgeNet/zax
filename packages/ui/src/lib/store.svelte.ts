@@ -153,6 +153,9 @@ export type View = "settings" | "mods";
 /** The Mods view's own tabs: getting mods, ordering them, and configuring them are three different jobs. */
 export type ModsTab = "installation" | "order" | "settings";
 
+/** Which of a mod row's controls started what is running - one label each, and the button says it. */
+export type ModAction = "prepare" | "install" | "remove" | "restore";
+
 /** Something that happened and the user needs told: a save, a refusal, a failure. */
 export interface Notice {
   kind: "done" | "problem";
@@ -220,7 +223,17 @@ class Store {
    * is left reading 100% after the thing it was measuring has finished.
    */
   progress = $state<OperationProgress | null>(null);
+  /**
+   * Which mod row the running operation belongs to, when it belongs to one. The top bar says what is
+   * happening; this is what lets the button that started it say so rather than only greying out.
+   */
+  private modOperation = $state<{ id: string; action: ModAction } | null>(null);
   notice = $state<Notice | null>(null);
+
+  /** Whether this row's own control is the one running - a button's cue to change its label. */
+  modWorking(id: string, action: ModAction): boolean {
+    return this.modOperation?.id === id && this.modOperation.action === action;
+  }
 
   /** The step and, where the length is known, the proportion - for one line under the operation's name. */
   get progressText(): string | null {
@@ -377,8 +390,16 @@ class Store {
     return this.managedOverrides();
   }
 
-  /** Runs one outward-facing operation, reporting whatever it fails with rather than swallowing it. */
-  private async run(what: string, work: () => Promise<Notice | null>): Promise<void> {
+  /**
+   * Runs one outward-facing operation, reporting whatever it fails with rather than swallowing it. `on` names
+   * the mod row it belongs to, when it has one: set here rather than by the caller so a refused click cannot
+   * mark a row that never started, and cleared with `busy` so no row can be left claiming to be working.
+   */
+  private async run(
+    what: string,
+    work: () => Promise<Notice | null>,
+    on?: { id: string; action: ModAction },
+  ): Promise<void> {
     if (this.busy !== null) {
       // Said rather than dropped. These operations can run for minutes on a poor connection, and a click that
       // does nothing at all reads as the button being broken rather than as the application being busy.
@@ -386,6 +407,7 @@ class Store {
       return;
     }
     this.busy = what;
+    this.modOperation = on ?? null;
     this.notice = null;
     try {
       this.notice = await work();
@@ -394,6 +416,7 @@ class Store {
       this.notice = { kind: "problem", text: `${what} failed: ${reason}` };
     } finally {
       this.busy = null;
+      this.modOperation = null;
       this.progress = null;
     }
   }
@@ -605,11 +628,15 @@ class Store {
       this.notice = refusal;
       return;
     }
-    await this.run(`Preparing ${offer.name} ${offer.version}`, async () => {
-      const plan = await backend.planMod(install, offer.id);
-      this.modPlan = { offer, plan };
-      return null;
-    });
+    await this.run(
+      `Preparing ${offer.name} ${offer.version}`,
+      async () => {
+        const plan = await backend.planMod(install, offer.id);
+        this.modPlan = { offer, plan };
+        return null;
+      },
+      { id: offer.id, action: "prepare" },
+    );
   }
 
   /** The confirmed plan is executed; the plan dialog closes either way, the working directory persists. */
@@ -618,16 +645,20 @@ class Store {
     const install = this.install;
     this.modPlan = null;
     if (!held || !install) return;
-    await this.run(`Installing ${held.offer.name} ${held.offer.version}`, async () => {
-      const outcome = await backend.installMod(install, held.offer.id);
-      await this.readInstall();
-      await this.refreshModOffers(install);
-      const conflicts =
-        outcome.conflicts.length > 0
-          ? ` ${outcome.conflicts.length} setting(s) you had changed were kept over the release's new defaults.`
-          : "";
-      return { kind: "done", text: `${held.offer.name} ${outcome.version} installed.${conflicts}` };
-    });
+    await this.run(
+      `Installing ${held.offer.name} ${held.offer.version}`,
+      async () => {
+        const outcome = await backend.installMod(install, held.offer.id);
+        await this.readInstall();
+        await this.refreshModOffers(install);
+        const conflicts =
+          outcome.conflicts.length > 0
+            ? ` ${outcome.conflicts.length} setting(s) you had changed were kept over the release's new defaults.`
+            : "";
+        return { kind: "done", text: `${held.offer.name} ${outcome.version} installed.${conflicts}` };
+      },
+      { id: held.offer.id, action: "install" },
+    );
   }
 
   /** Cancelling the plan keeps the working directory, so a later attempt resumes rather than re-downloads. */
@@ -643,12 +674,16 @@ class Store {
       this.notice = refusal;
       return;
     }
-    await this.run(`Removing ${offer.name}`, async () => {
-      await backend.removeMod(install, offer.id);
-      await this.readInstall();
-      await this.refreshModOffers(install);
-      return { kind: "done", text: `${offer.name} removed. Copies are in the backup folder.` };
-    });
+    await this.run(
+      `Removing ${offer.name}`,
+      async () => {
+        await backend.removeMod(install, offer.id);
+        await this.readInstall();
+        await this.refreshModOffers(install);
+        return { kind: "done", text: `${offer.name} removed. Copies are in the backup folder.` };
+      },
+      { id: offer.id, action: "remove" },
+    );
   }
 
   /** Opens one of an installed mod's own inis - the route to the sections its schema does not cover. */
@@ -670,12 +705,16 @@ class Store {
       this.notice = refusal;
       return;
     }
-    await this.run(`Restoring before ${offer.name}`, async () => {
-      await backend.restoreMod(install, offer.id);
-      await this.readInstall();
-      await this.refreshModOffers(install);
-      return { kind: "done", text: `The install is back to what it was before ${offer.name}.` };
-    });
+    await this.run(
+      `Restoring before ${offer.name}`,
+      async () => {
+        await backend.restoreMod(install, offer.id);
+        await this.readInstall();
+        await this.refreshModOffers(install);
+        return { kind: "done", text: `The install is back to what it was before ${offer.name}.` };
+      },
+      { id: offer.id, action: "restore" },
+    );
   }
 
   /**
