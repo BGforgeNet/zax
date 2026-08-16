@@ -44,6 +44,7 @@ import {
   type ModRemoval,
 } from "./mod-install.js";
 import { loadRecord, reconcileRecord } from "./records.js";
+import { readTransaction, releaseOf } from "./mod-transaction.js";
 import { readMods, saveMods, type ModsSaveRequest, type ModsSnapshot } from "./mods.js";
 import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
 import { installedHiresVersion } from "./hires.js";
@@ -98,7 +99,8 @@ export interface Backend {
   availableMods(install: Install): Promise<ModListing>;
   /** Downloads and verifies a mod's newest release, answering the resolved plan the confirmation shows. */
   planMod(install: Install, modId: string): Promise<ModInstallPlan>;
-  installMod(install: Install, modId: string): Promise<ModInstallOutcome>;
+  /** Installs the plan whose fingerprint this is; one that no longer resolves the same is refused. */
+  installMod(install: Install, modId: string, fingerprint: string): Promise<ModInstallOutcome>;
   /** Unwinds an install that never finished; the working directory holds everything it puts back. */
   restoreMod(install: Install, modId: string): Promise<void>;
   removeMod(install: Install, modId: string): Promise<ModRemoval>;
@@ -175,8 +177,15 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         ? debugDirectory(platform)
         : packageDirectory(platform);
 
-  /** The feed release for a mod the interface named - never data the renderer supplied. */
-  const releaseForMod = async (modId: string) => {
+  /**
+   * The release a mod flow works on - never data the renderer supplied. An unfinished transaction answers
+   * with the release it opened on, so a retry finishes the version it started: the copies it set aside are
+   * that version's, and a feed that published a newer one meanwhile would otherwise leave a recovery
+   * describing files that are no longer the ones on disk.
+   */
+  const releaseForMod = async (install: Install, modId: string) => {
+    const open = await readTransaction(platform, install, modId);
+    if (open) return releaseOf(open);
     const feed = MOD_FEEDS.find((entry) => entry.id === modId);
     if (!feed) throw new Error(`No known feed carries "${modId}".`);
     return fetchFeed(platform, feed);
@@ -234,16 +243,23 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       const sfall = await installedSfallVersion(platform, install);
       return listAvailableMods(platform, install, record, sfall);
     },
-    planMod: async (install, modId) => planModInstall(platform, install, await releaseForMod(modId), reporting()),
-    installMod: async (install, modId) => {
-      const release = await releaseForMod(modId);
+    planMod: async (install, modId) =>
+      planModInstall(platform, install, await releaseForMod(install, modId), reporting()),
+    installMod: async (install, modId, fingerprint) => {
+      const release = await releaseForMod(install, modId);
       const progress = reporting();
       // Re-planned rather than trusting a plan the renderer held: the directory may have moved on since the
-      // confirmation, and the plan is cheap against the already-verified archive.
+      // confirmation, and the plan is cheap against the already-verified archive. What runs is still what
+      // was agreed to - a plan that resolved differently is refused here rather than quietly carried out.
       const plan = await planModInstall(platform, install, release, progress);
+      if (plan.fingerprint !== fingerprint) {
+        throw new Error(
+          `What installing ${release.manifest.name} would do has changed since you confirmed it - the game folder or the release moved on. Look at the new plan and confirm again.`,
+        );
+      }
       return applyModInstall(platform, install, release, plan, progress, new Date());
     },
-    restoreMod: (install, modId) => restoreModInstall(platform, install, modId),
+    restoreMod: (install, modId) => restoreModInstall(platform, install, modId, new Date()),
     removeMod: (install, modId) => uninstallMod(platform, install, modId, new Date()),
     modSettings: (install) => installedModSettings(install.path),
     openModFile: async (install, modId, file) => {

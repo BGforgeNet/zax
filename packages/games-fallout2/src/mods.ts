@@ -260,16 +260,48 @@ export async function saveMods(
   request: ModsSaveRequest,
   now: Date = new Date(),
 ): Promise<SaveOutcome> {
-  const path = platform.paths.join(request.installPath, MODS_DIRECTORY, MODS_ORDER_FILE);
+  const path = orderPath(platform, request.installPath);
   const current = (await platform.fs.stat(path))?.kind === "file" ? latin1(await platform.fs.read(path)) : undefined;
   if (current !== request.original) return { ok: false, changed: [MODS_ORDER_PATH] };
 
-  let backup: string | null = null;
-  if (current !== undefined) {
-    backup = platform.paths.join(backupDirectory(platform), stamp(now));
-    await platform.fs.copy(path, platform.paths.join(backup, MODS_DIRECTORY, MODS_ORDER_FILE));
-  }
-
+  const backup = await copyOrderAside(platform, path, current, now);
   await platform.fs.write(path, latin1Bytes(writeOrder(current, request.mods)));
   return { ok: true, files: [MODS_ORDER_PATH], backup };
+}
+
+const orderPath = (platform: Platform, installPath: string): string =>
+  platform.paths.join(installPath, MODS_DIRECTORY, MODS_ORDER_FILE);
+
+/** The copy every rewrite of this file makes first, or null when there was no file to copy. */
+async function copyOrderAside(
+  platform: Platform,
+  path: string,
+  current: string | undefined,
+  now: Date,
+): Promise<string | null> {
+  if (current === undefined) return null;
+  const backup = platform.paths.join(backupDirectory(platform), stamp(now));
+  await platform.fs.copy(path, platform.paths.join(backup, MODS_DIRECTORY, MODS_ORDER_FILE));
+  return backup;
+}
+
+/**
+ * Puts the order file back to text captured earlier, rather than to an order computed from what is on disk
+ * now. An unwound install has to leave the file as it found it, and what a mod's lines looked like is not
+ * derivable afterwards: a dat the install enabled may have been sitting there disabled, and every rule for
+ * rebuilding the file from the folder would enable it again. `text` is null when there was no file, which
+ * restoring means deleting the one the install created.
+ */
+export async function restoreOrder(
+  platform: Platform,
+  installPath: string,
+  text: string | null,
+  now: Date = new Date(),
+): Promise<void> {
+  const path = orderPath(platform, installPath);
+  const current = (await platform.fs.stat(path))?.kind === "file" ? latin1(await platform.fs.read(path)) : undefined;
+  if (current === (text ?? undefined)) return;
+  await copyOrderAside(platform, path, current, now);
+  if (text === null) return platform.fs.remove(path);
+  await platform.fs.write(path, latin1Bytes(text));
 }

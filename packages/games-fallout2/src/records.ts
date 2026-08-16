@@ -9,15 +9,24 @@
  */
 
 import { parse, stringify } from "yaml";
+import { fnv1a } from "@zax/core";
 import type { Platform } from "@zax/platform";
-import { insideMods } from "./manifest.js";
+import { insideMods, isModId, isModVersion } from "./manifest.js";
 
 /** Bumped when the meaning of a field changes - the same rule the manifest's `spec` carries. */
 const RECORD_FORMAT = 1;
 
 export interface InstalledMod {
+  /** Bound to the manifest's own id shape: it names a working directory, and a record is a file on disk. */
   id: string;
   version: string;
+  /**
+   * The manifest's type as it was validated at install time, and the reason a permanent one gives. Held as
+   * its own field rather than read back out of the manifest snapshot below, so a removal is judged against
+   * something this version parsed rather than against a document a newer ZAX may have written.
+   */
+  type?: "pluggable" | "permanent";
+  reason?: string;
   /** False from the first byte deployed until the install finished, so a relaunch offers retry or restore. */
   complete: boolean;
   /** Deployed paths relative to the install, every one under `mods/` - what uninstall deletes. */
@@ -40,21 +49,15 @@ const recordsDirectory = (platform: Platform): string => platform.paths.join(pla
 const normalizePath = (path: string): string => path.replace(/[\\/]+$/, "");
 
 /**
- * FNV-1a, 64-bit. The name carries nothing but uniqueness - the path in clear inside the file is the
- * truth - so a small non-cryptographic hash serves, and unlike WebCrypto it exists everywhere this runs:
- * `crypto.subtle` is absent in the browser preview when it is served over plain http away from localhost.
+ * One install directory as a short path-safe name. The name carries nothing but uniqueness - the path in
+ * clear inside the record is the truth - so a small non-cryptographic hash serves. Exported because a
+ * transaction's working directory is keyed by install too, and two spellings of that key would put one
+ * install's recovery files where another's are looked for.
  */
-function hashedName(installPath: string): string {
-  let hash = 0xcbf29ce484222325n;
-  for (const byte of new TextEncoder().encode(normalizePath(installPath))) {
-    hash ^= BigInt(byte);
-    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
-  }
-  return hash.toString(16).padStart(16, "0");
-}
+export const installKey = (installPath: string): string => fnv1a(normalizePath(installPath));
 
 function recordPath(platform: Platform, installPath: string): string {
-  return platform.paths.join(recordsDirectory(platform), `${hashedName(installPath)}.yml`);
+  return platform.paths.join(recordsDirectory(platform), `${installKey(installPath)}.yml`);
 }
 
 const asText = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
@@ -72,6 +75,13 @@ function readMod(entry: unknown): InstalledMod | null {
   const version = asText(fields["version"]);
   const manifest = asText(fields["manifest"]);
   if (id === undefined || version === undefined || manifest === undefined) return null;
+  // Both name a directory under the cache once a transaction opens, so they pass the manifest's own shapes
+  // before they are believed - a hand-edited record is the one route into these fields that skipped them.
+  if (!isModId(id) || !isModVersion(version)) return null;
+
+  const declared = asText(fields["type"]);
+  const type = declared === "pluggable" || declared === "permanent" ? declared : undefined;
+  const reason = asText(fields["reason"]);
 
   const files: string[] = [];
   for (const file of Array.isArray(fields["files"]) ? fields["files"] : []) {
@@ -90,7 +100,16 @@ function readMod(entry: unknown): InstalledMod | null {
     }
   }
 
-  return { id, version, complete: fields["complete"] === true, files, manifest, shipped };
+  return {
+    id,
+    version,
+    ...(type !== undefined ? { type } : {}),
+    ...(reason !== undefined ? { reason } : {}),
+    complete: fields["complete"] === true,
+    files,
+    manifest,
+    shipped,
+  };
 }
 
 /** The record for an install, or the empty one - a first install and a lost record read the same. */
@@ -126,6 +145,8 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
       mods: record.mods.map((mod) => ({
         id: mod.id,
         version: mod.version,
+        ...(mod.type !== undefined ? { type: mod.type } : {}),
+        ...(mod.reason !== undefined ? { reason: mod.reason } : {}),
         complete: mod.complete,
         files: [...mod.files],
         manifest: mod.manifest,

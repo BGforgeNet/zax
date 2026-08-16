@@ -3,26 +3,32 @@
  * exit is finished, retryable, or restored - never a directory that is neither what it was nor the mod with
  * nothing to say about it.
  *
- * The working directory under the cache carries everything a recovery needs: the downloaded archive, copies
- * of whatever deployment overwrote or removed, and the record entry the install replaced. It is cleared when
- * an install finishes and kept by failure and cancellation alike, so a retry resumes instead of paying the
- * download again and a restore can put every byte back.
+ * An install runs in five phases, and the list is what recovery is written against: journal, deploy, merge,
+ * order, commit. Its durable state is exactly four things - the deployed files, `mods_order.txt`, the
+ * install record, and the working directory itself - so a restore that puts the first three back from the
+ * fourth is total, and needs no phase marker to know how far the failure got.
+ *
+ * The working directory under the cache carries everything that recovery needs: the journal, the downloaded
+ * archive, and copies of whatever deployment overwrote or removed. It is cleared when an install finishes
+ * and kept by failure and cancellation alike, so a retry resumes instead of paying the download again and a
+ * restore can put every byte back.
  */
 
 import {
   IniDocument,
   backupDirectory,
+  fnv1a,
   latin1,
   mergeIni,
   stamp,
-  temporaryDirectory,
   type Install,
   type MergeConflict,
 } from "@zax/core";
 import type { DirEntry, DownloadOptions, Platform } from "@zax/platform";
 import { MANIFEST_NAME, insideMods, parseManifest, type ModManifest } from "./manifest.js";
-import { answersToId, listMods, readMods, saveMods, MODS_ORDER_PATH, type Mod } from "./mods.js";
+import { answersToId, listMods, readMods, restoreOrder, saveMods, MODS_ORDER_PATH, type Mod } from "./mods.js";
 import { loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
+import { modWorkDirectory, readTransaction, writeTransaction, type ModTransaction } from "./mod-transaction.js";
 import type { ModRelease } from "./mod-feed.js";
 
 /** Preflight ceilings, calibrated against the real corpus with headroom - RPU's gigabyte is the outlier. */
@@ -49,6 +55,12 @@ export interface ModInstallPlan {
   orderLines: readonly string[];
   /** Recorded files the new release does not ship - an upgrade replaces, never overlays. */
   removes: readonly string[];
+  /**
+   * What this plan resolved to, in one short string. The install re-plans - the directory may have moved on
+   * since the confirmation - and refuses when the answer no longer fingerprints the same, so what runs is
+   * what was agreed to rather than whatever the same button would resolve to now.
+   */
+  fingerprint: string;
 }
 
 export interface ModInstallOutcome {
@@ -58,17 +70,35 @@ export interface ModInstallOutcome {
   conflicts: readonly MergeConflict[];
 }
 
-const workDirectory = (platform: Platform, id: string, version: string): string =>
-  // Both components arrived shape-checked from the manifest, so they are path-safe by construction.
-  platform.paths.join(temporaryDirectory(platform), `mod-${id}-${version}`);
-
 const insidePath = (platform: Platform, root: string, relative: string): string =>
   platform.paths.join(root, ...relative.split("/"));
 
-/** Where the record entry an install replaced waits, in case the install has to be unwound. */
-const PREVIOUS_RECORD = "previous-record.json";
+/** Where deployment sets aside what it overwrote, and what it removed, relative to the working directory. */
+const OVERWRITTEN = "overwritten";
+const REMOVED = "removed";
 
 const ORDER_DAT = /^mods\/([^/]+\.dat)$/i;
+
+/**
+ * The plan in one line, hashed. Not a cryptographic digest and not meant as one: it detects a plan that
+ * moved between the confirmation and the install, and anything that could forge it could have supplied the
+ * plan itself.
+ */
+function fingerprintOf(
+  release: ModRelease,
+  files: readonly PlannedFile[],
+  plan: Omit<ModInstallPlan, "fingerprint" | "files">,
+): string {
+  return fnv1a(
+    [
+      release.manifest.version,
+      release.archive?.digest ?? "",
+      ...files.map((file) => `${file.path}:${file.size}:${file.overwrites ? "over" : "new"}`),
+      ...plan.orderLines.map((name) => `+${name}`),
+      ...plan.removes.map((path) => `-${path}`),
+    ].join("\n"),
+  );
+}
 
 async function fileExists(platform: Platform, path: string): Promise<boolean> {
   return (await platform.fs.stat(path))?.kind === "file";
@@ -132,7 +162,7 @@ export async function planModInstall(
   // corrupted resume in one check, and the feeds this list trusts all publish one.
   if (!digest) throw new Error(`The ${manifest.name} release states no digest for ${asset.name}.`);
 
-  const work = workDirectory(platform, manifest.id, manifest.version);
+  const work = modWorkDirectory(platform, install, manifest.id);
   const archivePath = platform.paths.join(work, asset.name);
 
   const held = (await fileExists(platform, archivePath)) && (await platform.hash.sha256(archivePath)) === digest;
@@ -184,11 +214,17 @@ export async function planModInstall(
   if (files.length === 0) throw new Error(`${asset.name} ships nothing under mods/ - there is nothing to install.`);
 
   const planned = new Set(files.map((file) => file.path.toLowerCase()));
-  const recorded = (await loadRecord(platform, install.path)).mods.find((mod) => mod.id === manifest.id);
-  const removes = (recorded?.files ?? []).filter((path) => !planned.has(path.toLowerCase()));
+  // What this install replaces comes from the open transaction when there is one. Read from the record
+  // instead, a retry would find its own unfinished entry there and conclude it replaces itself - so the
+  // files a first attempt already removed would go unlisted, and their order lines would outlive them.
+  const open = await readTransaction(platform, install, manifest.id);
+  const replacing =
+    open?.previous ??
+    (await loadRecord(platform, install.path)).mods.find((mod) => mod.id === manifest.id && mod.complete);
+  const removes = (replacing?.files ?? []).filter((path) => !planned.has(path.toLowerCase()));
 
   const orderLines = files.map((file) => ORDER_DAT.exec(file.path)?.[1]).filter((name): name is string => !!name);
-  return { files, orderLines, removes };
+  return { files, orderLines, removes, fingerprint: fingerprintOf(release, files, { orderLines, removes }) };
 }
 
 /**
@@ -239,20 +275,42 @@ export async function applyModInstall(
   const refusal = await refusalFor(platform, install, release);
   if (refusal !== null) throw new Error(refusal);
 
-  const work = workDirectory(platform, manifest.id, manifest.version);
+  const work = modWorkDirectory(platform, install, manifest.id);
   const archivePath = platform.paths.join(work, release.archive?.name ?? "");
   const record = await loadRecord(platform, install.path);
-  const previous = record.mods.find((mod) => mod.id === manifest.id);
-  const upgrading = previous !== undefined;
 
-  // What this install replaces waits in the working directory, so a restore can put the record back too.
-  await platform.fs.write(
-    platform.paths.join(work, PREVIOUS_RECORD),
-    new TextEncoder().encode(JSON.stringify(previous ?? null)),
-  );
+  // Phase 1, journal. Opened once and resumed thereafter: everything it holds describes the directory as it
+  // was before the first byte landed, and a retry that re-derived it would be recording its own wreckage -
+  // the half-deployed files as the originals to restore, its own unfinished entry as what it replaces.
+  const journal = (await readTransaction(platform, install, manifest.id)) ?? (await openJournal());
+  const previous = journal.previous;
+  const upgrading = previous !== null;
+
+  async function openJournal(): Promise<ModTransaction> {
+    const snapshot = await readMods(platform, install);
+    const opened: ModTransaction = {
+      id: manifest.id,
+      archive: {
+        name: release.archive?.name ?? "",
+        url: release.archive?.url ?? "",
+        digest: release.archive?.digest ?? "",
+      },
+      manifestText: release.manifestText,
+      // Only a finished entry is something to go back to. An unfinished one here means an earlier
+      // transaction whose working directory is gone, and nothing it replaced is recoverable either.
+      previous: record.mods.find((mod) => mod.id === manifest.id && mod.complete) ?? null,
+      order: snapshot.text ?? null,
+      preexisting: plan.files.filter((file) => file.overwrites).map((file) => file.path),
+    };
+    await writeTransaction(platform, install, opened);
+    return opened;
+  }
+
   const pending: InstalledMod = {
     id: manifest.id,
     version: manifest.version,
+    type: manifest.type,
+    ...(manifest.reason !== undefined ? { reason: manifest.reason } : {}),
     complete: false,
     files: plan.files.map((file) => file.path),
     manifest: release.manifestText,
@@ -260,15 +318,23 @@ export async function applyModInstall(
   };
   await saveRecord(platform, withMod(record, pending));
 
+  // Phase 2, deploy.
   options?.onStep?.(`Installing ${manifest.name} ${manifest.version}`);
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
+  const held = new Set(journal.preexisting.map((path) => path.toLowerCase()));
   for (const file of plan.files) {
     // Resolved fresh rather than trusting the plan's `overwrites` - the directory may have moved on since.
     const found = await realCasedPath(platform, install.path, file.path);
     if (found === null) continue;
-    await platform.fs.copy(found, insidePath(platform, platform.paths.join(work, "overwritten"), file.path));
-    // An upgrade's replaced files also reach the timestamped backup, as anything a save replaces does.
-    if (upgrading) await platform.fs.copy(found, insidePath(platform, backup, file.path));
+    // Only what was there before the transaction is worth setting aside, and only once. On a retry what
+    // sits here is this transaction's own half-deployed file: copying it would overwrite the real original
+    // with the wreckage, and a restore would then put the failed attempt back.
+    const kept = insidePath(platform, platform.paths.join(work, OVERWRITTEN), file.path);
+    if (held.has(file.path.toLowerCase()) && !(await fileExists(platform, kept))) {
+      await platform.fs.copy(found, kept);
+      // An upgrade's replaced files also reach the timestamped backup, as anything a save replaces does.
+      if (upgrading) await platform.fs.copy(found, insidePath(platform, backup, file.path));
+    }
     // Replaced means replaced: left in place, a differently-spelled original would sit beside the extracted
     // file on a case-sensitive filesystem, and the loader - which folds case - would see the same mod twice.
     if (found !== insidePath(platform, install.path, file.path)) await platform.fs.remove(found);
@@ -276,13 +342,14 @@ export async function applyModInstall(
   for (const path of plan.removes) {
     const found = await realCasedPath(platform, install.path, path);
     if (found === null) continue;
-    await platform.fs.copy(found, insidePath(platform, platform.paths.join(work, "removed"), path));
+    await platform.fs.copy(found, insidePath(platform, platform.paths.join(work, REMOVED), path));
     if (upgrading) await platform.fs.copy(found, insidePath(platform, backup, path));
     await platform.fs.remove(found);
   }
 
   await platform.archive.extract(archivePath, install.path, { only: plan.files.map((file) => file.path) });
 
+  // Phase 3, merge.
   // State files: what the release shipped is recorded as the next upgrade's merge base, then the user's
   // values are merged into the shipped file - with the previous release's copy as base where a record holds
   // one, and user-wins where none does, exactly as the sfall updater treats ddraw.ini.
@@ -294,8 +361,10 @@ export async function applyModInstall(
     if (!(await fileExists(platform, target))) continue;
     const shippedBytes = await platform.fs.read(target);
     shipped[path] = latin1(shippedBytes);
-    const previousCopy = insidePath(platform, platform.paths.join(work, "overwritten"), path);
+    const previousCopy = insidePath(platform, platform.paths.join(work, OVERWRITTEN), path);
     if (!(await fileExists(platform, previousCopy))) continue;
+    // The journal's entry, not the record's: on a retry the record holds this transaction's own unfinished
+    // entry, whose base is empty, and merging against that would drop every default the last release set.
     const base = previous?.shipped[path];
     const outcome = mergeIni(
       IniDocument.parseBytes(shippedBytes),
@@ -306,8 +375,10 @@ export async function applyModInstall(
     conflicts.push(...outcome.conflicts);
   }
 
+  // Phase 4, order.
   await updateOrderLines(platform, install, { enable: plan.orderLines, drop: orderDats(plan.removes) });
 
+  // Phase 5, commit. The working directory goes last: until it does, this is still a transaction to unwind.
   await saveRecord(
     platform,
     withMod(await loadRecord(platform, install.path), { ...pending, complete: true, shipped }),
@@ -325,24 +396,42 @@ function withoutMod(record: InstallRecord, id: string): InstallRecord {
 }
 
 /**
- * Unwinds an install that never finished: what deployment overwrote or removed goes back from the working
- * directory's copies, files new with the payload are deleted, the order lines go, and the record returns to
- * what it said before. The working directory is cleared last - it is the restore's own source.
+ * Unwinds an install that never finished, from the journal the transaction opened: what deployment
+ * overwrote or removed goes back from the working directory's copies, files new with the payload are
+ * deleted, the order file returns to the text it held, and so does the record. Every phase is undone
+ * whichever one the failure reached - the copies say what deployment did, and the other two are snapshots -
+ * so there is no phase marker to consult and no phase this misses. The working directory is cleared last:
+ * it is the restore's own source.
  */
-export async function restoreModInstall(platform: Platform, install: Install, id: string): Promise<void> {
+export async function restoreModInstall(
+  platform: Platform,
+  install: Install,
+  id: string,
+  now: Date = new Date(),
+): Promise<void> {
   const record = await loadRecord(platform, install.path);
   const pending = record.mods.find((mod) => mod.id === id);
   if (!pending || pending.complete) throw new Error(`Nothing of "${id}" is waiting to be restored.`);
 
-  const work = workDirectory(platform, pending.id, pending.version);
+  const work = modWorkDirectory(platform, install, pending.id);
+  const journal = await readTransaction(platform, install, id);
+  // Without the journal there is nothing to restore from - the copies of whatever was overwritten lived in
+  // the same directory. Said plainly rather than half-done: deleting the deployed files without putting the
+  // originals back is not a restore, and retrying the install still reaches a finished state from here.
+  if (journal === null) {
+    throw new Error(
+      `The working files for "${id}" are gone, so there is nothing to restore from - the cache they sat in was cleared. Retry the install instead.`,
+    );
+  }
+
   for (const path of pending.files) {
     if (!insideMods(path)) continue;
     const target = insidePath(platform, install.path, path);
-    const kept = insidePath(platform, platform.paths.join(work, "overwritten"), path);
+    const kept = insidePath(platform, platform.paths.join(work, OVERWRITTEN), path);
     if (await fileExists(platform, kept)) await platform.fs.copy(kept, target);
     else await platform.fs.remove(target);
   }
-  const removedRoot = platform.paths.join(work, "removed");
+  const removedRoot = platform.paths.join(work, REMOVED);
   if ((await platform.fs.stat(removedRoot))?.kind === "dir") {
     for (const path of await listRecursively(platform, removedRoot)) {
       await platform.fs.copy(
@@ -352,22 +441,12 @@ export async function restoreModInstall(platform: Platform, install: Install, id
     }
   }
 
-  // After the files, so a refused order-file write leaves a directory already made whole - and loudly. Only
-  // lines whose dat is genuinely gone go: a restored upgrade put the previous release's dats back, and their
-  // lines are theirs to keep.
-  const gone: string[] = [];
-  for (const path of pending.files) {
-    const name = ORDER_DAT.exec(path)?.[1];
-    if (name && !(await fileExists(platform, insidePath(platform, install.path, path)))) gone.push(name);
-  }
-  await updateOrderLines(platform, install, { drop: gone });
+  // After the files, so a refused write leaves a directory already made whole - and loudly. The snapshot
+  // rather than a computed order: a dat this install enabled may have been sitting there disabled, and
+  // nothing readable off the folder afterwards distinguishes that from one it added.
+  await restoreOrder(platform, install.path, journal.order, now);
 
-  let restored = withoutMod(record, id);
-  const previousPath = platform.paths.join(work, PREVIOUS_RECORD);
-  if (await fileExists(platform, previousPath)) {
-    const previous = JSON.parse(new TextDecoder().decode(await platform.fs.read(previousPath))) as InstalledMod | null;
-    if (previous !== null) restored = withMod(restored, previous);
-  }
+  const restored = journal.previous === null ? withoutMod(record, id) : withMod(record, journal.previous);
   await saveRecord(platform, restored);
   await platform.fs.remove(work);
 }
@@ -383,6 +462,37 @@ async function listRecursively(platform: Platform, root: string): Promise<string
   };
   await walk(root, "");
   return out;
+}
+
+/**
+ * Whether a recorded mod may be removed, from the record's own validated fields first and the manifest
+ * snapshot only for records written before those fields existed. `type: null` is "cannot be determined",
+ * which is a distinct answer from "pluggable" and is treated as one.
+ */
+function permanenceOf(recorded: InstalledMod): {
+  type: "pluggable" | "permanent" | null;
+  name: string;
+  reason?: string;
+} {
+  if (recorded.type !== undefined) {
+    return {
+      type: recorded.type,
+      name: recorded.id,
+      ...(recorded.reason !== undefined ? { reason: recorded.reason } : {}),
+    };
+  }
+  let manifest: ModManifest | null = null;
+  try {
+    manifest = parseManifest(new TextEncoder().encode(recorded.manifest));
+  } catch {
+    // A snapshot this version cannot read gives no verdict, which the caller refuses on.
+  }
+  if (manifest === null) return { type: null, name: recorded.id };
+  return {
+    type: manifest.type,
+    name: manifest.name,
+    ...(manifest.reason !== undefined ? { reason: manifest.reason } : {}),
+  };
 }
 
 export interface ModRemoval {
@@ -410,14 +520,15 @@ export async function uninstallMod(
   // A recordless permanent mod is not covered here - the interface never offers Remove for one it knows, and
   // deleting an unknown folder by name is no more than the convention below could always do.
   if (recorded) {
-    let manifest: ModManifest | null = null;
-    try {
-      manifest = parseManifest(new TextEncoder().encode(recorded.manifest));
-    } catch {
-      // A snapshot this version cannot read gives no verdict; the recorded list still bounds removal to mods/.
-    }
-    if (manifest?.type === "permanent")
-      throw new Error(`${manifest.name} cannot be uninstalled: ${manifest.reason ?? "its manifest says so"}`);
+    const verdict = permanenceOf(recorded);
+    if (verdict.type === "permanent")
+      throw new Error(`${verdict.name} cannot be uninstalled: ${verdict.reason ?? "its manifest says so"}`);
+    // Closed rather than open: a record that cannot be read is exactly the state where a permanent mod would
+    // look removable, and a wrong refusal costs a message while a wrong removal costs the install.
+    if (verdict.type === null)
+      throw new Error(
+        `ZAX cannot tell whether "${id}" may be uninstalled: its record was written by a version this one cannot read. Update ZAX, or remove the mod by hand.`,
+      );
   }
 
   let files: string[];

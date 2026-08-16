@@ -71,7 +71,11 @@ export interface MemoryOptions {
   responses?: Readonly<Record<string, string>>;
   /** What `net.download` writes at the destination, by URL. A URL with no entry rejects, as fetching does. */
   downloads?: Readonly<Record<string, string | Uint8Array>>;
-  /** What `archive.extract` produces, by archive path: file contents keyed by path inside the archive. */
+  /**
+   * What `archive.extract` produces: file contents keyed by path inside the archive. Keyed by the archive's
+   * path, or by the text it holds - which is what a path that carries different archives at different times
+   * needs, an install's working directory being one.
+   */
   archives?: Readonly<Record<string, Readonly<Record<string, string | Uint8Array>>>>;
   /**
    * Canned `archive.list` answers, for archives whose declared directory must differ from their contents - a
@@ -216,7 +220,7 @@ export class MemoryPlatform implements Platform {
     this.archive = {
       extract: async (archive, destination, options) => {
         this.extracted.push({ archive, destination, ...(options?.only ? { only: [...options.only] } : {}) });
-        const inside = this.contents[normalize(archive)] ?? this.contents[archive];
+        const inside = this.cannedContents(archive);
         if (!inside) throw new Error(`No canned contents for ${archive}`);
         const wanted = options?.only;
         for (const [name, content] of Object.entries(inside)) {
@@ -228,7 +232,7 @@ export class MemoryPlatform implements Platform {
         this.listed.push(archive);
         const canned = this.listings[normalize(archive)] ?? this.listings[archive];
         if (canned) return canned;
-        const inside = this.contents[normalize(archive)] ?? this.contents[archive];
+        const inside = this.cannedContents(archive);
         if (!inside) throw new Error(`No canned contents for ${archive}`);
         return Object.entries(inside).map(([name, content]) => ({ name, kind: "file", size: content.length }));
       },
@@ -271,6 +275,14 @@ export class MemoryPlatform implements Platform {
   /** Every file present, by path, for asserting that a write touched nothing else. */
   allFiles(): string[] {
     return [...this.files.keys()].sort();
+  }
+
+  /** An archive's canned contents, by its path or by the text sitting at that path. */
+  private cannedContents(archive: string): Readonly<Record<string, string | Uint8Array>> | undefined {
+    const byPath = this.contents[normalize(archive)] ?? this.contents[archive];
+    if (byPath) return byPath;
+    const held = this.files.get(normalize(archive));
+    return held === undefined ? undefined : this.contents[text(held)];
   }
 
   private put(path: string, data: Uint8Array): void {

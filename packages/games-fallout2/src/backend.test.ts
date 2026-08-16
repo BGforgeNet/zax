@@ -125,6 +125,106 @@ describe("the operations", () => {
   });
 });
 
+describe("installing a mod", () => {
+  const REPO = "BGforgeNet/FO2tweaks";
+  const RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=30`;
+  const manifest = (version: string) =>
+    `spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "${version}"\ngame: fallout2\narchive: fo2tweaks.zip\n`;
+  const payload = (version: string) => `ZIP-${version}`;
+  // The digest the feed states, which the download is checked against before anything is planned.
+  const digest = async (version: string) => {
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload(version)));
+    return `sha256:${[...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  };
+  const listing = async (versions: readonly string[]) =>
+    JSON.stringify(
+      await Promise.all(
+        versions.map(async (version) => ({
+          tag_name: `v${version}`,
+          assets: [
+            { name: "zax-mod.yml", browser_download_url: `https://example.test/${version}/zax-mod.yml` },
+            {
+              name: "fo2tweaks.zip",
+              browser_download_url: `https://example.test/${version}/fo2tweaks.zip`,
+              digest: await digest(version),
+            },
+          ],
+        })),
+      ),
+    );
+
+  const feeding = async (versions: readonly string[]) =>
+    new MemoryPlatform({
+      home: "/home/t",
+      files: { "/games/one/fallout2.exe": "MZ" },
+      responses: {
+        [RELEASES]: await listing(versions),
+        ...Object.fromEntries(versions.map((v) => [`https://example.test/${v}/zax-mod.yml`, manifest(v)])),
+      },
+      downloads: Object.fromEntries(versions.map((v) => [`https://example.test/${v}/fo2tweaks.zip`, payload(v)])),
+      archives: Object.fromEntries(
+        versions.map((v) => [payload(v), { "zax-mod.yml": manifest(v), "mods/fo2tweaks.dat": `DAT-${v}` }]),
+      ),
+    });
+
+  it("runs the plan that was confirmed, and refuses one that has moved since", async () => {
+    const platform = await feeding(["14.7"]);
+    const backend = createBackend(platform, noShell);
+    const plan = await backend.planMod(install, "fo2tweaks");
+
+    // The folder moves between the confirmation and the click: what the plan called a new file is now an
+    // overwrite, and the plan on screen no longer describes what would happen.
+    await platform.fs.write("/games/one/mods/fo2tweaks.dat", new TextEncoder().encode("HAND-INSTALLED"));
+    await expect(backend.installMod(install, "fo2tweaks", plan.fingerprint)).rejects.toThrow(/confirm again/);
+    expect(platform.textAt("/games/one/mods/fo2tweaks.dat"), "and nothing was written").toBe("HAND-INSTALLED");
+
+    const fresh = await backend.planMod(install, "fo2tweaks");
+    await expect(backend.installMod(install, "fo2tweaks", fresh.fingerprint)).resolves.toMatchObject({
+      version: "14.7",
+    });
+  });
+
+  it("finishes the version an unfinished install started, whatever the feed has published since", async () => {
+    // Both releases are downloadable throughout - only what the feed lists changes - so installing the newer
+    // one would succeed here. What stops it is the pin, not a missing payload.
+    const platform = await feeding(["14.7", "15"]);
+    let published = ["14.7"];
+    const feed = {
+      ...platform,
+      net: {
+        download: platform.net.download,
+        fetchText: async (url: string) => (url === RELEASES ? await listing(published) : platform.net.fetchText(url)),
+      },
+    };
+
+    const plan = await createBackend(feed, noShell).planMod(install, "fo2tweaks");
+    const breaking = {
+      ...feed,
+      fs: {
+        ...platform.fs,
+        write: (path: string, bytes: Uint8Array) => {
+          if (path.endsWith("mods_order.txt")) throw new Error("locked file");
+          return platform.fs.write(path, bytes);
+        },
+      },
+    };
+    await expect(createBackend(breaking, noShell).installMod(install, "fo2tweaks", plan.fingerprint)).rejects.toThrow(
+      "locked file",
+    );
+
+    // 15 is published while the transaction sits unfinished, and the cached listing is dropped so the feed
+    // is genuinely re-read. The retry is still 14.7's: the copies waiting to be put back are that release's.
+    published = ["15", "14.7"];
+    await platform.fs.remove("/home/t/.cache/zax/feeds/BGforgeNet-FO2tweaks.json");
+
+    const retry = await createBackend(feed, noShell).planMod(install, "fo2tweaks");
+    await expect(
+      createBackend(feed, noShell).installMod(install, "fo2tweaks", retry.fingerprint),
+    ).resolves.toMatchObject({ version: "14.7" });
+    expect(platform.textAt("/games/one/mods/fo2tweaks.dat")).toBe("DAT-14.7");
+  });
+});
+
 /** A compile-time check that the list is exactly the interface's keys, not merely a subset of them. */
 const _covers: Record<keyof Backend, true> = Object.fromEntries(BACKEND_METHODS.map((name) => [name, true])) as Record<
   keyof Backend,

@@ -648,7 +648,9 @@ class Store {
     await this.run(
       `Installing ${held.offer.name} ${held.offer.version}`,
       async () => {
-        const outcome = await backend.installMod(install, held.offer.id);
+        // The plan's own fingerprint, so what runs is what was on screen: the install re-plans, and one
+        // that now resolves differently comes back as a refusal to look again rather than as a surprise.
+        const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint);
         await this.readInstall();
         await this.refreshModOffers(install);
         const conflicts =

@@ -71,6 +71,14 @@ const ID_SHAPE = /^[a-z0-9][a-z0-9.-]*$/;
 /** Versions become path components and feed comparisons; the same bound the sfall names already pass. */
 const VERSION_SHAPE = /^\d[\d.a-z-]*$/i;
 
+/**
+ * The same two bounds, for values that reach the install paths without a manifest to have passed - a record's
+ * own id and version, which name a working directory. Exported rather than re-spelled there, so a mod's id
+ * means one thing whichever side of the install it is read from.
+ */
+export const isModId = (text: string): boolean => ID_SHAPE.test(text);
+export const isModVersion = (text: string): boolean => VERSION_SHAPE.test(text);
+
 /** Invalid UTF-8 is a refusal, not replacement characters silently standing in for the real content. */
 const decoder = new TextDecoder("utf-8", { fatal: true });
 

@@ -166,6 +166,9 @@ await saveRecord(previewPlatform, {
     {
       id: "fo2tweaks",
       version: "14.7",
+      // What an install writes, and what a removal is judged against - a record without it is one an older
+      // version left, which the preview is not pretending to be.
+      type: "pluggable",
       complete: true,
       files: ["mods/fo2tweaks.ini"],
       manifest: PREVIEW_MOD_MANIFEST,
