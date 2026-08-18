@@ -337,7 +337,7 @@ class Store {
       this.modById = new Map();
       this.index();
       this.overrides = {};
-      this.setMods({ text: undefined, present: [] });
+      this.setMods({ text: undefined, present: [], owners: [] });
       return;
     }
     this.contents = await backend.loadConfigFiles(install.path);

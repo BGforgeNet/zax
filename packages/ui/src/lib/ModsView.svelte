@@ -101,7 +101,8 @@
           backwards is how two mods that both work end up cancelling each other out.
         -->
         What sfall loads out of <code>mods</code>, in the order it loads them - a mod further down overrides one above
-        it. Saved to <code>{MODS_ORDER_PATH}</code>.
+        it. An entry ZAX installed names its mod; anything else was put there by hand. Saved to
+        <code>{MODS_ORDER_PATH}</code>.
       {:else}
         The installed mods' own settings, edited and saved the same way the game's are.
       {/if}
@@ -223,6 +224,11 @@
                 <span class="name">{mod.name}</span>
               </label>
               <span class="badge" class:missing={mod.kind === "missing"}>{KIND_LABEL[mod.kind]}</span>
+              <!-- Named only where the record claims the entry: a blank is one ZAX did not put there - a dat
+                 dropped in by hand, or one from before the record existed. -->
+              {#if mod.owner}
+                <span class="owner">{mod.owner}</span>
+              {/if}
 
               <div class="actions">
                 {#if mod.kind === "missing"}
@@ -347,7 +353,7 @@
   */
   .mod {
     display: grid;
-    grid-template-columns: minmax(0, 22rem) auto 1fr;
+    grid-template-columns: minmax(0, 22rem) auto minmax(0, 1fr) auto;
     align-items: center;
     column-gap: 12px;
     padding: 7px var(--gutter);
@@ -408,11 +414,26 @@
     color: var(--invalid);
   }
 
-  /* At the row's right edge, where the settings rows put theirs, whatever the name and badge before it are. */
+  /*
+    ZAX's own knowledge rather than the folder's, so it reads as annotation beside the entry: the interface
+    font against the name's mono, and the dim tone the status lines use.
+  */
+  .owner {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* At the row's right edge, where the settings rows put theirs, whatever the name and badge before it are.
+     Pinned to its own track so a row with no owner keeps the arrows where the row above has them. */
   .actions {
     display: flex;
     align-items: center;
     justify-self: end;
+    grid-column: 4;
     gap: 10px;
   }
 

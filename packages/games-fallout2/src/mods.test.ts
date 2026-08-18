@@ -2,13 +2,24 @@ import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { MemoryPlatform } from "@zax/platform/memory";
 import type { Install } from "@zax/core";
-import { entryName, listMods, readMods, saveMods, writeOrder, type Mod, type ModsSnapshot } from "./mods.js";
+import {
+  entryName,
+  listMods,
+  readMods,
+  saveMods,
+  writeOrder,
+  type Mod,
+  type ModOwner,
+  type ModsSnapshot,
+} from "./mods.js";
+import { saveRecord } from "./records.js";
 
 const install: Install = { path: "game", type: "fallout2" };
 
-const snapshot = (text: string | undefined, present: string[] = []): ModsSnapshot => ({
+const snapshot = (text: string | undefined, present: string[] = [], owners: ModOwner[] = []): ModsSnapshot => ({
   text,
   present: present.map((name) => ({ name, kind: name.includes(".") ? "dat" : "folder" })),
+  owners,
 });
 
 const shown = (mods: readonly Mod[]) => mods.map((m) => `${m.enabled ? "+" : "-"}${m.name}`);
@@ -80,6 +91,31 @@ describe("listMods", () => {
 
   it("matches a name against the folder however it is cased", () => {
     expect(listMods(snapshot("RPU.DAT\n", ["rpu.dat"]))[0]?.kind).toBe("dat");
+  });
+
+  it("names the mod a recorded entry belongs to, and leaves the rest unowned", () => {
+    const owners = [{ name: "FO2tweaks", files: ["mods/fo2tweaks.dat", "mods/fo2tweaks.ini"] }];
+    const mods = listMods(snapshot("rpu.dat\nfo2tweaks.dat\n", ["rpu.dat", "fo2tweaks.dat"], owners));
+    expect(mods.map((mod) => mod.owner)).toEqual([undefined, "FO2tweaks"]);
+  });
+
+  it("names one the order file never mentions, however either side spells it", () => {
+    const owners = [{ name: "FO2tweaks", files: ["Mods/fo2tweaks.dat"] }];
+    expect(listMods(snapshot(undefined, ["FO2tweaks.dat"], owners))[0]?.owner).toBe("FO2tweaks");
+  });
+
+  it("names the folder a mod's files sit in, which is the entry the order file carries", () => {
+    const owners = [{ name: "Hero Appearance", files: ["mods/hero_look/art/critters/hmjmps.frm"] }];
+    expect(listMods(snapshot("hero_look\n", ["hero_look"], owners))[0]?.owner).toBe("Hero Appearance");
+  });
+
+  it("leaves an entry two mods both claim unowned, rather than crediting one of them", () => {
+    const owners = [
+      { name: "One", files: ["mods/patches/one.dat"] },
+      { name: "Two", files: ["mods/patches/two.dat"] },
+    ];
+    const mods = listMods(snapshot("patches\npatches\\one.dat\n", ["patches", "patches\\one.dat"], owners));
+    expect(mods.map((mod) => mod.owner)).toEqual([undefined, "One"]);
   });
 });
 
@@ -199,7 +235,7 @@ describe("readMods", () => {
 
   it("answers with nothing for an install that has no mods folder", async () => {
     const snap = await readMods(platform({ "game/fallout2.exe": "" }), install);
-    expect(snap).toEqual({ text: undefined, present: [] });
+    expect(snap).toEqual({ text: undefined, present: [], owners: [] });
   });
 
   it("ignores the order file and loose clutter when listing what could load", async () => {
@@ -221,6 +257,25 @@ describe("readMods", () => {
   it("takes a folder in the mods directory for a mod", async () => {
     const snap = await readMods(platform({ "game/mods/fo1_base/master.dat": "" }), install);
     expect(snap.present).toEqual([{ name: "fo1_base", kind: "folder" }]);
+  });
+
+  it("carries what the record says it installed, an unfinished install included", async () => {
+    const held = platform({ "game/mods/fo2tweaks.dat": "" });
+    await saveRecord(held, {
+      path: "game",
+      mods: [
+        {
+          id: "fo2tweaks",
+          version: "14.7",
+          complete: false,
+          files: ["mods/fo2tweaks.dat"],
+          manifest: 'spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "14.7"\ngame: fallout2\n',
+          shipped: {},
+        },
+      ],
+    });
+    const snap = await readMods(held, install);
+    expect(snap.owners).toEqual([{ name: "FO2tweaks", files: ["mods/fo2tweaks.dat"] }]);
   });
 });
 

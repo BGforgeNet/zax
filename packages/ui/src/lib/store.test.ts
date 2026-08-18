@@ -302,11 +302,25 @@ describe("mods", () => {
       "-extra_music.dat",
       "+hero_appearance",
       "+old_patch.dat",
+      "+fo2tweaks.dat",
       "-barter_prices.dat",
     ]);
     // The kinds are what makes a row's badge honest: a folder is not an archive, and an entry pointing at
     // nothing is neither.
-    expect(store.mods.map((mod) => mod.kind)).toEqual(["dat", "dat", "folder", "missing", "dat"]);
+    expect(store.mods.map((mod) => mod.kind)).toEqual(["dat", "dat", "folder", "missing", "dat", "dat"]);
+  });
+
+  test("names the mod behind an entry the record claims, and nothing behind the rest", () => {
+    // The one entry the preview's record lists. Everything else in that folder arrived by hand, which is
+    // what an unnamed row means.
+    expect(store.mods.map((mod) => mod.owner)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "FO2tweaks",
+      undefined,
+    ]);
   });
 
   test("counts the whole order as one unsaved change, however far a mod moves", () => {
@@ -338,7 +352,7 @@ describe("mods", () => {
 
     expect(await order()).toBe(
       "; Loaded in this order - a mod further down overrides one above it.\n" +
-        "weapon_sounds.dat\nextra_music.dat\nhero_appearance\nold_patch.dat\n; barter_prices.dat\n",
+        "weapon_sounds.dat\nextra_music.dat\nhero_appearance\nold_patch.dat\nfo2tweaks.dat\n; barter_prices.dat\n",
     );
   });
 
@@ -389,6 +403,7 @@ describe("mods", () => {
       "-extra_music.dat",
       "+hero_appearance",
       "+old_patch.dat",
+      "+fo2tweaks.dat",
       "-barter_prices.dat",
     ]);
   });

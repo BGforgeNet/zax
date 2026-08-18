@@ -11,7 +11,7 @@
 import { parse, stringify } from "yaml";
 import { fnv1a } from "@zax/core";
 import type { Platform } from "@zax/platform";
-import { insideMods, isModId, isModVersion } from "./manifest.js";
+import { insideMods, isModId, isModVersion, parseManifest } from "./manifest.js";
 
 /** Bumped when the meaning of a field changes - the same rule the manifest's `spec` carries. */
 const RECORD_FORMAT = 1;
@@ -35,6 +35,18 @@ export interface InstalledMod {
   manifest: string;
   /** State files as that release shipped them, latin1 text - the base an upgrade's merge compares against. */
   shipped: Readonly<Record<string, string>>;
+}
+
+/**
+ * What to call a recorded mod. The manifest snapshot carries the name the author gave it; an id is what is
+ * left when that snapshot will not parse, which is the same fallback the availability list makes.
+ */
+export function modName(mod: InstalledMod): string {
+  try {
+    return parseManifest(new TextEncoder().encode(mod.manifest)).name;
+  } catch {
+    return mod.id;
+  }
 }
 
 export interface InstallRecord {

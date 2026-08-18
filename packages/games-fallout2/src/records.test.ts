@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MemoryPlatform } from "@zax/platform/memory";
-import { loadRecord, reconcileRecord, saveRecord, type InstalledMod } from "./records.js";
+import { loadRecord, modName, reconcileRecord, saveRecord, type InstalledMod } from "./records.js";
 
 const GAME = "/games/fallout2";
 
@@ -12,6 +12,17 @@ const mod = (over: Partial<InstalledMod> = {}): InstalledMod => ({
   manifest: "spec: 1\nid: fo2tweaks\n",
   shipped: { "mods/fo2tweaks.ini": "[main]\r\nenabled=1\r\n" },
   ...over,
+});
+
+describe("modName", () => {
+  it("takes the name the manifest snapshot carries", () => {
+    const manifest = 'spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "14.7"\ngame: fallout2\n';
+    expect(modName(mod({ manifest }))).toBe("FO2tweaks");
+  });
+
+  it("falls back to the id when that snapshot will not parse", () => {
+    expect(modName(mod({ manifest: "spec: 99\n" }))).toBe("fo2tweaks");
+  });
 });
 
 describe("installed records", () => {

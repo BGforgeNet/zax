@@ -14,6 +14,7 @@
 
 import { backupDirectory, latin1, latin1Bytes, splitLines, stamp, type Install, type SaveOutcome } from "@zax/core";
 import type { Platform } from "@zax/platform";
+import { loadRecord, modName } from "./records.js";
 
 export const MODS_DIRECTORY = "mods";
 export const MODS_ORDER_FILE = "mods_order.txt";
@@ -29,6 +30,15 @@ export interface Mod {
   name: string;
   enabled: boolean;
   kind: ModKind;
+  /** The installed mod this entry belongs to, when the record claims it and only it. */
+  owner?: string;
+}
+
+/** An installed mod as the order list needs it: what to call it, and what it put in the mods folder. */
+export interface ModOwner {
+  name: string;
+  /** Deployed paths as the record holds them - relative to the install, and under `mods/`. */
+  files: readonly string[];
 }
 
 /** Something in the mods folder that the engine could load. */
@@ -42,6 +52,11 @@ export interface ModsSnapshot {
   text: string | undefined;
   /** Every name that resolves: what the folder holds, plus anything the file names that exists. */
   present: readonly ModsDirEntry[];
+  /**
+   * What ZAX installed here. The folder cannot say who put a dat there, so this is the only thing that can
+   * tell one a mod deployed from one the user dropped in by hand.
+   */
+  owners: readonly ModOwner[];
 }
 
 export interface ModsSaveRequest {
@@ -111,6 +126,33 @@ function namedInOrder(text: string | undefined): readonly string[] {
 }
 
 /**
+ * Which installed mod each entry belongs to, keyed the way the order file spells its entries. A deployed
+ * path answers for itself, and its first segment answers for the folder it sits in - an entry names the
+ * folder rather than the files inside it.
+ *
+ * An entry two mods both claim is left unnamed. One folder holding two mods' files is exactly the case a
+ * single name would misreport, and a wrong owner is worse than none: it invites deleting another mod's work.
+ */
+function ownersByEntry(owners: readonly ModOwner[]): Map<string, string | null> {
+  const claims = new Map<string, string | null>();
+  for (const owner of owners) {
+    for (const file of owner.files) {
+      // Every recorded path is under `mods/`, which is where the order file's own names start.
+      const entry = fold(file)
+        .replace(/\//g, "\\")
+        .replace(/^mods\\/, "");
+      const cut = entry.indexOf("\\");
+      for (const key of cut === -1 ? [entry] : [entry, entry.slice(0, cut)]) {
+        const held = claims.get(key);
+        if (held === undefined) claims.set(key, owner.name);
+        else if (held !== owner.name) claims.set(key, null);
+      }
+    }
+  }
+  return claims;
+}
+
+/**
  * The mods to show, in load order: what the file names, then whatever sits in the folder it never named.
  *
  * A commented line counts as a disabled mod only when it names something actually in the folder. Nothing in
@@ -119,6 +161,11 @@ function namedInOrder(text: string | undefined): readonly string[] {
  */
 export function listMods(snapshot: ModsSnapshot): readonly Mod[] {
   const present = new Map(snapshot.present.map((entry) => [fold(entry.name), entry]));
+  const claims = ownersByEntry(snapshot.owners);
+  const owned = (name: string): { owner?: string } => {
+    const owner = claims.get(fold(name));
+    return owner ? { owner } : {};
+  };
   const out: Mod[] = [];
 
   for (const line of parseOrder(snapshot.text ?? "").lines) {
@@ -128,13 +175,19 @@ export function listMods(snapshot: ModsSnapshot): readonly Mod[] {
     // The loader drops the earlier of two lines naming the same mod, so the last one is the one that decides.
     const already = out.findIndex((mod) => fold(mod.name) === key);
     if (already !== -1) out.splice(already, 1);
-    out.push({ name: line.name, enabled: line.enabled, kind: present.get(key)?.kind ?? "missing" });
+    out.push({
+      name: line.name,
+      enabled: line.enabled,
+      kind: present.get(key)?.kind ?? "missing",
+      ...owned(line.name),
+    });
   }
 
   const listed = new Set(out.map((mod) => fold(mod.name)));
   // In the folder but named nowhere: the engine does not load it, which is what disabled means here.
   for (const entry of snapshot.present) {
-    if (!listed.has(fold(entry.name))) out.push({ name: entry.name, enabled: false, kind: entry.kind });
+    if (!listed.has(fold(entry.name)))
+      out.push({ name: entry.name, enabled: false, kind: entry.kind, ...owned(entry.name) });
   }
   return out;
 }
@@ -243,9 +296,12 @@ export async function readMods(platform: Platform, install: Install): Promise<Mo
     else if (found?.kind === "file") present.set(fold(name), { name, kind: /\.dat$/i.test(name) ? "dat" : "file" });
   }
 
+  // Incomplete entries name their mod too: an install that stopped half way still put those files there.
+  const record = await loadRecord(platform, install.path);
   return {
     text,
     present: [...present.values()].sort((a, b) => fold(a.name).localeCompare(fold(b.name))),
+    owners: record.mods.map((mod) => ({ name: modName(mod), files: mod.files })),
   };
 }
 
