@@ -105,6 +105,33 @@ const isOrderFile = (path: string) => path === `${GAME}/mods/mods_order.txt`;
 const isRecord = (path: string) => path.startsWith(`/home/tester/.config/zax/installed-mods/`);
 
 describe("install", () => {
+  it("puts a new line where the recommendation says, not at the end of the file", async () => {
+    // The shipped recommendation loads fo2tweaks before InventoryFilter, so the new line goes above it
+    // rather than after everything, which is where a first install used to land whatever it added.
+    const platform = gamePlatform({
+      files: {
+        [`${GAME}/mods/rpu.dat`]: "RPU",
+        [`${GAME}/mods/InventoryFilter.dat`]: "FILTER",
+        [`${GAME}/mods/mods_order.txt`]: "rpu.dat\nInventoryFilter.dat\n",
+      },
+    });
+    const release = await releaseFor("14.7");
+    await applyModInstall(platform, install, release, await planModInstall(platform, install, release));
+    expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).toBe("rpu.dat\nfo2tweaks.dat\nInventoryFilter.dat\n");
+  });
+
+  it("leaves a line the file already carries where the user put it", async () => {
+    const platform = gamePlatform({
+      files: {
+        [`${GAME}/mods/InventoryFilter.dat`]: "FILTER",
+        [`${GAME}/mods/mods_order.txt`]: "InventoryFilter.dat\n; fo2tweaks.dat\n",
+      },
+    });
+    const release = await releaseFor("14.7");
+    await applyModInstall(platform, install, release, await planModInstall(platform, install, release));
+    expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).toBe("InventoryFilter.dat\nfo2tweaks.dat\n");
+  });
+
   it("plans, deploys only what sits under mods/, enables the order line, and records it all", async () => {
     const platform = gamePlatform();
     const release = await releaseFor("14.7");

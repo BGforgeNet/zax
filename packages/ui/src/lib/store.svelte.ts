@@ -25,10 +25,13 @@ import {
   CONFIG_FILES,
   MODS_ORDER_PATH,
   SETTINGS,
+  againstRecommendation,
   describePlace,
   hiddenIds,
   listMods,
   placesById,
+  recommendationFor,
+  recommendedOrder,
   wrapMethods,
   type Backend,
   type MachineDescription,
@@ -576,12 +579,39 @@ class Store {
     this.scheduleAutosave();
   }
 
+  /** The order this install is judged against - the one its own project states, or the shared fallback. */
+  private get recommendation(): readonly string[] {
+    return this.install ? recommendationFor(this.install.type) : [];
+  }
+
+  /** The entries loading against ZAX's recommendation, which is both the warning and what a sort moves. */
+  get againstRecommendation(): readonly string[] {
+    return againstRecommendation(this.mods, this.recommendation);
+  }
+
+  /** Puts the mods the recommendation names in its order. Everything else keeps the place the user gave it. */
+  sortMods(): void {
+    this.mods = recommendedOrder(this.mods, this.recommendation);
+    this.scheduleAutosave();
+  }
+
   /**
    * Drops an entry naming something no longer in the folder. Only offered for those: an entry whose mod is
    * still there would come straight back on the next read, from the folder listing rather than the file.
    */
   forgetMod(name: string): void {
     this.mods = this.mods.filter((mod) => mod.name !== name);
+    this.scheduleAutosave();
+  }
+
+  /** The entries pointing at nothing - what the row's own Forget drops one at a time. */
+  get missingMods(): readonly Mod[] {
+    return this.mods.filter((mod) => mod.kind === "missing");
+  }
+
+  /** The same drop for all of them at once, a folder that was cleared by hand leaving a line each. */
+  forgetMissingMods(): void {
+    this.mods = this.mods.filter((mod) => mod.kind !== "missing");
     this.scheduleAutosave();
   }
 

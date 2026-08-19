@@ -127,12 +127,6 @@ button {
   font-size: 17px;
 }
 
-.pane .heading p {
-  margin: 3px 0 0;
-  color: var(--text-dim);
-  font-size: 12.5px;
-}
-
 .pane .list {
   overflow-y: auto;
   flex: 1;

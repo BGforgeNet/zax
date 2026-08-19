@@ -118,8 +118,12 @@ function parseOrder(text: string): { lines: OrderLine[]; eol: string } {
   return { lines, eol: crlf >= lf && crlf > 0 ? "\r\n" : "\n" };
 }
 
-/** Every name the order file mentions, whether the line is commented out or not. */
-function namedInOrder(text: string | undefined): readonly string[] {
+/**
+ * Every name the order file mentions, whether the line is commented out or not. Exported because an install
+ * has to tell a mod the file already places - wherever the user put it, enabled or not - from one the folder
+ * listing turned up, which is what the file has no opinion about yet.
+ */
+export function namedInOrder(text: string | undefined): readonly string[] {
   return parseOrder(text ?? "")
     .lines.filter((line) => line.name !== "")
     .map((line) => line.name);

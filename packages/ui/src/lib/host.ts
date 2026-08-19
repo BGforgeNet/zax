@@ -125,12 +125,17 @@ export const previewPlatform: Platform = (() => {
       /*
         A mods folder covering every state the mods view has: one loaded, one commented out, one folder rather
         than an archive, an entry whose file is gone, one sitting in the folder that the order file never
-        names, and one the record below claims - the only kind that shows an owner. None of these names is a
-        marker `detectGameType` reads, or seeding them would relabel the preview install as a different game.
+        names, and one the record below claims - the only kind that shows an owner. Two entries are gone
+        rather than one, which is the state the bulk forget is offered in; the last two are the two the
+        shipped recommendation ranks, seeded the wrong way round, which is what the load-order advice has to
+        say something about. None of these names is a marker `detectGameType` reads, or seeding them would
+        relabel the preview install as a different game.
       */
       [`${PREVIEW_INSTALL}/mods/mods_order.txt`]:
         "; Loaded in this order - a mod further down overrides one above it.\n" +
-        "weapon_sounds.dat\n; extra_music.dat\nhero_appearance\nold_patch.dat\nfo2tweaks.dat\n",
+        "weapon_sounds.dat\n; extra_music.dat\nhero_appearance\nold_patch.dat\nold_music.dat\n" +
+        "InventoryFilter.dat\nfo2tweaks.dat\n",
+      [`${PREVIEW_INSTALL}/mods/InventoryFilter.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/fo2tweaks.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/weapon_sounds.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/extra_music.dat`]: "",

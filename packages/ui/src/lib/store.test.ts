@@ -302,12 +302,23 @@ describe("mods", () => {
       "-extra_music.dat",
       "+hero_appearance",
       "+old_patch.dat",
+      "+old_music.dat",
+      "+InventoryFilter.dat",
       "+fo2tweaks.dat",
       "-barter_prices.dat",
     ]);
     // The kinds are what makes a row's badge honest: a folder is not an archive, and an entry pointing at
     // nothing is neither.
-    expect(store.mods.map((mod) => mod.kind)).toEqual(["dat", "dat", "folder", "missing", "dat", "dat"]);
+    expect(store.mods.map((mod) => mod.kind)).toEqual([
+      "dat",
+      "dat",
+      "folder",
+      "missing",
+      "missing",
+      "dat",
+      "dat",
+      "dat",
+    ]);
   });
 
   test("names the mod behind an entry the record claims, and nothing behind the rest", () => {
@@ -318,9 +329,34 @@ describe("mods", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
+      undefined,
       "FO2tweaks",
       undefined,
     ]);
+  });
+
+  test("names the mods loading against the recommendation, and sorting puts just those right", async () => {
+    // The two the shipped order ranks, seeded the wrong way round. Everything else it says nothing about.
+    expect(store.againstRecommendation).toEqual(["InventoryFilter.dat", "fo2tweaks.dat"]);
+
+    store.sortMods();
+    expect(shown()).toEqual([
+      "+weapon_sounds.dat",
+      "-extra_music.dat",
+      "+hero_appearance",
+      "+old_patch.dat",
+      "+old_music.dat",
+      "+fo2tweaks.dat",
+      "+InventoryFilter.dat",
+      "-barter_prices.dat",
+    ]);
+    expect(store.againstRecommendation, "and there is nothing left to say").toEqual([]);
+
+    // An ordinary unsaved edit, saved and reverted like any other - it is the file's own two lines that swap.
+    expect(store.modsChanged).toBe(true);
+    await store.save();
+    expect(await order()).toContain("old_music.dat\nfo2tweaks.dat\nInventoryFilter.dat\n");
   });
 
   test("counts the whole order as one unsaved change, however far a mod moves", () => {
@@ -352,7 +388,8 @@ describe("mods", () => {
 
     expect(await order()).toBe(
       "; Loaded in this order - a mod further down overrides one above it.\n" +
-        "weapon_sounds.dat\nextra_music.dat\nhero_appearance\nold_patch.dat\nfo2tweaks.dat\n; barter_prices.dat\n",
+        "weapon_sounds.dat\nextra_music.dat\nhero_appearance\nold_patch.dat\nold_music.dat\n" +
+        "InventoryFilter.dat\nfo2tweaks.dat\n; barter_prices.dat\n",
     );
   });
 
@@ -362,6 +399,20 @@ describe("mods", () => {
 
     expect(await order()).not.toContain("old_patch.dat");
     expect(shown()).not.toContain("+old_patch.dat");
+  });
+
+  test("forgetting them all drops every dead line and nothing else", async () => {
+    expect(store.missingMods.map((mod) => mod.name)).toEqual(["old_patch.dat", "old_music.dat"]);
+
+    store.forgetMissingMods();
+    await store.save();
+
+    const written = await order();
+    expect(written).not.toMatch(/old_patch|old_music/);
+    // The entries that resolve are untouched, commented ones included - only the dead lines went.
+    expect(written).toContain("weapon_sounds.dat\n");
+    expect(written).toContain("; barter_prices.dat\n");
+    expect(store.missingMods).toEqual([]);
   });
 
   /*
@@ -403,6 +454,8 @@ describe("mods", () => {
       "-extra_music.dat",
       "+hero_appearance",
       "+old_patch.dat",
+      "+old_music.dat",
+      "+InventoryFilter.dat",
       "+fo2tweaks.dat",
       "-barter_prices.dat",
     ]);

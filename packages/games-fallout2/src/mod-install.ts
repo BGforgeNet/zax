@@ -26,7 +26,17 @@ import {
 } from "@zax/core";
 import type { DirEntry, DownloadOptions, Platform } from "@zax/platform";
 import { MANIFEST_NAME, insideMods, parseManifest, type ModManifest } from "./manifest.js";
-import { answersToId, listMods, readMods, restoreOrder, saveMods, MODS_ORDER_PATH, type Mod } from "./mods.js";
+import {
+  answersToId,
+  listMods,
+  namedInOrder,
+  readMods,
+  restoreOrder,
+  saveMods,
+  MODS_ORDER_PATH,
+  type Mod,
+} from "./mods.js";
+import { placeFor, recommendationFor } from "./recommended-order.js";
 import { loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 import { modWorkDirectory, readTransaction, writeTransaction, type ModTransaction } from "./mod-transaction.js";
 import type { ModRelease } from "./mod-feed.js";
@@ -247,9 +257,16 @@ async function updateOrderLines(
   const mods: Mod[] = held
     .filter((mod) => !gone.has(mod.name.toLowerCase()))
     .map((mod) => (wanted.has(mod.name.toLowerCase()) ? { ...mod, enabled: true } : mod));
+  // What the file itself names, rather than what `listMods` holds: by now the payload is deployed, so the
+  // folder listing carries the new dat too, and a mod the file has never placed would keep the place that
+  // listing gave it - the end - however the recommendation reads.
+  const named = new Set(namedInOrder(snapshot.text).map((name) => name.toLowerCase()));
   for (const name of enable) {
-    if (!held.some((mod) => mod.name.toLowerCase() === name.toLowerCase()))
-      mods.push({ name, enabled: true, kind: "dat" });
+    // A line the file already carries stays where the user put it; only a first placement is ZAX's to make.
+    if (named.has(name.toLowerCase())) continue;
+    const listed = mods.findIndex((mod) => mod.name.toLowerCase() === name.toLowerCase());
+    if (listed !== -1) mods.splice(listed, 1);
+    mods.splice(placeFor(mods, name, recommendationFor(install.type)), 0, { name, enabled: true, kind: "dat" });
   }
   const saved = await saveMods(platform, { installPath: install.path, original: snapshot.text, mods });
   if (!saved.ok) throw new Error(`${MODS_ORDER_PATH} changed underneath - retry to pick up the new file.`);

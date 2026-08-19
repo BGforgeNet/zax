@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { MODS_ORDER_PATH, type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
+  import { type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
   import SaveBar from "./SaveBar.svelte";
   import SettingRow from "./SettingRow.svelte";
@@ -91,22 +91,6 @@
 <div class="pane">
   <div class="heading">
     <h1>Mods</h1>
-    <p>
-      {#if store.modsTab === "installation"}
-        Mods the known feeds publish: install, upgrade, remove. Every download is verified against the digest its
-        release states before a byte lands in the game folder.
-      {:else if store.modsTab === "order"}
-        <!--
-          Which end wins is the one thing about this file nobody can see by looking at it, and getting it
-          backwards is how two mods that both work end up cancelling each other out.
-        -->
-        What sfall loads out of <code>mods</code>, in the order it loads them - a mod further down overrides one above
-        it. An entry ZAX installed names its mod; anything else was put there by hand. Saved to
-        <code>{MODS_ORDER_PATH}</code>.
-      {:else}
-        The installed mods' own settings, edited and saved the same way the game's are.
-      {/if}
-    </p>
   </div>
 
   <div class="tabbar">
@@ -210,6 +194,32 @@
           {/if}
         {/if}
       {:else if store.modsTab === "order"}
+        <!-- The strip is absent only where there is no list to act on. The sort is disabled rather than
+           removed when the order already follows the recommendation, as the reorder arrows are at the ends
+           of the list: the row keeps its shape, and nothing under the cursor moves when the state changes.
+           The bulk forget does come and go - it waits for a second dead entry, one being the row's own
+           Forget already, and there is no shape to hold for a control most folders never have. -->
+        {#if store.mods.length > 0}
+          <div class="tools">
+            {#if store.missingMods.length > 1}
+              <button
+                title="Drops their lines from the file. Nothing on disk is touched - these mods are already gone."
+                onclick={() => store.forgetMissingMods()}
+              >
+                Forget all missing
+              </button>
+            {/if}
+            <!-- Which end wins is the one thing about this file nobody can see by looking at it, and getting
+               it backwards is how two mods that both work end up cancelling each other out. -->
+            <button
+              title="The last line wins - a mod further down overrides one above it"
+              disabled={store.againstRecommendation.length === 0}
+              onclick={() => store.sortMods()}
+            >
+              Sort to the recommendation
+            </button>
+          </div>
+        {/if}
         <div class="list">
           {#each store.mods as mod, i (mod.name)}
             <div class="mod" class:off={!mod.enabled} class:gone={mod.kind === "missing"}>
@@ -371,6 +381,22 @@
     background: var(--panel-alt);
   }
 
+  /* Above the list rather than in it - these act on the order as a whole - and drawn where the Installation
+     tab draws its own control, so the two tabs put their tools in the same place. */
+  .tools {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px var(--gutter) 0;
+  }
+
+  /* What the save bar and the panels draw for a button that is present but cannot act. Without it a kept
+     button reads as clickable, which is worse than the removal it replaced. */
+  .tools button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
   .pick {
     display: flex;
     align-items: center;
@@ -486,8 +512,7 @@
     text-decoration: underline;
   }
 
-  .empty code,
-  .heading code {
+  .empty code {
     font-family: var(--mono);
     font-size: 0.92em;
   }
