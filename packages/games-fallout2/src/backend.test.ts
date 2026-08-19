@@ -142,7 +142,7 @@ describe("installing a mod", () => {
         versions.map(async (version) => ({
           tag_name: `v${version}`,
           assets: [
-            { name: "zax-mod.yml", browser_download_url: `https://example.test/${version}/zax-mod.yml` },
+            { name: "f2mod.yml", browser_download_url: `https://example.test/${version}/f2mod.yml` },
             {
               name: "fo2tweaks.zip",
               browser_download_url: `https://example.test/${version}/fo2tweaks.zip`,
@@ -159,11 +159,11 @@ describe("installing a mod", () => {
       files: { "/games/one/fallout2.exe": "MZ" },
       responses: {
         [RELEASES]: await listing(versions),
-        ...Object.fromEntries(versions.map((v) => [`https://example.test/${v}/zax-mod.yml`, manifest(v)])),
+        ...Object.fromEntries(versions.map((v) => [`https://example.test/${v}/f2mod.yml`, manifest(v)])),
       },
       downloads: Object.fromEntries(versions.map((v) => [`https://example.test/${v}/fo2tweaks.zip`, payload(v)])),
       archives: Object.fromEntries(
-        versions.map((v) => [payload(v), { "zax-mod.yml": manifest(v), "mods/fo2tweaks.dat": `DAT-${v}` }]),
+        versions.map((v) => [payload(v), { "f2mod.yml": manifest(v), "mods/fo2tweaks.dat": `DAT-${v}` }]),
       ),
     });
 

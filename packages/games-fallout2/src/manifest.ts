@@ -1,5 +1,5 @@
 /**
- * `zax-mod.yml`: the manifest a mod's release carries and this application interprets. A release ships two
+ * `f2mod.yml`: the manifest a mod's release carries and this application interprets. A release ships two
  * byte-identical copies - one at the archive root, one as a standalone asset - and this parser reads both.
  *
  * Parsing is strict and every refusal names its cause. A manifest is downloaded data even from a trusted
@@ -14,8 +14,12 @@ import { parse } from "yaml";
 import { GAME_TYPES, type GameType, type SettingDef, type SettingKind, type ValueTest } from "@zax/core";
 import { SETTINGS } from "./catalog.js";
 
-/** The file's name at the archive root, and the release asset's name - the same on purpose. */
-export const MANIFEST_NAME = "zax-mod.yml";
+/**
+ * The file's name at the archive root, and the release asset's name - the same on purpose. The name is not
+ * manager-branded: the manifest declares its own `game`, and a second manager reading this format should not
+ * have to ship a file named after this application.
+ */
+export const MANIFEST_NAME = "f2mod.yml";
 
 /**
  * Refused before parsing. A catalog-parity settings schema with help text runs tens of kilobytes; something

@@ -20,7 +20,7 @@ const manifestText = (id: string, version: string, rest = "") =>
 const release = (tag: string, withManifest: boolean, extraAssets: object[] = []) => ({
   tag_name: tag,
   assets: [
-    ...(withManifest ? [{ name: "zax-mod.yml", browser_download_url: `https://example.test/${tag}/zax-mod.yml` }] : []),
+    ...(withManifest ? [{ name: "f2mod.yml", browser_download_url: `https://example.test/${tag}/f2mod.yml` }] : []),
     {
       name: "fo2tweaks.zip",
       browser_download_url: `https://example.test/${tag}/fo2tweaks.zip`,
@@ -38,7 +38,7 @@ describe("fetchFeed", () => {
     const platform = feedPlatform({
       responses: {
         [RELEASES_URL]: JSON.stringify([release("v15", false), release("v14.7", true)]),
-        "https://example.test/v14.7/zax-mod.yml": manifestText("fo2tweaks", "14.7"),
+        "https://example.test/v14.7/f2mod.yml": manifestText("fo2tweaks", "14.7"),
       },
     });
     const found = await fetchFeed(platform, FEED);
@@ -56,8 +56,8 @@ describe("fetchFeed", () => {
     const platform = feedPlatform({
       responses: {
         [RELEASES_URL]: JSON.stringify([release("v14.8", true), release("v15", true)]),
-        "https://example.test/v14.8/zax-mod.yml": manifestText("fo2tweaks", "14.8"),
-        "https://example.test/v15/zax-mod.yml": manifestText("fo2tweaks", "15"),
+        "https://example.test/v14.8/f2mod.yml": manifestText("fo2tweaks", "14.8"),
+        "https://example.test/v15/f2mod.yml": manifestText("fo2tweaks", "15"),
       },
     });
     expect((await fetchFeed(platform, FEED)).manifest.version).toBe("15");
@@ -67,8 +67,8 @@ describe("fetchFeed", () => {
     const platform = feedPlatform({
       responses: {
         [RELEASES_URL]: JSON.stringify([release("v2.4", true), release("v2.3", true)]),
-        "https://example.test/v2.4/zax-mod.yml": manifestText("other-line", "2.4"),
-        "https://example.test/v2.3/zax-mod.yml": manifestText("fo2tweaks", "2.3"),
+        "https://example.test/v2.4/f2mod.yml": manifestText("other-line", "2.4"),
+        "https://example.test/v2.3/f2mod.yml": manifestText("fo2tweaks", "2.3"),
       },
     });
     expect((await fetchFeed(platform, FEED)).manifest.version).toBe("2.3");
@@ -77,7 +77,7 @@ describe("fetchFeed", () => {
   it("caches the release listing, and answers from a stale cache when the network refuses", async () => {
     const responses = {
       [RELEASES_URL]: JSON.stringify([release("v14.7", true)]),
-      "https://example.test/v14.7/zax-mod.yml": manifestText("fo2tweaks", "14.7"),
+      "https://example.test/v14.7/f2mod.yml": manifestText("fo2tweaks", "14.7"),
     };
     const platform = feedPlatform({ responses });
     // Just after the memory platform's own fake clock, which stamps the cache file's modification time.
@@ -99,7 +99,7 @@ describe("fetchFeed", () => {
     const platform = feedPlatform({
       responses: {
         [RELEASES_URL]: JSON.stringify([release("v99", true)]),
-        "https://example.test/v99/zax-mod.yml": manifestText("fo2tweaks", "99").replace("spec: 1", "spec: 2"),
+        "https://example.test/v99/f2mod.yml": manifestText("fo2tweaks", "99").replace("spec: 1", "spec: 2"),
       },
     });
     await expect(fetchFeed(platform, FEED)).rejects.toThrow(/newer version of ZAX/);

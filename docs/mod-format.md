@@ -1,13 +1,13 @@
-# The mod manifest: `zax-mod.yml`
+# The mod manifest: `f2mod.yml`
 
 A mod release tells ZAX what it is by shipping a manifest. This page is the format's specification for mod
 authors and their release CI; the parser at `packages/games-fallout2/src/manifest.ts` is the reference
-implementation, and `pnpm check-manifest path/to/zax-mod.yml` (from a ZAX checkout) validates a file with
+implementation, and `pnpm check-manifest path/to/f2mod.yml` (from a ZAX checkout) validates a file with
 exactly the rules described here.
 
 ## What a release carries
 
-- **Two byte-identical copies of the manifest**: one as a standalone release asset named `zax-mod.yml`, one at
+- **Two byte-identical copies of the manifest**: one as a standalone release asset named `f2mod.yml`, one at
   the root of the payload archive. ZAX reads the asset to list and judge the release without downloading the
   payload, then compares the embedded copy byte for byte before installing - a difference means the archive is
   not the release the manifest described, and the install refuses. Write both from one source in CI; a

@@ -38,10 +38,10 @@ const INI_147 = "[main]\r\nnew_key=5\r\nspeed=10\r\n";
 const INI_15 = "[main]\r\nnew_key=7\r\nspeed=10\r\nextra=1\r\n";
 
 const CONTENTS: Record<string, Record<string, string>> = {
-  "14.7": { "zax-mod.yml": manifestFor("14.7"), "mods/fo2tweaks.dat": "DAT-14.7", "mods/fo2tweaks.ini": INI_147 },
-  "15": { "zax-mod.yml": manifestFor("15"), "mods/fo2tweaks.dat": "DAT-15", "mods/fo2tweaks.ini": INI_15 },
+  "14.7": { "f2mod.yml": manifestFor("14.7"), "mods/fo2tweaks.dat": "DAT-14.7", "mods/fo2tweaks.ini": INI_147 },
+  "15": { "f2mod.yml": manifestFor("15"), "mods/fo2tweaks.dat": "DAT-15", "mods/fo2tweaks.ini": INI_15 },
   // 16 renames its dat, which is what makes an upgrade a replacement rather than an overlay.
-  "16": { "zax-mod.yml": manifestFor("16"), "mods/fo2tweaks_core.dat": "DAT-16", "mods/fo2tweaks.ini": INI_15 },
+  "16": { "f2mod.yml": manifestFor("16"), "mods/fo2tweaks_core.dat": "DAT-16", "mods/fo2tweaks.ini": INI_15 },
 };
 
 /**
@@ -148,7 +148,7 @@ describe("install", () => {
     expect(platform.textAt(`${GAME}/mods/fo2tweaks.ini`)).toBe(INI_147);
     // Manual-install convenience outside mods/ is ignored, and the manifest is never deposited in the game.
     expect(platform.textAt(`${GAME}/readme.txt`)).toBeUndefined();
-    expect(platform.textAt(`${GAME}/zax-mod.yml`)).toBeUndefined();
+    expect(platform.textAt(`${GAME}/f2mod.yml`)).toBeUndefined();
     const order = platform.textAt(`${GAME}/mods/mods_order.txt`) ?? "";
     expect(order).toMatch(/^fo2tweaks\.dat$/m);
 
@@ -172,7 +172,7 @@ describe("install", () => {
     const platform = new MemoryPlatform({
       files: { [`${GAME}/fallout2.exe`]: "", [`${GAME}/RP-MARKER.TXT`]: "" },
       downloads: { [zipUrl("14.7")]: payload("14.7") },
-      archives: { [payload("14.7")]: { ...CONTENTS["14.7"]!, "zax-mod.yml": text } },
+      archives: { [payload("14.7")]: { ...CONTENTS["14.7"]!, "f2mod.yml": text } },
     });
     const plan = await planModInstall(platform, install, release);
     await expect(applyModInstall(platform, install, release, plan)).rejects.toThrow("Not over this.");
@@ -224,7 +224,7 @@ describe("install", () => {
     const platform = new MemoryPlatform({
       files: { [`${GAME}/fallout2.exe`]: "" },
       downloads: { [zipUrl("14.7")]: payload("14.7") },
-      archives: { [payload("14.7")]: { ...CONTENTS["14.7"]!, "zax-mod.yml": manifestFor("14.7") + "# altered\n" } },
+      archives: { [payload("14.7")]: { ...CONTENTS["14.7"]!, "f2mod.yml": manifestFor("14.7") + "# altered\n" } },
     });
     await expect(planModInstall(platform, install, await releaseFor("14.7"))).rejects.toThrow(
       /not the one its release published/,

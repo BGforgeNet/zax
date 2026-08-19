@@ -1,5 +1,5 @@
 /**
- * Validates a zax-mod.yml the way ZAX will: the application's own parser, the same refusals, word for word.
+ * Validates a f2mod.yml the way ZAX will: the application's own parser, the same refusals, word for word.
  * For mod authors and their release CI - a manifest that passes here is one every ZAX reading spec 1 accepts.
  * Runs under jiti (`pnpm check-manifest <file>`) because the parser lives in TypeScript source.
  */
@@ -9,7 +9,7 @@ import { parseManifest } from "../packages/games-fallout2/src/manifest.js";
 
 const path = process.argv[2];
 if (!path) {
-  console.error("usage: pnpm check-manifest <path-to-zax-mod.yml>");
+  console.error("usage: pnpm check-manifest <path-to-f2mod.yml>");
   process.exit(2);
 }
 
