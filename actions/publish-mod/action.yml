@@ -1,0 +1,111 @@
+# Packs a mod's payload and attaches it to the release for a version tag, so publishing is `git push --tags`
+# and nothing else. Nothing here stamps the manifest: ZAX takes the version from the tag and the payload from
+# the release's sole archive asset, so `f2mod.yml` is committed once and never touched again.
+#
+# Inputs reach the scripts through `env` rather than `${{ }}` interpolation, so a value can never be read as
+# shell. The checkout is the caller's - an action that checked out for you could not be used after a build
+# step that produced the files being packed.
+
+name: Publish a ZAX mod release
+description: Packs a mod's payload into a release asset on a version tag, for a repository carrying an f2mod.yml.
+
+inputs:
+  paths:
+    description: What goes into the archive, one path per line, relative to `directory`.
+    default: mods
+  directory:
+    description: The directory those paths are relative to. `mods/` must end up at the archive's root.
+    default: "."
+  name:
+    description: The archive's base name. Defaults to the repository's own name.
+    default: ""
+  token:
+    description: The token the release is created with.
+    default: ${{ github.token }}
+
+outputs:
+  archive:
+    description: The name of the archive attached to the release.
+    value: ${{ steps.pack.outputs.archive }}
+  version:
+    description: The version ZAX will read from the tag.
+    value: ${{ steps.pack.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Pack the payload
+      id: pack
+      shell: bash
+      env:
+        PATHS: ${{ inputs.paths }}
+        DIRECTORY: ${{ inputs.directory }}
+        NAME: ${{ inputs.name }}
+      run: |
+        set -euo pipefail
+
+        if [ "${GITHUB_REF_TYPE:-}" != "tag" ]; then
+          echo "This action publishes a tag's release; it ran on ${GITHUB_REF_TYPE:-nothing}." >&2
+          exit 1
+        fi
+        version="${GITHUB_REF_NAME#v}"
+        # ZAX passes over a tag whose version does not start with a digit, so a release built from one would
+        # be published and never offered. Refusing here is the difference between a red run and a silent miss.
+        case "$version" in
+          [0-9]*) ;;
+          *)
+            echo "The tag \"$GITHUB_REF_NAME\" names no version - ZAX reads v14.7 as 14.7 and ignores the rest." >&2
+            exit 1
+            ;;
+        esac
+
+        if [ ! -f f2mod.yml ]; then
+          echo "No f2mod.yml at the repository root, which is where ZAX reads it for the tag." >&2
+          exit 1
+        fi
+
+        cd "$DIRECTORY"
+        if [ ! -d mods ] || [ -z "$(find mods -type f -print -quit)" ]; then
+          echo "Nothing under mods/ in \"$DIRECTORY\" - a payload with no mods/ installs nothing." >&2
+          exit 1
+        fi
+
+        name="${NAME:-${GITHUB_REPOSITORY##*/}}"
+        archive="${name}-${version}.zip"
+        # -X drops the extra file attributes, which are per-machine and would change the archive's digest
+        # between two builds of identical content.
+        # shellcheck disable=SC2086
+        zip -rXq "$archive" $PATHS
+
+        # Only when it was built somewhere else: with the default directory the archive is already there, and
+        # moving a file onto itself is an error rather than a no-op.
+        if [ "$(pwd -P)" != "$(cd "$GITHUB_WORKSPACE" && pwd -P)" ]; then
+          mv "$archive" "$GITHUB_WORKSPACE/$archive"
+        fi
+        echo "archive=$archive" >>"$GITHUB_OUTPUT"
+        echo "version=$version" >>"$GITHUB_OUTPUT"
+
+    - name: Attach it to the release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ARCHIVE: ${{ steps.pack.outputs.archive }}
+      run: |
+        set -euo pipefail
+        cd "$GITHUB_WORKSPACE"
+
+        # A re-run of the same tag replaces the asset rather than failing: the release already exists, and a
+        # publish that cannot be repeated is one a fixed workflow cannot recover.
+        if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+          gh release upload "$GITHUB_REF_NAME" "$ARCHIVE" --clobber
+        else
+          gh release create "$GITHUB_REF_NAME" "$ARCHIVE" --title "$GITHUB_REF_NAME" --generate-notes
+        fi
+
+        # ZAX infers the payload only where a release holds one archive. Two is not an error here - the
+        # release is fine - but the manifest has to name which one, or nothing will install.
+        archives=$(gh release view "$GITHUB_REF_NAME" --json assets \
+          --jq '[.assets[].name | select(test("\\.(zip|7z|rar|tar\\.gz|tgz|tar)$"; "i"))] | length')
+        if [ "$archives" -gt 1 ]; then
+          echo "::warning::This release carries $archives archives, so ZAX cannot tell which is the payload - name it with \"archive:\" in f2mod.yml."
+        fi

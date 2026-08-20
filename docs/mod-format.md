@@ -8,7 +8,8 @@ What a mod release ships so ZAX can install it. This page is the spec;
 
 **Commit the manifest** at the repository root with no `version` and no `archive`, and release by pushing a
 tag. The tag names the version - `v14.7` is 14.7, a tag shaped like anything else is passed over - and the
-release's sole archive asset is the payload. There is nothing per-release to maintain.
+release's sole archive asset is the payload. There is nothing per-release to maintain, and the
+`actions/publish-mod` action in this repository does the packing and the release for you.
 
 **Or publish the manifest as an asset**, stamped by CI with both fields. The payload must then carry a
 byte-identical copy at its root, which ZAX compares before installing: a difference of one line ending
