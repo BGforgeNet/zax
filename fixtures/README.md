@@ -7,4 +7,4 @@ sfall 3.3, which predates the `[Debugging]` and `[Interface]` sections that 4.x 
 settings whose section does not yet exist in a given install.
 
 These are plain text configuration files, not game assets. Keep them byte-for-byte as they came off a real
-install: the round-trip tests assert exact reproduction, so reformatting them would defeat their purpose.
+install - the round-trip tests assert exact reproduction.

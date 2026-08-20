@@ -13,8 +13,7 @@ Fallout 2 engine.
 
 ### Installation
 
-The current version has no packaged release yet. Until one ships, run it from a checkout - see
-[Building](docs/building.md):
+No packaged release yet - run it from a checkout, see [Building](docs/building.md):
 
 ```bash
 pnpm install
@@ -23,8 +22,7 @@ pnpm desktop
 
 `pnpm --filter @zax/app package` produces distributables for the platform you are on.
 
-The [releases page](https://github.com/BGforgeNet/zax/releases) still carries the earlier Python-based versions,
-up to 0.7.
+The [releases page](https://github.com/BGforgeNet/zax/releases) carries the earlier Python versions, up to 0.7.
 
 ### Info
 
