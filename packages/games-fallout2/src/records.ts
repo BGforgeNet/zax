@@ -43,7 +43,7 @@ export interface InstalledMod {
  */
 export function modName(mod: InstalledMod): string {
   try {
-    return parseManifest(new TextEncoder().encode(mod.manifest)).name;
+    return parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version }).name;
   } catch {
     return mod.id;
   }

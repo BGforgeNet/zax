@@ -197,7 +197,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     for (const mod of (await loadRecord(platform, installPath)).mods) {
       if (!mod.complete) continue;
       try {
-        const manifest = parseManifest(new TextEncoder().encode(mod.manifest));
+        const manifest = parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version });
         // A mod without a schema gets no configuration surface - the schema is the convention.
         if (manifest.settings.length === 0) continue;
         groups.push({
@@ -268,7 +268,8 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       // Bounded to the files the record itself declares - its state snapshots and its schema's files.
       const allowed = new Set(Object.keys(mod.shipped));
       try {
-        for (const setting of parseManifest(new TextEncoder().encode(mod.manifest)).settings) {
+        for (const setting of parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version })
+          .settings) {
           allowed.add(setting.file);
         }
       } catch {

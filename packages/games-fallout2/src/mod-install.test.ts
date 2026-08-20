@@ -30,6 +30,7 @@ const releaseFor = async (version: string, extra = ""): Promise<ModRelease> => {
   return {
     manifest: parseManifest(new TextEncoder().encode(text)),
     manifestText: text,
+    manifestFromAsset: true,
     archive: { name: "fo2tweaks.zip", url: zipUrl(version), digest: `sha256:${await sha(payload(version))}` },
   };
 };
@@ -166,6 +167,7 @@ describe("install", () => {
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(text)),
       manifestText: text,
+      manifestFromAsset: true,
       archive: { name: "fo2tweaks.zip", url: zipUrl("14.7"), digest: `sha256:${await sha(payload("14.7"))}` },
     };
     // The plan compares the embedded manifest byte-for-byte, so the canned archive must carry this variant.
@@ -229,6 +231,30 @@ describe("install", () => {
     await expect(planModInstall(platform, install, await releaseFor("14.7"))).rejects.toThrow(
       /not the one its release published/,
     );
+  });
+
+  it("refuses a payload carrying no manifest when the release published one", async () => {
+    const bare = Object.fromEntries(Object.entries(CONTENTS["14.7"]!).filter(([name]) => name !== "f2mod.yml"));
+    const platform = new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "" },
+      downloads: { [zipUrl("14.7")]: payload("14.7") },
+      archives: { [payload("14.7")]: bare },
+    });
+    await expect(planModInstall(platform, install, await releaseFor("14.7"))).rejects.toThrow(/carries no f2mod\.yml/);
+  });
+
+  it("installs a payload carrying no manifest when the manifest came from the repository at the tag", async () => {
+    const bare = Object.fromEntries(Object.entries(CONTENTS["14.7"]!).filter(([name]) => name !== "f2mod.yml"));
+    const platform = new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "" },
+      downloads: { [zipUrl("14.7")]: payload("14.7") },
+      archives: { [payload("14.7")]: bare },
+    });
+    const release = { ...(await releaseFor("14.7")), manifestFromAsset: false };
+    const plan = await planModInstall(platform, install, release);
+    await applyModInstall(platform, install, release, plan);
+    expect(platform.textAt(`${GAME}/mods/fo2tweaks.dat`)).toBe("DAT-14.7");
+    expect((await loadRecord(platform, GAME)).mods[0]).toMatchObject({ version: "14.7", complete: true });
   });
 });
 

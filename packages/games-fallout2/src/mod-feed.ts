@@ -6,6 +6,11 @@
  * entry names a repository and the mod id it follows; two entries may share a repository and each takes the
  * newest release whose manifest carries its id, which is how parallel release lines interleave in one list.
  *
+ * A release describes itself two ways. It may publish the manifest as an asset, stamped by CI with the
+ * version and the payload's name; or it may publish only the payload, and the manifest is read from the
+ * repository at the release's tag - the tag supplies the version, the sole archive asset the payload. The
+ * second route costs a mod author no build step at all, which is most of them.
+ *
  * GitHub allows an unauthenticated address 60 API requests an hour, shared with the update check, so the
  * release listing is cached with a short life and a stale copy answers when the network cannot. A release's
  * manifest asset is immutable once published and is kept for good.
@@ -13,7 +18,7 @@
 
 import { compareVersions, GAME_TYPES, type Install } from "@zax/core";
 import { NetworkError, type Platform } from "@zax/platform";
-import { MANIFEST_NAME, parseManifest, type ModManifest } from "./manifest.js";
+import { MANIFEST_NAME, isModVersion, parseManifest, type ModManifest } from "./manifest.js";
 import type { InstallRecord } from "./records.js";
 import { MODS_DIRECTORY, answersToId } from "./mods.js";
 
@@ -29,8 +34,14 @@ export const MOD_FEEDS: readonly ModFeed[] = [{ repository: "BGforgeNet/FO2tweak
 /** One release as ZAX holds it: the parsed manifest, its exact bytes, and where the payload is. */
 export interface ModRelease {
   manifest: ModManifest;
-  /** The manifest asset's text as fetched - what the archive's embedded copy must match byte for byte. */
+  /** The manifest's text as fetched - what the archive's embedded copy must match byte for byte. */
   manifestText: string;
+  /**
+   * Whether the release published the manifest itself. False means it was read from the repository at the
+   * tag, where the payload cannot be expected to carry a copy - so only a published manifest makes an archive
+   * without one a refusal.
+   */
+  manifestFromAsset: boolean;
   /** The payload asset the manifest names, with what the release states about it. */
   archive?: { name: string; url: string; digest?: string; size?: number };
 }
@@ -104,15 +115,67 @@ async function fetchReleases(platform: Platform, repository: string, now: Date):
   return readReleases(body);
 }
 
-/** A release's manifest text, fetched once - a published asset does not change under its tag. */
-async function fetchManifestText(platform: Platform, repository: string, release: FeedRelease): Promise<string | null> {
+/** The manifest as committed, at the tag the release names - the route that costs an author no build step. */
+const repositoryManifestUrl = (repository: string, tag: string): string =>
+  `https://raw.githubusercontent.com/${repository}/${tag}/${MANIFEST_NAME}`;
+
+/** Payload assets ZAX can open. Anything else on a release - checksums, signatures, notes - is not a payload. */
+const ARCHIVE_SUFFIXES = [".zip", ".7z", ".rar", ".tar.gz", ".tgz", ".tar"];
+
+/**
+ * The payload when the manifest does not name one: a release's sole archive-shaped asset. Two of them is an
+ * ambiguity only the author can settle, so the manifest's `archive` stays in the format for that case.
+ */
+function soleArchive(assets: readonly ReleaseAsset[]): ReleaseAsset | undefined {
+  const archives = assets.filter(
+    (asset) => asset.name !== MANIFEST_NAME && ARCHIVE_SUFFIXES.some((end) => asset.name.toLowerCase().endsWith(end)),
+  );
+  return archives.length === 1 ? archives[0] : undefined;
+}
+
+/** A tag's version: `v14.7` is 14.7. A tag shaped like anything else names no version and is passed over. */
+function versionFromTag(tag: string): string | undefined {
+  const version = tag.replace(/^v/i, "");
+  return isModVersion(version) ? version : undefined;
+}
+
+interface FetchedManifest {
+  text: string;
+  fromAsset: boolean;
+}
+
+/**
+ * A release's manifest, fetched once - neither a published asset nor a tagged tree changes afterwards. The
+ * repository route is tried only when the release publishes no manifest, and its absence is kept too: a
+ * repository that ships none would otherwise cost one request per release on every listing refresh.
+ */
+async function fetchManifestText(
+  platform: Platform,
+  repository: string,
+  release: FeedRelease,
+): Promise<FetchedManifest | null> {
   const asset = release.assets.find((entry) => entry.name === MANIFEST_NAME);
-  if (!asset) return null;
-  const kept = platform.paths.join(feedsDirectory(platform), `${slug(repository)}-${slug(release.tag)}.yml`);
-  if ((await platform.fs.stat(kept))?.kind === "file") return new TextDecoder().decode(await platform.fs.read(kept));
-  const text = await platform.net.fetchText(asset.url);
+  const fromAsset = asset !== undefined;
+  const base = platform.paths.join(feedsDirectory(platform), `${slug(repository)}-${slug(release.tag)}`);
+  const kept = `${base}.yml`;
+  if ((await platform.fs.stat(kept))?.kind === "file")
+    return { text: new TextDecoder().decode(await platform.fs.read(kept)), fromAsset };
+  const missing = `${base}.none`;
+  if (!fromAsset && (await platform.fs.stat(missing))?.kind === "file") return null;
+
+  let text: string;
+  try {
+    text = await platform.net.fetchText(asset ? asset.url : repositoryManifestUrl(repository, release.tag));
+  } catch (error) {
+    // A tag with no manifest is a release that is not for ZAX, not a broken feed - every other failure is.
+    if (!fromAsset && error instanceof NetworkError && error.status === 404) {
+      await platform.fs.write(missing, new Uint8Array());
+      return null;
+    }
+    throw error;
+  }
   await platform.fs.write(kept, new TextEncoder().encode(text));
-  return text;
+  return { text, fromAsset };
 }
 
 /**
@@ -130,12 +193,17 @@ export async function fetchFeed(platform: Platform, feed: ModFeed, now: Date = n
   let best: ModRelease | null = null;
 
   for (const release of releases) {
-    const text = await fetchManifestText(platform, feed.repository, release);
-    if (text === null) continue;
+    const found = await fetchManifestText(platform, feed.repository, release);
+    if (found === null) continue;
     sawManifest = true;
+    const tagged = versionFromTag(release.tag);
+    const inferred = soleArchive(release.assets);
     let manifest: ModManifest;
     try {
-      manifest = parseManifest(new TextEncoder().encode(text));
+      manifest = parseManifest(new TextEncoder().encode(found.text), {
+        ...(tagged !== undefined ? { version: tagged } : {}),
+        ...(inferred !== undefined ? { archive: inferred.name } : {}),
+      });
     } catch (error) {
       firstRefusal ??= error instanceof Error ? error : new Error(String(error));
       continue;
@@ -144,7 +212,7 @@ export async function fetchFeed(platform: Platform, feed: ModFeed, now: Date = n
     // Strictly higher, so a version published twice keeps its newest release's assets.
     if (best !== null && compareVersions(manifest.version, best.manifest.version) <= 0) continue;
     const archive = manifest.archive ? release.assets.find((asset) => asset.name === manifest.archive) : undefined;
-    best = { manifest, manifestText: text, ...(archive ? { archive } : {}) };
+    best = { manifest, manifestText: found.text, manifestFromAsset: found.fromAsset, ...(archive ? { archive } : {}) };
   }
 
   if (best !== null) return best;
@@ -287,7 +355,7 @@ export async function listAvailableMods(
     if (followed.has(mod.id)) continue;
     let manifest: ModManifest | null = null;
     try {
-      manifest = parseManifest(new TextEncoder().encode(mod.manifest));
+      manifest = parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version });
     } catch {
       // An unreadable snapshot still names the mod through the record's own fields, and defaulting the type
       // to removable is safe: uninstall re-reads the type itself, so a wrong guess costs a refused click.

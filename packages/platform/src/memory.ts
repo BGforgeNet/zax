@@ -67,8 +67,11 @@ export interface MemoryOptions {
   files?: Readonly<Record<string, string | Uint8Array>>;
   /** Directories that exist while holding no files - an empty `mods/`, a game folder with nothing in it. */
   dirs?: readonly string[];
-  /** Canned responses for `net.fetchText`, by URL. A URL with no entry rejects, as an unreachable host would. */
-  responses?: Readonly<Record<string, string>>;
+  /**
+   * Canned responses for `net.fetchText`, by URL: a body, or a status number for a server that answered with
+   * a failure. A URL with no entry rejects, as an unreachable host would.
+   */
+  responses?: Readonly<Record<string, string | number>>;
   /** What `net.download` writes at the destination, by URL. A URL with no entry rejects, as fetching does. */
   downloads?: Readonly<Record<string, string | Uint8Array>>;
   /**
@@ -116,7 +119,7 @@ export class MemoryPlatform implements Platform {
   private readonly files = new Map<string, Uint8Array>();
   private readonly dirs = new Set<string>(["/"]);
   private readonly times = new Map<string, number>();
-  private readonly responses: Record<string, string>;
+  private readonly responses: Record<string, string | number>;
   private readonly payloads: Record<string, string | Uint8Array>;
   private readonly contents: Record<string, Readonly<Record<string, string | Uint8Array>>>;
   private readonly listings: Record<string, readonly ArchiveEntryInfo[]>;
@@ -203,6 +206,9 @@ export class MemoryPlatform implements Platform {
         // A URL with no canned response stands for a host that is not there, which is what the real one
         // reports as well - so a test of the offline path gets the same error type the interface handles.
         if (body === undefined) throw new NetworkError("offline", url, `No canned response for ${url}`);
+        // A number is a server that answered without a body - the missing-file case a caller may act on.
+        if (typeof body === "number")
+          throw new NetworkError("status", url, `${url} answered ${body}`, { status: body });
         return body;
       },
       download: async (url, destination, options) => {

@@ -13,13 +13,27 @@ if (!path) {
   process.exit(2);
 }
 
+// A committed manifest states no version - its tag will - so it is read a second time as a release would
+// read it, and the report says which fields came from the stand-in rather than from the file.
+const SUPPLIED = { version: "0", archive: "payload.zip" };
+
 try {
-  const manifest = parseManifest(new Uint8Array(readFileSync(path)));
-  const payload = manifest.archive
-    ? `payload: ${manifest.archive}`
-    : 'no "archive" named - valid, but a release without one cannot offer a download';
+  const bytes = new Uint8Array(readFileSync(path));
+  let manifest;
+  let tagged = false;
+  try {
+    manifest = parseManifest(bytes);
+  } catch (error) {
+    if (!/states no "version"/.test(error instanceof Error ? error.message : "")) throw error;
+    manifest = parseManifest(bytes, SUPPLIED);
+    tagged = true;
+  }
+  const version = tagged ? "(version from the tag)" : manifest.version;
+  const payload = tagged
+    ? "(payload from the release)"
+    : (manifest.archive ?? 'no "archive" named - valid, but a release without one cannot offer a download');
   console.log(
-    `OK: ${manifest.id} ${manifest.version} (${manifest.type}); ${payload}; ` +
+    `OK: ${manifest.id} ${version} (${manifest.type}); payload: ${payload}; ` +
       `${manifest.settings.length} setting(s), ${manifest.refuse.length} refusal rule(s)`,
   );
 } catch (error) {

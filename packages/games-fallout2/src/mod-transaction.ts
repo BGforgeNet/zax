@@ -19,7 +19,7 @@ import type { ModRelease } from "./mod-feed.js";
 import { installKey, type InstalledMod } from "./records.js";
 
 /** Bumped when the meaning of a field changes; a journal this version cannot read is not resumed. */
-const TRANSACTION_FORMAT = 1;
+const TRANSACTION_FORMAT = 2;
 
 const JOURNAL = "transaction.json";
 
@@ -33,6 +33,13 @@ export interface ModTransaction {
    */
   archive: { name: string; url: string; digest: string };
   manifestText: string;
+  /**
+   * The version this install resolved to, and whether the release published the manifest. Both are part of
+   * the pin rather than re-derivable: a manifest read from the repository states no version, so the tag it
+   * came from is the only thing that knows which release a retry is finishing.
+   */
+  version: string;
+  manifestFromAsset: boolean;
   /** The record entry this install replaces, or null when it replaces nothing. The restore's target. */
   previous: InstalledMod | null;
   /** `mods_order.txt` exactly as it stood, or null when the install had none - the other half of that target. */
@@ -73,11 +80,14 @@ export async function readTransaction(
   // A journal written to a format this version does not know is not a journal it can resume from safely.
   if (journal.transaction !== TRANSACTION_FORMAT) return null;
   if (typeof journal.id !== "string" || typeof journal.manifestText !== "string") return null;
+  if (typeof journal.version !== "string" || typeof journal.manifestFromAsset !== "boolean") return null;
   if (journal.archive === undefined) return null;
   return {
     id: journal.id,
     archive: journal.archive,
     manifestText: journal.manifestText,
+    version: journal.version,
+    manifestFromAsset: journal.manifestFromAsset,
     previous: journal.previous ?? null,
     order: journal.order ?? null,
     preexisting: Array.isArray(journal.preexisting) ? journal.preexisting : [],
@@ -100,8 +110,12 @@ export async function writeTransaction(
  */
 export function releaseOf(transaction: ModTransaction): ModRelease {
   return {
-    manifest: parseManifest(new TextEncoder().encode(transaction.manifestText)),
+    manifest: parseManifest(new TextEncoder().encode(transaction.manifestText), {
+      version: transaction.version,
+      archive: transaction.archive.name,
+    }),
     manifestText: transaction.manifestText,
+    manifestFromAsset: transaction.manifestFromAsset,
     archive: transaction.archive,
   };
 }

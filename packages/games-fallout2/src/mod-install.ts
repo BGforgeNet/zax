@@ -166,7 +166,10 @@ export async function planModInstall(
 ): Promise<ModInstallPlan> {
   const { manifest } = release;
   const asset = release.archive;
-  if (!asset) throw new Error(`The ${manifest.name} release does not say which of its files is the mod.`);
+  if (!asset)
+    throw new Error(
+      `The ${manifest.name} release does not say which of its files is the mod - its manifest needs an "archive".`,
+    );
   const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest ?? "")?.[1]?.toLowerCase();
   // Required rather than best-effort: the digest is what closes in-transit tampering, truncation and a
   // corrupted resume in one check, and the feeds this list trusts all publish one.
@@ -202,16 +205,20 @@ export async function planModInstall(
   if (total > MAX_TOTAL_BYTES)
     throw new Error(`${asset.name} declares ${total} bytes unpacked, past what any known mod needs - refused.`);
 
-  // The embedded copy must match the asset eligibility was decided on, byte for byte - CI writes both from
-  // one source, so a difference means the archive is not the release the manifest described.
+  // The embedded copy must match the one eligibility was decided on, byte for byte - a difference means the
+  // archive is not the release the manifest described. Required only of a release that published a manifest
+  // asset, where CI writes both from one source; a manifest read from the repository is tied to the tag
+  // instead, and its payload is under no obligation to carry a copy. One that does is still checked.
   const embeddedAt = platform.paths.join(work, "embedded");
   await platform.archive.extract(archivePath, embeddedAt, { only: [MANIFEST_NAME] });
   const embeddedPath = platform.paths.join(embeddedAt, MANIFEST_NAME);
-  if (!(await fileExists(platform, embeddedPath)))
+  if (await fileExists(platform, embeddedPath)) {
+    const embedded = new TextDecoder().decode(await platform.fs.read(embeddedPath));
+    if (embedded !== release.manifestText)
+      throw new Error(`The manifest inside ${asset.name} is not the one its release published - refused.`);
+  } else if (release.manifestFromAsset) {
     throw new Error(`${asset.name} carries no ${MANIFEST_NAME} at its root - refused.`);
-  const embedded = new TextDecoder().decode(await platform.fs.read(embeddedPath));
-  if (embedded !== release.manifestText)
-    throw new Error(`The manifest inside ${asset.name} is not the one its release published - refused.`);
+  }
 
   const files: PlannedFile[] = [];
   // One read per directory across the whole archive; planning writes nothing, so the cache cannot go stale.
@@ -313,6 +320,8 @@ export async function applyModInstall(
         digest: release.archive?.digest ?? "",
       },
       manifestText: release.manifestText,
+      version: manifest.version,
+      manifestFromAsset: release.manifestFromAsset,
       // Only a finished entry is something to go back to. An unfinished one here means an earlier
       // transaction whose working directory is gone, and nothing it replaced is recoverable either.
       previous: record.mods.find((mod) => mod.id === manifest.id && mod.complete) ?? null,
@@ -500,7 +509,7 @@ function permanenceOf(recorded: InstalledMod): {
   }
   let manifest: ModManifest | null = null;
   try {
-    manifest = parseManifest(new TextEncoder().encode(recorded.manifest));
+    manifest = parseManifest(new TextEncoder().encode(recorded.manifest), { version: recorded.version });
   } catch {
     // A snapshot this version cannot read gives no verdict, which the caller refuses on.
   }

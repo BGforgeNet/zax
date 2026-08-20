@@ -31,6 +31,12 @@ const release = (tag: string, withManifest: boolean, extraAssets: object[] = [])
   ],
 });
 
+/** Where the repository route reads a committed manifest from, for a tag. */
+const atTag = (tag: string) => `https://raw.githubusercontent.com/${REPO}/${tag}/f2mod.yml`;
+
+/** A manifest as an author commits it: no version, no archive - the tag and the release supply both. */
+const committed = (id: string, rest = "") => `spec: 1\nid: ${id}\nname: ${id}\ngame: fallout2\n${rest}`;
+
 const feedPlatform = (options: MemoryOptions = {}) => new MemoryPlatform(options);
 
 describe("fetchFeed", () => {
@@ -38,6 +44,7 @@ describe("fetchFeed", () => {
     const platform = feedPlatform({
       responses: {
         [RELEASES_URL]: JSON.stringify([release("v15", false), release("v14.7", true)]),
+        [atTag("v15")]: 404,
         "https://example.test/v14.7/f2mod.yml": manifestText("fo2tweaks", "14.7"),
       },
     });
@@ -107,15 +114,92 @@ describe("fetchFeed", () => {
 
   it("says when no release ships a manifest yet, which is the state before upstream adoption", async () => {
     const platform = feedPlatform({
-      responses: { [RELEASES_URL]: JSON.stringify([release("v15", false), release("v14", false)]) },
+      responses: {
+        [RELEASES_URL]: JSON.stringify([release("v15", false), release("v14", false)]),
+        [atTag("v15")]: 404,
+        [atTag("v14")]: 404,
+      },
     });
     await expect(fetchFeed(platform, FEED)).rejects.toThrow(/no release of .* ships a zax manifest yet/i);
+  });
+
+  it("takes the version from the tag and the payload from the sole archive, when the release states neither", async () => {
+    const platform = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([release("v14.7", false)]),
+        [atTag("v14.7")]: committed("fo2tweaks"),
+      },
+    });
+    const found = await fetchFeed(platform, FEED);
+    expect(found.manifest.version).toBe("14.7");
+    expect(found.manifest.archive).toBe("fo2tweaks.zip");
+    expect(found.archive?.url).toBe("https://example.test/v14.7/fo2tweaks.zip");
+    expect(found.manifestFromAsset).toBe(false);
+  });
+
+  it("keeps a stated version over the tag's, the manifest being the more specific claim", async () => {
+    const platform = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([release("v99", false)]),
+        [atTag("v99")]: committed("fo2tweaks", 'version: "14.7"\n'),
+      },
+    });
+    expect((await fetchFeed(platform, FEED)).manifest.version).toBe("14.7");
+  });
+
+  it("refuses a tag that names no version rather than inventing one", async () => {
+    const platform = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([release("nightly", false)]),
+        [atTag("nightly")]: committed("fo2tweaks"),
+      },
+    });
+    await expect(fetchFeed(platform, FEED)).rejects.toThrow(/states no "version"/);
+  });
+
+  it("names no payload where two archives could be it - the ambiguity only the manifest can settle", async () => {
+    const other = { name: "fo2tweaks-nomusic.zip", browser_download_url: "https://example.test/v14.7/nomusic.zip" };
+    const platform = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([release("v14.7", false, [other])]),
+        [atTag("v14.7")]: committed("fo2tweaks"),
+      },
+    });
+    const found = await fetchFeed(platform, FEED);
+    expect(found.manifest.archive).toBeUndefined();
+    expect(found.archive).toBeUndefined();
+  });
+
+  it("ignores assets that are not archives when inferring the payload", async () => {
+    const sums = { name: "checksums.txt", browser_download_url: "https://example.test/v14.7/checksums.txt" };
+    const platform = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([release("v14.7", false, [sums])]),
+        [atTag("v14.7")]: committed("fo2tweaks"),
+      },
+    });
+    expect((await fetchFeed(platform, FEED)).manifest.archive).toBe("fo2tweaks.zip");
+  });
+
+  it("asks the repository once per tag, remembering which tags carry no manifest", async () => {
+    const platform = feedPlatform({
+      responses: { [RELEASES_URL]: JSON.stringify([release("v15", false)]), [atTag("v15")]: 404 },
+    });
+    await expect(fetchFeed(platform, FEED)).rejects.toThrow(/ships a zax manifest yet/i);
+    await expect(fetchFeed(platform, FEED)).rejects.toThrow(/ships a zax manifest yet/i);
+    expect(platform.fetched.filter((url) => url === atTag("v15"))).toHaveLength(1);
+  });
+
+  it("reports a repository that cannot be reached rather than reading it as a tag without a manifest", async () => {
+    const platform = feedPlatform({ responses: { [RELEASES_URL]: JSON.stringify([release("v15", false)]) } });
+    await expect(fetchFeed(platform, FEED)).rejects.toThrow(/No canned response/);
   });
 });
 
 describe("availability", () => {
   const install: Install = { path: "/games/fallout2", type: "fallout2" };
   const parsed = (text: string): ModRelease => ({
+    manifestFromAsset: true,
     manifest: {
       id: "fo2tweaks",
       name: "FO2tweaks",
@@ -181,7 +265,7 @@ describe("availability", () => {
   });
 
   it("blocks every offer to download when the release never names its payload", () => {
-    const bare: ModRelease = { manifest: parsed("").manifest, manifestText: "" };
+    const bare: ModRelease = { manifest: parsed("").manifest, manifestText: "", manifestFromAsset: true };
     expect(availability(bare, context())).toMatchObject({ kind: "blocked" });
     expect(availability(bare, context({ record: recorded("14.7") }))).toEqual({ kind: "installed" });
   });

@@ -1,6 +1,7 @@
 /**
- * `f2mod.yml`: the manifest a mod's release carries and this application interprets. A release ships two
- * byte-identical copies - one at the archive root, one as a standalone asset - and this parser reads both.
+ * `f2mod.yml`: the manifest a mod's release carries and this application interprets. It reaches ZAX two ways
+ * - published as a release asset beside the payload, or read from the repository at the release's tag - so
+ * `version` and `archive` may be absent from the file and supplied by the release instead.
  *
  * Parsing is strict and every refusal names its cause. A manifest is downloaded data even from a trusted
  * publisher, so it gets a boundary of its own: a size cap before parsing, a YAML alias cap, length-capped
@@ -15,11 +16,21 @@ import { GAME_TYPES, type GameType, type SettingDef, type SettingKind, type Valu
 import { SETTINGS } from "./catalog.js";
 
 /**
- * The file's name at the archive root, and the release asset's name - the same on purpose. The name is not
- * manager-branded: the manifest declares its own `game`, and a second manager reading this format should not
- * have to ship a file named after this application.
+ * The file's name wherever it sits - repository root, archive root, release asset - the same on purpose. The
+ * name is not manager-branded: the manifest declares its own `game`, and a second manager reading this format
+ * should not have to ship a file named after this application.
  */
 export const MANIFEST_NAME = "f2mod.yml";
+
+/**
+ * What the release supplies for fields the manifest may leave out. A committed manifest states neither its
+ * version nor its payload's name - the tag and the release's assets do - and a manifest re-read from a record
+ * or a journal takes back the version that was resolved when it was installed.
+ */
+export interface ManifestDefaults {
+  version?: string;
+  archive?: string;
+}
 
 /**
  * Refused before parsing. A catalog-parity settings schema with help text runs tens of kilobytes; something
@@ -349,7 +360,7 @@ const MANIFEST_FIELDS = [
   "extra",
 ];
 
-export function parseManifest(bytes: Uint8Array): ModManifest {
+export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}): ModManifest {
   if (bytes.byteLength > MANIFEST_BYTE_CAP)
     refuse(`it is ${bytes.byteLength} bytes, past the ${MANIFEST_BYTE_CAP} byte cap`);
 
@@ -374,7 +385,10 @@ export function parseManifest(bytes: Uint8Array): ModManifest {
   // later catalog addition collides with, and a per-id check can only see the catalog as it is now.
   if (CATALOG_PREFIXES.has(id.split(".")[0] ?? id))
     refuse(`"id" ("${id}") is inside the catalog's "${id.split(".")[0]}" namespace`);
-  const version = literal(fields["version"], `"version"`);
+  // Stated wins over supplied: a manifest published as an asset is the more specific claim, and the archive's
+  // embedded copy is checked against it.
+  const version = fields["version"] === undefined ? defaults.version : literal(fields["version"], `"version"`);
+  if (version === undefined) refuse(`it states no "version", and its release supplies none`);
   if (!VERSION_SHAPE.test(version)) refuse(`"version" ("${version}") is not a version`);
 
   const type = fields["type"] === undefined ? "pluggable" : text(fields["type"], `"type"`, SHORT_TEXT);
@@ -409,13 +423,15 @@ export function parseManifest(bytes: Uint8Array): ModManifest {
     if (installOn.length === 0) refuse(`"install-on" is empty, which would install nowhere`);
   }
 
+  const archive = fields["archive"] === undefined ? defaults.archive : fields["archive"];
+
   return {
     id,
     name: text(fields["name"], `"name"`, SHORT_TEXT),
     version,
     type,
     ...(type === "permanent" ? { reason: text(fields["reason"], `"reason"`, LONG_TEXT) } : {}),
-    ...(fields["archive"] !== undefined ? { archive: assetName(fields["archive"]) } : {}),
+    ...(archive !== undefined ? { archive: assetName(archive) } : {}),
     ...(installOn !== undefined ? { installOn } : {}),
     ...(requiresSfall !== undefined ? { requiresSfall } : {}),
     ...(fields["state"] !== undefined
