@@ -34,6 +34,27 @@ asarUnpack:
 # Nothing here is a native module - the one piece of native code is WebAssembly, which needs no rebuild.
 npmRebuild: false
 
+# Electron ships these on, which leaves every copy of ZAX usable as a general Node interpreter and as a
+# debugger target: `ELECTRON_RUN_AS_NODE=1 zax script.js` runs the script, and `--inspect` attaches. That
+# matters more here than for most applications, because every target is portable and unsigned - a copy sits in
+# a directory the user can write to, under a name their machine already trusts.
+#
+# None of the three costs anything to give up: the workers are `worker_threads`, not `process.fork`, which is
+# the one thing disabling `runAsNode` breaks.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  # Electron otherwise searches `app.asar` then `app/` then `default_app.asar`, so a directory dropped beside
+  # the archive is loaded in preference to nothing. One entry means the archive or nothing.
+  onlyLoadAppFromAsar: true
+  # Left off deliberately, not overlooked. It is what would make the archive tamper-evident rather than merely
+  # canonical, but it validates against hashes bound to a signature, and this application is not signed. It
+  # becomes worth turning on with code signing, not before.
+  enableEmbeddedAsarIntegrityValidation: false
+# `grantFileProtocolExtraPrivileges` stays at its default: the packaged interface is loaded with `loadFile`,
+# so it is a `file://` page, and revoking those privileges is a change to how it loads rather than a setting.
+
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
 win:
