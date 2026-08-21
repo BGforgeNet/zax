@@ -33,7 +33,7 @@ is yours to do, so a mod that builds its files can run its build before packing 
 
 ## What it does
 
-Packs `mods/` into `<repository>-<version>.zip` in the workspace. It stamps nothing: ZAX reads the version
+Packs `mods/` into `<repository>_<tag>.zip` in the workspace - `fo2tweaks_v14.7.zip` for tag `v14.7`. It stamps nothing: ZAX reads the version
 from the tag (`v14.7` is 14.7) and the payload from the release's sole archive asset, so the committed
 manifest never changes between releases.
 

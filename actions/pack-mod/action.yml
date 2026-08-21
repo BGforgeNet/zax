@@ -69,8 +69,13 @@ runs:
           exit 1
         fi
 
+        # `<name>_<tag>.zip`, the tag whole rather than the version - the naming Fallout 2 mod releases
+        # already use, and what a person scanning a releases page expects to see.
         name="${NAME:-${GITHUB_REPOSITORY##*/}}"
-        archive="${name}-${version}.zip"
+        archive="${name}_${GITHUB_REF_NAME}.zip"
+        # Removed first: zip ADDS to an archive that already exists, so a build that packed one under this
+        # name - or a re-run - would ship its entries merged with these rather than replaced.
+        rm -f "$archive"
         # -X drops the extra file attributes, which are per-machine and would change the archive's digest
         # between two builds of identical content.
         # shellcheck disable=SC2086
