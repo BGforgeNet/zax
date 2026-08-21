@@ -53,9 +53,12 @@ function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 860,
-    // The interface drops the sidebar below 820 viewport pixels because the settings pane is at its minimum
-    // there - and with it goes the only way to switch installs. The floor keeps the window out of that band.
-    minWidth: 840,
+    // Two things want a floor, and this clears the higher one. The interface drops the sidebar below 820
+    // viewport pixels because the settings pane is at its minimum there - and with it goes the only way to
+    // switch installs. Above that the sidebar is back but the Settings tab strip needs about 890 to lay its
+    // tabs out, and between the two the strip opens already scrolled with its last tab off the edge. The
+    // window is a little wider than its viewport, so the floor sits above 890 rather than at it.
+    minWidth: 900,
     minHeight: 520,
     // Shown once it has something to draw, so the window does not flash empty on a slow first paint.
     show: false,
