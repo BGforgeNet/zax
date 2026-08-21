@@ -5,7 +5,7 @@ import svelte from "eslint-plugin-svelte";
 import globals from "globals";
 
 export default defineConfig(
-  globalIgnores(["**/dist/", ".work/", "scripts/gen/formats/"]),
+  globalIgnores(["**/dist/", ".work/", "coverage/", "scripts/gen/formats/"]),
   js.configs.recommended,
   ts.configs.recommended,
   svelte.configs.recommended,

@@ -8,3 +8,4 @@ scripts/gen/py-layout.json
 scripts/gen/formats/
 pnpm-lock.yaml
 .work/
+coverage/

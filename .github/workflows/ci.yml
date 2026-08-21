@@ -38,7 +38,9 @@ jobs:
       - run: pnpm audit
       - run: pnpm check
       - run: pnpm lint
-      - run: pnpm test
+      # Coverage rather than a plain run: the threshold is a gate rather than a local habit, so it is
+      # checked where a change has to pass rather than where it slows every run down.
+      - run: pnpm test:coverage
       # The chokidar override puts svelte-check on a major its authors do not test against, and only watch mode
       # loads it - which the single-pass `pnpm check` above never enters.
       - run: pnpm verify:chokidar
