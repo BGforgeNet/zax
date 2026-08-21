@@ -5,6 +5,10 @@
 Node 24 and pnpm. Its version is pinned in the root `package.json`'s `packageManager` field, so
 `corepack enable` gets the right one.
 
+`@types/node` tracks the Node major rather than the newest published one, so it stays on the 24 line for as
+long as this is built and tested against Node 24. An update tool reporting it as two majors behind is
+describing the runtime, not the pin.
+
 ```bash
 pnpm install
 ```
