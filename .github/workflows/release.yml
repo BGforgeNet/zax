@@ -53,8 +53,9 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: ./.github/scripts/check-tag-version.sh
-      # The cache stays outside the checkout: electron-builder downloads helper tools into it as CommonJS, and
-      # the root package.json's `type: module` governs the whole tree, so Node would load them as ESM and fail.
+      # Scratch for this run rather than a cache restored from an earlier one - nothing populates it here. It
+      # stays outside the checkout because electron-builder downloads helper tools into it as CommonJS, and the
+      # root package.json's `type: module` governs the whole tree, so Node would load them as ESM and fail.
       - run: pnpm --filter @zax/app package
         env:
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
