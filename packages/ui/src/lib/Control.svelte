@@ -1,7 +1,7 @@
 <script lang="ts">
   import {
     KEY_BY_SCANCODE,
-    SCANCODE_BY_KEY,
+    SCANCODE_BY_DOM_CODE,
     parseScancode,
     percentToScale,
     scaleToPercent,
@@ -15,9 +15,10 @@
 
   const value = $derived(store.valueOf(def.id) ?? "");
 
+  // On `code` rather than `key`: the file stores a physical scancode, and `key` is what the layout makes of
+  // the keypress - it also names modifiers and function keys in a way no scancode answers to.
   function onKeyCapture(event: KeyboardEvent) {
-    const name = event.key.length === 1 ? event.key.toUpperCase() : "";
-    const code = SCANCODE_BY_KEY[name];
+    const code = SCANCODE_BY_DOM_CODE[event.code];
     if (code) {
       event.preventDefault();
       store.set(def.id, code);

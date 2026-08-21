@@ -37,7 +37,7 @@ export {
 } from "./config-io.js";
 export {
   KEY_BY_SCANCODE,
-  SCANCODE_BY_KEY,
+  SCANCODE_BY_DOM_CODE,
   describeValueTest,
   displayValue,
   matchesValueTest,
