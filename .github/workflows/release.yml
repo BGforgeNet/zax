@@ -59,14 +59,40 @@ jobs:
       - run: pnpm --filter @zax/app package
         env:
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+      # One step per target, as in ci.yml. The draft job merges these and attaches every file it finds, so the
+      # split does not change what a release carries - what it changes is the guard: `if-no-files-found` asks
+      # whether a step found anything, so four patterns in one step pass as long as any one of them matched. A
+      # target that stopped building would have gone out as a release missing it, silently. One target per
+      # step is what makes each one answerable.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Linux'
         with:
-          name: zax-${{ runner.os }}
-          path: |
-            packages/app/release/*.zip
-            packages/app/release/*.exe
-            packages/app/release/*.AppImage
-            packages/app/release/*.tar.gz
+          name: zax-Linux-AppImage
+          path: packages/app/release/*.AppImage
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Linux'
+        with:
+          name: zax-Linux-tar.gz
+          path: packages/app/release/*.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Windows'
+        with:
+          name: zax-Windows-zip
+          path: packages/app/release/*.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Windows'
+        with:
+          name: zax-Windows-exe
+          path: packages/app/release/*.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'macOS'
+        with:
+          name: zax-macOS-zip
+          path: packages/app/release/*.zip
           if-no-files-found: error
 
   draft:
