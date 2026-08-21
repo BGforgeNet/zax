@@ -33,9 +33,9 @@ is yours to do, so a mod that builds its files can run its build before packing 
 
 ## What it does
 
-Packs `mods/` into `<repository>_<tag>.zip` in the workspace - `fo2tweaks_v14.7.zip` for tag `v14.7`. It stamps nothing: ZAX reads the version
-from the tag (`v14.7` is 14.7) and the payload from the release's sole archive asset, so the committed
-manifest never changes between releases.
+Packs `mods/` into `<repository>_<tag>.zip` in the workspace - `fo2tweaks_v14.7.zip` for tag `v14.7`. It
+stamps nothing: ZAX reads the version from the tag (`v14.7` is 14.7) and the payload from the release's sole
+archive asset, so the committed manifest never changes between releases.
 
 It refuses before packing anything when the run is not on a tag, when the tag names no version, when there is
 no `f2mod.yml` at the repository root, or when nothing sits under `mods/` - each of which would otherwise
