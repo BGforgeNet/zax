@@ -7,5 +7,7 @@ export const DEBUG_PACKAGE_CONTENTS: readonly string[] = [
   "ddraw.dll, so the sfall version is unambiguous",
   "debug.log and sfall-log.txt, if the run produced them",
   "a listing of the game folder and of mods/, plus every mods/*.ini",
+  "mods_order.txt, which says which mods are on and in what order",
+  "ZAX's own log, which records what ZAX did",
   "the savegames you pick",
 ];

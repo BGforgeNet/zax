@@ -80,6 +80,36 @@ describe("creating the package", () => {
     expect(await packaged(installed())).not.toContain("mods.txt");
   });
 
+  it("takes the load order, which says which of those mods are on and in what order", async () => {
+    const platform = installed({
+      "/games/one/mods/upu.dat": "",
+      "/games/one/mods/mods_order.txt": "upu.dat\n;off.dat\n",
+    });
+    const contents = await packaged(platform);
+
+    // `mods.txt` names the files present; only this says which are enabled, and in which order the loader
+    // takes them - which is the whole question for a mod conflict.
+    expect(contents).toContain("mods/mods_order.txt");
+    expect(platform.zipped[0]?.contents["mods/mods_order.txt"]).toBe("upu.dat\n;off.dat\n");
+  });
+
+  it("takes ZAX's own log, which is where a failed or resumed download is recorded", async () => {
+    const platform = installed();
+    await platform.fs.write(
+      "/home/t/.cache/zax/zax.log",
+      new TextEncoder().encode("2026-08-05T18:00:00.000Z sfall 4.5: attempt 2 resumed from 400000\n"),
+    );
+    const contents = await packaged(platform);
+
+    // Nothing in the game folder records what ZAX did; a report from a poor connection cannot reconstruct it.
+    expect(contents).toContain("zax.log");
+    expect(platform.zipped[0]?.contents["zax.log"]).toContain("resumed from 400000");
+  });
+
+  it("leaves the log out rather than attaching an empty one when ZAX has written none", async () => {
+    expect(await packaged(installed())).not.toContain("zax.log");
+  });
+
   it("attaches the saves that were chosen, whole, and no others", async () => {
     const platform = installed({
       "/games/one/data/SAVEGAME/SLOT01/SAVE.DAT": "one",

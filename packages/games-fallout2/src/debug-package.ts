@@ -4,9 +4,10 @@
  * it lives here rather than in the view that offers the button.
  */
 
-import { debugDirectory, listFilesRecursively, stamp, temporaryDirectory } from "@zax/core";
+import { debugDirectory, listFilesRecursively, logFile, stamp, temporaryDirectory } from "@zax/core";
 import type { Install } from "@zax/core";
 import type { ArchiveEntry, Platform } from "@zax/platform";
+import { MODS_ORDER_FILE } from "./mods.js";
 
 /** Fallout 2 installers disagree about the case of this directory, and both spellings occur in the wild. */
 const SAVE_DIRECTORIES = ["data/SAVEGAME", "data/savegame"];
@@ -82,11 +83,23 @@ export async function createDebugPackage(
     const mods = join(install.path, "mods");
     if ((await platform.fs.stat(mods))?.kind === "dir") {
       for (const entry of await platform.fs.list(mods)) {
-        if (entry.kind === "file" && entry.name.toLowerCase().endsWith(".ini")) {
+        // The load order by name as well as by suffix: it is the only file saying which of the mods listed
+        // beside it are enabled and in what order the loader takes them, which is the question a conflict asks.
+        const wanted =
+          entry.name.toLowerCase().endsWith(".ini") || entry.name.toLowerCase() === MODS_ORDER_FILE.toLowerCase();
+        if (entry.kind === "file" && wanted) {
           entries.push({ source: join(mods, entry.name), name: `mods/${entry.name}` });
         }
       }
       await listing(mods, "mods.txt");
+    }
+
+    // ZAX's own record of what it did - failed and resumed downloads above all, which nothing in the game
+    // folder witnesses and a report from a poor connection cannot reconstruct. Absent until something has
+    // been written, and an install that has had no trouble legitimately has none.
+    const log = logFile(platform);
+    if ((await platform.fs.stat(log))?.kind === "file") {
+      entries.push({ source: log, name: platform.paths.basename(log) });
     }
 
     const savesAt = await saveDirectory(platform, install);
