@@ -169,6 +169,13 @@ export interface Notice {
  * Edits are held as a sparse override map rather than applied to the parsed documents. That keeps
  * "what did I change" and revert trivial, and it is the shape a saved profile will store.
  */
+/*
+  One object rather than one per view, and long because of it. The split that suggests itself - settings,
+  mods, installs, updates - does not hold: almost every method reads `selectedInstall`, `busy`, `progress` and
+  `notice`, and the pieces would go on sharing them through something passed between them. That trades a long
+  file for the same coupling plus the indirection, and reintroduces the question of who owns a field. The
+  reason to revisit it is a piece that stops touching the shared four, not the line count.
+*/
 class Store {
   view = $state<View>("settings");
   panel = $state<Panel>("games");
