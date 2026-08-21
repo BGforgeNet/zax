@@ -975,7 +975,7 @@ class Store {
   private pendingChanges(values: Record<string, string> = this.overrides): ConfigChange[] {
     const out: ConfigChange[] = [];
     for (const [id, value] of Object.entries(values)) {
-      const def = SETTINGS.find((s) => s.id === id) ?? this.modById.get(id) ?? this.discovered.find((s) => s.id === id);
+      const def = this.defOf(id) ?? this.discovered.find((s) => s.id === id);
       if (def) out.push({ file: def.file, section: def.section, key: def.key, value });
     }
     return out;
