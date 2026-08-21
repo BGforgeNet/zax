@@ -20,6 +20,7 @@ import {
 } from "@zax/core";
 import type { Install } from "@zax/core";
 import type { DownloadOptions, Platform } from "@zax/platform";
+import { preflightArchive } from "./archive-preflight.js";
 import { installedLibraryVersion } from "./pe-version.js";
 
 /** sfall is a DirectDraw wrapper: it ships as this DLL, and its version is the DLL's own. */
@@ -160,6 +161,10 @@ const DDRAW_INI = "ddraw.ini";
  * Extracts a release, and throws away the cached archive if it will not open. An archive can begin with the
  * right bytes and still be truncated - a chunked body that ended early is not detectable until something tries
  * to read it - and a cache keyed on existence would hand the same broken file to every attempt after this one.
+ *
+ * Judged before it is opened, by the same bounds a mod payload gets: this is a third-party archive unpacked
+ * over the user's install, and asking for one file out of it rather than all of them narrows what is written,
+ * not what the archive may declare.
  */
 async function extractPackage(
   platform: Platform,
@@ -170,6 +175,7 @@ async function extractPackage(
 ): Promise<void> {
   const archive = await sfallPackage(platform, version, options);
   try {
+    await preflightArchive(platform, archive, `sfall ${version}`);
     await platform.archive.extract(archive, destination, only ? { only } : undefined);
   } catch (error) {
     await platform.fs.remove(archive);

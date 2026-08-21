@@ -197,6 +197,56 @@ describe("an answer that is not the archive it was meant to be", () => {
   });
 });
 
+/*
+  The release is a third-party archive unpacked over the user's game folder, so it is judged before anything is
+  extracted - by the same bounds a mod payload gets, since the two paths differ in where the archive comes from
+  and not in what an archive can do.
+*/
+describe("what the release archive is allowed to contain", () => {
+  const PACKAGE = "/home/t/.cache/zax/packages/sfall-4.5.7z";
+
+  const listing = (entries: readonly { name: string; kind: "file" | "dir" | "link"; size: number }[]) =>
+    new MemoryPlatform({
+      home: "/home/t",
+      files: { "/games/one/fallout2.exe": "MZ", [PACKAGE]: archiveBytes("release 4.5") },
+      archives: { [PACKAGE]: { "ddraw.dll": "new sfall" } },
+      listings: { [PACKAGE]: entries },
+    });
+
+  it("refuses a symbolic link, which is how an archive writes outside where it was unpacked", async () => {
+    const platform = listing([{ name: "ddraw.dll", kind: "link", size: 1 }]);
+
+    await expect(updateSfall(platform, INSTALL, "4.5", new Date(2026, 7, 5))).rejects.toThrow(/symbolic link/);
+    expect(platform.textAt("/games/one/ddraw.dll"), "nothing was extracted").toBeUndefined();
+  });
+
+  it("refuses a declaration that would fill the disk", async () => {
+    const platform = listing([{ name: "ddraw.dll", kind: "file", size: 9 * 1024 ** 3 }]);
+
+    await expect(updateSfall(platform, INSTALL, "4.5", new Date(2026, 7, 5))).rejects.toThrow(/refused/);
+  });
+
+  it("refuses a path nested deeper than a release is", async () => {
+    const platform = listing([{ name: `${"a/".repeat(20)}ddraw.dll`, kind: "file", size: 1 }]);
+
+    await expect(updateSfall(platform, INSTALL, "4.5", new Date(2026, 7, 5))).rejects.toThrow(/refused/);
+  });
+
+  it("judges the archive even when only one file is being taken out of it", async () => {
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      files: { "/games/one/fallout2.exe": "MZ", [PACKAGE]: archiveBytes("release 4.5") },
+      // Readable content, so an unjudged extraction would hand back a document rather than null - which is
+      // what tells this case apart from an archive that simply carries no `ddraw.ini`.
+      archives: { [PACKAGE]: { "ddraw.ini": "[Main]\nBoo=1\n" } },
+      listings: { [PACKAGE]: [{ name: "ddraw.ini", kind: "link", size: 1 }] },
+    });
+
+    // `sfallDefaults` absorbs a failure into "no base to merge against", so the refusal is what it returns on.
+    expect(await sfallDefaults(platform, "4.5")).toBeNull();
+  });
+});
+
 describe("merging against what the installed version shipped", () => {
   const AT = new Date(2026, 7, 5, 18, 30, 0);
   const OLD = "/home/t/.cache/zax/packages/sfall-4.4.7z";

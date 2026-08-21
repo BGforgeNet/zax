@@ -25,6 +25,7 @@ import {
   type MergeConflict,
 } from "@zax/core";
 import type { DirEntry, DownloadOptions, Platform } from "@zax/platform";
+import { preflightArchive } from "./archive-preflight.js";
 import { MANIFEST_NAME, insideMods, parseManifest, type ModManifest } from "./manifest.js";
 import {
   answersToId,
@@ -40,11 +41,6 @@ import { placeFor, recommendationFor } from "./recommended-order.js";
 import { loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 import { modWorkDirectory, readTransaction, writeTransaction, type ModTransaction } from "./mod-transaction.js";
 import type { ModRelease } from "./mod-feed.js";
-
-/** Preflight ceilings, calibrated against the real corpus with headroom - RPU's gigabyte is the outlier. */
-const MAX_ENTRIES = 10_000;
-const MAX_PATH_DEPTH = 16;
-const MAX_TOTAL_BYTES = 8 * 1024 ** 3;
 
 export interface ModProgress extends DownloadOptions {
   onStep?: (step: string) => void;
@@ -192,18 +188,7 @@ export async function planModInstall(
   }
 
   options?.onStep?.("Reading the archive");
-  const entries = await platform.archive.list(archivePath);
-  if (entries.length > MAX_ENTRIES) throw new Error(`${asset.name} declares ${entries.length} entries - refused.`);
-  let total = 0;
-  for (const entry of entries) {
-    if (entry.kind === "link")
-      throw new Error(`${asset.name} contains a symbolic link (${entry.name}) - refused, nothing was extracted.`);
-    if (entry.name.split("/").length > MAX_PATH_DEPTH)
-      throw new Error(`${asset.name} nests paths deeper than any mod does (${entry.name}) - refused.`);
-    total += entry.size;
-  }
-  if (total > MAX_TOTAL_BYTES)
-    throw new Error(`${asset.name} declares ${total} bytes unpacked, past what any known mod needs - refused.`);
+  const entries = await preflightArchive(platform, archivePath, asset.name);
 
   // The embedded copy must match the one eligibility was decided on, byte for byte - a difference means the
   // archive is not the release the manifest described. Required only of a release that published a manifest
