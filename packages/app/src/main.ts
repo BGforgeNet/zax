@@ -11,6 +11,7 @@ import { createBackend, type Backend } from "@zax/fallout2";
 import { nodePlatform } from "@zax/platform-node";
 import { CHANNEL, PROGRESS_CHANNEL } from "./channel.js";
 import { createDispatch, describeError } from "./dispatch.js";
+import { isOwnContent, isWebUrl } from "./navigation.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -48,31 +49,6 @@ async function chooseFolder(): Promise<string | null> {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 }
 
-/**
- * Handing an arbitrary scheme to the desktop's own handler is how a `file://` path or a registered protocol
- * becomes code execution, so only the two schemes a link can legitimately carry are passed on.
- */
-function isWebUrl(target: string): boolean {
-  try {
-    const { protocol } = new URL(target);
-    return protocol === "https:" || protocol === "http:";
-  } catch {
-    // Not a URL at all, which is not something to hand outwards either.
-    return false;
-  }
-}
-
-/** Where this window is allowed to go: the dev server when one is given, otherwise the built files. */
-function isOwnContent(target: string): boolean {
-  try {
-    const url = new URL(target);
-    // Same truthiness test the load below makes, so the two cannot disagree about which mode this is.
-    return DEV_SERVER ? url.origin === new URL(DEV_SERVER).origin : url.protocol === "file:";
-  } catch {
-    return false;
-  }
-}
-
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
@@ -107,7 +83,7 @@ function createWindow(): BrowserWindow {
   // Navigating away would leave the preload's bridge attached to whatever loaded next, so the window stays on
   // its own content and a web link is handed to the browser instead.
   window.webContents.on("will-navigate", (event, url) => {
-    if (isOwnContent(url)) return;
+    if (isOwnContent(url, DEV_SERVER)) return;
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
     else void logLine(`refused to navigate to ${url}`);
