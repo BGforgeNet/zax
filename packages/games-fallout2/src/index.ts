@@ -1,29 +1,19 @@
 export { SETTINGS } from "./catalog.js";
-export { CONFIG_FILES, type ConfigFile } from "./files.js";
+export { CONFIG_FILES } from "./files.js";
 export { ACTIONS, COMMON_RESOLUTIONS } from "./actions.js";
 export { DEBUG_PACKAGE_CONTENTS } from "./trouble.js";
 export { LAYOUT, type LayoutFile, type LayoutNode, type LayoutTab } from "./layout.js";
 export { describePlace, hiddenIds, placesById, type Place } from "./places.js";
-export { EXECUTABLE, planLaunch, type LaunchPlan } from "./launch.js";
-export {
-  SFALL_LIBRARY,
-  installedSfallVersion,
-  latestSfall,
-  updateSfall,
-  type SfallRelease,
-  type SfallUpdate,
-} from "./sfall.js";
-export { HIRES_LIBRARY, installedHiresVersion } from "./hires.js";
+export { planLaunch } from "./launch.js";
+export { installedSfallVersion, latestSfall, updateSfall, type SfallRelease, type SfallUpdate } from "./sfall.js";
+export { installedHiresVersion } from "./hires.js";
 export {
   MODS_DIRECTORY,
-  MODS_ORDER_FILE,
   MODS_ORDER_PATH,
   listMods,
   readMods,
   saveMods,
   type Mod,
-  type ModKind,
-  type ModsDirEntry,
   type ModsSaveRequest,
   type ModsSnapshot,
 } from "./mods.js";
@@ -36,7 +26,6 @@ export {
   parseManifest,
   type ModManifest,
   type ModSetting,
-  type RefuseRule,
 } from "./manifest.js";
 export { loadRecord, reconcileRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 export {
@@ -45,9 +34,7 @@ export {
   fetchFeed,
   listAvailableMods,
   presentInMods,
-  type Availability,
   type ModContext,
-  type ModFeed,
   type ModListing,
   type ModOffer,
   type ModRelease,
@@ -55,16 +42,13 @@ export {
 export {
   applyModInstall,
   planModInstall,
-  refusalFor,
   restoreModInstall,
   uninstallMod,
   type ModInstallOutcome,
   type ModInstallPlan,
-  type ModProgress,
   type ModRemoval,
-  type PlannedFile,
 } from "./mod-install.js";
-export { BACKEND_METHODS, fromMethods, wrapMethods, type BackendMethod } from "./backend-methods.js";
+export { BACKEND_METHODS, fromMethods, wrapMethods } from "./backend-methods.js";
 export {
   RELEASES_PAGE,
   createBackend,
