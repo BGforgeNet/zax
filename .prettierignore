@@ -7,5 +7,8 @@ scripts/gen/layout.json
 scripts/gen/py-layout.json
 scripts/gen/formats/
 pnpm-lock.yaml
+# Fixtures are copies of files other people publish, kept byte-for-byte so the round-trip tests and the
+# preview see what a real install and a real mod release carry.
+fixtures/
 .work/
 coverage/

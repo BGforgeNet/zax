@@ -15,6 +15,11 @@ import { createBackend, saveRecord, wrapMethods, type Backend, type OperationPro
 import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
 import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
+// FO2tweaks as it publishes itself: the manifest its repository carries and the ini its release ships, both
+// verbatim. A sample written here would drift from the format the mod actually uses, and this surface only
+// means anything if it is the real one.
+import fo2tweaksManifest from "../../../../fixtures/fo2tweaks/f2mod.yml?raw";
+import fo2tweaksIni from "../../../../fixtures/fo2tweaks/mods/fo2tweaks.ini?raw";
 
 /** How the interface hears about a long operation's progress, whichever host it is talking to. */
 export interface ProgressSource {
@@ -40,73 +45,6 @@ export const PREVIEW_REASON = "The browser preview has no machine to reach - thi
 function refuses(): never {
   throw new Error(PREVIEW_REASON);
 }
-
-/*
-  An installed mod for the preview, so the settings-schema surface exists somewhere file-shaped. The keys,
-  values and help lines are FO2tweaks' own, taken from its published ini; the schema is a hand-written sample
-  of what its release would carry, including the real cross-file gate its readme states (damage_mod requires
-  sfall's DamageFormula at 0).
-*/
-const PREVIEW_MOD_INI =
-  "[main]\n" +
-  "; don't penalize scoped weapons chance to hit at close range\n" +
-  "no_scope_penalty=1\n" +
-  "; Automatically open/walk through unlocked doors when not in combat\n" +
-  "autodoors=1\n" +
-  "; Limit max knockback distance in hexes. -1 is vanilla (unlimited). 0 is no knockback at all.\n" +
-  "max_knockback=-1\n" +
-  "; AP/JHP damage mod. You must set DamageFormula=0 in ddraw.ini for this component to work correctly.\n" +
-  "damage_mod=1\n" +
-  "\n" +
-  "[run_speed]\n" +
-  "; You can enable run speed increase for the Chosen, party, or both.\n" +
-  "dude=1\n" +
-  "party=1\n";
-
-const PREVIEW_MOD_MANIFEST = `spec: 1
-id: fo2tweaks
-name: FO2tweaks
-version: "14.7"
-game: fallout2
-settings:
-  main.no_scope_penalty:
-    kind: bool
-    default: 1
-    label: No scope penalty
-    help: Don't penalize scoped weapons chance to hit at close range.
-  main.autodoors:
-    kind: choice
-    options:
-      - { value: 0, label: "Off" }
-      - { value: 1, label: "Open" }
-      - { value: 2, label: "Open and close" }
-    default: 1
-    label: Automatic doors
-    help: Walk through unlocked doors without clicking, outside combat.
-  main.max_knockback:
-    kind: int
-    min: -1
-    sentinels: { "-1": "Vanilla (unlimited)", "0": "No knockback" }
-    default: -1
-    label: Max knockback
-    help: Limit knockback distance in hexes.
-  main.damage_mod:
-    kind: bool
-    default: 1
-    label: AP/JHP damage mod
-    help: Needs sfall's DamageFormula at 0 to work correctly.
-    gated-by: { id: sfall.Misc.DamageFormula, is: [0] }
-  run_speed.dude:
-    kind: bool
-    default: 1
-    label: The Chosen One
-    help: Increase run speed for the player when wearing armor.
-  run_speed.party:
-    kind: bool
-    default: 1
-    label: Party members
-    help: Increase run speed for party members.
-`;
 
 /** The in-memory disk the preview edits. Exported so tests can reseed it between cases. */
 export const previewPlatform: Platform = (() => {
@@ -141,7 +79,7 @@ export const previewPlatform: Platform = (() => {
       [`${PREVIEW_INSTALL}/mods/extra_music.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/barter_prices.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/hero_appearance/art/critters/hmjmps.frm`]: "",
-      [`${PREVIEW_INSTALL}/mods/fo2tweaks.ini`]: PREVIEW_MOD_INI,
+      [`${PREVIEW_INSTALL}/mods/fo2tweaks.ini`]: fo2tweaksIni,
       "preview/config/zax.yml": `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`,
     },
   });
@@ -169,14 +107,16 @@ await saveRecord(previewPlatform, {
   mods: [
     {
       id: "fo2tweaks",
+      // The release the fixture was taken from. The manifest states no version of its own - a committed one
+      // takes it from the release tag - so refreshing the fixture means moving this with it.
       version: "14.7",
       // What an install writes, and what a removal is judged against - a record without it is one an older
       // version left, which the preview is not pretending to be.
       type: "pluggable",
       complete: true,
       files: ["mods/fo2tweaks.dat", "mods/fo2tweaks.ini"],
-      manifest: PREVIEW_MOD_MANIFEST,
-      shipped: { "mods/fo2tweaks.ini": PREVIEW_MOD_INI },
+      manifest: fo2tweaksManifest,
+      shipped: { "mods/fo2tweaks.ini": fo2tweaksIni },
     },
   ],
 });

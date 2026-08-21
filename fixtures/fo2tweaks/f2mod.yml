@@ -1,0 +1,419 @@
+# What ZAX needs to install FO2tweaks and to show its settings. The version comes from the release tag and
+# the payload is the release's sole archive, so nothing here is stamped per release.
+#
+# Settings are addressed as they sit in mods/fo2tweaks.ini, section.key. Sections keyed by pid or by key name
+# - keymap, party_level_match, party_level_maxstage, damage_mod_ammo_dr, damage_mod_ammo_type - and the
+# comma-separated pid lists are left out: their entries are data rather than a fixed set of settings, so a
+# schema could only name the ones shipped today.
+
+spec: 1
+id: fo2tweaks
+name: FO2tweaks
+game: fallout2
+
+requires:
+  # The lowest version the mod works with, as the readme states it - not the 4.5 the payload bundles,
+  # which ZAX ignores in favour of its own sfall updater.
+  sfall: ">=4.1.3"
+
+settings:
+  # ----- Components -------------------------------------------------------------------------------------
+
+  main.worldmap_key:
+    kind: text
+    default: "W"
+    label: World map hotkey
+    help: Opens the world map at any moment. A key name rather than a scancode; 0 disables it.
+
+  main.townmap_key:
+    kind: text
+    default: "Y"
+    label: Town map hotkey
+    help: Opens the town map at any moment. 0 or T keeps the vanilla T key.
+
+  main.no_scope_penalty:
+    kind: bool
+    default: 1
+    label: No close range penalty for scoped weapons
+    help:
+      Covers the scoped hunting rifle, and the Bozar and sniper rifle where EcCo is installed. Affected
+      weapons are listed in the no_scope_penalty section of the ini.
+
+  main.improved_grenades:
+    kind: bool
+    default: 1
+    label: Improved grenades
+    help:
+      Grenades ignore the target's armour class and can be thrown into empty hexes. Also covers flares,
+      explosive rockets and EcCo's grenade launchers.
+
+  main.molotov_fire:
+    kind: bool
+    default: 1
+    label: Molotov cocktails do fire damage
+    help: Fire damage instead of explosive, with the burning death animation.
+
+  main.max_knockback:
+    kind: int
+    min: -1
+    unit: hexes
+    sentinels:
+      "-1": Unlimited (vanilla)
+      "0": No knockback
+    default: -1
+    label: Limit knockback distance
+    help: Applies to all weapons and explosives.
+
+  main.trunk_space:
+    kind: bool
+    default: 0
+    label: Bottomless car trunk
+
+  main.autodoors:
+    kind: choice
+    options:
+      - { value: 0, label: "Off" }
+      - { value: 1, label: Open }
+      - { value: 2, label: Open and close }
+    default: 1
+    label: Automatic doors
+    help: Outside combat, walk through unlocked doors without opening them first, the way NPCs do.
+
+  main.carry_weight:
+    kind: bool
+    default: 0
+    label: Unlimited carry weight
+    help: The Chosen One carries up to 99999 regardless of Strength.
+
+  main.level5:
+    kind: bool
+    default: 0
+    label: Level 5 after the Temple of Trials
+    help: Grants 9500 XP on completing the temple.
+
+  main.ammobox:
+    kind: bool
+    default: 1
+    label: Show ammo type in combat
+    help: The current ammo type is displayed in a notification box.
+
+  main.modoc_brahmin:
+    kind: bool
+    default: 1
+    label: Modoc brahmin on your team
+    help: Stops party members wiping out the brahmin during the Modoc quest.
+
+  main.healing_revision:
+    kind: bool
+    default: 1
+    label: Healing revision
+    help:
+      Reworks Doctor and First Aid - Doctor's effectiveness scales with First Aid, each is usable once a day
+      per patient, the amount healed follows skill level, and healing applies automatically while resting and
+      travelling.
+
+  main.hp_over_head:
+    kind: bool
+    default: 0
+    label: Show HP over head
+    help:
+      In combat, for the player, party and nearby enemies. Updates can lag, and it interferes with combat
+      floats.
+
+  main.damage_mod:
+    kind: bool
+    default: 1
+    label: Damage mod
+    # The readme is explicit that the component only works correctly with sfall's own formula set to vanilla.
+    gated-by: { id: sfall.Misc.DamageFormula, is: [0] }
+    help:
+      Reworks firearm damage so DR mod multiplies DR and DT and sets the damage multiplier, which makes AP
+      ammo worth carrying. Built for vanilla stats; mods that rebalance ammo, such as YAAM or F2WR, will not
+      combine well.
+
+  main.highlighting:
+    kind: bool
+    default: 1
+    label: Expanded highlighting
+    help: Replaces sfall's own highlighting mod. Set Key=0 in the Highlighting section of sfall-mods.ini when using this.
+
+  main.auto_reload:
+    kind: bool
+    default: 1
+    label: Reload after combat
+    help: Both weapons are reloaded once combat ends.
+
+  main.party_level_match:
+    kind: bool
+    default: 0
+    label: Party level match
+    help:
+      Companions level up to match the player's experience rather than staying behind. Covers vanilla and
+      Restoration Project companions.
+
+  main.unlimited_party:
+    kind: bool
+    default: 0
+    label: No charisma limit on party size
+    help: Removes the charisma check when an NPC joins. Karma and quest checks still apply.
+
+  main.keymap:
+    kind: bool
+    default: 1
+    label: Remap hotkeys
+    help:
+      Applies the remapping in the keymap section of mods/fo2tweaks.ini, which by default puts quick save on
+      F5, quick load on F8, load game on F9, and centre on the player on J.
+
+  main.min_light_level:
+    kind: int
+    min: 0
+    max: 100
+    unit: "%"
+    sentinels:
+      "0": "Off"
+    default: 0
+    label: Minimum light level
+    help: Map light never falls below this, for Restoration Project maps dark enough to be a strain. 49 is the recommended value.
+
+  main.speedup:
+    kind: bool
+    default: 0
+    label: General game speedup
+    help:
+      Writes faster values into the game's config files - skipped movies, shorter fades, quicker equip
+      animation. It takes effect after loading a save and relaunching, and turning it off later does not put
+      the old values back.
+
+  main.run_speed:
+    kind: bool
+    default: 0
+    label: Increased run speed
+    gated-by: { id: sfall.Misc.UseFileSystemOverride, is: [1] }
+    help: Removes the run speed penalty armour carries and lets slower companions keep up. Who it covers is set below.
+
+  main.no_drop_items_on_death:
+    kind: bool
+    default: 1
+    label: Don't drop items on death
+    help:
+      Critters killed by the violent death animations keep their inventory, so the remains can be looted
+      normally instead of scattering across the ground.
+
+  main.gigolo_limit:
+    kind: int
+    min: 0
+    sentinels:
+      "0": Vanilla
+    default: 0
+    label: Gigolo perk threshold
+    help: How many different partners the Gigolo perk takes. Vanilla grants it after 10 encounters with anyone.
+
+  main.auto_cursor:
+    kind: bool
+    default: 0
+    label: Automatic combat cursor
+    help: The cursor switches to attack over an enemy and back to move over an empty hex.
+
+  main.ap_rollover:
+    kind: int
+    min: 0
+    unit: AP
+    default: 2
+    label: Action points carried over
+    help: Unused action points carry to the next turn, replacing the armour class bonus they normally give. Applies to everyone.
+
+  # ----- Ammobox ----------------------------------------------------------------------------------------
+
+  ammobox.number:
+    kind: int
+    default: 9
+    label: Notification box number
+    gated-by: { id: fo2tweaks.main.ammobox, is: [1] }
+    help: Which of the interface's boxes carries the text. Leave it alone unless you know what this is.
+
+  ammobox.color:
+    kind: int
+    default: 3
+    label: Text colour
+    gated-by: { id: fo2tweaks.main.ammobox, is: [1] }
+    help: The colour number sfall's set_iface_tag_text takes; its documentation lists them.
+
+  # ----- Healing revision -------------------------------------------------------------------------------
+
+  healing_revision.living_anatomy_min_doctor:
+    kind: int
+    min: 0
+    default: 135
+    label: Free Living Anatomy at Doctor skill
+    gated-by: { id: fo2tweaks.main.healing_revision, is: [1] }
+    help: Granted on entering a map once Doctor reaches this level. Set it above 300 to turn the bonus off.
+
+  # ----- Expanded highlighting --------------------------------------------------------------------------
+
+  highlighting.key:
+    kind: key
+    default: 42
+    label: Highlight key
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+    help: Held down to highlight objects on the ground.
+
+  highlighting.color_critters:
+    kind: choice
+    options: &highlight_colors
+      - { value: 0, label: "Off" }
+      - { value: 1, label: Glowing red }
+      - { value: 2, label: Red }
+      - { value: 4, label: Grey }
+      - { value: 8, label: Glowing green }
+      - { value: 16, label: Bright yellow }
+      - { value: 32, label: Dark yellow }
+      - { value: 64, label: Purple }
+    default: 32
+    label: Critters
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_corpses:
+    kind: choice
+    options: *highlight_colors
+    default: 16
+    label: Corpses
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_containers:
+    kind: choice
+    options: *highlight_colors
+    default: 8
+    label: Containers
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_locked_containers:
+    kind: choice
+    options: *highlight_colors
+    default: 2
+    label: Locked containers
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_locked_doors:
+    kind: choice
+    options: *highlight_colors
+    default: 2
+    label: Locked doors
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_traps:
+    kind: choice
+    options: *highlight_colors
+    default: 2
+    label: Traps
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_items:
+    kind: choice
+    options: *highlight_colors
+    default: 16
+    label: Items
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_party:
+    kind: choice
+    options: *highlight_colors
+    default: 8
+    label: Party members
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_dude:
+    kind: choice
+    options: *highlight_colors
+    default: 0
+    label: The Chosen One
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.color_transitions:
+    kind: choice
+    options: *highlight_colors
+    default: 64
+    label: Area transitions
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.check_los:
+    kind: bool
+    default: 0
+    label: Line of sight only
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+    help: Highlight only what the player can actually see.
+
+  highlighting.skip_empty:
+    kind: bool
+    default: 1
+    label: Skip empty containers and corpses
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  highlighting.ignore_nohighlight:
+    kind: bool
+    default: 1
+    label: Ignore the no-highlight flag
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+    help: Highlights objects the game marks as not to be highlighted.
+
+  highlighting.motion_scanner:
+    kind: choice
+    options:
+      - { value: 0, label: Not needed }
+      - { value: 1, label: Must be carried }
+      - { value: 2, label: "Must be carried, and spends a charge each use" }
+    default: 0
+    label: Motion Scanner
+    gated-by: { id: fo2tweaks.main.highlighting, is: [1] }
+
+  # ----- Damage mod -------------------------------------------------------------------------------------
+
+  damage_mod.damage_difficulty:
+    kind: choice
+    options:
+      - { value: 0, label: Follow combat difficulty (vanilla) }
+      - { value: 1, label: Wimpy (75%) }
+      - { value: 2, label: Normal (100%) }
+      - { value: 3, label: Rough (125%) }
+    default: 0
+    label: Damage multiplier
+    gated-by: { id: fo2tweaks.main.damage_mod, is: [1] }
+    help: Separates damage from the combat difficulty option, which then only decides AI and chance to hit.
+
+  damage_mod.party_scale_damage:
+    kind: bool
+    default: 0
+    label: Scale damage for all combatants
+    gated-by: { id: fo2tweaks.main.damage_mod, is: [1] }
+    help: In vanilla only enemy damage scales with difficulty - the player and companions always deal 100%.
+
+  # ----- Run speed --------------------------------------------------------------------------------------
+
+  run_speed.dude:
+    kind: bool
+    default: 1
+    label: The Chosen One
+    gated-by: { id: fo2tweaks.main.run_speed, is: [1] }
+    help: Drops the run speed penalty heavy armour carries, roughly 20% in vanilla.
+
+  run_speed.party:
+    kind: bool
+    default: 1
+    label: Companions
+    gated-by: { id: fo2tweaks.main.run_speed, is: [1] }
+    help: A slight boost for every companion, and a running animation for Marcus, Skynet and Lenny, who have none.
+
+  # ----- HP over head -----------------------------------------------------------------------------------
+
+  hp_over_head.key:
+    kind: text
+    default: "V"
+    label: Show HP key
+    gated-by: { id: fo2tweaks.main.hp_over_head, is: [1] }
+    help: A key name rather than a scancode; the floats show once per tap. Leave it empty to display them all the time.
+
+  hp_over_head.only_party:
+    kind: bool
+    default: 0
+    label: Party members only
+    gated-by: { id: fo2tweaks.main.hp_over_head, is: [1] }
