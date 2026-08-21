@@ -21,6 +21,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
@@ -38,12 +42,20 @@ jobs:
       # The chokidar override puts svelte-check on a major its authors do not test against, and only watch mode
       # loads it - which the single-pass `pnpm check` above never enters.
       - run: pnpm verify:chokidar
-      # The generated modules must be what their generators produce. The tests read the committed output, so a
-      # hand edit - or a generator change nobody regenerated for - passes every one of them.
-      - run: |
-          node scripts/gen/gen-catalog.mjs
-          node scripts/gen/gen-layout.mjs
-          git diff --exit-code packages/games-fallout2/src/catalog.ts packages/games-fallout2/src/layout.ts
+      - run: ./.github/scripts/check-generated.sh
+
+  # Separate from `verify` because it needs none of the Node install and shares nothing with it, so the two run
+  # at once rather than one after the other.
+  lint-workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - run: ./.github/scripts/lint-workflows.sh
 
   # Packaging is its own gate: the tests run the sources, and none of them would notice a file left out of the
   # archive, a path that only resolves in a checkout, or a target that stopped building on one platform. Three
@@ -58,6 +70,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:

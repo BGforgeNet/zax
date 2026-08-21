@@ -39,6 +39,12 @@ pnpm test    # the whole suite
 CI runs all three on every push, installing with `--ignore-scripts`, then builds the distributables on Linux,
 Windows and macOS.
 
+The shell scripts, the workflows and the composite action are checked by `shellcheck`, `actionlint` and
+`zizmor` in a job of their own - `.github/scripts/lint-workflows.sh`, which fetches the two the runner does
+not carry. It is not part of `pnpm lint`: none of the three is a Node dependency, and requiring them on every
+contributor's `PATH` costs more than the checks are worth locally. Run that script directly to reproduce a
+failure.
+
 ## Icons
 
 `packages/ui/src/assets/zax.svg` is the source; the two PNGs beside it are generated and committed, so a

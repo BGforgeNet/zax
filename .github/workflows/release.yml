@@ -30,15 +30,21 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          # Nothing here pushes, and what this job builds is what users download - so the job's
+          # token does not stay in .git/config where the build could carry it into an artifact.
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      # No caching in this workflow, unlike ci.yml: a cache entry is writable from any branch that can run a
+      # workflow, and what this job produces is signed, attested, and downloaded by users. Paying the Electron
+      # download and a cold install on every release buys the guarantee that nothing restored from a cache
+      # reached the binaries.
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
-          cache: pnpm
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/electron-builder-cache
-          key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          # Its own `package-manager-cache` input defaults to true, so leaving `cache` unset is not the same
+          # as taking no cache.
+          package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       # The tag is what names the release; a tag whose version does not match the manifest would produce
       # binaries reporting a version nobody can find, so it is checked before anything is built.
