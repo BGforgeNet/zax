@@ -19,7 +19,9 @@ archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
 curl -fsSL -o "$tools/$archive" \
   "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
 echo "${ACTIONLINT_SHA256}  $tools/$archive" | sha256sum -c -
-tar -xzf "$tools/$archive" -C "$tools" actionlint
+# --no-same-owner: the archive carries its builder's uid, and restoring it needs a privilege the runner does
+# not have. Only the one binary is wanted; the rest of the archive is a README and a licence.
+tar -xzf "$tools/$archive" -C "$tools" --no-same-owner actionlint
 
 pipx install "zizmor==${ZIZMOR_VERSION}"
 
