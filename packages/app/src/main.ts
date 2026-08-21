@@ -60,6 +60,13 @@ function createWindow(): BrowserWindow {
     // window is a little wider than its viewport, so the floor sits above 890 rather than at it.
     minWidth: 900,
     minHeight: 520,
+    // A settings row caps its label, control and notes tracks and gives every surplus pixel to the trailing
+    // one, so a wider window shows nothing more - it only pushes each row's revert link further from the
+    // setting it reverts. Resizing still works; this is the one-click jump to the whole screen.
+    //
+    // Windows and macOS only. Electron does not implement `maximizable` on Linux, where whether a window can
+    // be maximized is the window manager's to decide and an application does not get a say.
+    maximizable: false,
     // Shown once it has something to draw, so the window does not flash empty on a slow first paint.
     show: false,
     title: "ZAX",
