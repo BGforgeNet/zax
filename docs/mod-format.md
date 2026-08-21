@@ -107,10 +107,11 @@ effect. A partial schema is fine, and a mod without one simply has no settings s
 
 ## How ZAX chooses a release
 
-A feed entry names a repository and the id it follows. Of every release whose manifest carries that id, ZAX
+A feed entry names a repository and the id it follows. Of the releases whose manifest carries that id, ZAX
 takes the highest manifest `version` - not the newest by date, so a hotfix on an older line does not shadow
-the current one. Two ids may share a repository. A manifest that refuses to parse is reported rather than
-skipped: when no release matches, the first refusal is the answer.
+the current one. It reads the hundred most recent releases, which is as many as one request may ask for; past
+that, a hotfix to a line that old is not seen. Two ids may share a repository. A manifest that refuses to
+parse is reported rather than skipped: when no release matches, the first refusal is the answer.
 
 ## Installing, upgrading, removing
 

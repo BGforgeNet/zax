@@ -127,7 +127,7 @@ describe("the operations", () => {
 
 describe("installing a mod", () => {
   const REPO = "BGforgeNet/FO2tweaks";
-  const RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=30`;
+  const RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
   const manifest = (version: string) =>
     `spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "${version}"\ngame: fallout2\narchive: fo2tweaks.zip\n`;
   const payload = (version: string) => `ZIP-${version}`;

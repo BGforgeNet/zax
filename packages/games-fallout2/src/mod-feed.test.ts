@@ -12,7 +12,7 @@ import {
 
 const REPO = "BGforgeNet/FO2tweaks";
 const FEED = { repository: REPO, id: "fo2tweaks" };
-const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases?per_page=30`;
+const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
 
 const manifestText = (id: string, version: string, rest = "") =>
   `spec: 1\nid: ${id}\nname: ${id}\nversion: "${version}"\ngame: fallout2\narchive: ${id}.zip\n${rest}`;

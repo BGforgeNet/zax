@@ -52,8 +52,16 @@ const slug = (text: string): string => text.replace(/[^\w.-]+/g, "-");
 
 const feedsDirectory = (platform: Platform): string => platform.paths.join(platform.paths.cache, "feeds");
 
-/** GitHub's release feed for a repository, newest first. */
-const releasesUrl = (repository: string): string => `https://api.github.com/repos/${repository}/releases?per_page=30`;
+/**
+ * GitHub's release feed for a repository, newest first.
+ *
+ * 100 is the most one request may ask for, and this asks for it rather than taking the default 30: a mod with
+ * a long history is normal - the one followed feed passed thirty releases some time ago - and a page that
+ * stops short does not say so, it just answers without the releases it left out. Still one request, so a
+ * repository past a hundred releases has its oldest lines invisible; the newest version is on the first page
+ * either way, and it is a hotfix to an older line that would go unseen.
+ */
+const releasesUrl = (repository: string): string => `https://api.github.com/repos/${repository}/releases?per_page=100`;
 
 interface ReleaseAsset {
   name: string;
