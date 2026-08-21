@@ -3,7 +3,7 @@
  * is allowed to ask for, dispatched by name.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { appendLog } from "@zax/core";
@@ -36,6 +36,25 @@ process.on("unhandledRejection", (reason) => void logLine(`unhandled rejection: 
 function register(backend: Backend): void {
   const dispatch = createDispatch(backend, (line) => void logLine(line));
   ipcMain.handle(CHANNEL, (_event, method: string, args: unknown[]) => dispatch(method, args));
+}
+
+/**
+ * Electron builds a default menu when an application sets none, and on Windows and Linux draws it inside the
+ * window - a File, Edit, View and Window bar above the interface's own header. None of it is ZAX's: every
+ * entry is either something the interface already offers or something it should not, a devtools toggle and a
+ * set of zoom levels among them. It goes.
+ *
+ * macOS is the exception, and not for appearance - its menu lives in the system bar, and the clipboard
+ * shortcuts are routed through it, so an application with no Edit menu is one where Cmd-C and Cmd-V do nothing
+ * in any field. It gets the three standard roles and nothing else - the app, edit and window menus macOS
+ * expects an application to have, without the rest of what the default would build.
+ */
+function installMenu(): void {
+  if (process.platform !== "darwin") {
+    Menu.setApplicationMenu(null);
+    return;
+  }
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]));
 }
 
 /**
@@ -128,6 +147,7 @@ else {
         },
       }),
     );
+    installMenu();
     createWindow();
     // macOS keeps the application running with no windows; clicking the dock icon opens one again.
     app.on("activate", () => {
