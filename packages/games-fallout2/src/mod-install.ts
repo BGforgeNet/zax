@@ -24,7 +24,8 @@ import {
   type Install,
   type MergeConflict,
 } from "@zax/core";
-import type { ArchiveEntryInfo, DirEntry, DownloadOptions, Platform } from "@zax/platform";
+import type { ArchiveEntryInfo, DirEntry, Platform } from "@zax/platform";
+import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import { preflightArchive } from "./archive-preflight.js";
 import { MANIFEST_NAME, mayWrite, parseManifest, type ModManifest, type ModPart, type ModType } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
@@ -44,10 +45,6 @@ import { assertUsable, loadRecord, saveRecord, type InstallRecord, type Installe
 import { modWorkDirectory, readTransaction, writeTransaction, type ModTransaction } from "./mod-transaction.js";
 import { isArchiveName, type ModRelease, type ReleaseAsset } from "./mod-feed.js";
 import { chosenParts } from "./mod-parts.js";
-
-export interface ModProgress extends DownloadOptions {
-  onStep?: (step: string) => void;
-}
 
 export interface PlannedFile {
   /** Relative to the install, under `mods/`. */
@@ -335,39 +332,6 @@ export async function planModInstall(
     ...(parts ? { parts } : {}),
     fingerprint: fingerprintOf(release, files, { orderLines, removes, ...(parts ? { parts } : {}) }),
   };
-}
-
-/**
- * One asset in the working directory, verified against the digest its release states. A verified copy already
- * there is kept, which is what makes a retry resume instead of paying the download again. Exported because a
- * base mod's installer arrives exactly this way, and a second copy of these four steps would be a second
- * place for the digest check to go missing from.
- */
-export async function fetchAsset(
-  platform: Platform,
-  work: string,
-  asset: ReleaseAsset,
-  what: { mod: string; label: string },
-  options?: ModProgress,
-): Promise<string> {
-  const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest ?? "")?.[1]?.toLowerCase();
-  // Required rather than best-effort: the digest is what closes in-transit tampering, truncation and a
-  // corrupted resume in one check, and the feeds this list trusts all publish one.
-  if (!digest) throw new Error(`The ${what.mod} release states no digest for ${asset.name}.`);
-
-  const archivePath = platform.paths.join(work, asset.name);
-  const held = (await fileExists(platform, archivePath)) && (await platform.hash.sha256(archivePath)) === digest;
-  if (held) return archivePath;
-
-  options?.onStep?.(`Downloading ${what.label}`);
-  await platform.net.download(asset.url, archivePath, options);
-  if ((await platform.hash.sha256(archivePath)) !== digest) {
-    await platform.fs.remove(archivePath);
-    throw new Error(
-      `What arrived for ${asset.name} does not match the digest its release states - the download may have been tampered with or corrupted. Nothing was installed.`,
-    );
-  }
-  return archivePath;
 }
 
 /**
