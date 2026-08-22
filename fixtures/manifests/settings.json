@@ -1,0 +1,123 @@
+{
+  "parses": {
+    "id": "fo2tweaks",
+    "name": "FO2tweaks",
+    "version": "14.7",
+    "type": "pluggable",
+    "refuse": [],
+    "settings": [
+      {
+        "id": "fo2tweaks.main.autodoors",
+        "file": "mods/fo2tweaks.ini",
+        "section": "main",
+        "key": "autodoors",
+        "kind": {
+          "type": "bool",
+          "onValue": "1",
+          "offValue": "0"
+        },
+        "label": "Automatic doors",
+        "help": "Walk through unlocked doors without clicking, outside combat.",
+        "default": "1"
+      },
+      {
+        "id": "fo2tweaks.main.style",
+        "file": "mods/fo2tweaks.ini",
+        "section": "main",
+        "key": "style",
+        "kind": {
+          "type": "choice",
+          "options": [
+            {
+              "value": "0",
+              "label": "Off"
+            },
+            {
+              "value": "1",
+              "label": "Open",
+              "help": "Opens the door and steps through."
+            }
+          ]
+        },
+        "label": "Door style",
+        "default": "1"
+      },
+      {
+        "id": "fo2tweaks.run_speed.dude",
+        "file": "mods/fo2tweaks.ini",
+        "section": "run_speed",
+        "key": "dude",
+        "kind": {
+          "type": "int",
+          "min": 0,
+          "max": 10,
+          "unit": "steps",
+          "sentinels": {
+            "0": "Unchanged"
+          }
+        },
+        "label": "The Chosen One",
+        "default": "4",
+        "gatedBy": {
+          "id": "fo2tweaks.main.autodoors",
+          "is": [
+            "1"
+          ]
+        }
+      },
+      {
+        "id": "fo2tweaks.run_speed.party",
+        "file": "mods/fo2tweaks.ini",
+        "section": "run_speed",
+        "key": "party",
+        "kind": {
+          "type": "float",
+          "min": 0.5,
+          "max": 2
+        },
+        "label": "Party members",
+        "default": "1"
+      },
+      {
+        "id": "fo2tweaks.volume.music",
+        "file": "mods/fo2tweaks.ini",
+        "section": "volume",
+        "key": "music",
+        "kind": {
+          "type": "scale",
+          "max": 100
+        },
+        "label": "Music",
+        "default": "80"
+      },
+      {
+        "id": "fo2tweaks.paths.data",
+        "file": "mods/fo2tweaks-paths.ini",
+        "section": "paths",
+        "key": "data",
+        "kind": {
+          "type": "text",
+          "path": true
+        },
+        "label": "Extra data folder"
+      },
+      {
+        "id": "fo2tweaks.keys.toggle",
+        "file": "mods/fo2tweaks.ini",
+        "section": "keys",
+        "key": "toggle",
+        "kind": {
+          "type": "key"
+        },
+        "label": "Toggle key",
+        "default": "42",
+        "gatedBy": {
+          "id": "sfall.Misc.DamageFormula",
+          "is": [
+            "0"
+          ]
+        }
+      }
+    ]
+  }
+}

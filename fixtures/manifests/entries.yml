@@ -1,0 +1,8 @@
+spec: 1
+id: inventoryfilter
+name: Inventory Filter
+version: "1.4"
+game: fallout2
+entries:
+  - InventoryFilter.dat
+  - patches/extra.dat

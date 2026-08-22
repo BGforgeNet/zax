@@ -222,6 +222,23 @@ describe("install", () => {
     expect(platform.textAt(`${GAME}/mods/FO2Tweaks.dat`)).toBeUndefined();
   });
 
+  it("copies what a first install replaces to the timestamped backup, not only what an upgrade replaces", async () => {
+    // A hand-placed dat is the common case: the working directory's copy is gone once the install finishes,
+    // so the timestamped backup is the only place the original can still be. Without it a later uninstall
+    // deletes the replacement with nothing to put back.
+    const when = new Date(2026, 7, 12, 14, 0, 0);
+    const platform = gamePlatform({ files: { [`${GAME}/mods/fo2tweaks.dat`]: "HAND" } });
+    const release = await releaseFor("14.7");
+    const plan = await planModInstall(platform, install, release);
+
+    await applyModInstall(platform, install, release, plan, undefined, when);
+
+    expect(platform.textAt(`${GAME}/mods/fo2tweaks.dat`)).toBe("DAT-14.7");
+    expect(platform.textAt(`${CACHE}/backup/${stamp(when)}/mods/fo2tweaks.dat`)).toBe("HAND");
+    // The working directory is cleared on success, which is what makes the backup copy the only one left.
+    expect(platform.textAt(`${WORK}/overwritten/mods/fo2tweaks.dat`)).toBeUndefined();
+  });
+
   it("refuses an archive whose embedded manifest is not the one the release published", async () => {
     const platform = new MemoryPlatform({
       files: { [`${GAME}/fallout2.exe`]: "" },
@@ -615,5 +632,221 @@ describe("uninstall", () => {
         files: ["mods/fo2tweaks.dat"],
       });
     });
+  });
+});
+
+describe("a mod that declares its entries", () => {
+  const FOLDER_MANIFEST = [
+    "spec: 1",
+    "id: inventoryfilter",
+    "name: Inventory Filter",
+    'version: "2.0.4"',
+    "game: fallout2",
+    "archive: filter.zip",
+    "entries: [InventoryFilter.dat]",
+    "",
+  ].join("\n");
+
+  // The payload's own shape: a folder that is named `*.dat`, which is what sfall loads it as. Nothing in
+  // these paths could tell a derivation that `InventoryFilter.dat` is the entry rather than a directory
+  // holding two of them.
+  const FOLDER_CONTENTS = {
+    "f2mod.yml": FOLDER_MANIFEST,
+    "mods/InventoryFilter.dat/InvenFilter.ini": "[main]\r\nenabled=1\r\n",
+    "mods/InventoryFilter.dat/scripts/gl_InvenFilter.int": "INT",
+  };
+
+  const folderPlatform = () =>
+    new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "" },
+      downloads: { "https://example.test/filter.zip": "ZIP-FILTER" },
+      archives: { "ZIP-FILTER": FOLDER_CONTENTS },
+    });
+
+  const folderRelease = async (): Promise<ModRelease> => ({
+    manifest: parseManifest(new TextEncoder().encode(FOLDER_MANIFEST)),
+    manifestText: FOLDER_MANIFEST,
+    manifestFromAsset: true,
+    archive: {
+      name: "filter.zip",
+      url: "https://example.test/filter.zip",
+      digest: `sha256:${await sha("ZIP-FILTER")}`,
+    },
+  });
+
+  it("writes the declared order line, which no derivation from the payload's paths could find", async () => {
+    const platform = folderPlatform();
+    const release = await folderRelease();
+    const plan = await planModInstall(platform, install, release);
+    expect(plan.orderLines).toEqual(["InventoryFilter.dat"]);
+
+    await applyModInstall(platform, install, release, plan);
+    // Without the line sfall never loads the folder, so an install that skipped it reported success and did
+    // nothing - the defect this field exists to close.
+    expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).toMatch(/^InventoryFilter\.dat$/m);
+    expect(platform.textAt(`${GAME}/mods/InventoryFilter.dat/InvenFilter.ini`)).toBe("[main]\r\nenabled=1\r\n");
+  });
+
+  it("removes the declared order line on uninstall, where the deployed paths name no line at all", async () => {
+    const platform = folderPlatform();
+    const release = await folderRelease();
+    await applyModInstall(platform, install, release, await planModInstall(platform, install, release));
+
+    await uninstallMod(platform, install, "inventoryfilter");
+    const order = platform.textAt(`${GAME}/mods/mods_order.txt`) ?? "";
+    expect(order).not.toMatch(/InventoryFilter/);
+    expect(platform.textAt(`${GAME}/mods/InventoryFilter.dat/InvenFilter.ini`)).toBeUndefined();
+  });
+
+  it("spells a nested entry the way the order file does, so re-installing does not add a second line", async () => {
+    const text = FOLDER_MANIFEST.replace("entries: [InventoryFilter.dat]", 'entries: ["patches/extra.dat"]');
+    const platform = new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "" },
+      downloads: { "https://example.test/filter.zip": "ZIP-FILTER" },
+      archives: { "ZIP-FILTER": { "f2mod.yml": text, "mods/patches/extra.dat": "DAT" } },
+    });
+    const release: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(text)),
+      manifestText: text,
+      manifestFromAsset: true,
+      archive: {
+        name: "filter.zip",
+        url: "https://example.test/filter.zip",
+        digest: `sha256:${await sha("ZIP-FILTER")}`,
+      },
+    };
+    await applyModInstall(platform, install, release, await planModInstall(platform, install, release));
+    const first = platform.textAt(`${GAME}/mods/mods_order.txt`) ?? "";
+    expect(first).toMatch(/^patches\\extra\.dat$/m);
+
+    // The order file reads its lines back with `\` separators, so a `/` here would match nothing and the
+    // second install would append a duplicate the loader then loads twice.
+    await applyModInstall(platform, install, release, await planModInstall(platform, install, release));
+    expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).toBe(first);
+    expect(first.match(/extra\.dat/g)).toHaveLength(1);
+  });
+
+  it("refuses an entry the payload does not ship, rather than ordering a name nothing answers to", async () => {
+    const text = FOLDER_MANIFEST.replace("entries: [InventoryFilter.dat]", "entries: [NotShipped.dat]");
+    const platform = new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "" },
+      downloads: { "https://example.test/filter.zip": "ZIP-FILTER" },
+      archives: { "ZIP-FILTER": { ...FOLDER_CONTENTS, "f2mod.yml": text } },
+    });
+    const release: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(text)),
+      manifestText: text,
+      manifestFromAsset: true,
+      archive: {
+        name: "filter.zip",
+        url: "https://example.test/filter.zip",
+        digest: `sha256:${await sha("ZIP-FILTER")}`,
+      },
+    };
+    await expect(planModInstall(platform, install, release)).rejects.toThrow(/NotShipped\.dat/);
+  });
+});
+
+describe("a record a newer ZAX manages", () => {
+  /** Bumps the format on disk past what this version writes - what an older ZAX opening the folder meets. */
+  const laterOnDisk = async (platform: MemoryPlatform, mods: InstalledMod[]) => {
+    await saveRecord(platform, { path: GAME, mods });
+    const file = platform.allFiles().find((path) => path.includes("installed-mods"))!;
+    const text = new TextDecoder().decode(await platform.fs.read(file));
+    await platform.fs.write(file, new TextEncoder().encode(text.replace("record: 1", "record: 2")));
+  };
+
+  const recorded = (over: Partial<InstalledMod> = {}): InstalledMod => ({
+    id: "fo2tweaks",
+    version: "14.7",
+    complete: true,
+    files: ["mods/fo2tweaks.dat"],
+    manifest: manifestFor("14.7"),
+    shipped: {},
+    ...over,
+  });
+
+  it("refuses the install before the download, rather than rewriting the record from here", async () => {
+    const platform = gamePlatform();
+    await laterOnDisk(platform, [recorded()]);
+    const release = await releaseFor("15");
+    await expect(planModInstall(platform, install, release)).rejects.toThrow(/newer version of ZAX/);
+    // Nothing was fetched: the refusal is what the user gets instead of a transfer.
+    expect(platform.allFiles().some((path) => path.includes("fo2tweaks.zip"))).toBe(false);
+  });
+
+  it("refuses the removal too, since it would write the record back", async () => {
+    const platform = gamePlatform({ files: { [`${GAME}/mods/fo2tweaks.dat`]: "DAT" } });
+    await laterOnDisk(platform, [recorded()]);
+    await expect(uninstallMod(platform, install, "fo2tweaks")).rejects.toThrow(/newer version of ZAX/);
+    expect(platform.textAt(`${GAME}/mods/fo2tweaks.dat`)).toBe("DAT");
+  });
+
+  it("refuses to install over an entry it cannot read, rather than recording a second one beside it", async () => {
+    const platform = gamePlatform();
+    // Readable id, unreadable rest: a path this version grants the mod nothing for, which is what a record
+    // written after a grant was added looks like from here.
+    await saveRecord(platform, { path: GAME, mods: [recorded({ files: ["appearance/hero.dat"] })] });
+    const release = await releaseFor("15");
+    await expect(planModInstall(platform, install, release)).rejects.toThrow(/cannot read/);
+  });
+});
+
+describe("a payload that is not an archive", () => {
+  // Cassidy publishes four loose `.dat` assets, and the walk-speed and Goris fixes one each.
+  const DAT_URL = "https://example.test/cassidy_head.dat";
+  const DAT = "CASSIDY-HEAD-BYTES";
+
+  const bareManifest = (entries = "entries:\n  - cassidy_head.dat\n") =>
+    `spec: 1\nid: cassidy\nname: Cassidy\nversion: "1.0"\ngame: fallout2\narchive: cassidy_head.dat\n${entries}`;
+
+  const bareRelease = async (entries?: string): Promise<ModRelease> => {
+    const text = bareManifest(entries);
+    return {
+      manifest: parseManifest(new TextEncoder().encode(text)),
+      manifestText: text,
+      // Published as an asset, which for an archive would demand an embedded copy - there is nowhere to put
+      // one in a single file, so the check does not apply rather than failing.
+      manifestFromAsset: true,
+      archive: { name: "cassidy_head.dat", url: DAT_URL, digest: `sha256:${await sha(DAT)}`, size: DAT.length },
+    };
+  };
+
+  const barePlatform = (files: Record<string, string> = {}) =>
+    new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "", ...files },
+      downloads: { [DAT_URL]: DAT },
+    });
+
+  it("installs to the entry the manifest declares, orders it, and removes it again", async () => {
+    const platform = barePlatform();
+    const release = await bareRelease();
+    const plan = await planModInstall(platform, install, release);
+    expect(plan.files).toEqual([{ path: "mods/cassidy_head.dat", size: DAT.length, overwrites: false }]);
+
+    await applyModInstall(platform, install, release, plan);
+    expect(platform.textAt(`${GAME}/mods/cassidy_head.dat`)).toBe(DAT);
+    expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).toContain("cassidy_head.dat");
+    // The id could never have reached this filename - it carries an underscore and an id may not.
+    expect((await loadRecord(platform, GAME)).mods[0]?.entries).toEqual(["cassidy_head.dat"]);
+
+    await uninstallMod(platform, install, "cassidy");
+    expect(platform.textAt(`${GAME}/mods/cassidy_head.dat`)).toBeUndefined();
+    expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).not.toContain("cassidy_head.dat");
+  });
+
+  it("refuses a single file the manifest does not say what to install as", async () => {
+    const platform = barePlatform();
+    await expect(planModInstall(platform, install, await bareRelease(""))).rejects.toThrow(/single "entries" name/);
+    const two = "entries:\n  - cassidy_head.dat\n  - cassidy_voice.dat\n";
+    await expect(planModInstall(platform, install, await bareRelease(two))).rejects.toThrow(/single "entries" name/);
+  });
+
+  it("checks the digest exactly as an archive's is checked", async () => {
+    const platform = barePlatform();
+    const release = await bareRelease();
+    const wrong: ModRelease = { ...release, archive: { ...release.archive!, digest: `sha256:${"0".repeat(64)}` } };
+    await expect(planModInstall(platform, install, wrong)).rejects.toThrow(/does not match the digest/);
+    expect(platform.textAt(`${GAME}/mods/cassidy_head.dat`)).toBeUndefined();
   });
 });

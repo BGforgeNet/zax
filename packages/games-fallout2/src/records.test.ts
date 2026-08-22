@@ -105,3 +105,60 @@ describe("record reconciliation", () => {
     expect(reconciled.mods).toHaveLength(1);
   });
 });
+
+describe("a record a later ZAX wrote", () => {
+  /** The same record with its format bumped past what this version writes - what a downgrade meets. */
+  const laterOnDisk = async (platform: MemoryPlatform): Promise<string> => {
+    await saveRecord(platform, { path: GAME, mods: [mod()] });
+    const file = platform.allFiles().find((path) => path.includes("installed-mods"))!;
+    const text = new TextDecoder().decode(await platform.fs.read(file));
+    await platform.fs.write(file, new TextEncoder().encode(text.replace("record: 1", "record: 2")));
+    return file;
+  };
+
+  it("is read, and refused a write back", async () => {
+    const platform = new MemoryPlatform();
+    const file = await laterOnDisk(platform);
+    const before = new TextDecoder().decode(await platform.fs.read(file));
+
+    const loaded = await loadRecord(platform, GAME);
+    expect(loaded.laterFormat).toBe(2);
+    expect(loaded.mods.map((entry) => entry.id)).toEqual(["fo2tweaks"]);
+
+    await expect(saveRecord(platform, loaded)).rejects.toThrow(/newer version of ZAX/);
+    // Untouched is the whole point: rewriting it from here would drop whatever that format added.
+    expect(new TextDecoder().decode(await platform.fs.read(file))).toBe(before);
+  });
+
+  it("is not pruned by reconciliation either, however stale the directory looks", async () => {
+    const platform = new MemoryPlatform({ dirs: [GAME] });
+    await laterOnDisk(platform);
+    // Every recorded file is gone, which for a record this version owns drops the entry and saves the drop.
+    expect((await reconcileRecord(platform, await loadRecord(platform, GAME))).mods).toHaveLength(1);
+  });
+
+  it("keeps an entry this version cannot read rather than erasing it on the next write", async () => {
+    const platform = new MemoryPlatform();
+    await saveRecord(platform, {
+      path: GAME,
+      mods: [mod(), mod({ id: "granted", files: ["appearance/hero.dat"] })],
+    });
+    const loaded = await loadRecord(platform, GAME);
+    expect(loaded.mods.map((entry) => entry.id)).toEqual(["fo2tweaks"]);
+    expect(loaded.opaque?.map((entry) => entry.id)).toEqual(["granted"]);
+
+    await saveRecord(platform, loaded);
+    const again = await loadRecord(platform, GAME);
+    expect(again.opaque).toEqual(loaded.opaque);
+    expect(again.mods).toEqual(loaded.mods);
+  });
+
+  it("carries a per-mod field it has no rule for through a rewrite", async () => {
+    const platform = new MemoryPlatform();
+    await saveRecord(platform, { path: GAME, mods: [mod({ carried: { parts: ["head"] } })] });
+    const loaded = await loadRecord(platform, GAME);
+    expect(loaded.mods[0]?.carried).toEqual({ parts: ["head"] });
+    await saveRecord(platform, loaded);
+    expect((await loadRecord(platform, GAME)).mods[0]?.carried).toEqual({ parts: ["head"] });
+  });
+});

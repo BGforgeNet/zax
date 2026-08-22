@@ -26,6 +26,10 @@
         return "Installed and current.";
       case "upgrade":
         return `Installed: ${state.from}.`;
+      case "convert":
+        return state.was === "pluggable"
+          ? `Installed: ${state.from}, which can be removed. ${offer.version} cannot be - installing it gives that up.`
+          : `Installed: ${state.from}, which cannot be removed. ${offer.version} can be.`;
       case "downgrade":
         return `Installed: ${state.from}, newer than what the feed offers - a feed answering with an older release is worth distrusting.`;
       case "retry":
@@ -39,8 +43,11 @@
 
   /** Whether the row gets a Remove control: something of it is here, and its type permits removal. */
   function removable(offer: ModOffer): boolean {
-    if (offer.type !== "pluggable") return false;
-    return ["installed", "upgrade", "downgrade", "install-over", "unfollowed"].includes(offer.availability.kind);
+    const state = offer.availability;
+    // What is installed decides, not what is offered: a mod that turns permanent in its next release is
+    // still the removable one on disk until that release is installed.
+    if ((state.kind === "convert" ? state.was : offer.type) !== "pluggable") return false;
+    return ["installed", "upgrade", "downgrade", "install-over", "unfollowed", "convert"].includes(state.kind);
   }
 
   /** A schema's sections, in the order the manifest declares them - the author's one lever over layout. */
@@ -65,6 +72,8 @@
         return `Install ${offer.version} over it`;
       case "upgrade":
         return `Upgrade to ${offer.version}`;
+      case "convert":
+        return `Replace with ${offer.version}`;
       case "retry":
         return "Retry";
       default:

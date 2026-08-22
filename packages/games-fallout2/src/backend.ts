@@ -32,7 +32,8 @@ import {
 } from "@zax/core";
 import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
-import { insideMods, parseManifest, type ModSetting } from "./manifest.js";
+import { mayWrite, parseManifest, type ModSetting } from "./manifest.js";
+import { grantsFor } from "./mod-grants.js";
 import { MOD_FEEDS, fetchFeed, listAvailableMods, type ModListing } from "./mod-feed.js";
 import {
   applyModInstall,
@@ -275,7 +276,8 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       } catch {
         // An unreadable snapshot narrows what may be opened; it does not widen anything.
       }
-      if (!allowed.has(file) || !insideMods(file)) throw new Error(`"${file}" is not one of ${modId}'s files.`);
+      if (!allowed.has(file) || !mayWrite(file, grantsFor(modId)))
+        throw new Error(`"${file}" is not one of ${modId}'s files.`);
       return platform.process.open(platform.paths.join(install.path, ...file.split("/")));
     },
     identifyInstall: (path) => identifyInstall(platform, path),

@@ -130,14 +130,17 @@ const repositoryManifestUrl = (repository: string, tag: string): string =>
 /** Payload assets ZAX can open. Anything else on a release - checksums, signatures, notes - is not a payload. */
 const ARCHIVE_SUFFIXES = [".zip", ".7z", ".rar", ".tar.gz", ".tgz", ".tar"];
 
+/** Whether an asset is one 7-Zip opens. A payload that is not is a single file, deployed as it stands. */
+export const isArchiveName = (name: string): boolean =>
+  ARCHIVE_SUFFIXES.some((end) => name.toLowerCase().endsWith(end));
+
 /**
  * The payload when the manifest does not name one: a release's sole archive-shaped asset. Two of them is an
- * ambiguity only the author can settle, so the manifest's `archive` stays in the format for that case.
+ * ambiguity only the author can settle, so the manifest's `archive` stays in the format for that case - and
+ * so does a release of loose files, where nothing distinguishes the payload from anything else published.
  */
 function soleArchive(assets: readonly ReleaseAsset[]): ReleaseAsset | undefined {
-  const archives = assets.filter(
-    (asset) => asset.name !== MANIFEST_NAME && ARCHIVE_SUFFIXES.some((end) => asset.name.toLowerCase().endsWith(end)),
-  );
+  const archives = assets.filter((asset) => asset.name !== MANIFEST_NAME && isArchiveName(asset.name));
   return archives.length === 1 ? archives[0] : undefined;
 }
 
@@ -239,6 +242,13 @@ export type Availability =
   | { kind: "install-over" }
   | { kind: "installed" }
   | { kind: "upgrade"; from: string }
+  /**
+   * Recorded at one type and offered at another. The version rises, but what the install *is* changes with
+   * it - a mod taking its own removability away, and later a stacking mod becoming a base one - so the offer
+   * names the change instead of calling it an update. `was` is what is on disk, which is what decides
+   * whether it can still be removed.
+   */
+  | { kind: "convert"; from: string; was: "pluggable" | "permanent" }
   /** A feed answering with an older version than the record - what a rolled-back feed looks like. */
   | { kind: "downgrade"; from: string }
   /** An install that never finished; the working directory decides between resume and restore. */
@@ -285,7 +295,13 @@ export function availability(release: ModRelease, context: ModContext): Availabi
     return { kind: "blocked", why: `The ${manifest.name} release does not say which of its files is the mod.` };
   }
 
-  if (recorded) return { kind: "upgrade", from: recorded.version };
+  if (recorded) {
+    // A record written before the type was kept carries none, and unknown is not a change.
+    if (recorded.type !== undefined && recorded.type !== manifest.type) {
+      return { kind: "convert", from: recorded.version, was: recorded.type };
+    }
+    return { kind: "upgrade", from: recorded.version };
+  }
 
   // Presence always comes from the directory; a mod there without a record upgrades by installing over.
   if (context.present) return { kind: "install-over" };
@@ -302,11 +318,33 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   return { kind: "install" };
 }
 
-/** Whether anything in the install's `mods/` answers to the id - `<id>.*` or a folder of that name. */
-export async function presentInMods(platform: Platform, installPath: string, id: string): Promise<boolean> {
+/**
+ * Whether the mod is already in the install's `mods/`.
+ *
+ * A release that declares its `entries` is judged against those, which is the only thing that answers for a
+ * payload whose filename an id cannot reach: an id carries no underscore and most of these filenames do, so
+ * `cassidy_head.dat` matches no id that could be minted for it. Without a declaration the id's own convention
+ * stands - `<id>` or `<id>.*`, file or folder alike - which is what every manifest written before the field
+ * relied on.
+ */
+export async function presentInMods(
+  platform: Platform,
+  installPath: string,
+  id: string,
+  entries?: readonly string[],
+): Promise<boolean> {
   const directory = platform.paths.join(installPath, MODS_DIRECTORY);
   if ((await platform.fs.stat(directory))?.kind !== "dir") return false;
-  return (await platform.fs.list(directory)).some((entry) => answersToId(entry.name, id));
+  const held = await platform.fs.list(directory);
+  // A declared entry may be nested - `patches/extra.dat` - and only its first piece is a name the mods folder
+  // itself lists. Matching on that over-reports where the folder exists without its dat, which is the harmless
+  // direction: it offers the release laid over what is there rather than beside it.
+  if (entries?.length)
+    return entries.some((entry) => {
+      const top = (entry.split("/")[0] ?? entry).toLowerCase();
+      return held.some((found) => found.name.toLowerCase() === top);
+    });
+  return held.some((entry) => answersToId(entry.name, id));
 }
 
 /** One mod as the interface lists it, everything plain enough to cross the process boundary. */
@@ -342,7 +380,7 @@ export async function listAvailableMods(
   for (const feed of MOD_FEEDS) {
     try {
       const release = await fetchFeed(platform, feed, now);
-      const present = await presentInMods(platform, install.path, feed.id);
+      const present = await presentInMods(platform, install.path, feed.id, release.manifest.entries);
       offers.push({
         id: release.manifest.id,
         name: release.manifest.name,

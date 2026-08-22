@@ -1,0 +1,10 @@
+{
+  "parses": {
+    "id": "fo2tweaks",
+    "name": "FO2tweaks",
+    "version": "14.7",
+    "type": "pluggable",
+    "refuse": [],
+    "settings": []
+  }
+}

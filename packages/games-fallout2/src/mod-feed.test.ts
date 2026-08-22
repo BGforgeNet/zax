@@ -3,12 +3,14 @@ import { MemoryPlatform, type MemoryOptions } from "@zax/platform/memory";
 import type { Install } from "@zax/core";
 import {
   availability,
+  MOD_FEEDS,
   fetchFeed,
   listAvailableMods,
   presentInMods,
   type ModContext,
   type ModRelease,
 } from "./mod-feed.js";
+import { MOD_GRANTS } from "./mod-grants.js";
 
 const REPO = "BGforgeNet/FO2tweaks";
 const FEED = { repository: REPO, id: "fo2tweaks" };
@@ -235,6 +237,24 @@ describe("availability", () => {
     expect(availability(parsed(""), context({ record: recorded("15") }))).toEqual({ kind: "downgrade", from: "15" });
   });
 
+  it("does not call a type change an upgrade - what is recorded decides what the offer is", () => {
+    const base = parsed("");
+    const release: ModRelease = { ...base, manifest: { ...base.manifest, type: "permanent" } };
+    const was = (type: "pluggable" | "permanent") => ({
+      path: install.path,
+      mods: [{ id: "fo2tweaks", version: "14.6", complete: true, type, files: [], manifest: "", shipped: {} }],
+    });
+
+    expect(availability(release, context({ record: was("pluggable") }))).toEqual({
+      kind: "convert",
+      from: "14.6",
+      was: "pluggable",
+    });
+    // The same type on both sides is an ordinary upgrade, and so is a record too old to carry one at all.
+    expect(availability(release, context({ record: was("permanent") }))).toEqual({ kind: "upgrade", from: "14.6" });
+    expect(availability(release, context({ record: recorded("14.6") }))).toEqual({ kind: "upgrade", from: "14.6" });
+  });
+
   it("offers retry for an install that never finished, before anything else", () => {
     expect(availability(parsed(""), context({ record: recorded("14.7", false) }))).toEqual({
       kind: "retry",
@@ -336,5 +356,92 @@ describe("presentInMods", () => {
     expect(await presentInMods(platform, "/game", "fo2tweaks")).toBe(true);
     expect(await presentInMods(platform, "/game", "ecco")).toBe(false);
     expect(await presentInMods(platform, "/elsewhere", "fo2tweaks")).toBe(false);
+  });
+
+  it("answers from the declared entries when the release names them, which an id cannot always reach", async () => {
+    // An id may carry no underscore, and most payload filenames do - so `cassidy_head.dat` answers to no id
+    // that could be minted for it, and the stem match alone reports a hand-installed copy as absent.
+    const platform = new MemoryPlatform({ files: { "/game/mods/cassidy_head.dat": "" } });
+    expect(await presentInMods(platform, "/game", "cassidy")).toBe(false);
+    expect(await presentInMods(platform, "/game", "cassidy", ["cassidy_head.dat"])).toBe(true);
+    expect(await presentInMods(platform, "/game", "cassidy", ["cassidy_voice_hq.dat"])).toBe(false);
+  });
+
+  it("matches a declared folder entry, which is what the loader loads it as", async () => {
+    const platform = new MemoryPlatform({ files: { "/game/mods/InventoryFilter.dat/InvenFilter.ini": "" } });
+    expect(await presentInMods(platform, "/game", "inventoryfilter", ["InventoryFilter.dat"])).toBe(true);
+  });
+
+  it("matches a nested entry by the folder it sits in, which is all the mods folder lists", async () => {
+    const platform = new MemoryPlatform({ files: { "/game/mods/patches/extra.dat": "" } });
+    expect(await presentInMods(platform, "/game", "patched", ["patches/extra.dat"])).toBe(true);
+    expect(await presentInMods(platform, "/game", "patched", ["elsewhere/extra.dat"])).toBe(false);
+  });
+});
+
+describe("a release of loose files", () => {
+  it("infers no payload from them, so the manifest has to name one", async () => {
+    // Cassidy publishes four `.dat` assets and no archive. Nothing distinguishes the payload from the rest,
+    // so inference stays archive-only and a committed manifest that names none has no payload at all.
+    const loose = {
+      tag_name: "v1.0",
+      assets: [
+        { name: "cassidy_head.dat", browser_download_url: "https://example.test/v1.0/head.dat", digest: "sha256:aa" },
+        { name: "cassidy_voice.dat", browser_download_url: "https://example.test/v1.0/voice.dat", digest: "sha256:bb" },
+      ],
+    };
+    const platform = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([loose]),
+        [atTag("v1.0")]: committed("fo2tweaks"),
+      },
+    });
+    const found = await fetchFeed(platform, FEED);
+    expect(found.manifest.archive).toBeUndefined();
+    expect(found.archive).toBeUndefined();
+    // Which the offer reports as what it is, rather than picking one of the two.
+    const where: ModContext = {
+      install: { path: "/game", type: "fallout2" },
+      record: { path: "/game", mods: [] },
+      sfall: "4.5",
+      present: false,
+    };
+    expect(availability(found, where)).toMatchObject({
+      kind: "blocked",
+      why: expect.stringContaining("which of its files"),
+    });
+  });
+
+  it("takes the one the manifest names, archive-shaped or not", async () => {
+    const platform = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([
+          {
+            tag_name: "v1.0",
+            assets: [
+              {
+                name: "cassidy_head.dat",
+                browser_download_url: "https://example.test/v1.0/head.dat",
+                digest: "sha256:aa",
+                size: 4,
+              },
+            ],
+          },
+        ]),
+        [atTag("v1.0")]: committed("fo2tweaks", "archive: cassidy_head.dat\nentries: [cassidy_head.dat]\n"),
+      },
+    });
+    const found = await fetchFeed(platform, FEED);
+    expect(found.archive?.name).toBe("cassidy_head.dat");
+  });
+});
+
+describe("the grants list", () => {
+  it("grants only ids a feed follows", () => {
+    const followed = new Set(MOD_FEEDS.map((feed) => feed.id));
+    for (const grant of MOD_GRANTS) expect([...followed]).toContain(grant.id);
+    // Empty today, since the two mods known to need a grant publish no manifest and so have no id yet. This
+    // is the same check against an id that would be wrong, so the one above is not passing on an empty list.
+    expect(followed.has("hqmusic")).toBe(false);
   });
 });

@@ -1,0 +1,48 @@
+spec: 1
+id: fo2tweaks
+name: FO2tweaks
+version: "14.7"
+game: fallout2
+settings:
+  main.autodoors:
+    kind: bool
+    default: 1
+    label: Automatic doors
+    help: Walk through unlocked doors without clicking, outside combat.
+  main.style:
+    kind: choice
+    options:
+      - { value: 0, label: "Off" }
+      - { value: 1, label: Open, help: Opens the door and steps through. }
+    default: 1
+    label: Door style
+  run_speed.dude:
+    kind: int
+    min: 0
+    max: 10
+    unit: steps
+    sentinels: { 0: Unchanged }
+    default: 4
+    label: The Chosen One
+    gated-by: { id: fo2tweaks.main.autodoors, is: [1] }
+  run_speed.party:
+    kind: float
+    min: 0.5
+    max: 2
+    default: 1
+    label: Party members
+  volume.music:
+    kind: scale
+    max: 100
+    default: 80
+    label: Music
+  paths.data:
+    file: mods/fo2tweaks-paths.ini
+    kind: text
+    path: true
+    label: Extra data folder
+  keys.toggle:
+    kind: key
+    default: 42
+    label: Toggle key
+    gated-by: { id: sfall.Misc.DamageFormula, is: [0] }

@@ -1,0 +1,15 @@
+{
+  "defaults": {
+    "version": "14.7",
+    "archive": "fo2tweaks.zip"
+  },
+  "parses": {
+    "id": "fo2tweaks",
+    "name": "FO2tweaks",
+    "version": "14.7",
+    "type": "pluggable",
+    "archive": "fo2tweaks.zip",
+    "refuse": [],
+    "settings": []
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "parses": {
+    "id": "ecco",
+    "name": "EcCo Gameplay Overhaul",
+    "version": "1.0.0",
+    "type": "permanent",
+    "reason": "EcCo's changes live in the save; removing it breaks every save made while it was in.",
+    "archive": "ecco_v1-0-0.zip",
+    "installOn": [
+      "fallout2upu",
+      "fallout2rpu"
+    ],
+    "requiresSfall": "4.4.5",
+    "state": [
+      "mods/ecco.ini"
+    ],
+    "entries": [
+      "ecco.dat"
+    ],
+    "refuse": [
+      {
+        "present": [
+          "mods/other.dat"
+        ],
+        "absent": [
+          "mods/compat.ini"
+        ],
+        "reason": "Not alongside Other without its compatibility patch."
+      }
+    ],
+    "settings": []
+  }
+}

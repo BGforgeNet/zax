@@ -1,0 +1,14 @@
+{
+  "parses": {
+    "id": "inventoryfilter",
+    "name": "Inventory Filter",
+    "version": "1.4",
+    "type": "pluggable",
+    "entries": [
+      "InventoryFilter.dat",
+      "patches/extra.dat"
+    ],
+    "refuse": [],
+    "settings": []
+  }
+}

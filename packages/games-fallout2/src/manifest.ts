@@ -14,6 +14,7 @@
 import { parse } from "yaml";
 import { GAME_TYPES, type GameType, type SettingDef, type SettingKind, type ValueTest } from "@zax/core";
 import { SETTINGS } from "./catalog.js";
+import { grantsFor } from "./mod-grants.js";
 
 /**
  * The file's name wherever it sits - repository root, archive root, release asset - the same on purpose. The
@@ -40,6 +41,14 @@ export const MANIFEST_BYTE_CAP = 256 * 1024;
 
 /** Anchors and aliases past this refuse - an alias flood multiplies in memory, not on the wire. */
 const ALIAS_CAP = 64;
+
+/**
+ * The highest manifest spec this version implements, and a floor rather than a pin: a manifest may state this
+ * or anything below it. The format is append-only within a major - a field's meaning never changes and a
+ * retired one stays parsed and ignored for a major - so an older spec still means here what it said when it
+ * was written, and only a later one can name something this version cannot honour.
+ */
+export const MANIFEST_SPEC = 1;
 
 const SHORT_TEXT = 200;
 const LONG_TEXT = 1000;
@@ -71,6 +80,16 @@ export interface ModManifest {
   requiresSfall?: string;
   /** Files that belong to the user and survive upgrades by merging. Absent means every payload `.ini`. */
   state?: readonly string[];
+  /**
+   * What the mod puts in the mods folder, spelled as the loader names it - relative to `mods\`, so these
+   * become its order lines verbatim. Absent means the payload decides, which is the top-level `mods/*.dat`
+   * derivation every manifest written before this field relied on.
+   *
+   * Declared rather than derived because two things cannot be read off the payload's paths: a mod whose
+   * entry is a folder (`InventoryFilter.dat` is a directory), and which of `mods/patches/extra.dat`'s two
+   * readings - a folder entry `patches`, or a nested dat - the mod meant.
+   */
+  entries?: readonly string[];
   refuse: readonly RefuseRule[];
   settings: readonly ModSetting[];
 }
@@ -155,22 +174,49 @@ function confinedPath(value: unknown, where: string): string {
   return path;
 }
 
+/** A relative path's segments, or null when it could resolve anywhere but inside the install directory. */
+function segments(path: string): string[] | null {
+  if (path.includes(":")) return null;
+  const pieces = path.replace(/\\/g, "/").split("/");
+  if (pieces.some((piece) => piece === "" || piece === "." || piece === "..")) return null;
+  return pieces;
+}
+
 /**
  * Whether a relative path stays confined under `mods/` - no escapes, no absolutes, at least one segment below
  * it. The one spec rule the manifest parser, the record reader and uninstall all judge by, so a tampered
  * record cannot name what a manifest could not.
  */
 export function insideMods(path: string): boolean {
-  if (path.includes(":")) return false;
-  const pieces = path.replace(/\\/g, "/").split("/");
-  if (pieces.some((piece) => piece === "" || piece === "." || piece === "..")) return false;
-  return pieces.length > 1 && (pieces[0] ?? "").toLowerCase() === "mods";
+  const pieces = segments(path);
+  return pieces !== null && pieces.length > 1 && (pieces[0] ?? "").toLowerCase() === "mods";
 }
 
-/** Stacking mods live under `mods/`; a path elsewhere is a spec violation, not a creative layout. */
-function modsPath(value: unknown, where: string): string {
+/** Whether a path sits at least one segment below a granted directory, compared as the engine compares. */
+function below(path: string, directory: string): boolean {
+  const pieces = segments(path);
+  const root = segments(directory);
+  if (pieces === null || root === null || pieces.length <= root.length) return false;
+  return root.every((piece, at) => piece.toLowerCase() === (pieces[at] ?? "").toLowerCase());
+}
+
+/**
+ * Whether a mod may write to a path: under `mods/` as every mod may, or below one of the directories ZAX
+ * grants this one. The grant is ZAX's own list (`mod-grants.ts`), so a manifest cannot widen it by declaring
+ * a path and neither can a hand-edited record - and it widens only where, never how far, since a granted
+ * path is confined exactly as `mods/` is.
+ */
+export function mayWrite(path: string, granted: readonly string[]): boolean {
+  return insideMods(path) || granted.some((directory) => below(path, directory));
+}
+
+/** A path a mod is allowed to write - under `mods/`, or inside what ZAX grants it by name. */
+function writablePath(value: unknown, where: string, id: string, granted: readonly string[]): string {
   const path = confinedPath(value, where);
-  if (!insideMods(path)) refuse(`${where} ("${path}") is not under mods/`);
+  if (!mayWrite(path, granted))
+    refuse(
+      `${where} ("${path}") is outside what ZAX grants ${id} - that grant is ZAX's to give, not the manifest's to claim`,
+    );
   return path;
 }
 
@@ -269,7 +315,7 @@ const ADDRESS_SHAPE = /^[A-Za-z0-9._-]+$/;
  * section name cannot carry one, a key can. The id is the mod's id plus the address, verbatim - a gate names
  * a sibling with no transform - the same rule the catalog's generator applies to the engine's own files.
  */
-function parseSettings(value: unknown, modId: string): readonly ModSetting[] {
+function parseSettings(value: unknown, modId: string, granted: readonly string[]): readonly ModSetting[] {
   if (value === null || typeof value !== "object" || Array.isArray(value)) refuse(`"settings" must be a mapping`);
   const out: ModSetting[] = [];
   const gates: { setting: ModSetting; where: string }[] = [];
@@ -292,7 +338,10 @@ function parseSettings(value: unknown, modId: string): readonly ModSetting[] {
 
     const setting: ModSetting = {
       id,
-      file: parts["file"] === undefined ? `mods/${modId}.ini` : modsPath(parts["file"], `${where}'s file`),
+      file:
+        parts["file"] === undefined
+          ? `mods/${modId}.ini`
+          : writablePath(parts["file"], `${where}'s file`, modId, granted),
       section,
       key,
       kind: parseKind(parts, where),
@@ -317,6 +366,16 @@ function parseSettings(value: unknown, modId: string): readonly ModSetting[] {
       needsNewerZax(`${where} names "${target}", which is not a setting this version knows`);
   }
   return out;
+}
+
+/**
+ * The mods-folder entries a mod declares. Each is confined the way every path-shaped field is, and kept as
+ * written rather than prefixed with `mods/`: the order file's own lines start below that folder.
+ */
+function parseEntries(value: unknown): readonly string[] {
+  const entries = items(value, `"entries"`).map((name, at) => confinedPath(name, `"entries" entry ${at + 1}`));
+  if (entries.length === 0) refuse(`"entries" is empty, which would order nothing while claiming to`);
+  return entries;
 }
 
 function parseRefuse(value: unknown): readonly RefuseRule[] {
@@ -354,6 +413,7 @@ const MANIFEST_FIELDS = [
   "install-on",
   "requires",
   "state",
+  "entries",
   "refuse",
   "settings",
   "install",
@@ -371,11 +431,19 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     refuse(`it does not parse (${error instanceof Error ? error.message.split("\n")[0] : "unreadable"})`);
   }
 
+  // A later spec is answered ahead of everything else, the unknown-field pass included: that spec's whole
+  // effect here is fields this version has no name for, and the answer to those is to update ZAX rather than
+  // to name one of them a misspelling.
+  const stated = root !== null && typeof root === "object" ? (root as Record<string, unknown>)["spec"] : undefined;
+  if (typeof stated === "number" && Number.isInteger(stated) && stated > MANIFEST_SPEC)
+    needsNewerZax(`it is written to manifest spec ${stated}, this version reads spec ${MANIFEST_SPEC}`);
+
   const fields = record(root, "the manifest", MANIFEST_FIELDS);
 
-  // Spec first: everything after it is judged by this version's rules, which a later spec may have changed.
-  if (fields["spec"] !== 1)
-    needsNewerZax(`it is written to manifest spec ${String(fields["spec"])}, this version reads spec 1`);
+  // Everything after this is judged by this version's rules, so the number that selects them is checked here.
+  const spec = fields["spec"];
+  if (typeof spec !== "number" || !Number.isInteger(spec) || spec < 1)
+    refuse(`"spec" is ${spec === undefined ? "missing" : JSON.stringify(spec)}, not a spec number`);
 
   if (fields["game"] !== "fallout2") refuse(`it is for "${String(fields["game"])}", not Fallout 2`);
 
@@ -385,6 +453,8 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
   // later catalog addition collides with, and a per-id check can only see the catalog as it is now.
   if (CATALOG_PREFIXES.has(id.split(".")[0] ?? id))
     refuse(`"id" ("${id}") is inside the catalog's "${id.split(".")[0]}" namespace`);
+  // Read once, off the id: every path this manifest declares is judged against what ZAX grants that name.
+  const granted = grantsFor(id);
   // Stated wins over supplied: a manifest published as an asset is the more specific claim, and the archive's
   // embedded copy is checked against it.
   const version = fields["version"] === undefined ? defaults.version : literal(fields["version"], `"version"`);
@@ -435,9 +505,14 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     ...(installOn !== undefined ? { installOn } : {}),
     ...(requiresSfall !== undefined ? { requiresSfall } : {}),
     ...(fields["state"] !== undefined
-      ? { state: items(fields["state"], `"state"`).map((path, at) => modsPath(path, `"state" entry ${at + 1}`)) }
+      ? {
+          state: items(fields["state"], `"state"`).map((path, at) =>
+            writablePath(path, `"state" entry ${at + 1}`, id, granted),
+          ),
+        }
       : {}),
+    ...(fields["entries"] !== undefined ? { entries: parseEntries(fields["entries"]) } : {}),
     refuse: fields["refuse"] === undefined ? [] : parseRefuse(fields["refuse"]),
-    settings: fields["settings"] === undefined ? [] : parseSettings(fields["settings"], id),
+    settings: fields["settings"] === undefined ? [] : parseSettings(fields["settings"], id, granted),
   };
 }

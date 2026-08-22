@@ -24,9 +24,10 @@ import {
   type Install,
   type MergeConflict,
 } from "@zax/core";
-import type { DirEntry, DownloadOptions, Platform } from "@zax/platform";
+import type { ArchiveEntryInfo, DirEntry, DownloadOptions, Platform } from "@zax/platform";
 import { preflightArchive } from "./archive-preflight.js";
-import { MANIFEST_NAME, insideMods, parseManifest, type ModManifest } from "./manifest.js";
+import { MANIFEST_NAME, mayWrite, parseManifest, type ModManifest } from "./manifest.js";
+import { grantsFor } from "./mod-grants.js";
 import {
   answersToId,
   listMods,
@@ -34,13 +35,14 @@ import {
   readMods,
   restoreOrder,
   saveMods,
+  MODS_DIRECTORY,
   MODS_ORDER_PATH,
   type Mod,
 } from "./mods.js";
 import { placeFor, recommendationFor } from "./recommended-order.js";
-import { loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
+import { assertUsable, loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 import { modWorkDirectory, readTransaction, writeTransaction, type ModTransaction } from "./mod-transaction.js";
-import type { ModRelease } from "./mod-feed.js";
+import { isArchiveName, type ModRelease } from "./mod-feed.js";
 
 export interface ModProgress extends DownloadOptions {
   onStep?: (step: string) => void;
@@ -84,6 +86,33 @@ const OVERWRITTEN = "overwritten";
 const REMOVED = "removed";
 
 const ORDER_DAT = /^mods\/([^/]+\.dat)$/i;
+
+/**
+ * The order-file entries an install adds: what the manifest declares, or - for a manifest written before the
+ * field existed - the payload's own top-level dats.
+ *
+ * The derivation cannot see two things the declaration can. A mod whose entry is a folder ships only paths
+ * below it (`mods/InventoryFilter.dat/InvenFilter.ini`), which match no top-level dat, so it would install and
+ * never be loaded; and `mods/patches/extra.dat` reads either as a folder entry `patches` or as a nested dat,
+ * which only the mod knows.
+ */
+function orderEntriesFor(manifest: ModManifest, files: readonly PlannedFile[]): readonly string[] {
+  // Spelled the way the loader does. The manifest holds `/` like every other path-shaped field, while the
+  // order file's own separator is `\` - and `namedInOrder` reads its lines back normalized, so a nested
+  // entry written with the wrong one would never match the line it just added, and the next install would
+  // add it again.
+  if (manifest.entries) return manifest.entries.map((entry) => entry.replace(/\//g, "\\"));
+  return files.map((file) => ORDER_DAT.exec(file.path)?.[1]).filter((name): name is string => !!name);
+}
+
+/** Whether the payload actually carries a declared entry - the name itself, or anything under it. */
+function shipsEntry(files: readonly PlannedFile[], entry: string): boolean {
+  const at = `mods/${entry}`.toLowerCase();
+  return files.some((file) => {
+    const path = file.path.toLowerCase();
+    return path === at || path.startsWith(`${at}/`);
+  });
+}
 
 /**
  * The plan in one line, hashed. Not a cryptographic digest and not meant as one: it detects a plan that
@@ -150,6 +179,22 @@ export async function refusalFor(platform: Platform, install: Install, release: 
 }
 
 /**
+ * Where a payload that is not an archive lands, or null for one that is. Cassidy publishes four loose `.dat`
+ * assets and the walk-speed and Goris fixes one each, and a single file carries no paths of its own - so the
+ * manifest's `entries` is the only thing that can say what it installs as, and it must name exactly one.
+ */
+function singleFileTarget(release: ModRelease): string | null {
+  const asset = release.archive;
+  if (!asset || isArchiveName(asset.name)) return null;
+  const entries = release.manifest.entries ?? [];
+  if (entries.length !== 1)
+    throw new Error(
+      `${asset.name} is one file rather than an archive, so the ${release.manifest.name} manifest has to declare the single "entries" name it installs as.`,
+    );
+  return `${MODS_DIRECTORY}/${entries[0]}`;
+}
+
+/**
  * Downloads and verifies the release, then resolves what installing it would do - without writing a byte
  * into the game directory. The archive is fetched into the working directory unless a verified copy is
  * already there, which is what makes a retry resume instead of paying the download again.
@@ -161,6 +206,9 @@ export async function planModInstall(
   options?: ModProgress,
 ): Promise<ModInstallPlan> {
   const { manifest } = release;
+  // Ahead of the download rather than after it: a record this version may not write is a refusal the user
+  // should get before spending a transfer on it.
+  assertUsable(await loadRecord(platform, install.path), manifest.id);
   const asset = release.archive;
   if (!asset)
     throw new Error(
@@ -187,33 +235,46 @@ export async function planModInstall(
     }
   }
 
-  options?.onStep?.("Reading the archive");
-  const entries = await preflightArchive(platform, archivePath, asset.name);
+  const single = singleFileTarget(release);
+  let entries: readonly ArchiveEntryInfo[];
+  if (single !== null) {
+    // Every archive-shaped step is beside the point for one file: no directory to read, no entry count or
+    // unpacked total to bound, no symlink entry to refuse, and no embedded manifest to compare against. The
+    // manifest's own declaration says where it lands, which is what an archive's paths would have said.
+    entries = [{ name: single, kind: "file", size: asset.size ?? (await platform.fs.stat(archivePath))?.size ?? 0 }];
+  } else {
+    options?.onStep?.("Reading the archive");
+    entries = await preflightArchive(platform, archivePath, asset.name);
 
-  // The embedded copy must match the one eligibility was decided on, byte for byte - a difference means the
-  // archive is not the release the manifest described. Required only of a release that published a manifest
-  // asset, where CI writes both from one source; a manifest read from the repository is tied to the tag
-  // instead, and its payload is under no obligation to carry a copy. One that does is still checked.
-  const embeddedAt = platform.paths.join(work, "embedded");
-  await platform.archive.extract(archivePath, embeddedAt, { only: [MANIFEST_NAME] });
-  const embeddedPath = platform.paths.join(embeddedAt, MANIFEST_NAME);
-  if (await fileExists(platform, embeddedPath)) {
-    const embedded = new TextDecoder().decode(await platform.fs.read(embeddedPath));
-    if (embedded !== release.manifestText)
-      throw new Error(`The manifest inside ${asset.name} is not the one its release published - refused.`);
-  } else if (release.manifestFromAsset) {
-    throw new Error(`${asset.name} carries no ${MANIFEST_NAME} at its root - refused.`);
+    // The embedded copy must match the one eligibility was decided on, byte for byte - a difference means the
+    // archive is not the release the manifest described. Required only of a release that published a manifest
+    // asset, where CI writes both from one source; a manifest read from the repository is tied to the tag
+    // instead, and its payload is under no obligation to carry a copy. One that does is still checked.
+    const embeddedAt = platform.paths.join(work, "embedded");
+    await platform.archive.extract(archivePath, embeddedAt, { only: [MANIFEST_NAME] });
+    const embeddedPath = platform.paths.join(embeddedAt, MANIFEST_NAME);
+    if (await fileExists(platform, embeddedPath)) {
+      const embedded = new TextDecoder().decode(await platform.fs.read(embeddedPath));
+      if (embedded !== release.manifestText)
+        throw new Error(`The manifest inside ${asset.name} is not the one its release published - refused.`);
+    } else if (release.manifestFromAsset) {
+      throw new Error(`${asset.name} carries no ${MANIFEST_NAME} at its root - refused.`);
+    }
   }
 
+  const granted = grantsFor(manifest.id);
   const files: PlannedFile[] = [];
   // One read per directory across the whole archive; planning writes nothing, so the cache cannot go stale.
   const listings = new Map<string, readonly DirEntry[] | null>();
   for (const entry of entries) {
-    if (entry.kind !== "file" || !insideMods(entry.name)) continue;
+    if (entry.kind !== "file" || !mayWrite(entry.name, granted)) continue;
     const overwrites = (await realCasedPath(platform, install.path, entry.name, listings)) !== null;
     files.push({ path: entry.name, size: entry.size, overwrites });
   }
-  if (files.length === 0) throw new Error(`${asset.name} ships nothing under mods/ - there is nothing to install.`);
+  if (files.length === 0)
+    throw new Error(
+      `${asset.name} ships nothing under mods/${granted.length > 0 ? ` or in ${granted.join(", ")}` : ""} - there is nothing to install.`,
+    );
 
   const planned = new Set(files.map((file) => file.path.toLowerCase()));
   // What this install replaces comes from the open transaction when there is one. Read from the record
@@ -225,7 +286,14 @@ export async function planModInstall(
     (await loadRecord(platform, install.path)).mods.find((mod) => mod.id === manifest.id && mod.complete);
   const removes = (replacing?.files ?? []).filter((path) => !planned.has(path.toLowerCase()));
 
-  const orderLines = files.map((file) => ORDER_DAT.exec(file.path)?.[1]).filter((name): name is string => !!name);
+  // A declared entry nothing carries would put a line in the order file naming something absent, which the
+  // loader skips with a log line nobody reads - so it refuses here, where the cause is still visible.
+  for (const entry of manifest.entries ?? []) {
+    if (!shipsEntry(files, entry))
+      throw new Error(`${asset.name} does not carry "${entry}", which the ${manifest.name} manifest declares.`);
+  }
+
+  const orderLines = orderEntriesFor(manifest, files);
   return { files, orderLines, removes, fingerprint: fingerprintOf(release, files, { orderLines, removes }) };
 }
 
@@ -287,6 +355,10 @@ export async function applyModInstall(
   const work = modWorkDirectory(platform, install, manifest.id);
   const archivePath = platform.paths.join(work, release.archive?.name ?? "");
   const record = await loadRecord(platform, install.path);
+  assertUsable(record, manifest.id);
+  // Resolved here rather than at the deploy, so a release whose payload and manifest disagree about being
+  // one file is refused before the transaction opens rather than part way through it.
+  const single = singleFileTarget(release);
 
   // Phase 1, journal. Opened once and resumed thereafter: everything it holds describes the directory as it
   // was before the first byte landed, and a retry that re-derived it would be recording its own wreckage -
@@ -324,6 +396,7 @@ export async function applyModInstall(
     ...(manifest.reason !== undefined ? { reason: manifest.reason } : {}),
     complete: false,
     files: plan.files.map((file) => file.path),
+    ...(manifest.entries ? { entries: manifest.entries } : {}),
     manifest: release.manifestText,
     shipped: {},
   };
@@ -343,8 +416,10 @@ export async function applyModInstall(
     const kept = insidePath(platform, platform.paths.join(work, OVERWRITTEN), file.path);
     if (held.has(file.path.toLowerCase()) && !(await fileExists(platform, kept))) {
       await platform.fs.copy(found, kept);
-      // An upgrade's replaced files also reach the timestamped backup, as anything a save replaces does.
-      if (upgrading) await platform.fs.copy(found, insidePath(platform, backup, file.path));
+      // And to the timestamped backup, as anything a save replaces does. The working directory's copy is
+      // cleared when the install finishes, so on a first install this is the only one that outlives it -
+      // which is what a later uninstall would otherwise have nothing to put back.
+      await platform.fs.copy(found, insidePath(platform, backup, file.path));
     }
     // Replaced means replaced: left in place, a differently-spelled original would sit beside the extracted
     // file on a case-sensitive filesystem, and the loader - which folds case - would see the same mod twice.
@@ -358,7 +433,8 @@ export async function applyModInstall(
     await platform.fs.remove(found);
   }
 
-  await platform.archive.extract(archivePath, install.path, { only: plan.files.map((file) => file.path) });
+  if (single !== null) await platform.fs.copy(archivePath, insidePath(platform, install.path, single));
+  else await platform.archive.extract(archivePath, install.path, { only: plan.files.map((file) => file.path) });
 
   // Phase 3, merge.
   // State files: what the release shipped is recorded as the next upgrade's merge base, then the user's
@@ -386,8 +462,14 @@ export async function applyModInstall(
     conflicts.push(...outcome.conflicts);
   }
 
-  // Phase 4, order.
-  await updateOrderLines(platform, install, { enable: plan.orderLines, drop: orderDats(plan.removes) });
+  // Phase 4, order. What the previous release ordered and this one no longer does goes with it - read from
+  // its own declaration where it made one, since a folder entry names no line the deployed paths could yield.
+  const dropped = journal.previous?.entries
+    ? journal.previous.entries.filter(
+        (name) => !plan.orderLines.some((kept) => kept.toLowerCase() === name.toLowerCase()),
+      )
+    : orderDats(plan.removes);
+  await updateOrderLines(platform, install, { enable: plan.orderLines, drop: dropped });
 
   // Phase 5, commit. The working directory goes last: until it does, this is still a transaction to unwind.
   await saveRecord(
@@ -399,11 +481,12 @@ export async function applyModInstall(
 }
 
 function withMod(record: InstallRecord, mod: InstalledMod): InstallRecord {
-  return { path: record.path, mods: [...record.mods.filter((held) => held.id !== mod.id), mod] };
+  // Spread, so the entries this version could not read survive an install of something else entirely.
+  return { ...record, mods: [...record.mods.filter((held) => held.id !== mod.id), mod] };
 }
 
 function withoutMod(record: InstallRecord, id: string): InstallRecord {
-  return { path: record.path, mods: record.mods.filter((held) => held.id !== id) };
+  return { ...record, mods: record.mods.filter((held) => held.id !== id) };
 }
 
 /**
@@ -421,6 +504,7 @@ export async function restoreModInstall(
   now: Date = new Date(),
 ): Promise<void> {
   const record = await loadRecord(platform, install.path);
+  assertUsable(record, id);
   const pending = record.mods.find((mod) => mod.id === id);
   if (!pending || pending.complete) throw new Error(`Nothing of "${id}" is waiting to be restored.`);
 
@@ -435,8 +519,9 @@ export async function restoreModInstall(
     );
   }
 
+  const granted = grantsFor(id);
   for (const path of pending.files) {
-    if (!insideMods(path)) continue;
+    if (!mayWrite(path, granted)) continue;
     const target = insidePath(platform, install.path, path);
     const kept = insidePath(platform, platform.paths.join(work, OVERWRITTEN), path);
     if (await fileExists(platform, kept)) await platform.fs.copy(kept, target);
@@ -525,6 +610,7 @@ export async function uninstallMod(
   now: Date = new Date(),
 ): Promise<ModRemoval> {
   const record = await loadRecord(platform, install.path);
+  assertUsable(record, id);
   const recorded = record.mods.find((mod) => mod.id === id);
 
   // The one gate every removal surface goes through, so no menu or shortcut can offer what the type forbids.
@@ -555,8 +641,9 @@ export async function uninstallMod(
 
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
   const deleted: string[] = [];
+  const granted = grantsFor(id);
   for (const path of files) {
-    if (!insideMods(path)) continue;
+    if (!mayWrite(path, granted)) continue;
     const target = insidePath(platform, install.path, path);
     const found = await platform.fs.stat(target);
     if (found === null) continue;
@@ -571,7 +658,9 @@ export async function uninstallMod(
     deleted.push(path);
   }
 
-  await updateOrderLines(platform, install, { drop: orderDats(deleted) });
+  // The release's own declaration where the record holds one: a folder mod's deployed paths are all below
+  // its entry, so deriving from them removes nothing and the line outlives the files.
+  await updateOrderLines(platform, install, { drop: recorded?.entries ?? orderDats(deleted) });
   await saveRecord(platform, withoutMod(record, id));
   return { files: deleted, backup };
 }

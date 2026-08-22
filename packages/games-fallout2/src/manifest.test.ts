@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MANIFEST_BYTE_CAP, parseManifest, type ModManifest } from "./manifest.js";
+import { MANIFEST_BYTE_CAP, MANIFEST_SPEC, mayWrite, parseManifest, type ModManifest } from "./manifest.js";
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 const parsed = (text: string): ModManifest => parseManifest(bytes(text));
@@ -118,6 +118,17 @@ settings:
   });
 });
 
+it("reads the entries a mod declares it puts under mods/, keeping the loader's own spelling", () => {
+  // The loader names an entry relative to `mods\`, and these become its lines verbatim - so a folder mod
+  // whose entry happens to end in `.dat` is expressible where a derivation from the payload's paths is not.
+  const manifest = parsed(`${FO2TWEAKS}entries: [InventoryFilter.dat, "patches/extra.dat"]\n`);
+  expect(manifest.entries).toEqual(["InventoryFilter.dat", "patches/extra.dat"]);
+});
+
+it("leaves entries absent when the manifest declares none, so the payload still decides", () => {
+  expect(parsed(FO2TWEAKS).entries).toBeUndefined();
+});
+
 describe("parseManifest refusals", () => {
   const refuses = (text: string, cause: RegExp | string) => expect(() => parsed(text)).toThrow(cause);
 
@@ -143,9 +154,24 @@ describe("parseManifest refusals", () => {
     refuses(`${FO2TWEAKS}refuze: []\n`, /unknown field "refuze"/);
   });
 
-  it("refuses a later spec as needing a newer ZAX", () => {
-    refuses(FO2TWEAKS.replace("spec: 1", "spec: 2"), /newer version of ZAX/);
-    refuses(FO2TWEAKS.replace("spec: 1\n", ""), /newer version of ZAX/);
+  it("reads the spec number as a floor rather than a pin", () => {
+    // The pin was the defect: once spec 2 is implemented it would have refused every spec-1 manifest. What
+    // refuses is a manifest asking for more than this version implements, whatever this version implements.
+    expect(parsed(FO2TWEAKS.replace("spec: 1", `spec: ${MANIFEST_SPEC}`)).id).toBe("fo2tweaks");
+    refuses(FO2TWEAKS.replace("spec: 1", `spec: ${MANIFEST_SPEC + 1}`), /newer version of ZAX/);
+  });
+
+  it("answers a later spec ahead of the unknown field that spec brought", () => {
+    // The order is the whole point of the floor: a spec-2 manifest carries fields this version has no name
+    // for, and being told to update ZAX is the answer to that, not being told one of them is misspelled.
+    refuses(`${FO2TWEAKS.replace("spec: 1", "spec: 2")}whatever-spec-2-adds: yes\n`, /newer version of ZAX/);
+  });
+
+  it("refuses a spec that is not a whole number, rather than reading it as a later one", () => {
+    refuses(FO2TWEAKS.replace("spec: 1\n", ""), /"spec"/);
+    refuses(FO2TWEAKS.replace("spec: 1", "spec: one"), /"spec"/);
+    refuses(FO2TWEAKS.replace("spec: 1", "spec: 1.5"), /"spec"/);
+    refuses(FO2TWEAKS.replace("spec: 1", "spec: 0"), /"spec"/);
   });
 
   it("refuses another game's manifest", () => {
@@ -175,10 +201,13 @@ describe("parseManifest refusals", () => {
     refuses(`${FO2TWEAKS}refuse:\n  - when: { present: ["../marker"] }\n    reason: no\n`, /leaves the game directory/);
   });
 
-  it("confines a stacking mod's files to mods/", () => {
-    refuses(`${FO2TWEAKS}state: [data/scripts/gl_a.int]\n`, /not under mods\//);
+  it("confines a stacking mod's files to mods/, naming the grant as ZAX's rather than the mod's fault", () => {
+    refuses(`${FO2TWEAKS}state: [data/scripts/gl_a.int]\n`, /outside what ZAX grants fo2tweaks/);
     const outside = `${FO2TWEAKS}settings:\n  main.a:\n    { file: ddraw.ini, kind: key, label: A }\n`;
-    refuses(outside, /not under mods\//);
+    refuses(outside, /outside what ZAX grants fo2tweaks/);
+    // Where to ask matters as much as the refusal: the list is ZAX's, so a mod that needs a path it does not
+    // hold is a ZAX release to ask for, not a bug to report to the mod's author.
+    refuses(outside, /ZAX's to give, not the manifest's to claim/);
   });
 
   it("refuses a settings block that is not the flat mapping", () => {
@@ -246,5 +275,45 @@ describe("parseManifest refusals", () => {
   it("refuses an archive name that is not a bare file name", () => {
     refuses(`${FO2TWEAKS}archive: ../elsewhere.zip\n`, /not a file name/);
     refuses(`${FO2TWEAKS}archive: "sub/dir.zip"\n`, /not a file name/);
+  });
+});
+
+describe("entries refusals", () => {
+  it("refuses an entry that could leave the mods folder", () => {
+    expect(() => parsed(`${FO2TWEAKS}entries: ["../rpu.dat"]\n`)).toThrow(/leaves the game directory/);
+  });
+
+  it("refuses an empty entries list, which would order nothing while claiming to", () => {
+    expect(() => parsed(`${FO2TWEAKS}entries: []\n`)).toThrow(/"entries" is empty/);
+  });
+});
+
+describe("mayWrite", () => {
+  it("lets any mod write under mods/ and nowhere else", () => {
+    expect(mayWrite("mods/fo2tweaks.dat", [])).toBe(true);
+    expect(mayWrite("mods/patches/extra.dat", [])).toBe(true);
+    // The folder itself is not something to write into, and everything beside it is off limits.
+    expect(mayWrite("mods", [])).toBe(false);
+    expect(mayWrite("data/sound/music/track.acm", [])).toBe(false);
+  });
+
+  it("lets a granted mod write below the directories it was granted", () => {
+    const granted = ["data/sound/music"];
+    expect(mayWrite("data/sound/music/track.acm", granted)).toBe(true);
+    expect(mayWrite("data/sound/music/deep/track.acm", granted)).toBe(true);
+    // Matched as the engine matches paths, and by segment - so a longer name that merely starts the same is
+    // a different directory, which a string prefix would have let through.
+    expect(mayWrite("Data/Sound/Music/track.acm", granted)).toBe(true);
+    expect(mayWrite("data/sound/musical/track.acm", granted)).toBe(false);
+    expect(mayWrite("data/sound/sfx/track.acm", granted)).toBe(false);
+    expect(mayWrite("data/sound/music", granted)).toBe(false);
+  });
+
+  it("widens where a mod writes, never how far - an escape is still an escape", () => {
+    const granted = ["data/sound/music"];
+    expect(mayWrite("data/sound/music/../../../elsewhere/x", granted)).toBe(false);
+    expect(mayWrite("/data/sound/music/x", granted)).toBe(false);
+    expect(mayWrite("C:/data/sound/music/x", granted)).toBe(false);
+    expect(mayWrite("mods/../data/sound/music/x", granted)).toBe(false);
   });
 });
