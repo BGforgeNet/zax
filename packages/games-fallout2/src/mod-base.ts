@@ -15,6 +15,7 @@ import type { GameType, Install } from "@zax/core";
 import type { Platform } from "@zax/platform";
 import { fnv1a } from "@zax/core";
 import { preflightArchive } from "./archive-preflight.js";
+import { caseSensitiveAt, mixedCasePaths } from "./case-lowering.js";
 import type { ModComponent, ModManifest } from "./manifest.js";
 import { chooseFrom } from "./mod-choice.js";
 import { fetchAsset, refusalFor, type ModProgress } from "./mod-install.js";
@@ -41,6 +42,11 @@ export interface BaseInstallPlan {
   free?: number;
   /** The components chosen, including the ones the manifest marks required. Windows only. */
   components?: readonly string[];
+  /**
+   * How many entries the case-lowering pass would rename before the install runs. Absent where the pass does
+   * not apply - a filesystem that folds case, or an install that is already this mod's.
+   */
+  lowercasing?: number;
   /** The game type the install reports afterwards. */
   becomes: GameType;
   fingerprint: string;
@@ -98,7 +104,8 @@ export async function planBaseInstall(
   // mod has already changed, and after it has installed, the install answers to those rules itself: UPU
   // refuses over `mods/upu.dat`, which is the file UPU put there. Re-running them on an upgrade would refuse
   // every release after the first.
-  if (!isSameInstall(record, install, manifest)) {
+  const upgrading = isSameInstall(record, install, manifest);
+  if (!upgrading) {
     const refusal = await refusalFor(platform, install, release);
     if (refusal !== null) throw new Error(refusal);
   }
@@ -106,6 +113,15 @@ export async function planBaseInstall(
   const components = manifest.installer?.windows?.components
     ? componentsFor(manifest, selection).map((component) => component.id)
     : undefined;
+
+  // Before the download rather than after it: the pass can refuse over a pair of colliding names, and that
+  // refusal is worth having before an 800 MB transfer rather than after one. The upgrade arm skips it for the
+  // reason `mods.md` gives - the tree was lowercased by the first install, and the payload's own
+  // deliberately mixed-case files (`mods/AmmoGlovz.ini`) arrived afterwards and are not ZAX's to rename.
+  const lowercasing =
+    upgrading || !(await caseSensitiveAt(platform, install.path))
+      ? undefined
+      : (await mixedCasePaths(platform, install.path)).length;
 
   const download = installer.asset.size ?? 0;
   const free = await platform.fs.freeSpace(install.path);
@@ -145,6 +161,7 @@ export async function planBaseInstall(
     ...(unpacked !== undefined ? { unpacked } : {}),
     ...(free !== null ? { free } : {}),
     ...(components !== undefined ? { components } : {}),
+    ...(lowercasing !== undefined && lowercasing > 0 ? { lowercasing } : {}),
     becomes: manifest.becomes,
     fingerprint: fnv1a(
       [manifest.version, installer.asset.digest ?? "", installer.route, ...(components ?? [])].join("\n"),

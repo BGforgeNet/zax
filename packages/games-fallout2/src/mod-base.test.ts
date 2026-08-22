@@ -178,3 +178,29 @@ describe("a base mod over its own install", () => {
     await expect(planBaseInstall(platform, install, found)).rejects.toThrow(/cannot be installed over UPU/);
   });
 });
+
+describe("the case-lowering pass in the plan", () => {
+  it("counts what it would rename on a first install, and says nothing where there is nothing to do", async () => {
+    const mixed = basePlatform({ files: { [`${GAME}/Master.dat`]: "DAT", [`${GAME}/data/Proto/Items`]: "" } });
+    const plan = await planBaseInstall(mixed, install, await release());
+    expect(plan.lowercasing).toBe(3);
+
+    // A tree that is already lowercase needs no pass, and the plan does not offer to make one.
+    const clean = basePlatform({ files: { [`${GAME}/master.dat`]: "DAT" } });
+    expect((await planBaseInstall(clean, install, await release())).lowercasing).toBeUndefined();
+  });
+
+  it("does not lowercase an install that is already this mod's", async () => {
+    // The first install did it, and what arrived afterwards is the payload's own - `mods/AmmoGlovz.ini` is
+    // upstream's file, spelled the way upstream spells it.
+    const platform = basePlatform({ files: { [`${GAME}/mods/AmmoGlovz.ini`]: "[main]" } });
+    const onRpu: Install = { path: GAME, type: "fallout2rpu" };
+    expect((await planBaseInstall(platform, onRpu, await release())).lowercasing).toBeUndefined();
+  });
+
+  it("refuses over a pair of colliding names before spending the download on it", async () => {
+    const platform = basePlatform({ files: { [`${GAME}/Rpu.dat`]: "ONE", [`${GAME}/rpu.dat`]: "TWO" } });
+    await expect(planBaseInstall(platform, install, await release())).rejects.toThrow(/differ only in case/);
+    expect(platform.downloaded).toEqual([]);
+  });
+});
