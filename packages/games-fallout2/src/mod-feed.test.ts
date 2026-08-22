@@ -571,9 +571,9 @@ parts:
     // The renderer never reads a manifest, so the choice has to reach it through the offer or not at all.
     const listing = await listAvailableMods(platform, install, record, null);
     const offer = listing.offers.find((one) => one.id === "fo2tweaks");
-    expect(offer?.parts?.groups.map((group) => group.label)).toEqual(["Head", "Voice"]);
+    expect(offer?.choices?.groups.map((group) => group.label)).toEqual(["Head", "Voice"]);
     // Carried over rather than merely reported: this is what an upgrade would install without asking.
-    expect(offer?.parts).toMatchObject({ selection: ["head"], dropped: [], ask: false });
+    expect(offer?.choices).toMatchObject({ what: "parts", selection: ["head"], dropped: [], ask: false });
   });
 
   it("sees the mod as installed when any part of it is in the mods folder", async () => {
@@ -763,5 +763,37 @@ installer:
       baseVersion: { version: "34" },
     });
     expect(state).toEqual({ kind: "upgrade", from: "34" });
+  });
+});
+
+describe("a base mod beside a stacking mod of a similar name", () => {
+  it("does not read another mod's dat as itself being installed", async () => {
+    // The gate that keeps a base mod off an already-patched game runs before this, and a `present` that came
+    // from `mods/fo2tweaks.dat` would have walked straight past it.
+    const BASE = `spec: 1
+id: fo2tweaks
+name: Restoration Project, updated
+version: "2.4.34"
+game: fallout2
+type: base
+becomes: fallout2rpu
+installer:
+  other: { asset: rpu.zip, run: rpu-install.sh }
+`;
+    const release: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(BASE)),
+      manifestText: BASE,
+      manifestFromAsset: true,
+      installer: { route: "other", asset: { name: "rpu.zip", url: "https://example.test/rpu.zip" } },
+    };
+    const onPatched: Install = { path: "/games/fallout2", type: "fallout2up" };
+    const state = availability(release, {
+      install: onPatched,
+      record: { path: onPatched.path, mods: [] },
+      sfall: null,
+      present: true,
+    });
+    expect(state).toMatchObject({ kind: "blocked" });
+    expect((state as { why: string }).why).toMatch(/installs on Fallout 2 /);
   });
 });

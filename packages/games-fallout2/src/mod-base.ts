@@ -111,9 +111,12 @@ export async function planBaseInstall(
     if (refusal !== null) throw new Error(refusal);
   }
 
-  const components = manifest.installer?.windows?.components
-    ? componentsFor(manifest, selection).map((component) => component.id)
-    : undefined;
+  // Only where this host runs the installer that has them. The zip route ships every optional dat and takes
+  // no component argument, so naming a component in its plan would name something that changes nothing.
+  const components =
+    installer.route === "windows" && manifest.installer?.windows?.components
+      ? componentsFor(manifest, selection).map((component) => component.id)
+      : undefined;
 
   // Before the download rather than after it: the pass can refuse over a pair of colliding names, and that
   // refusal is worth having before an 800 MB transfer rather than after one. The upgrade arm skips it for the

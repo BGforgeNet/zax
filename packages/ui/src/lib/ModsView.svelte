@@ -20,9 +20,14 @@
     const state = offer.availability;
     switch (state.kind) {
       case "install":
-        return "Not installed.";
+        return offer.becomes
+          ? `Not installed. Turns this installation into ${gameName(offer.becomes)}.`
+          : "Not installed.";
       case "install-over":
-        return "In the mods folder without a record - installed by hand, or before ZAX kept one.";
+        // A base mod's directory is the record it has not got: this install already is what the mod makes.
+        return offer.becomes
+          ? `This installation is already ${gameName(offer.becomes)}, at a version it does not state. Installing lays this release over it.`
+          : "In the mods folder without a record - installed by hand, or before ZAX kept one.";
       case "installed":
         return "Installed and current.";
       case "upgrade":
@@ -74,7 +79,7 @@
 
   /** Part ids as the manifest labels them; an id the release no longer offers stands for itself. */
   function partLabels(offer: ModOffer, ids: readonly string[]): string[] {
-    const options = (offer.parts?.groups ?? []).flatMap((group) => group.options);
+    const options = (offer.choices?.groups ?? []).flatMap((group) => group.options);
     return ids.map((id) => options.find((part) => part.id === id)?.label ?? id);
   }
 
@@ -175,10 +180,14 @@
               <div class="about">
                 <span class="mod-name">{offer.name}</span>
                 <span class="version">{offer.version}</span>
-                {#if offer.type === "permanent"}
-                  <span class="badge">permanent</span>
+                {#if offer.type !== "pluggable"}
+                  <span class="badge">{offer.type}</span>
                 {/if}
                 <p class="status" class:warn={offer.availability.kind === "downgrade"}>{statusOf(offer)}</p>
+                {#if offer.type === "base"}
+                  <!-- Said before install as well as after, because it is the thing to know going in. -->
+                  <p class="status">Cannot be uninstalled: it replaces the installation rather than adding to it.</p>
+                {/if}
                 {#if offer.type === "permanent" && offer.reason !== undefined}
                   <!-- The declared reason stands in for the Remove control the row never gets - and it is
                      said before install too, since permanence is something to know going in. -->
@@ -354,15 +363,15 @@
 <!-- Asked before anything is downloaded, and only when the choice cannot be carried over from the record:
      a first install, or a release that took away what was chosen. The plan dialog follows it as always. -->
 <Dialog open={store.modParts !== null} title="Choose what to install" dismiss={() => store.dismissModParts()}>
-  {#if store.modParts?.offer.parts}
+  {#if store.modParts?.offer.choices}
     {@const chosen = store.modParts.chosen}
-    {#if store.modParts.offer.parts.dropped.length > 0}
+    {#if store.modParts.offer.choices.dropped.length > 0}
       <p class="plan-lead">
         No longer offered by {store.modParts.offer.version}, so it cannot be kept:
-        <code>{store.modParts.offer.parts.dropped.join(", ")}</code>.
+        <code>{store.modParts.offer.choices.dropped.join(", ")}</code>.
       </p>
     {/if}
-    {#each store.modParts.offer.parts.groups as group (group.label)}
+    {#each store.modParts.offer.choices.groups as group (group.label)}
       <fieldset class="parts">
         <legend>{group.label}</legend>
         {#each group.options as part (part.id)}
@@ -371,17 +380,21 @@
             part.needs === undefined || chosen.includes(part.needs)
               ? null
               : partLabels(store.modParts.offer, [part.needs])[0]}
+          <!-- A component the installer always selects is shown rather than hidden, and not as a choice: it
+             is part of what installing means, so its box is ticked and beyond reach. -->
+          {@const fixed = "required" in part && part.required === true}
           <label class="part" class:blocked={waits !== null}>
             <input
               type={group.pick === "one" ? "radio" : "checkbox"}
               name={group.label}
-              checked={chosen.includes(part.id)}
-              disabled={waits !== null}
+              checked={fixed || chosen.includes(part.id)}
+              disabled={fixed || waits !== null}
               onchange={(event) => store.setModPart(part.id, event.currentTarget.checked)}
             />
             <span>
               <span class="part-name">{part.label}</span>
               {#if part.help}<span class="note">{part.help}</span>{/if}
+              {#if fixed}<span class="note">Always installed.</span>{/if}
               <!-- Named rather than merely greyed: what to tick to make it available is the whole answer. -->
               {#if waits !== null}<span class="note">Needs {waits}.</span>{/if}
             </span>
@@ -392,7 +405,13 @@
   {/if}
   {#snippet footer()}
     <button onclick={() => store.dismissModParts()}>Cancel</button>
-    <button class="primary" disabled={store.modParts?.chosen.length === 0} onclick={() => void store.confirmModParts()}>
+    <!-- A mod installing none of its own parts installs nothing; an installer with nothing ticked still
+       installs what it always installs, so only the first is a reason to hold the button. -->
+    <button
+      class="primary"
+      disabled={store.modParts?.offer.choices?.what === "parts" && store.modParts.chosen.length === 0}
+      onclick={() => void store.confirmModParts()}
+    >
       Continue
     </button>
   {/snippet}
@@ -420,7 +439,9 @@
       </li>
       {#if plan.free !== undefined}<li>Free on this drive: {megabytes(plan.free)}</li>{/if}
       {#if plan.components && plan.components.length > 0}
-        <li>Components: <code>{plan.components.join(", ")}</code></li>
+        <!-- By the names they were chosen under, not the installer's own: `walk_speed\low_fps` is what goes
+           on the command line, and nobody picked that. -->
+        <li>Components: {partLabels(store.modPlan.offer, plan.components).join(", ")}</li>
       {/if}
       {#if plan.lowercasing}
         <!-- Its own line rather than something that happens silently: it is the widest-reaching rename here. -->
@@ -454,11 +475,11 @@
         Parts: <code>{partLabels(store.modPlan.offer, plan.parts).join(", ")}</code>.
       </p>
     {/if}
-    {#if store.modPlan.offer.parts && store.modPlan.offer.parts.dropped.length > 0}
+    {#if store.modPlan.offer.choices && store.modPlan.offer.choices.dropped.length > 0}
       <!-- Said before the install runs rather than left for the record to explain afterwards. -->
       <p class="plan-lead">
-        <code>{store.modPlan.offer.parts.dropped.join(", ")}</code>
-        {store.modPlan.offer.parts.dropped.length === 1 ? "is" : "are"} no longer offered, and will not be reinstalled.
+        <code>{store.modPlan.offer.choices.dropped.join(", ")}</code>
+        {store.modPlan.offer.choices.dropped.length === 1 ? "is" : "are"} no longer offered, and will not be reinstalled.
       </p>
     {/if}
     {#if plan.orderLines.length > 0}

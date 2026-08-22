@@ -215,7 +215,7 @@ class Store {
    * mod's names every file, and a base mod's names the release and the space, the installer owning the rest.
    */
   modPlan = $state<{ offer: ModOffer; plan: ModInstallPlan | BaseInstallPlan } | null>(null);
-  /** The parts chooser while it is open: the offer whose choice is being made, and what is ticked. */
+  /** The chooser while it is open: the offer whose choice is being made, and what is ticked in it. */
   modParts = $state<{ offer: ModOffer; chosen: readonly string[] } | null>(null);
   /** The installed mods' settings schemas, rendered with the same per-kind controls the catalog gets. */
   modSettings = $state<readonly ModSettingsGroup[]>([]);
@@ -721,11 +721,11 @@ class Store {
       this.notice = refusal;
       return;
     }
-    if (chosen === undefined && offer.parts?.ask) {
-      this.modParts = { offer, chosen: offer.parts.selection };
+    if (chosen === undefined && offer.choices?.ask) {
+      this.modParts = { offer, chosen: offer.choices.selection };
       return;
     }
-    const parts = chosen ?? offer.parts?.selection;
+    const parts = chosen ?? offer.choices?.selection;
     await this.run(
       `Preparing ${offer.name} ${offer.version}`,
       async () => {
@@ -744,7 +744,7 @@ class Store {
    */
   setModPart(id: string, on: boolean): void {
     const held = this.modParts;
-    const groups = held?.offer.parts?.groups;
+    const groups = held?.offer.choices?.groups;
     if (!held || !groups) return;
     const group = groups.find((one) => one.options.some((option) => option.id === id));
     if (!group) return;
@@ -789,6 +789,9 @@ class Store {
         // The plan's own choices, not the chooser's: what runs is what the resolved plan said it would.
         const chosen = held.plan.kind === "base" ? held.plan.components : held.plan.parts;
         const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint, chosen);
+        // A base install makes this a different game, and nothing but the directory knows that: the stored
+        // type came from a reading taken before the installer ran.
+        if ("becomes" in outcome) await this.reidentify(install.path);
         await this.readInstall();
         await this.refreshModOffers(install);
         const conflicts =
@@ -799,6 +802,17 @@ class Store {
       },
       { id: held.offer.id, action: "install" },
     );
+  }
+
+  /**
+   * Re-reads what kind of game sits at a path and stores it. Only a base install changes the answer, and it
+   * is what makes the install's name and badge follow what was just done to it.
+   */
+  private async reidentify(path: string): Promise<void> {
+    const type = await backend.identifyInstall(path);
+    if (type === null) return;
+    this.installs = this.installs.map((one) => (one.path === path ? { ...one, type } : one));
+    await this.persist();
   }
 
   /** Cancelling the plan keeps the working directory, so a later attempt resumes rather than re-downloads. */

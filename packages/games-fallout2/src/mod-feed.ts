@@ -16,7 +16,7 @@
  * manifest asset is immutable once published and is kept for good.
  */
 
-import { compareVersions, GAME_TYPES, type Install } from "@zax/core";
+import { compareVersions, GAME_TYPES, type GameType, type Install } from "@zax/core";
 import { NetworkError, type Platform } from "@zax/platform";
 import {
   MANIFEST_NAME,
@@ -27,6 +27,7 @@ import {
   type ModPartGroup,
   type ModType,
 } from "./manifest.js";
+import type { ChoiceGroup } from "./mod-choice.js";
 import { installedBaseVersion, type BaseVersion } from "./base-version.js";
 import { carryOver, type CarriedSelection } from "./mod-parts.js";
 import type { InstallRecord } from "./records.js";
@@ -398,10 +399,12 @@ export function availability(release: ModRelease, context: ModContext): Availabi
     return { kind: "upgrade", from: recorded.version };
   }
 
-  // Presence always comes from the directory; a mod there without a record upgrades by installing over.
-  // For a base mod the directory says so by having become what the mod makes: a hand-installed RPU is the
-  // common state, and this arm is both its upgrade path and its repair - laying the release down again.
-  if (manifest.becomes !== undefined && context.install.type === manifest.becomes) {
+  // Presence always comes from the directory. For a base mod that means the type the directory reports and
+  // nothing else - a hand-installed RPU is the common state, and this arm is both its upgrade path and its
+  // repair. A file in `mods/` answering to the mod's id is somebody else's dat with a similar name, and
+  // reading it as "already installed" would walk past the gate that keeps a base mod off a changed game.
+  if (manifest.type === "base") {
+    if (context.install.type !== manifest.becomes) return blockedByType(manifest, context) ?? { kind: "install" };
     const held = context.baseVersion;
     // What the install stamped into `ddraw.ini` stands in for the record it has not got - but only within
     // its own line. RPU's 2.3 and 2.4 ship in lockstep and never upgrade across, so a 2.4 release meeting a
@@ -421,15 +424,18 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   if (context.present) return { kind: "install-over" };
 
   // The game-type gate protects a first install alone - install-over and upgrades are the same mod already.
-  if (manifest.installOn !== undefined && !manifest.installOn.includes(context.install.type)) {
-    const wanted = manifest.installOn.map((type) => GAME_TYPES[type].name).join(" or ");
-    return {
-      kind: "blocked",
-      why: `${manifest.name} installs on ${wanted} - this install is ${GAME_TYPES[context.install.type].name}.`,
-    };
-  }
+  const blocked = blockedByType(manifest, context);
+  return blocked ?? { kind: "install" };
+}
 
-  return { kind: "install" };
+/** The game-type gate: what a mod says it installs on, against what this install is. */
+function blockedByType(manifest: ModManifest, context: ModContext): Availability | null {
+  if (manifest.installOn === undefined || manifest.installOn.includes(context.install.type)) return null;
+  const wanted = manifest.installOn.map((type) => GAME_TYPES[type].name).join(" or ");
+  return {
+    kind: "blocked",
+    why: `${manifest.name} installs on ${wanted} - this install is ${GAME_TYPES[context.install.type].name}.`,
+  };
 }
 
 /**
@@ -469,15 +475,23 @@ export interface ModOffer {
   type: ModType;
   /** A permanent mod's declared reason, standing where the Remove control would be. */
   reason?: string;
-  /** The choice this release offers and where this install stands in it. Absent for a mod without parts. */
-  parts?: ModPartsOffer;
+  /** What a base mod turns this install into, which is the thing worth knowing before installing one. */
+  becomes?: GameType;
+  /**
+   * The choice to make before installing this release, and where this install stands in it. A stacking mod's
+   * parts and a base installer's components are the same question asked of two different manifests, so the
+   * interface gets one shape and draws one dialog.
+   */
+  choices?: ChoiceOffer;
   availability: Availability;
 }
 
 /** Everything the interface needs to draw a choice it cannot compute: the renderer reads no manifest. */
-export interface ModPartsOffer extends CarriedSelection {
+export interface ChoiceOffer extends CarriedSelection {
+  /** Which of the two is being chosen - the words the dialog uses, and nothing else, turn on this. */
+  what: "parts" | "components";
   /** The groups this release can deliver, in the order the manifest declares them. */
-  groups: readonly ModPartGroup[];
+  groups: readonly ChoiceGroup[];
 }
 
 export interface ModListing {
@@ -508,15 +522,27 @@ export async function listAvailableMods(
       const present = await presentInMods(platform, install.path, feed.id, declared);
       // Read only for a base mod, and only where it could answer: a stacking mod's version is the record's.
       const baseVersion = release.manifest.type === "base" ? await installedBaseVersion(platform, install) : undefined;
-      const groups = offeredParts(release);
-      const carried = carryOver(release, record.mods.find((mod) => mod.id === release.manifest.id)?.parts);
+      // A base mod's components are asked for every install rather than carried over: they are the
+      // installer's own list, ZAX records no selection for them, and the installer's wizard would ask too.
+      //
+      // Only where this host would actually run that installer. The choice exists in the Inno installer and
+      // nowhere else - RPU's build moves the optional dats out of `mods/` for that route alone, and the zip
+      // every other system takes ships all of them - so offering it here would be offering a choice that
+      // changes nothing.
+      const components =
+        release.installer?.route === "windows" ? release.manifest.installer?.windows?.components : undefined;
+      const groups = components ?? offeredParts(release);
+      const carried: CarriedSelection = components
+        ? { selection: [], dropped: [], ask: true }
+        : carryOver(release, record.mods.find((mod) => mod.id === release.manifest.id)?.parts);
       offers.push({
         id: release.manifest.id,
         name: release.manifest.name,
         version: release.manifest.version,
         type: release.manifest.type,
         ...(release.manifest.reason !== undefined ? { reason: release.manifest.reason } : {}),
-        ...(groups.length > 0 ? { parts: { groups, ...carried } } : {}),
+        ...(release.manifest.becomes !== undefined ? { becomes: release.manifest.becomes } : {}),
+        ...(groups.length > 0 ? { choices: { what: components ? "components" : "parts", groups, ...carried } } : {}),
         availability: availability(release, {
           install,
           record,

@@ -311,3 +311,12 @@ describe("the command an Inno installer is given", () => {
     expect(args[args.length - 1]).toBe("/COMPONENTS=core,walk_speed,walk_speed\\low_fps");
   });
 });
+
+describe("components on a system whose route has none", () => {
+  it("plans no components for the payload route, whose zip ships them all anyway", async () => {
+    // The manifest declares components for its Windows installer; this host takes the other route, where
+    // there is nothing to pass them to.
+    const plan = await planBaseInstall(basePlatform(), install, await release("other"));
+    expect(plan.components).toBeUndefined();
+  });
+});
