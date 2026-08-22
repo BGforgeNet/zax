@@ -58,6 +58,12 @@ export interface ModRelease {
    * publishes are here: a release missing one asset still offers the others, rather than nothing.
    */
   parts?: Readonly<Record<string, ReleaseAsset>>;
+  /**
+   * A base mod's installer for the platform ZAX is running on, and which of the two routes it is - the
+   * Windows installer program, or the payload with a script inside it. Resolved here rather than at the
+   * install so eligibility can say "not for this system" without downloading anything.
+   */
+  installer?: { route: "windows" | "other"; asset: ReleaseAsset };
 }
 
 /**
@@ -233,6 +239,19 @@ async function fetchManifestText(
  * silently - when no release matches, the first refusal is the answer, since "this needs a newer ZAX" is
  * truer than "nothing found".
  */
+/** Which of a base manifest's routes this host takes, and the asset it names - or nothing for either miss. */
+function installerFor(
+  platform: Platform,
+  manifest: ModManifest,
+  assets: readonly ReleaseAsset[],
+): ModRelease["installer"] {
+  const route = platform.os === "windows" ? "windows" : "other";
+  const declared = manifest.installer?.[route];
+  if (!declared) return undefined;
+  const asset = assets.find((entry) => entry.name === declared.asset);
+  return asset ? { route, asset } : undefined;
+}
+
 export async function fetchFeed(platform: Platform, feed: ModFeed, now: Date = new Date()): Promise<ModRelease> {
   const releases = await fetchReleases(platform, feed.repository, now);
   let firstRefusal: Error | null = null;
@@ -264,12 +283,14 @@ export async function fetchFeed(platform: Platform, feed: ModFeed, now: Date = n
       const asset = release.assets.find((entry) => entry.name === part.archive);
       if (asset) parts[part.id] = asset;
     }
+    const installer = installerFor(platform, manifest, release.assets);
     best = {
       manifest,
       manifestText: found.text,
       manifestFromAsset: found.fromAsset,
       ...(archive ? { archive } : {}),
       ...(manifest.parts ? { parts } : {}),
+      ...(installer ? { installer } : {}),
     };
   }
 
@@ -339,7 +360,15 @@ export function availability(release: ModRelease, context: ModContext): Availabi
 
   // Everything from here on is an offer to download, which a release that never names its payload cannot make.
   // For a parts release the payload is whatever parts resolved: one asset short is not nothing to install.
-  if (!release.archive && offeredParts(release).length === 0) {
+  if (manifest.type === "base") {
+    // A base mod's payload is its installer, and a release that publishes one for another system is not a
+    // release that named nothing - the mod is real and this machine cannot run it, which is what it says.
+    if (!release.installer)
+      return {
+        kind: "blocked",
+        why: `${manifest.name} publishes no installer for this system.`,
+      };
+  } else if (!release.archive && offeredParts(release).length === 0) {
     return {
       kind: "blocked",
       why: manifest.parts
@@ -357,7 +386,10 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   }
 
   // Presence always comes from the directory; a mod there without a record upgrades by installing over.
-  if (context.present) return { kind: "install-over" };
+  // For a base mod the directory says so by having become what the mod makes: a hand-installed RPU is the
+  // common state, and this arm is both its upgrade path and its repair - laying the release down again.
+  if (context.present || (manifest.becomes !== undefined && context.install.type === manifest.becomes))
+    return { kind: "install-over" };
 
   // The game-type gate protects a first install alone - install-over and upgrades are the same mod already.
   if (manifest.installOn !== undefined && !manifest.installOn.includes(context.install.type)) {

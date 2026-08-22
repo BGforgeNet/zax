@@ -581,3 +581,96 @@ parts:
     expect(await presentInMods(platform, "/game", "cassidy", ALL)).toBe(true);
   });
 });
+
+describe("a base mod's release", () => {
+  const install: Install = { path: "/games/fallout2", type: "fallout2" };
+  const RPU = `spec: 1
+id: fo2tweaks
+name: Restoration Project, updated
+version: "2.4.34"
+game: fallout2
+type: base
+becomes: fallout2rpu
+installer:
+  windows: { asset: rpu.exe, silent: inno }
+  other: { asset: rpu.zip, run: rpu-install.sh }
+`;
+
+  const asset = (name: string) => ({
+    name,
+    browser_download_url: `https://example.test/v2.4.34/${name}`,
+    digest: "sha256:cc",
+    size: 800,
+  });
+  const basePlatform = (names: readonly string[], os: "linux" | "windows" = "linux") =>
+    new MemoryPlatform({
+      os,
+      responses: {
+        [RELEASES_URL]: JSON.stringify([{ tag_name: "v2.4.34", assets: [asset("f2mod.yml"), ...names.map(asset)] }]),
+        "https://example.test/v2.4.34/f2mod.yml": RPU,
+      },
+    });
+
+  const context = (over: Partial<ModContext> = {}): ModContext => ({
+    install,
+    record: { path: install.path, mods: [] },
+    sfall: null,
+    present: false,
+    ...over,
+  });
+
+  it("resolves the asset this platform's route names, and says which route it is", async () => {
+    const found = await fetchFeed(basePlatform(["rpu.zip", "rpu.exe"]), FEED);
+    expect(found.installer).toEqual({ route: "other", asset: expect.objectContaining({ name: "rpu.zip" }) });
+    const onWindows = await fetchFeed(basePlatform(["rpu.zip", "rpu.exe"], "windows"), FEED);
+    expect(onWindows.installer?.route).toBe("windows");
+    expect(onWindows.installer?.asset.name).toBe("rpu.exe");
+  });
+
+  it("blocks where the release publishes no installer this platform can run", async () => {
+    // Windows-only release, Linux host: the mod exists and this machine cannot install it, which is a
+    // different thing from a release that named no payload at all.
+    const found = await fetchFeed(basePlatform(["rpu.exe"]), FEED);
+    const state = availability(found, context());
+    expect(state).toMatchObject({ kind: "blocked" });
+    expect((state as { why: string }).why).toMatch(/no installer for this system/);
+  });
+
+  it("offers a base mod on a vanilla install and refuses it on a patched one", async () => {
+    const found = await fetchFeed(basePlatform(["rpu.zip"]), FEED);
+    expect(availability(found, context())).toEqual({ kind: "install" });
+    const patched = availability(found, context({ install: { path: install.path, type: "fallout2upu" } }));
+    expect(patched).toMatchObject({ kind: "blocked" });
+    expect((patched as { why: string }).why).toMatch(/Unofficial Patch Updated/);
+  });
+
+  it("offers the same release over an install already of the type it makes - repair, and the only way in", async () => {
+    // The common state: a hand-installed RPU, which has no record and is no longer vanilla, so the gate that
+    // protects a vanilla game would otherwise refuse the mod its own upgrade.
+    const found = await fetchFeed(basePlatform(["rpu.zip"]), FEED);
+    const onRpu = context({ install: { path: install.path, type: "fallout2rpu" } });
+    expect(availability(found, onRpu)).toEqual({ kind: "install-over" });
+  });
+
+  it("offers an upgrade against a record of the same mod, whatever the install has become", async () => {
+    const found = await fetchFeed(basePlatform(["rpu.zip"]), FEED);
+    const record = {
+      path: install.path,
+      mods: [
+        {
+          id: "fo2tweaks",
+          version: "2.4.33",
+          complete: true,
+          type: "base" as const,
+          files: [],
+          manifest: RPU,
+          shipped: {},
+        },
+      ],
+    };
+    expect(availability(found, context({ record, install: { path: install.path, type: "fallout2rpu" } }))).toEqual({
+      kind: "upgrade",
+      from: "2.4.33",
+    });
+  });
+});

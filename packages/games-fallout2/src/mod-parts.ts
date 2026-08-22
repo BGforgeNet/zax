@@ -8,6 +8,7 @@
  */
 
 import { partOptions, type ModPart } from "./manifest.js";
+import { chooseFrom } from "./mod-choice.js";
 import { offeredParts, type ModRelease } from "./mod-feed.js";
 
 /**
@@ -17,32 +18,11 @@ import { offeredParts, type ModRelease } from "./mod-feed.js";
  */
 export function chosenParts(release: ModRelease, selection: readonly string[]): readonly ModPart[] {
   const { manifest } = release;
-  const groups = offeredParts(release);
-  const offered = new Map(groups.flatMap((group) => group.options).map((part) => [part.id, part]));
-
-  const picked = new Set<string>();
-  for (const id of selection) {
-    const part = offered.get(id);
-    if (!part) throw new Error(`The ${manifest.name} release does not offer a part called "${id}".`);
-    picked.add(id);
-  }
-  if (picked.size === 0) throw new Error(`Nothing of ${manifest.name} is selected, so there is nothing to install.`);
-
-  for (const group of groups) {
-    const chosen = group.options.filter((part) => picked.has(part.id));
-    if (group.pick === "one" && chosen.length > 1) {
-      const names = chosen.map((part) => part.label).join(" and ");
-      throw new Error(`Only one ${group.label} can be installed, and ${names} are both selected.`);
-    }
-  }
-
-  for (const part of offered.values()) {
-    if (!picked.has(part.id) || part.needs === undefined || picked.has(part.needs)) continue;
-    const needed = offered.get(part.needs)?.label ?? part.needs;
-    throw new Error(`${part.label} needs ${needed}, which is not selected.`);
-  }
-
-  return partOptions(manifest).filter((part) => picked.has(part.id));
+  // Nothing chosen is a refusal here and not in the shared rules: an installer's components may legitimately
+  // come to nothing but what is required, while a mod installing none of its own parts installs nothing.
+  if (selection.length === 0)
+    throw new Error(`Nothing of ${manifest.name} is selected, so there is nothing to install.`);
+  return chooseFrom(offeredParts(release), selection, { thing: "part", of: manifest.name });
 }
 
 /** Where an install stands in a release's choices: what to install, what went, and whether to ask. */
