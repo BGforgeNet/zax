@@ -693,6 +693,19 @@ function permanenceOf(recorded: InstalledMod): {
   };
 }
 
+/** The directory a recorded mod created, where its manifest snapshot says it created one. */
+function createdDirectory(recorded: InstalledMod): string | null {
+  try {
+    return (
+      parseManifest(new TextEncoder().encode(recorded.manifest), { version: recorded.version }).creates?.directory ??
+      null
+    );
+  } catch {
+    // A snapshot this version cannot read says nothing either way, and the general sentence is the safe one.
+    return null;
+  }
+}
+
 export interface ModRemoval {
   /** What was deleted, relative to the install. */
   files: readonly string[];
@@ -724,10 +737,18 @@ export async function uninstallMod(
       throw new Error(`${verdict.name} cannot be uninstalled: ${verdict.reason ?? "its manifest says so"}`);
     // A base mod's own answer, and it needs no declared reason: it replaced the game rather than stacking on
     // it, so there is nothing to take away and leave the install as it was. Upstream says the same thing.
-    if (verdict.type === "base")
+    //
+    // Unless it created one instead of transforming this one, where the opposite is true: this install was
+    // never touched, and what the mod made is a folder. Read off the recorded manifest, since the type alone
+    // cannot tell the two apart and telling a user to reinstall the game would be false.
+    if (verdict.type === "base") {
+      const made = createdDirectory(recorded);
       throw new Error(
-        `${verdict.name} cannot be uninstalled: it replaced this installation rather than adding to it. Starting from a fresh copy of the game is the way back.`,
+        made === null
+          ? `${verdict.name} cannot be uninstalled: it replaced this installation rather than adding to it. Starting from a fresh copy of the game is the way back.`
+          : `${verdict.name} cannot be uninstalled by ZAX: what it installed is a whole game in ${made}, which is a folder to delete by hand.`,
       );
+    }
     // Closed rather than open: a record that cannot be read is exactly the state where a permanent mod would
     // look removable, and a wrong refusal costs a message while a wrong removal costs the install.
     if (verdict.type === null)

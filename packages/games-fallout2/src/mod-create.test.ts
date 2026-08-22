@@ -5,6 +5,7 @@ import { parseManifest } from "./manifest.js";
 import type { ModRelease } from "./mod-feed.js";
 import { loadRecord } from "./records.js";
 import { applyCreateInstall, planCreateInstall } from "./mod-create.js";
+import { uninstallMod } from "./mod-install.js";
 
 const GAME = "/game";
 const FO1 = "/fallout1";
@@ -212,5 +213,21 @@ describe("performing an install that creates another", () => {
 
     const after = new TextDecoder().decode(await platform.fs.read(`${GAME}/Fallout1in2/ddraw.ini`));
     expect(after).toContain("MyOwn=7");
+  });
+});
+
+describe("removing what created an install", () => {
+  it("says the folder is the way back, rather than telling the user to reinstall the game", async () => {
+    const { platform } = await (async () => {
+      const platform = createPlatform();
+      const found = await release();
+      const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
+      await applyCreateInstall(platform, install, found, plan, TOOL);
+      return { platform };
+    })();
+    // The host was never touched, so "start from a fresh copy of the game" - what a delegated base mod's
+    // removal says - would be false here.
+    await expect(uninstallMod(platform, install, "fo1in2")).rejects.toThrow(/folder to delete by hand/);
+    await expect(uninstallMod(platform, install, "fo1in2")).rejects.toThrow(/Fallout1in2/);
   });
 });

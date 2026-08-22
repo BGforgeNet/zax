@@ -193,8 +193,14 @@
                 {/if}
                 <p class="status" class:warn={offer.availability.kind === "downgrade"}>{statusOf(offer)}</p>
                 {#if offer.type === "base"}
-                  <!-- Said before install as well as after, because it is the thing to know going in. -->
-                  <p class="status">Cannot be uninstalled: it replaces the installation rather than adding to it.</p>
+                  <!-- Said before install as well as after, because it is the thing to know going in. The two
+                     kinds of base mod need different sentences: one replaces this installation and the other
+                     leaves it alone, so the way back differs as much as the install does. -->
+                  <p class="status">
+                    {offer.creates
+                      ? `ZAX will not remove it: what it installs is a whole game in ${offer.creates}, which is a folder to delete by hand.`
+                      : "Cannot be uninstalled: it replaces the installation rather than adding to it."}
+                  </p>
                 {/if}
                 {#if offer.type === "permanent" && offer.reason !== undefined}
                   <!-- The declared reason stands in for the Remove control the row never gets - and it is
@@ -440,11 +446,16 @@
         {#if input.help}<span class="note">{input.help}</span>{/if}
         <div class="ask-row">
           <!-- Read-only rather than a typed path: the picker is the shell's, and a folder typed by hand is a
-             refusal from the install rather than an answer. -->
-          <input type="text" readonly value={answers[input.id] ?? ""} placeholder="No folder chosen" />
+             refusal from the install rather than an answer. The file that decides whether the folder is the
+             right one is the placeholder rather than a line of its own, which the help above already is. -->
+          <input
+            type="text"
+            readonly
+            value={answers[input.id] ?? ""}
+            placeholder="Choose the folder holding {input.holds}"
+          />
           <button onclick={() => void store.browseForModInput(input.id)}>Browse...</button>
         </div>
-        <span class="note">The folder holding <code>{input.holds}</code>.</span>
       </div>
     {/each}
   {/if}
