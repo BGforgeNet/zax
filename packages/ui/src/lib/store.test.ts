@@ -808,6 +808,63 @@ describe("mod flows and unsaved edits", () => {
   });
 });
 
+describe("a mod that offers parts", () => {
+  const groups = [
+    {
+      label: "Head",
+      pick: "any" as const,
+      options: [{ id: "head", label: "New head", archive: "head.dat", entries: ["head.dat"] }],
+    },
+    {
+      label: "Voice",
+      pick: "one" as const,
+      options: [
+        { id: "joey", label: "Joey Bracken", archive: "joey.dat", entries: ["joey.dat"], needs: "head" },
+        { id: "tom", label: "Tom Regan", archive: "tom.dat", entries: ["tom.dat"], needs: "head" },
+      ],
+    },
+  ];
+  const offer = (parts: { selection: string[]; dropped: string[]; ask: boolean }) => ({
+    id: "cassidy",
+    name: "Cassidy",
+    version: "1.2",
+    type: "pluggable" as const,
+    parts: { groups, ...parts },
+    availability: { kind: "install" as const },
+  });
+
+  test("asks before planning when the choice cannot be carried over", async () => {
+    await store.prepareMod(offer({ selection: [], dropped: [], ask: true }));
+    expect(store.modParts?.chosen).toEqual([]);
+    expect(store.modPlan, "nothing is downloaded until the choice is made").toBeNull();
+    store.dismissModParts();
+  });
+
+  test("carries a recorded choice straight to the plan, without asking", async () => {
+    // The preview refuses the feed's network, so the flow ends in that refusal - which is after the point
+    // this is about: the dialog that never opened.
+    await store.prepareMod(offer({ selection: ["head", "joey"], dropped: [], ask: false }));
+    expect(store.modParts, "an upgrade re-installs the same parts without a question").toBeNull();
+    expect(store.notice?.kind).toBe("problem");
+  });
+
+  test("unticks what depended on a part when that part goes, and keeps a pick-one group to one", async () => {
+    await store.prepareMod(offer({ selection: [], dropped: [], ask: true }));
+    store.setModPart("head", true);
+    store.setModPart("joey", true);
+    expect(store.modParts?.chosen).toEqual(["head", "joey"]);
+
+    store.setModPart("tom", true);
+    expect(store.modParts?.chosen, "the other voice went with it").toEqual(["head", "tom"]);
+
+    // Nothing else could have installed: the voice needs the head, so the dialog cannot sit in a state the
+    // install would only refuse.
+    store.setModPart("head", false);
+    expect(store.modParts?.chosen).toEqual([]);
+    store.dismissModParts();
+  });
+});
+
 describe("a running mod flow", () => {
   test("marks the control that started it, and clears the mark however the flow ends", async () => {
     const offer = {

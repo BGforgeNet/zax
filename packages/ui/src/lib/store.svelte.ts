@@ -211,6 +211,8 @@ class Store {
   modListing = $state<ModListing | null>(null);
   /** A resolved install plan awaiting the user's word, with the offer it belongs to. */
   modPlan = $state<{ offer: ModOffer; plan: ModInstallPlan } | null>(null);
+  /** The parts chooser while it is open: the offer whose choice is being made, and what is ticked. */
+  modParts = $state<{ offer: ModOffer; chosen: readonly string[] } | null>(null);
   /** The installed mods' settings schemas, rendered with the same per-kind controls the catalog gets. */
   modSettings = $state<readonly ModSettingsGroup[]>([]);
   /** Which of the Mods view's tabs is showing. */
@@ -343,6 +345,7 @@ class Store {
     // Another install's offers would be wrong here, and a held plan doubly so; the view re-asks on demand.
     this.modListing = null;
     this.modPlan = null;
+    this.modParts = null;
     if (!install) {
       this.contents = {};
       this.modSettings = [];
@@ -701,8 +704,12 @@ class Store {
     return null;
   }
 
-  /** Downloads and verifies a release, then holds its resolved plan up for the user's word. */
-  async prepareMod(offer: ModOffer): Promise<void> {
+  /**
+   * Downloads and verifies a release, then holds its resolved plan up for the user's word. A release that
+   * offers parts is asked about first, unless the record's choice carried over - which is what "an upgrade
+   * re-installs the same choices without asking" means.
+   */
+  async prepareMod(offer: ModOffer, chosen?: readonly string[]): Promise<void> {
     const install = this.install;
     if (!install) return;
     const refusal = this.modFlowRefusal();
@@ -710,15 +717,58 @@ class Store {
       this.notice = refusal;
       return;
     }
+    if (chosen === undefined && offer.parts?.ask) {
+      this.modParts = { offer, chosen: offer.parts.selection };
+      return;
+    }
+    const parts = chosen ?? offer.parts?.selection;
     await this.run(
       `Preparing ${offer.name} ${offer.version}`,
       async () => {
-        const plan = await backend.planMod(install, offer.id);
+        const plan = await backend.planMod(install, offer.id, parts);
         this.modPlan = { offer, plan };
         return null;
       },
       { id: offer.id, action: "prepare" },
     );
+  }
+
+  /**
+   * Ticks or unticks one part. A `one` group's other options go off with it, which is what makes it one, and
+   * so does anything that needs what was just unticked - a selection the install would only refuse is not a
+   * state to let the dialog sit in.
+   */
+  setModPart(id: string, on: boolean): void {
+    const held = this.modParts;
+    const groups = held?.offer.parts?.groups;
+    if (!held || !groups) return;
+    const group = groups.find((one) => one.options.some((option) => option.id === id));
+    if (!group) return;
+    const cleared = group.pick === "one" ? group.options.map((option) => option.id) : [id];
+    let chosen = held.chosen.filter((picked) => !cleared.includes(picked));
+    if (on) chosen = [...chosen, id];
+
+    const options = groups.flatMap((one) => one.options);
+    for (;;) {
+      const kept = chosen.filter((picked) => {
+        const needs = options.find((option) => option.id === picked)?.needs;
+        return needs === undefined || chosen.includes(needs);
+      });
+      if (kept.length === chosen.length) break;
+      chosen = kept;
+    }
+    this.modParts = { offer: held.offer, chosen };
+  }
+
+  /** The chosen parts go on to the plan, which is the confirmation proper. */
+  async confirmModParts(): Promise<void> {
+    const held = this.modParts;
+    this.modParts = null;
+    if (held) await this.prepareMod(held.offer, held.chosen);
+  }
+
+  dismissModParts(): void {
+    this.modParts = null;
   }
 
   /** The confirmed plan is executed; the plan dialog closes either way, the working directory persists. */
@@ -732,7 +782,8 @@ class Store {
       async () => {
         // The plan's own fingerprint, so what runs is what was on screen: the install re-plans, and one
         // that now resolves differently comes back as a refusal to look again rather than as a surprise.
-        const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint);
+        // The plan's own parts, not the chooser's: what runs is what the resolved plan said it would.
+        const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint, held.plan.parts);
         await this.readInstall();
         await this.refreshModOffers(install);
         const conflicts =

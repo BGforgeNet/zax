@@ -64,6 +64,12 @@
   const activeSection = (group: ModSettingsGroup): string =>
     store.modSectionTab[group.modId] ?? sectionsOf(group)[0] ?? "";
 
+  /** Part ids as the manifest labels them; an id the release no longer offers stands for itself. */
+  function partLabels(offer: ModOffer, ids: readonly string[]): string[] {
+    const options = (offer.parts?.groups ?? []).flatMap((group) => group.options);
+    return ids.map((id) => options.find((part) => part.id === id)?.label ?? id);
+  }
+
   function installLabel(offer: ModOffer): string | null {
     switch (offer.availability.kind) {
       case "install":
@@ -337,6 +343,53 @@
   </main>
 </div>
 
+<!-- Asked before anything is downloaded, and only when the choice cannot be carried over from the record:
+     a first install, or a release that took away what was chosen. The plan dialog follows it as always. -->
+<Dialog open={store.modParts !== null} title="Choose what to install" dismiss={() => store.dismissModParts()}>
+  {#if store.modParts?.offer.parts}
+    {@const chosen = store.modParts.chosen}
+    {#if store.modParts.offer.parts.dropped.length > 0}
+      <p class="plan-lead">
+        No longer offered by {store.modParts.offer.version}, so it cannot be kept:
+        <code>{store.modParts.offer.parts.dropped.join(", ")}</code>.
+      </p>
+    {/if}
+    {#each store.modParts.offer.parts.groups as group (group.label)}
+      <fieldset class="parts">
+        <legend>{group.label}</legend>
+        {#each group.options as part (part.id)}
+          <!-- What this part waits on, by the name the manifest gave it, or nothing when it waits on none. -->
+          {@const waits =
+            part.needs === undefined || chosen.includes(part.needs)
+              ? null
+              : partLabels(store.modParts.offer, [part.needs])[0]}
+          <label class="part" class:blocked={waits !== null}>
+            <input
+              type={group.pick === "one" ? "radio" : "checkbox"}
+              name={group.label}
+              checked={chosen.includes(part.id)}
+              disabled={waits !== null}
+              onchange={(event) => store.setModPart(part.id, event.currentTarget.checked)}
+            />
+            <span>
+              <span class="part-name">{part.label}</span>
+              {#if part.help}<span class="note">{part.help}</span>{/if}
+              <!-- Named rather than merely greyed: what to tick to make it available is the whole answer. -->
+              {#if waits !== null}<span class="note">Needs {waits}.</span>{/if}
+            </span>
+          </label>
+        {/each}
+      </fieldset>
+    {/each}
+  {/if}
+  {#snippet footer()}
+    <button onclick={() => store.dismissModParts()}>Cancel</button>
+    <button class="primary" disabled={store.modParts?.chosen.length === 0} onclick={() => void store.confirmModParts()}>
+      Continue
+    </button>
+  {/snippet}
+</Dialog>
+
 <!-- The resolved plan is the confirmation: what will land, what moves aside, which lines change - before
      anything is written. Cancelling keeps the download, so saying no costs nothing. -->
 <Dialog
@@ -361,6 +414,18 @@
           <li><code>{path}</code></li>
         {/each}
       </ul>
+    {/if}
+    {#if store.modPlan.plan.parts}
+      <p class="plan-lead">
+        Parts: <code>{partLabels(store.modPlan.offer, store.modPlan.plan.parts).join(", ")}</code>.
+      </p>
+    {/if}
+    {#if store.modPlan.offer.parts && store.modPlan.offer.parts.dropped.length > 0}
+      <!-- Said before the install runs rather than left for the record to explain afterwards. -->
+      <p class="plan-lead">
+        <code>{store.modPlan.offer.parts.dropped.join(", ")}</code>
+        {store.modPlan.offer.parts.dropped.length === 1 ? "is" : "are"} no longer offered, and will not be reinstalled.
+      </p>
     {/if}
     {#if store.modPlan.plan.orderLines.length > 0}
       <p class="plan-lead">
@@ -410,8 +475,10 @@
   }
 
   /* What the save bar and the panels draw for a button that is present but cannot act. Without it a kept
-     button reads as clickable, which is worse than the removal it replaced. */
-  .tools button:disabled {
+     button reads as clickable, which is worse than the removal it replaced. Every button in this view, not
+     the tool strip's alone: the row actions grey out while an operation runs, and a dialog's Continue is
+     disabled until something is picked. */
+  button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
   }
@@ -658,5 +725,42 @@
   .plan .note {
     color: var(--text-dim);
     margin-left: 6px;
+  }
+
+  /* A box per group, so a pick-one and a pick-any read as two questions rather than one list of ticks. */
+  .parts {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 10px 0 0;
+    padding: 4px 10px 8px;
+  }
+
+  .parts legend {
+    padding: 0 4px;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  .part {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 5px 0;
+  }
+
+  .part input {
+    margin-top: 2px;
+  }
+
+  .part .note {
+    display: block;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  /* Dimmed rather than hidden: a part that needs another is still one of the choices, and the line under it
+     says which tick makes it available. */
+  .blocked .part-name {
+    color: var(--text-dim);
   }
 </style>

@@ -570,8 +570,9 @@ parts:
     // The renderer never reads a manifest, so the choice has to reach it through the offer or not at all.
     const listing = await listAvailableMods(platform, install, record, null);
     const offer = listing.offers.find((one) => one.id === "fo2tweaks");
-    expect(offer?.parts?.map((group) => group.label)).toEqual(["Head", "Voice"]);
-    expect(offer?.chosen).toEqual(["head"]);
+    expect(offer?.parts?.groups.map((group) => group.label)).toEqual(["Head", "Voice"]);
+    // Carried over rather than merely reported: this is what an upgrade would install without asking.
+    expect(offer?.parts).toMatchObject({ selection: ["head"], dropped: [], ask: false });
   });
 
   it("sees the mod as installed when any part of it is in the mods folder", async () => {

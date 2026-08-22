@@ -26,6 +26,7 @@ import {
   type ModManifest,
   type ModPartGroup,
 } from "./manifest.js";
+import { carryOver, type CarriedSelection } from "./mod-parts.js";
 import type { InstallRecord } from "./records.js";
 import { MODS_DIRECTORY, answersToId } from "./mods.js";
 
@@ -406,11 +407,15 @@ export interface ModOffer {
   type: "pluggable" | "permanent";
   /** A permanent mod's declared reason, standing where the Remove control would be. */
   reason?: string;
-  /** The choices this release can deliver. Absent for a mod without parts, which is most of them. */
-  parts?: readonly ModPartGroup[];
-  /** The part ids this install already recorded - what an upgrade carries over, and what the dialog shows. */
-  chosen?: readonly string[];
+  /** The choice this release offers and where this install stands in it. Absent for a mod without parts. */
+  parts?: ModPartsOffer;
   availability: Availability;
+}
+
+/** Everything the interface needs to draw a choice it cannot compute: the renderer reads no manifest. */
+export interface ModPartsOffer extends CarriedSelection {
+  /** The groups this release can deliver, in the order the manifest declares them. */
+  groups: readonly ModPartGroup[];
 }
 
 export interface ModListing {
@@ -440,15 +445,14 @@ export async function listAvailableMods(
       const declared = release.manifest.entries ?? partOptions(release.manifest).flatMap((part) => part.entries ?? []);
       const present = await presentInMods(platform, install.path, feed.id, declared);
       const groups = offeredParts(release);
-      const chosen = record.mods.find((mod) => mod.id === release.manifest.id)?.parts;
+      const carried = carryOver(release, record.mods.find((mod) => mod.id === release.manifest.id)?.parts);
       offers.push({
         id: release.manifest.id,
         name: release.manifest.name,
         version: release.manifest.version,
         type: release.manifest.type,
         ...(release.manifest.reason !== undefined ? { reason: release.manifest.reason } : {}),
-        ...(groups.length > 0 ? { parts: groups } : {}),
-        ...(chosen ? { chosen } : {}),
+        ...(groups.length > 0 ? { parts: { groups, ...carried } } : {}),
         availability: availability(release, { install, record, sfall, present }),
       });
     } catch (error) {
