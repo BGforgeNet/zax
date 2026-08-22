@@ -80,6 +80,31 @@ export interface RefuseRule {
   reason: string;
 }
 
+/**
+ * One choice inside a group. A part names its own release asset, because that is what every real case is -
+ * four zips, four dats, two zips - and no part is ever a subset of another's archive, so nothing here slices
+ * an archive up.
+ */
+export interface ModPart {
+  /** Permanent the way the mod's id is: the recorded selection names it, so a rename reads as a new part. */
+  id: string;
+  label: string;
+  help?: string;
+  /** The release asset this part deploys - its own download, its own digest, its own preflight. */
+  archive: string;
+  /** What this part puts in the mods folder, read exactly as the mod's own `entries` are. */
+  entries?: readonly string[];
+  /** Another part this one is meaningless without - Cassidy's voices without its head. */
+  needs?: string;
+}
+
+export interface ModPartGroup {
+  label: string;
+  /** `one` picks at most one - a group may end with nothing chosen - and `any` is each option on or off. */
+  pick: "one" | "any";
+  options: readonly ModPart[];
+}
+
 export interface ModManifest {
   id: string;
   name: string;
@@ -105,6 +130,11 @@ export interface ModManifest {
    * readings - a folder entry `patches`, or a nested dat - the mod meant.
    */
   entries?: readonly string[];
+  /**
+   * The choices this release offers, groups in the order the manifest declares them. A manifest with parts
+   * states no top-level `archive`: each part names the asset it deploys.
+   */
+  parts?: readonly ModPartGroup[];
   refuse: readonly RefuseRule[];
   settings: readonly ModSetting[];
   /** Entries the schema declares that this version cannot draw. The mod installs; these controls do not. */
@@ -419,10 +449,76 @@ function parseSettings(value: unknown, modId: string, granted: readonly string[]
  * The mods-folder entries a mod declares. Each is confined the way every path-shaped field is, and kept as
  * written rather than prefixed with `mods/`: the order file's own lines start below that folder.
  */
-function parseEntries(value: unknown): readonly string[] {
-  const entries = items(value, `"entries"`).map((name, at) => confinedPath(name, `"entries" entry ${at + 1}`));
-  if (entries.length === 0) refuse(`"entries" is empty, which would order nothing while claiming to`);
+function parseEntries(value: unknown, where: string): readonly string[] {
+  const entries = items(value, where).map((name, at) => confinedPath(name, `${where} entry ${at + 1}`));
+  if (entries.length === 0) refuse(`${where} is empty, which would order nothing while claiming to`);
   return entries;
+}
+
+const GROUP_FIELDS = ["label", "pick", "options"];
+const PART_FIELDS = ["id", "label", "help", "archive", "entries", "needs"];
+
+function parsePart(value: unknown, where: string): ModPart {
+  const fields = record(value, where, PART_FIELDS);
+  const id = text(fields["id"], `${where}'s id`, SHORT_TEXT);
+  // The same bound the mod's own id passes: a part id is recorded, and a record is a file on disk.
+  if (!ID_SHAPE.test(id)) refuse(`${where}'s id ("${id}") is not an id`);
+  return {
+    id,
+    label: text(fields["label"], `${where}'s label`, SHORT_TEXT),
+    ...(fields["help"] !== undefined ? { help: text(fields["help"], `${where}'s help`, LONG_TEXT) } : {}),
+    archive: assetName(fields["archive"], `${where}'s archive`),
+    ...(fields["entries"] !== undefined ? { entries: parseEntries(fields["entries"], `${where}'s entries`) } : {}),
+    ...(fields["needs"] !== undefined ? { needs: text(fields["needs"], `${where}'s needs`, SHORT_TEXT) } : {}),
+  };
+}
+
+/** Every part of a manifest, flat and in declared order - the shape a selection is judged against. */
+export function partOptions(manifest: ModManifest): readonly ModPart[] {
+  return (manifest.parts ?? []).flatMap((group) => group.options);
+}
+
+/**
+ * The choices a release offers. Groups and options keep the order the manifest declares them in: that order
+ * is the author's one lever over how the choice reads, and nothing here has a better one to impose.
+ */
+function parseParts(value: unknown): readonly ModPartGroup[] {
+  const groups = items(value, `"parts"`).map((raw, at): ModPartGroup => {
+    const where = `"parts" group ${at + 1}`;
+    const fields = record(raw, where, GROUP_FIELDS);
+    const pick = text(fields["pick"], `${where}'s pick`, SHORT_TEXT);
+    // On the refusing side of the ignorance rule, and the settings entries' opposite: `pick` decides what
+    // lands on disk, so reading an unknown one as `any` would install what the author never described.
+    if (pick !== "one" && pick !== "any")
+      needsNewerZax(`a "parts" group picks "${pick}", which this version does not implement`);
+    const options = items(fields["options"], `${where}'s options`).map((option, i) =>
+      parsePart(option, `${where} option ${i + 1}`),
+    );
+    if (options.length === 0) refuse(`${where} is empty, so it offers nothing to pick`);
+    return { label: text(fields["label"], `${where}'s label`, SHORT_TEXT), pick, options };
+  });
+  if (groups.length === 0) refuse(`"parts" is empty, so it offers nothing to pick`);
+
+  // Unique across the manifest rather than per group: the recorded selection names ids flat, and a group is
+  // no part of the address.
+  const byId = new Map<string, ModPart>();
+  for (const part of groups.flatMap((group) => group.options)) {
+    if (byId.has(part.id)) refuse(`"parts" names "${part.id}" twice`);
+    byId.set(part.id, part);
+  }
+  for (const part of byId.values()) {
+    if (part.needs === undefined) continue;
+    if (part.needs === part.id) refuse(`"${part.id}" needs itself, so it could never be selected`);
+    if (!byId.has(part.needs)) refuse(`"${part.id}" needs "${part.needs}", which is not a part of this mod`);
+    // A cycle is a set of parts none of which could ever be selected - said at publish time rather than at
+    // the first install that tries.
+    const seen = new Set([part.id]);
+    for (let at: string | undefined = part.needs; at !== undefined; at = byId.get(at)?.needs) {
+      if (seen.has(at)) refuse(`"${part.id}" and "${at}" need each other, so neither could ever be selected`);
+      seen.add(at);
+    }
+  }
+  return groups;
 }
 
 function parseRefuse(value: unknown): readonly RefuseRule[] {
@@ -442,9 +538,9 @@ function parseRefuse(value: unknown): readonly RefuseRule[] {
 }
 
 /** The payload asset's name becomes a filename in the working directory, so it must be one - no separators. */
-function assetName(value: unknown): string {
-  const name = text(value, `"archive"`, SHORT_TEXT);
-  if (/[\\/:]/.test(name) || name.startsWith(".")) refuse(`"archive" ("${name}") is not a file name`);
+function assetName(value: unknown, where: string): string {
+  const name = text(value, where, SHORT_TEXT);
+  if (/[\\/:]/.test(name) || name.startsWith(".")) refuse(`${where} ("${name}") is not a file name`);
   return name;
 }
 
@@ -461,6 +557,7 @@ const MANIFEST_FIELDS = [
   "requires",
   "state",
   "entries",
+  "parts",
   "refuse",
   "settings",
   "install",
@@ -540,7 +637,12 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     if (installOn.length === 0) refuse(`"install-on" is empty, which would install nowhere`);
   }
 
-  const archive = fields["archive"] === undefined ? defaults.archive : fields["archive"];
+  const parts = fields["parts"] === undefined ? undefined : parseParts(fields["parts"]);
+  if (parts && fields["archive"] !== undefined)
+    refuse(`it states both "archive" and "parts", where each part names the asset it deploys`);
+  // A release supplies its sole archive as a default. For a parts manifest that asset describes nothing this
+  // install would deploy, so it is passed over rather than refused - the release did nothing wrong.
+  const archive = fields["archive"] ?? (parts ? undefined : defaults.archive);
 
   return {
     id,
@@ -548,7 +650,7 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     version,
     type,
     ...(type === "permanent" ? { reason: text(fields["reason"], `"reason"`, LONG_TEXT) } : {}),
-    ...(archive !== undefined ? { archive: assetName(archive) } : {}),
+    ...(archive !== undefined ? { archive: assetName(archive, `"archive"`) } : {}),
     ...(installOn !== undefined ? { installOn } : {}),
     ...(requiresSfall !== undefined ? { requiresSfall } : {}),
     ...(fields["state"] !== undefined
@@ -558,7 +660,8 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
           ),
         }
       : {}),
-    ...(fields["entries"] !== undefined ? { entries: parseEntries(fields["entries"]) } : {}),
+    ...(fields["entries"] !== undefined ? { entries: parseEntries(fields["entries"], `"entries"`) } : {}),
+    ...(parts !== undefined ? { parts } : {}),
     refuse: fields["refuse"] === undefined ? [] : parseRefuse(fields["refuse"]),
     ...(fields["settings"] === undefined
       ? { settings: [], dropped: [] }

@@ -1,0 +1,47 @@
+{
+  "defaults": { "archive": "cassidy.zip" },
+  "parses": {
+    "id": "cassidy",
+    "name": "Cassidy Restoration",
+    "version": "1.2",
+    "type": "pluggable",
+    "parts": [
+      {
+        "label": "Head",
+        "pick": "any",
+        "options": [
+          {
+            "id": "head",
+            "label": "Cassidy's new head",
+            "help": "The portrait and critter art, without the voice.",
+            "archive": "cassidy_head.dat",
+            "entries": ["cassidy_head.dat"]
+          }
+        ]
+      },
+      {
+        "label": "Voice",
+        "pick": "one",
+        "options": [
+          {
+            "id": "voice-joey",
+            "label": "Joey Bracken",
+            "archive": "cassidy_voice_joey_bracken_hq.dat",
+            "entries": ["cassidy_voice_joey_bracken_hq.dat"],
+            "needs": "head"
+          },
+          {
+            "id": "voice-tom",
+            "label": "Tom Regan",
+            "archive": "cassidy_voice_tom_regan_hq.dat",
+            "entries": ["cassidy_voice_tom_regan_hq.dat"],
+            "needs": "head"
+          }
+        ]
+      }
+    ],
+    "refuse": [],
+    "settings": [],
+    "dropped": []
+  }
+}

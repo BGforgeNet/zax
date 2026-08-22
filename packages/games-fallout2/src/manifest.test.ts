@@ -345,3 +345,124 @@ describe("mayWrite", () => {
     expect(mayWrite("mods/../data/sound/music/x", granted)).toBe(false);
   });
 });
+
+/** Cassidy's real shape: an optional head, and a voice that only makes sense with it. */
+const CASSIDY = `spec: 1
+id: cassidy
+name: Cassidy Restoration
+version: "1.2"
+game: fallout2
+parts:
+  - label: Head
+    pick: any
+    options:
+      - id: head
+        label: Cassidy's new head
+        archive: cassidy_head.dat
+        entries: [cassidy_head.dat]
+  - label: Voice
+    pick: one
+    options:
+      - id: voice-joey
+        label: Joey Bracken
+        help: The voice from the original release.
+        archive: cassidy_voice_joey_bracken_hq.dat
+        entries: [cassidy_voice_joey_bracken_hq.dat]
+        needs: head
+      - id: voice-tom
+        label: Tom Regan
+        archive: cassidy_voice_tom_regan_hq.dat
+        entries: [cassidy_voice_tom_regan_hq.dat]
+        needs: head
+`;
+
+describe("parts", () => {
+  const refuses = (text: string, cause: RegExp) => expect(() => parsed(text)).toThrow(cause);
+
+  it("reads groups and options in the order the manifest declares them", () => {
+    const manifest = parsed(CASSIDY);
+    expect(manifest.archive).toBeUndefined();
+    expect(manifest.parts).toEqual([
+      {
+        label: "Head",
+        pick: "any",
+        options: [
+          { id: "head", label: "Cassidy's new head", archive: "cassidy_head.dat", entries: ["cassidy_head.dat"] },
+        ],
+      },
+      {
+        label: "Voice",
+        pick: "one",
+        options: [
+          {
+            id: "voice-joey",
+            label: "Joey Bracken",
+            help: "The voice from the original release.",
+            archive: "cassidy_voice_joey_bracken_hq.dat",
+            entries: ["cassidy_voice_joey_bracken_hq.dat"],
+            needs: "head",
+          },
+          {
+            id: "voice-tom",
+            label: "Tom Regan",
+            archive: "cassidy_voice_tom_regan_hq.dat",
+            entries: ["cassidy_voice_tom_regan_hq.dat"],
+            needs: "head",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("refuses a manifest that claims both a payload and parts", () => {
+    refuses(`${CASSIDY}archive: cassidy.zip\n`, /"archive" and "parts"/);
+  });
+
+  it("ignores a payload the release inferred, since the parts name their own", () => {
+    // The release supplies its sole archive as a default. A parts manifest states no top-level payload, so
+    // the supplied one describes nothing this install would deploy - and it is not the release's fault.
+    const supplied = parseManifest(bytes(CASSIDY), { archive: "cassidy.zip" });
+    expect(supplied.archive).toBeUndefined();
+  });
+
+  it("refuses a group with nothing in it, and a parts block with no groups", () => {
+    const emptied = `${CASSIDY.slice(0, CASSIDY.indexOf("  - label: Voice"))}  - label: Voice\n    pick: one\n    options: []\n`;
+    refuses(emptied, /empty/);
+    refuses(`${FO2TWEAKS}parts: []\n`, /empty/);
+  });
+
+  it("refuses a part id repeated anywhere in the manifest", () => {
+    refuses(CASSIDY.replace("id: voice-tom", "id: voice-joey"), /"voice-joey" twice/);
+  });
+
+  it("refuses a part id that could not be recorded", () => {
+    refuses(CASSIDY.replace("id: voice-tom", "id: Voice Tom"), /is not an id/);
+  });
+
+  it("refuses a needs naming a part that does not exist", () => {
+    refuses(CASSIDY.replace("needs: head", "needs: hed"), /needs "hed"/);
+  });
+
+  it("refuses parts that need each other, which nothing could ever select", () => {
+    refuses(CASSIDY.replace("      - id: head", "      - id: head\n        needs: voice-joey"), /need each other/);
+  });
+
+  it("refuses a part that needs itself", () => {
+    refuses(CASSIDY.replace("      - id: head", "      - id: head\n        needs: head"), /needs itself/);
+  });
+
+  it("asks for a newer ZAX when a group picks in a way this version does not implement", () => {
+    // Not a misspelling and not ignorable: `pick` decides what lands on disk, so reading an unknown one as
+    // `any` would install what the author did not describe. The same answer a later spec gets.
+    refuses(CASSIDY.replace("pick: one", "pick: at-least-one"), /newer version of ZAX/);
+  });
+
+  it("refuses a part whose asset is not a bare file name, or which names none", () => {
+    refuses(CASSIDY.replace("archive: cassidy_head.dat", "archive: ../cassidy_head.dat"), /not a file name/);
+    refuses(CASSIDY.replace("        archive: cassidy_head.dat\n", ""), /must be text/);
+  });
+
+  it("confines a part's entries the way the mod's own are", () => {
+    refuses(CASSIDY.replace("entries: [cassidy_head.dat]", 'entries: ["../rpu.dat"]'), /leaves the game directory/);
+  });
+});

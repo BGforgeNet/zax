@@ -29,13 +29,22 @@ try {
     tagged = true;
   }
   const version = tagged ? "(version from the tag)" : manifest.version;
-  const payload = tagged
-    ? "(payload from the release)"
-    : (manifest.archive ?? 'no "archive" named - valid, but a release without one cannot offer a download');
+  const payload = manifest.parts
+    ? `${manifest.parts.flatMap((group) => group.options).length} part(s), each naming its own asset`
+    : tagged
+      ? "(payload from the release)"
+      : (manifest.archive ?? 'no "archive" named - valid, but a release without one cannot offer a download');
   console.log(
     `OK: ${manifest.id} ${version} (${manifest.type}); payload: ${payload}; ` +
       `${manifest.settings.length} setting(s), ${manifest.refuse.length} refusal rule(s)`,
   );
+  // Spelled out because a part id is permanent and an author's first sight of one is here: what this prints
+  // is what every future release has to keep naming, and what an install records.
+  for (const group of manifest.parts ?? [])
+    console.log(
+      `  ${group.label} (pick ${group.pick}): ` +
+        group.options.map((part) => `${part.id} -> ${part.archive}`).join(", "),
+    );
   // Not a refusal: the mod installs and these controls do not appear. Reported because an author writing to a
   // later spec than the checkout has would otherwise see a clean OK and no sign the schema was trimmed.
   for (const entry of manifest.dropped) console.log(`  dropped "${entry.address}": ${entry.why}`);

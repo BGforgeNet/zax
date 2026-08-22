@@ -52,6 +52,7 @@ game: fallout2
 | `requires`   | no               | `sfall: ">=4.4.5"`, the lowest sfall version it works with. ZAX's updater is the answer. |
 | `state`      | no               | Files belonging to the user, merged across upgrades. Default: every payload `.ini`.      |
 | `entries`    | no               | What the mod puts in `mods/`, as the loader names them; see below. Default: derived.     |
+| `parts`      | no               | Choices the release offers, each naming its own asset; see below. Excludes `archive`.    |
 | `refuse`     | no               | When installing refuses; see below.                                                      |
 | `settings`   | no               | The settings schema; see below.                                                          |
 | `extra`      | no               | Ignored by contract - where an author's or a tool's own data may ride along.             |
@@ -89,6 +90,46 @@ does. A mod deploying more than one file names each: Cassidy's head and its voic
 An entry the payload does not carry refuses the install, rather than writing a line naming something absent.
 A payload that is not an archive declares exactly one: a single file has no paths of its own, so this is the
 only thing that can say what it installs as.
+
+### Parts
+
+A release that publishes several payloads and asks which of them to install - HQ music's four packages,
+Cassidy's head and its three voices - declares them as groups of options:
+
+```yaml
+parts:
+  - label: Head
+    pick: any
+    options:
+      - id: head
+        label: Cassidy's new head
+        archive: cassidy_head.dat
+        entries: [cassidy_head.dat]
+  - label: Voice
+    pick: one
+    options:
+      - id: voice-joey
+        label: Joey Bracken
+        help: The voice from the original release.
+        archive: cassidy_voice_joey_bracken_hq.dat
+        entries: [cassidy_voice_joey_bracken_hq.dat]
+        needs: head
+```
+
+`pick: one` takes at most one of the group - a group may end with nothing chosen - and `pick: any` makes each
+option independently on or off. Every part names its own release asset, an archive or a single file as the
+payload rules above have it, and its own `entries`; a manifest with `parts` states no top-level `archive`. A
+part may name one other part it `needs`, in any group, and is not offered while that one is unselected. Groups
+and options are shown in the order the manifest declares them.
+
+**A part id is as permanent as the mod's.** The install records which parts were chosen, and the next release
+is matched against that record by id: a renamed part reads as one part removed and another added, so the user
+loses the choice they made. A part the release stops offering is dropped, with the upgrade saying so; a part
+newly offered starts off; a `one` group whose choice is gone puts the question back to the user.
+
+A group asking for something ZAX does not implement - any `pick` beyond these two - refuses as needing a newer
+ZAX. Unlike a settings entry, what a group picks decides what lands on disk, so there is nothing safe to
+assume about one that cannot be read.
 
 ### Refusal rules
 
@@ -185,6 +226,7 @@ named instead. `extra` is the one place ignorance is free outright, by contract.
 The id is the feed match, the settings-id prefix, the removal convention and the record key. Renaming it
 publishes a different mod: existing installs would be offered a fresh install beside themselves rather than
 an upgrade. Ids may not begin with `game`, `hires` or `sfall`, the catalog's own namespaces.
+Part ids are forever for the same reason and in the same way, as _Parts_ above spells out.
 
 ## Getting a feed to follow a mod
 
