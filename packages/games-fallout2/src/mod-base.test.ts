@@ -3,7 +3,9 @@ import { MemoryPlatform, type MemoryOptions } from "@zax/platform/memory";
 import type { Install } from "@zax/core";
 import { parseManifest } from "./manifest.js";
 import type { ModRelease } from "./mod-feed.js";
-import { componentsFor, planBaseInstall } from "./mod-base.js";
+import { stamp } from "@zax/core";
+import { loadRecord } from "./records.js";
+import { applyBaseInstall, componentsFor, innoArguments, planBaseInstall } from "./mod-base.js";
 
 const GAME = "/game";
 const install: Install = { path: GAME, type: "fallout2" };
@@ -202,5 +204,110 @@ describe("the case-lowering pass in the plan", () => {
     const platform = basePlatform({ files: { [`${GAME}/Rpu.dat`]: "ONE", [`${GAME}/rpu.dat`]: "TWO" } });
     await expect(planBaseInstall(platform, install, await release())).rejects.toThrow(/differ only in case/);
     expect(platform.downloaded).toEqual([]);
+  });
+});
+
+describe("running the installer", () => {
+  const SCRIPT = `${GAME}/rpu-install.sh`;
+  const USER_INI = "[Main]\r\nStartYear=2241\r\nWindowed=1\r\n";
+  const SHIPPED_INI = "[Main]\r\nStartYear=-1\r\nWindowed=0\r\nExtraTweaks=1\r\n";
+
+  /** A payload that carries the script it names, plus a config file the release ships its own version of. */
+  const PAYLOAD_CONTENTS = {
+    "rpu-install.sh": "#!/bin/bash\n",
+    "ddraw.ini": SHIPPED_INI,
+    "mods/rpu.dat": "DAT",
+  };
+
+  const installing = (outcome: { code: number | null; output: string }, files: Record<string, string> = {}) =>
+    new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "", [`${GAME}/ddraw.ini`]: USER_INI, ...files },
+      downloads: { [ZIP_URL]: PAYLOAD, [EXE_URL]: "EXE" },
+      archives: { [PAYLOAD]: PAYLOAD_CONTENTS },
+      runs: { [SCRIPT]: outcome },
+    });
+
+  it("extracts the payload, runs the script it names, and merges the user's settings back in", async () => {
+    const platform = installing({ code: 0, output: "RPU installed. Backup is in backup/rpu." });
+    const found = await release();
+    const plan = await planBaseInstall(platform, install, found);
+    const done = await applyBaseInstall(platform, install, found, plan, undefined, new Date("2024-05-05T09:00:00Z"));
+
+    expect(done).toMatchObject({ version: "2.4.34", becomes: "fallout2rpu" });
+    expect(platform.textAt(`${GAME}/mods/rpu.dat`)).toBe("DAT");
+    // Run from the game directory, because the script works in the directory it sits in.
+    expect(platform.ran).toEqual([{ program: SCRIPT, args: [], options: { cwd: GAME } }]);
+    // And made runnable first: a script out of an archive may arrive without its mode.
+    expect(platform.executable).toContain(SCRIPT);
+
+    // The release's file, with the user's values merged over it - and its new key kept.
+    const merged = platform.textAt(`${GAME}/ddraw.ini`) ?? "";
+    expect(merged).toContain("StartYear=2241");
+    expect(merged).toContain("Windowed=1");
+    expect(merged).toContain("ExtraTweaks=1");
+    // The user's own copy reached the timestamped backup before any of that.
+    const backup = `/home/tester/.cache/zax/backup/${stamp(new Date("2024-05-05T09:00:00Z"))}`;
+    expect(platform.textAt(`${backup}/ddraw.ini`)).toBe(USER_INI);
+  });
+
+  it("records the install as this version of a base mod, and leaves nothing to remove", async () => {
+    const platform = installing({ code: 0, output: "" });
+    const found = await release();
+    await applyBaseInstall(platform, install, found, await planBaseInstall(platform, install, found));
+
+    const [held] = (await loadRecord(platform, GAME)).mods;
+    expect(held).toMatchObject({ id: "rpu", version: "2.4.34", type: "base", complete: true, files: [] });
+    // The state file as the release shipped it, which is what the next upgrade's merge compares against.
+    expect(held?.shipped["ddraw.ini"]).toBe(SHIPPED_INI);
+  });
+
+  it("reports a failed installer with its code and where its backup went, and stays unfinished", async () => {
+    const platform = installing({ code: 4, output: "out of space\nAborting.\n" });
+    const found = await release();
+    const plan = await planBaseInstall(platform, install, found);
+    await expect(applyBaseInstall(platform, install, found, plan)).rejects.toThrow(/code 4/);
+
+    const [held] = (await loadRecord(platform, GAME)).mods;
+    // Incomplete rather than absent: something is on disk and the record says so, which is what a relaunch
+    // needs to say the install never finished rather than offering a restore that cannot exist.
+    expect(held).toMatchObject({ id: "rpu", complete: false });
+  });
+
+  it("says what the installer said, so a failure is diagnosable rather than a number", async () => {
+    const platform = installing({ code: 1, output: "line one\nline two\nno room on device\n" });
+    const found = await release();
+    const plan = await planBaseInstall(platform, install, found);
+    await expect(applyBaseInstall(platform, install, found, plan)).rejects.toThrow(/no room on device/);
+  });
+
+  it("lowercases the tree before the payload lands, and not on a second install", async () => {
+    const platform = installing({ code: 0, output: "" }, { [`${GAME}/Master.dat`]: "DAT" });
+    const found = await release();
+    const first = await applyBaseInstall(platform, install, found, await planBaseInstall(platform, install, found));
+    expect(first.renamed).toBe(1);
+    expect(platform.textAt(`${GAME}/master.dat`)).toBe("DAT");
+
+    // The install is this mod's now, so the second run leaves the payload's own spellings alone.
+    const again = await applyBaseInstall(platform, install, found, await planBaseInstall(platform, install, found));
+    expect(again.renamed).toBe(0);
+  });
+});
+
+describe("the command an Inno installer is given", () => {
+  it("is silent, aimed at this install, and logs where ZAX can read it", () => {
+    expect(innoArguments("C:\\Games\\Fallout2", "C:\\log.txt")).toEqual([
+      "/VERYSILENT",
+      "/SUPPRESSMSGBOXES",
+      "/NORESTART",
+      "/DIR=C:\\Games\\Fallout2",
+      "/LOG=C:\\log.txt",
+    ]);
+  });
+
+  it("names every component to select, parents included", () => {
+    // Inno's switch deselects everything it does not name, and a child component is selected inside its
+    // parent - which is what its own name says, `walk_speed\\low_fps` sitting under `walk_speed`.
+    const args = innoArguments("C:\\Games\\Fallout2", "C:\\log.txt", ["core", "walk_speed\\low_fps"]);
+    expect(args[args.length - 1]).toBe("/COMPONENTS=core,walk_speed,walk_speed\\low_fps");
   });
 });

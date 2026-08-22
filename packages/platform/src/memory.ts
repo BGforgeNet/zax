@@ -114,6 +114,8 @@ export class MemoryPlatform implements Platform {
   readonly launched: Array<{ program: string; args: readonly string[]; options?: LaunchOptions }> = [];
   /** Programs run to completion, which is what asserts the command an installer was invoked with. */
   readonly ran: Array<{ program: string; args: readonly string[]; options?: LaunchOptions }> = [];
+  /** Paths marked runnable - there is no mode here, so the record is the effect. */
+  readonly executable: string[] = [];
   readonly opened: string[] = [];
   readonly fetched: string[] = [];
   readonly downloaded: Array<{ url: string; destination: string }> = [];
@@ -190,6 +192,9 @@ export class MemoryPlatform implements Platform {
       },
       remove: async (path) => this.removeAt(normalize(path)),
       rename: async (from, to) => this.renameAt(normalize(from), normalize(to)),
+      makeExecutable: async (path) => {
+        this.executable.push(normalize(path));
+      },
       freeSpace: async () => options.freeSpace ?? null,
     };
 

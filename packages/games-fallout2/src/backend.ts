@@ -35,6 +35,7 @@ import { CONFIG_FILES } from "./files.js";
 import { mayWrite, parseManifest, type DroppedSetting, type ModSetting } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 import { MOD_FEEDS, fetchFeed, listAvailableMods, type ModListing } from "./mod-feed.js";
+import { applyBaseInstall, planBaseInstall, type BaseInstallOutcome, type BaseInstallPlan } from "./mod-base.js";
 import {
   applyModInstall,
   planModInstall,
@@ -105,16 +106,18 @@ export interface Backend {
   availableMods(install: Install): Promise<ModListing>;
   /**
    * Downloads and verifies a mod's newest release, answering the resolved plan the confirmation shows.
-   * `parts` names the chosen parts of a release that offers them, and is ignored by one that does not.
+   * `choices` names what was picked before installing - a release's parts, or a base installer's components -
+   * and is ignored by a release that offers neither. A base mod answers with the thinner plan of the two,
+   * which says so: the installer decides what lands, so naming files there would be inventing them.
    */
-  planMod(install: Install, modId: string, parts?: readonly string[]): Promise<ModInstallPlan>;
+  planMod(install: Install, modId: string, choices?: readonly string[]): Promise<ModInstallPlan | BaseInstallPlan>;
   /** Installs the plan whose fingerprint this is; one that no longer resolves the same is refused. */
   installMod(
     install: Install,
     modId: string,
     fingerprint: string,
-    parts?: readonly string[],
-  ): Promise<ModInstallOutcome>;
+    choices?: readonly string[],
+  ): Promise<ModInstallOutcome | BaseInstallOutcome>;
   /** Unwinds an install that never finished; the working directory holds everything it puts back. */
   restoreMod(install: Install, modId: string): Promise<void>;
   removeMod(install: Install, modId: string): Promise<ModRemoval>;
@@ -261,22 +264,30 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       const sfall = await installedSfallVersion(platform, install);
       return listAvailableMods(platform, install, record, sfall);
     },
-    planMod: async (install, modId, parts) => {
-      const { release, selection } = await releaseForMod(install, modId, parts);
-      return planModInstall(platform, install, release, selection, reporting());
+    planMod: async (install, modId, choices) => {
+      const { release, selection } = await releaseForMod(install, modId, choices);
+      const progress = reporting();
+      return release.manifest.type === "base"
+        ? planBaseInstall(platform, install, release, selection, progress)
+        : planModInstall(platform, install, release, selection, progress);
     },
-    installMod: async (install, modId, fingerprint, parts) => {
-      const { release, selection } = await releaseForMod(install, modId, parts);
+    installMod: async (install, modId, fingerprint, choices) => {
+      const { release, selection } = await releaseForMod(install, modId, choices);
       const progress = reporting();
       // Re-planned rather than trusting a plan the renderer held: the directory may have moved on since the
       // confirmation, and the plan is cheap against the already-verified archive. What runs is still what
       // was agreed to - a plan that resolved differently is refused here rather than quietly carried out.
-      const plan = await planModInstall(platform, install, release, selection, progress);
-      if (plan.fingerprint !== fingerprint) {
-        throw new Error(
+      const stale = () =>
+        new Error(
           `What installing ${release.manifest.name} would do has changed since you confirmed it - the game folder or the release moved on. Look at the new plan and confirm again.`,
         );
+      if (release.manifest.type === "base") {
+        const plan = await planBaseInstall(platform, install, release, selection, progress);
+        if (plan.fingerprint !== fingerprint) throw stale();
+        return applyBaseInstall(platform, install, release, plan, progress, new Date());
       }
+      const plan = await planModInstall(platform, install, release, selection, progress);
+      if (plan.fingerprint !== fingerprint) throw stale();
       return applyModInstall(platform, install, release, plan, progress, new Date());
     },
     restoreMod: (install, modId) => restoreModInstall(platform, install, modId, new Date()),

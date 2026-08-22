@@ -38,6 +38,7 @@ import {
   type Backend,
   type MachineDescription,
   type Mod,
+  type BaseInstallPlan,
   type ModInstallPlan,
   type ModListing,
   type ModOffer,
@@ -209,8 +210,11 @@ class Store {
    * startup: it costs the network, and the Mods view is where the answer means anything.
    */
   modListing = $state<ModListing | null>(null);
-  /** A resolved install plan awaiting the user's word, with the offer it belongs to. */
-  modPlan = $state<{ offer: ModOffer; plan: ModInstallPlan } | null>(null);
+  /**
+   * A resolved install plan awaiting the user's word, with the offer it belongs to. Two shapes: a stacking
+   * mod's names every file, and a base mod's names the release and the space, the installer owning the rest.
+   */
+  modPlan = $state<{ offer: ModOffer; plan: ModInstallPlan | BaseInstallPlan } | null>(null);
   /** The parts chooser while it is open: the offer whose choice is being made, and what is ticked. */
   modParts = $state<{ offer: ModOffer; chosen: readonly string[] } | null>(null);
   /** The installed mods' settings schemas, rendered with the same per-kind controls the catalog gets. */
@@ -782,8 +786,9 @@ class Store {
       async () => {
         // The plan's own fingerprint, so what runs is what was on screen: the install re-plans, and one
         // that now resolves differently comes back as a refusal to look again rather than as a surprise.
-        // The plan's own parts, not the chooser's: what runs is what the resolved plan said it would.
-        const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint, held.plan.parts);
+        // The plan's own choices, not the chooser's: what runs is what the resolved plan said it would.
+        const chosen = held.plan.kind === "base" ? held.plan.components : held.plan.parts;
+        const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint, chosen);
         await this.readInstall();
         await this.refreshModOffers(install);
         const conflicts =

@@ -61,6 +61,8 @@ export interface PlannedFile {
 
 /** The resolved plan, shown before anything is written. */
 export interface ModInstallPlan {
+  /** Which kind of install this plan is for, so the interface can tell it from a base mod's. */
+  kind: "stacking";
   files: readonly PlannedFile[];
   /**
    * The mods-folder entries this install owns, as the manifest spells them - added or re-enabled in the
@@ -172,7 +174,7 @@ function shipsEntry(files: readonly PlannedFile[], entry: string): boolean {
 function fingerprintOf(
   release: ModRelease,
   files: readonly PlannedFile[],
-  plan: Omit<ModInstallPlan, "fingerprint" | "files">,
+  plan: Omit<ModInstallPlan, "fingerprint" | "files" | "kind">,
 ): string {
   return fnv1a(
     [
@@ -326,6 +328,7 @@ export async function planModInstall(
 
   const parts = manifest.parts ? payloads.map((payload) => payload.part?.id ?? "") : undefined;
   return {
+    kind: "stacking",
     files,
     orderLines,
     removes,

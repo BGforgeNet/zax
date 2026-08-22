@@ -11,7 +11,7 @@
 import { parse, stringify } from "yaml";
 import { fnv1a } from "@zax/core";
 import type { Platform } from "@zax/platform";
-import { insideMods, isModId, isModVersion, mayWrite, parseManifest, type ModType } from "./manifest.js";
+import { insideMods, isConfined, isModId, isModVersion, mayWrite, parseManifest, type ModType } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 
 /**
@@ -149,12 +149,18 @@ function readMod(entry: unknown): InstalledMod | null {
 
   // Judged against what ZAX grants this id, not against what the entry claims: a record is the one route
   // into these paths that skipped the manifest, so it must not reach further than a manifest could.
+  //
+  // A base mod is the exception, and the reason is what it is: its installer owns the whole game directory,
+  // and the files it keeps for the user - `ddraw.ini`, `f2_res.ini` - sit at the root by the engine's design.
+  // The bound that still holds is the install directory itself. Nothing widens for a stacking mod, which is
+  // where the narrow rule earns its keep.
   const granted = grantsFor(id);
+  const writable = (path: string): boolean => (type === "base" ? isConfined(path) : mayWrite(path, granted));
 
   const files: string[] = [];
   for (const file of Array.isArray(fields["files"]) ? fields["files"] : []) {
     const path = asText(file);
-    if (path === undefined || !mayWrite(path, granted)) return null;
+    if (path === undefined || !writable(path)) return null;
     files.push(path);
   }
 
@@ -185,7 +191,7 @@ function readMod(entry: unknown): InstalledMod | null {
   if (rawShipped !== null && typeof rawShipped === "object" && !Array.isArray(rawShipped)) {
     for (const [path, content] of Object.entries(rawShipped as Record<string, unknown>)) {
       const text = asText(content);
-      if (text === undefined || !mayWrite(path, granted)) return null;
+      if (text === undefined || !writable(path)) return null;
       shipped[path] = text;
     }
   }

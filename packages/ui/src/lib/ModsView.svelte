@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { GAME_TYPES, type GameType } from "@zax/core";
   import { type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
   import SaveBar from "./SaveBar.svelte";
@@ -63,6 +64,13 @@
 
   const activeSection = (group: ModSettingsGroup): string =>
     store.modSectionTab[group.modId] ?? sectionsOf(group)[0] ?? "";
+
+  /** The name ZAX gives the game a base mod turns this install into. */
+  const gameName = (type: GameType): string => GAME_TYPES[type].name;
+
+  /** Sizes as a person reads them. Bytes are what the release states; nobody counts in them. */
+  const megabytes = (bytes: number): string =>
+    bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
   /** Part ids as the manifest labels them; an id the release no longer offers stands for itself. */
   function partLabels(offer: ModOffer, ids: readonly string[]): string[] {
@@ -397,27 +405,53 @@
   title="Install {store.modPlan?.offer.name} {store.modPlan?.offer.version}"
   dismiss={() => store.dismissModPlan()}
 >
-  {#if store.modPlan}
+  {#if store.modPlan?.plan.kind === "base"}
+    {@const plan = store.modPlan.plan}
+    <!-- Thinner than a stacking mod's plan, and honestly so: the installer decides what lands, so this names
+       the release, what it will cost, and what it cannot undo. -->
+    <p class="plan-lead">
+      Runs {store.modPlan.offer.name}'s own installer (<code>{plan.asset}</code>), which turns this installation into {gameName(
+        plan.becomes,
+      )}.
+    </p>
+    <ul class="plan">
+      <li>
+        Download: {megabytes(plan.download)}{#if plan.unpacked}, unpacking to {megabytes(plan.unpacked)}{/if}
+      </li>
+      {#if plan.free !== undefined}<li>Free on this drive: {megabytes(plan.free)}</li>{/if}
+      {#if plan.components && plan.components.length > 0}
+        <li>Components: <code>{plan.components.join(", ")}</code></li>
+      {/if}
+      {#if plan.lowercasing}
+        <!-- Its own line rather than something that happens silently: it is the widest-reaching rename here. -->
+        <li>{plan.lowercasing} file(s) and folder(s) renamed to lowercase first, which this system needs</li>
+      {/if}
+    </ul>
+    <p class="plan-lead warn">
+      This cannot be undone. ZAX will not be able to remove it - going back means a fresh copy of the game.
+    </p>
+  {:else if store.modPlan}
+    {@const plan = store.modPlan.plan}
     <p class="plan-lead">Lands in the game folder:</p>
     <ul class="plan">
-      {#each store.modPlan.plan.files as file (file.path)}
+      {#each plan.files as file (file.path)}
         <li>
           <code>{file.path}</code>
           {#if file.overwrites}<span class="note">replaces the file there; a copy is kept</span>{/if}
         </li>
       {/each}
     </ul>
-    {#if store.modPlan.plan.removes.length > 0}
+    {#if plan.removes.length > 0}
       <p class="plan-lead">No longer shipped, removed - copies go to the backup first:</p>
       <ul class="plan">
-        {#each store.modPlan.plan.removes as path (path)}
+        {#each plan.removes as path (path)}
           <li><code>{path}</code></li>
         {/each}
       </ul>
     {/if}
-    {#if store.modPlan.plan.parts}
+    {#if plan.parts}
       <p class="plan-lead">
-        Parts: <code>{partLabels(store.modPlan.offer, store.modPlan.plan.parts).join(", ")}</code>.
+        Parts: <code>{partLabels(store.modPlan.offer, plan.parts).join(", ")}</code>.
       </p>
     {/if}
     {#if store.modPlan.offer.parts && store.modPlan.offer.parts.dropped.length > 0}
@@ -427,9 +461,9 @@
         {store.modPlan.offer.parts.dropped.length === 1 ? "is" : "are"} no longer offered, and will not be reinstalled.
       </p>
     {/if}
-    {#if store.modPlan.plan.orderLines.length > 0}
+    {#if plan.orderLines.length > 0}
       <p class="plan-lead">
-        Load order: <code>{store.modPlan.plan.orderLines.join(", ")}</code> enabled.
+        Load order: <code>{plan.orderLines.join(", ")}</code> enabled.
       </p>
     {/if}
   {/if}

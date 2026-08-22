@@ -57,6 +57,12 @@ export interface FileSystem {
    * answer, and neither has a path that is not there. A check that cannot run is not a check that failed.
    */
   freeSpace(path: string): Promise<number | null>;
+  /**
+   * Marks a file runnable. Needed because a script that arrives inside an archive may arrive without its
+   * mode, and a mod's installer that cannot be executed is an install that cannot happen. A no-op where the
+   * host has no such bit.
+   */
+  makeExecutable(path: string): Promise<void>;
 }
 
 /**

@@ -5,7 +5,19 @@
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
-import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
+import {
+  appendFile,
+  chmod,
+  copyFile,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  statfs,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -193,6 +205,13 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
       rename: async (from, to) => {
         await mkdir(dirname(to), { recursive: true });
         await rename(from, to);
+      },
+      makeExecutable: async (path) => {
+        // Windows has no execute bit and rejects the call; everywhere else, the owner's is what running it
+        // from here needs. The existing mode is read first so this only adds.
+        if (os === "win32") return;
+        const held = await stat(path);
+        await chmod(path, held.mode | 0o100);
       },
       freeSpace: async (path) => {
         try {

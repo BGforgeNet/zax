@@ -279,6 +279,16 @@ function segments(path: string): string[] | null {
 }
 
 /**
+ * Whether a relative path stays inside the install directory at all - no absolutes, no drive letters, no
+ * `..`. The bound a base mod's paths pass, its installer owning the whole directory rather than one folder
+ * inside it; every other mod passes the narrower one below.
+ */
+export function isConfined(path: string): boolean {
+  const pieces = segments(path);
+  return pieces !== null && pieces.length > 0;
+}
+
+/**
  * Whether a relative path stays confined under `mods/` - no escapes, no absolutes, at least one segment below
  * it. The one spec rule the manifest parser, the record reader and uninstall all judge by, so a tampered
  * record cannot name what a manifest could not.

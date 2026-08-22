@@ -177,3 +177,14 @@ describe("renaming and free space", () => {
     expect(await platform.fs.freeSpace(at("no-such-directory"))).toBeNull();
   });
 });
+
+describe("making a file runnable", () => {
+  it("adds the owner's execute bit, which a script out of an archive may arrive without", async () => {
+    const script = at("exec", "install.sh");
+    await platform.fs.write(script, new TextEncoder().encode("#!/bin/sh\nexit 0\n"));
+    await platform.fs.makeExecutable(script);
+    // Run it, which is the only thing the bit is for - and the check that does not depend on a mode constant.
+    const done = await platform.process.run(script, []);
+    expect(done.code).toBe(0);
+  });
+});
