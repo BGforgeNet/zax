@@ -190,7 +190,9 @@ settings:
     default: 0
     label: Increased run speed
     gated-by: { id: sfall.Misc.UseFileSystemOverride, is: [1] }
-    help: Removes the run speed penalty armour carries and lets slower companions keep up. Who it covers is set below.
+    help:
+      Removes the run speed penalty armour carries and lets slower companions keep up. The run_speed section
+      chooses which of them it covers.
 
   main.no_drop_items_on_death:
     kind: bool
