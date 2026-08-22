@@ -23,10 +23,12 @@ import {
   isModVersion,
   parseManifest,
   partOptions,
+  type ModInput,
   type ModManifest,
   type ModPartGroup,
   type ModType,
 } from "./manifest.js";
+import { datToolFor, noDatTool } from "./dat-tool.js";
 import type { ChoiceGroup } from "./mod-choice.js";
 import { installedBaseVersion, type BaseVersion } from "./base-version.js";
 import { carryOver, type CarriedSelection } from "./mod-parts.js";
@@ -340,6 +342,12 @@ export interface ModContext {
    * were never ZAX's, and without this they are a game type with no version and no update on offer.
    */
   baseVersion?: BaseVersion | null;
+  /**
+   * Whether this host has a build of the tool a mod's extraction step needs. Read only where a mod declares
+   * one, and false is a refusal rather than a silence: the step would be skipped otherwise, and an install
+   * missing what it was meant to unpack is worse than one that did not happen.
+   */
+  canExtract?: boolean;
 }
 
 /** Which sequence of releases a version belongs to - `2.4.34` is the 2.4 line, which never crosses to 2.3. */
@@ -372,9 +380,26 @@ export function availability(release: ModRelease, context: ModContext): Availabi
     if (newness === 0) return { kind: "installed" };
   }
 
+  // A mod that creates an install answers from the created directory's own stamp, and it answers here -
+  // before the offers below - so an install already at this version reads as installed even on a host where
+  // a later step could not run.
+  if (manifest.creates && context.baseVersion) {
+    const newness = compareVersions(manifest.version, context.baseVersion.version);
+    // Straight version comparison, with no line to cross: lines are a property of RPU's release lines, and a
+    // mod that creates an install publishes one sequence.
+    if (newness === 0) return { kind: "installed" };
+    if (newness < 0) return { kind: "downgrade", from: context.baseVersion.version };
+  }
+
   // Everything from here on is an offer to download, which a release that never names its payload cannot make.
   // For a parts release the payload is whatever parts resolved: one asset short is not nothing to install.
-  if (manifest.type === "base") {
+  if (manifest.extractDat && context.canExtract === false) return { kind: "blocked", why: noDatTool(manifest.name) };
+  if (manifest.creates) {
+    // Its payload is an ordinary archive, so the archive check below is the one that applies - said here
+    // because the installer arm is the other kind of base mod's and does not fit this one.
+    if (!release.archive)
+      return { kind: "blocked", why: `The ${manifest.name} release does not say which of its files is the mod.` };
+  } else if (manifest.type === "base") {
     // A base mod's payload is its installer, and a release that publishes one for another system is not a
     // release that named nothing - the mod is real and this machine cannot run it, which is what it says.
     if (!release.installer)
@@ -397,6 +422,16 @@ export function availability(release: ModRelease, context: ModContext): Availabi
       return { kind: "convert", from: recorded.version, was: recorded.type };
     }
     return { kind: "upgrade", from: recorded.version };
+  }
+
+  // A created install's own version, where one is there and this release is newer than it. The earlier arm
+  // answered the other two directions; this is the upgrade an install ZAX never performed can still take.
+  if (manifest.creates) {
+    if (context.baseVersion) return { kind: "upgrade", from: context.baseVersion.version };
+    // A directory that is there and says nothing about itself: the release goes over it, which is what
+    // unpacking a payload over an existing folder does anyway.
+    if (context.present) return { kind: "install-over" };
+    return blockedByType(manifest, context) ?? { kind: "install" };
   }
 
   // Presence always comes from the directory. For a base mod that means the type the directory reports and
@@ -477,6 +512,10 @@ export interface ModOffer {
   reason?: string;
   /** What a base mod turns this install into, which is the thing worth knowing before installing one. */
   becomes?: GameType;
+  /** The directory a creating mod makes inside this install, where it makes one. */
+  creates?: string;
+  /** What the user must be asked for before this can be installed, so the interface reads no manifest. */
+  asks?: readonly ModInput[];
   /**
    * The choice to make before installing this release, and where this install stands in it. A stacking mod's
    * parts and a base installer's components are the same question asked of two different manifests, so the
@@ -517,11 +556,19 @@ export async function listAvailableMods(
     try {
       const release = await fetchFeed(platform, feed, now);
       // A parts mod declares nothing at the top level, so presence is judged against every part's entries:
-      // any one of them in the folder is the mod being there.
+      // any one of them in the folder is the mod being there. A mod that creates an install is not in the
+      // mods folder at all: what answers for it is the directory it makes.
+      const creates = release.manifest.creates;
+      const created = creates ? platform.paths.join(install.path, creates.directory) : null;
       const declared = release.manifest.entries ?? partOptions(release.manifest).flatMap((part) => part.entries ?? []);
-      const present = await presentInMods(platform, install.path, feed.id, declared);
+      const present =
+        created === null
+          ? await presentInMods(platform, install.path, feed.id, declared)
+          : (await platform.fs.stat(created))?.kind === "dir";
       // Read only for a base mod, and only where it could answer: a stacking mod's version is the record's.
-      const baseVersion = release.manifest.type === "base" ? await installedBaseVersion(platform, install) : undefined;
+      // A created install stamps its own copy, one directory in, which is where this reads it.
+      const baseVersion =
+        release.manifest.type === "base" ? await installedBaseVersion(platform, created ?? install.path) : undefined;
       // A base mod's components are asked for every install rather than carried over: they are the
       // installer's own list, ZAX records no selection for them, and the installer's wizard would ask too.
       //
@@ -542,6 +589,8 @@ export async function listAvailableMods(
         type: release.manifest.type,
         ...(release.manifest.reason !== undefined ? { reason: release.manifest.reason } : {}),
         ...(release.manifest.becomes !== undefined ? { becomes: release.manifest.becomes } : {}),
+        ...(creates ? { creates: creates.directory } : {}),
+        ...(release.manifest.inputs ? { asks: release.manifest.inputs } : {}),
         ...(groups.length > 0 ? { choices: { what: components ? "components" : "parts", groups, ...carried } } : {}),
         availability: availability(release, {
           install,
@@ -549,6 +598,7 @@ export async function listAvailableMods(
           sfall,
           present,
           ...(baseVersion !== undefined ? { baseVersion } : {}),
+          ...(release.manifest.extractDat ? { canExtract: datToolFor(platform.os) !== undefined } : {}),
         }),
       });
     } catch (error) {

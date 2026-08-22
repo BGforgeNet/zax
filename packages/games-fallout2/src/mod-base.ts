@@ -13,7 +13,8 @@
 
 import type { GameType, Install, MergeConflict } from "@zax/core";
 import type { Platform } from "@zax/platform";
-import { backupDirectory, fnv1a, IniDocument, latin1, mergeIni, stamp } from "@zax/core";
+import { backupDirectory, fnv1a, stamp } from "@zax/core";
+import { holdUserFiles, mergeUserFiles } from "./mod-state.js";
 import { CONFIG_FILES } from "./files.js";
 import { preflightArchive } from "./archive-preflight.js";
 import { caseSensitiveAt, lowercaseTree, mixedCasePaths } from "./case-lowering.js";
@@ -213,20 +214,6 @@ export interface BaseInstallOutcome {
   backup: string;
 }
 
-/**
- * The files that belong to the user across a base install: what the manifest declares, or the engine's own
- * config files, which are the ones ZAX's settings tabs edit. A base mod deploys its bundled sfall and hi-res
- * patch, so without this an install would silently reset two tabs' worth of the user's settings.
- */
-async function stateFilesFor(platform: Platform, install: Install, manifest: ModManifest): Promise<readonly string[]> {
-  const declared = manifest.state ?? [...CONFIG_FILES];
-  const held: string[] = [];
-  for (const path of declared) {
-    if ((await platform.fs.stat(insidePath(platform, install.path, path)))?.kind === "file") held.push(path);
-  }
-  return held;
-}
-
 const insidePath = (platform: Platform, root: string, relative: string): string =>
   platform.paths.join(root, ...relative.split("/"));
 
@@ -261,16 +248,11 @@ export async function applyBaseInstall(
   }
 
   // The user's files, before anything runs: copied to the timestamped backup as every destructive path here
-  // does, and held in memory because the installer is about to write over them.
+  // does, and held in memory because the installer is about to write over them. A base mod deploys its own
+  // sfall and hi-res patch, so without this an install would reset two of ZAX's settings tabs.
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
-  const stateFiles = await stateFilesFor(platform, install, manifest);
-  const mine = new Map<string, Uint8Array>();
-  for (const path of stateFiles) {
-    const at = insidePath(platform, install.path, path);
-    const bytes = await platform.fs.read(at);
-    mine.set(path, bytes);
-    await platform.fs.copy(at, insidePath(platform, backup, path));
-  }
+  const stateFiles = manifest.state ?? [...CONFIG_FILES];
+  const mine = await holdUserFiles(platform, install.path, stateFiles, backup);
 
   // Before the payload lands, and on a first install only: what arrives with the mod is spelled the way the
   // mod spells it, and `mods/AmmoGlovz.ini` is upstream's file rather than something to rename.
@@ -331,24 +313,7 @@ export async function applyBaseInstall(
 
   // After the installer rather than before it, which is the one thing that differs from a stacking mod: the
   // installer owns writing these files, so the user's values go back in once it has written them.
-  const conflicts: MergeConflict[] = [];
-  const shipped: Record<string, string> = {};
-  for (const path of stateFiles) {
-    const target = insidePath(platform, install.path, path);
-    if ((await platform.fs.stat(target))?.kind !== "file") continue;
-    const shippedBytes = await platform.fs.read(target);
-    shipped[path] = latin1(shippedBytes);
-    const held = mine.get(path);
-    if (!held) continue;
-    const base = previous?.shipped[path];
-    const merged = mergeIni(
-      IniDocument.parseBytes(shippedBytes),
-      IniDocument.parseBytes(held),
-      base === undefined ? null : IniDocument.parse(base),
-    );
-    await platform.fs.write(target, merged.document.toBytes());
-    conflicts.push(...merged.conflicts);
-  }
+  const { shipped, conflicts } = await mergeUserFiles(platform, install.path, stateFiles, mine, previous?.shipped);
 
   await saveRecord(
     platform,

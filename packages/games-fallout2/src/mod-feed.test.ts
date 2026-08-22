@@ -797,3 +797,104 @@ installer:
     expect((state as { why: string }).why).toMatch(/installs on Fallout 2 /);
   });
 });
+
+describe("a mod that creates an install", () => {
+  const CREATES = `spec: 1
+id: fo1in2
+name: Fallout et tu
+version: "1.16.3771"
+game: fallout2
+type: base
+becomes: fo1in2
+archive: Fallout1in2.zip
+creates:
+  directory: Fallout1in2
+inputs:
+  - id: fallout1
+    label: Your Fallout 1 folder
+    holds: master.dat
+extract-dat:
+  from: fallout1
+  list: undat_files.txt
+  into: data
+`;
+
+  const release: ModRelease = {
+    manifest: parseManifest(new TextEncoder().encode(CREATES)),
+    manifestText: CREATES,
+    manifestFromAsset: true,
+    archive: { name: "Fallout1in2.zip", url: "https://example.test/Fallout1in2.zip" },
+  };
+
+  const install: Install = { path: "/games/fallout2", type: "fallout2" };
+  const where = (over: Partial<ModContext> = {}): ModContext => ({
+    install,
+    record: { path: install.path, mods: [] },
+    sfall: null,
+    present: false,
+    canExtract: true,
+    ...over,
+  });
+
+  it("offers an install on a host of any type, since it changes nothing about the host", () => {
+    expect(availability(release, where())).toEqual({ kind: "install" });
+    // Where a delegated base mod is refused on a patched game, this one is not: it writes only inside the
+    // directory it makes.
+    expect(availability(release, where({ install: { path: install.path, type: "fallout2rpu" } }))).toEqual({
+      kind: "install",
+    });
+  });
+
+  it("answers from the created install's own stamp, which is what a hand-installed one has", () => {
+    expect(availability(release, where({ baseVersion: { version: "1.16.3771", line: "1.16" } }))).toEqual({
+      kind: "installed",
+    });
+    expect(availability(release, where({ baseVersion: { version: "1.15.3735", line: "1.15" } }))).toEqual({
+      kind: "upgrade",
+      from: "1.15.3735",
+    });
+    expect(availability(release, where({ baseVersion: { version: "1.17.3800", line: "1.17" } }))).toEqual({
+      kind: "downgrade",
+      from: "1.17.3800",
+    });
+  });
+
+  it("offers the release over a directory that is there but says nothing about itself", () => {
+    expect(availability(release, where({ present: true }))).toEqual({ kind: "install-over" });
+  });
+
+  it("says so where the extraction step has no build for this system", () => {
+    const blocked = availability(release, where({ canExtract: false }));
+    expect(blocked).toMatchObject({ kind: "blocked" });
+    expect((blocked as { why: string }).why).toMatch(/no build for this system/);
+    // An install already at this version is still installed, whatever a later step could not do here.
+    expect(
+      availability(release, where({ canExtract: false, baseVersion: { version: "1.16.3771", line: "1.16" } })),
+    ).toEqual({ kind: "installed" });
+  });
+
+  it("carries what to ask the user for, so the interface never reads a manifest", async () => {
+    const platform = new MemoryPlatform({
+      files: { "/games/fallout2/fallout2.exe": "" },
+      responses: {
+        "https://api.github.com/repos/rotators/Fo1in2/releases?per_page=100": JSON.stringify([
+          {
+            tag_name: "v1.16.3771",
+            assets: [
+              { name: "f2mod.yml", browser_download_url: "https://example.test/f2mod.yml" },
+              {
+                name: "Fallout1in2.zip",
+                browser_download_url: "https://example.test/Fallout1in2.zip",
+                digest: "sha256:aa",
+                size: 10,
+              },
+            ],
+          },
+        ]),
+        "https://example.test/f2mod.yml": CREATES,
+      },
+    });
+    const found = await fetchFeed(platform, { repository: "rotators/Fo1in2", id: "fo1in2" });
+    expect(found.manifest.inputs?.[0]?.label).toBe("Your Fallout 1 folder");
+  });
+});

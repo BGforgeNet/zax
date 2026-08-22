@@ -17,7 +17,7 @@
  * parser finds the trailing version and does not match on the prefix.
  */
 
-import { IniDocument, type Install } from "@zax/core";
+import { IniDocument } from "@zax/core";
 import type { Platform } from "@zax/platform";
 
 /** What an install says about itself: the release it carries, and the line that release belongs to. */
@@ -56,14 +56,20 @@ export function baseVersionOf(text: string): BaseVersion | null {
   // Otherwise a marker before the version is what tells the RPU family from anything else. Which marker it
   // is does not matter, and deliberately: `RP` today, `RPU` in the next release.
   if (!/^[A-Za-z]+$/.test(tokens[tokens.length - 2] ?? "")) return null;
-  if (PRE_SPLIT.test(last)) return { version: last };
-  const split = LINE_AND_PATCH.exec(last);
-  return split?.[1] ? { version: last, line: split[1] } : null;
+  // Dropped rather than kept: Fallout et tu writes `v1.16.3771`, the same spelling as its tag, and the
+  // version compared against a release is the number rather than the way that release wrote it.
+  const version = last.replace(/^v/i, "");
+  if (PRE_SPLIT.test(version)) return { version };
+  const split = LINE_AND_PATCH.exec(version);
+  return split?.[1] ? { version, line: split[1] } : null;
 }
 
-/** The same, read from the install's own `ddraw.ini`. */
-export async function installedBaseVersion(platform: Platform, install: Install): Promise<BaseVersion | null> {
-  const at = platform.paths.join(install.path, "ddraw.ini");
+/**
+ * The same, read from an install's own `ddraw.ini`. Takes the directory rather than an install because a mod
+ * that creates one writes its stamp inside the directory it made, which is no install of its own yet.
+ */
+export async function installedBaseVersion(platform: Platform, root: string): Promise<BaseVersion | null> {
+  const at = platform.paths.join(root, "ddraw.ini");
   if ((await platform.fs.stat(at))?.kind !== "file") return null;
   const held = IniDocument.parseBytes(await platform.fs.read(at)).get("Misc", "VersionString");
   return held === null || held === undefined ? null : baseVersionOf(held);

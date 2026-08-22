@@ -32,10 +32,18 @@ import {
 } from "@zax/core";
 import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
-import { mayWrite, parseManifest, type DroppedSetting, type ModSetting } from "./manifest.js";
+import { mayWrite, parseManifest, type DroppedSetting, type ModManifest, type ModSetting } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 import { MOD_FEEDS, fetchFeed, listAvailableMods, type ModListing } from "./mod-feed.js";
 import { applyBaseInstall, planBaseInstall, type BaseInstallOutcome, type BaseInstallPlan } from "./mod-base.js";
+import {
+  applyCreateInstall,
+  planCreateInstall,
+  type CreateInstallOutcome,
+  type CreateInstallPlan,
+} from "./mod-create.js";
+import { datToolFor, ensureDatTool, noDatTool } from "./dat-tool.js";
+import type { ModProgress } from "./mod-asset.js";
 import {
   applyModInstall,
   planModInstall,
@@ -110,14 +118,20 @@ export interface Backend {
    * and is ignored by a release that offers neither. A base mod answers with the thinner plan of the two,
    * which says so: the installer decides what lands, so naming files there would be inventing them.
    */
-  planMod(install: Install, modId: string, choices?: readonly string[]): Promise<ModInstallPlan | BaseInstallPlan>;
+  planMod(
+    install: Install,
+    modId: string,
+    choices?: readonly string[],
+    answers?: Readonly<Record<string, string>>,
+  ): Promise<ModInstallPlan | BaseInstallPlan | CreateInstallPlan>;
   /** Installs the plan whose fingerprint this is; one that no longer resolves the same is refused. */
   installMod(
     install: Install,
     modId: string,
     fingerprint: string,
     choices?: readonly string[],
-  ): Promise<ModInstallOutcome | BaseInstallOutcome>;
+    answers?: Readonly<Record<string, string>>,
+  ): Promise<ModInstallOutcome | BaseInstallOutcome | CreateInstallOutcome>;
   /** Unwinds an install that never finished; the working directory holds everything it puts back. */
   restoreMod(install: Install, modId: string): Promise<void>;
   removeMod(install: Install, modId: string): Promise<ModRemoval>;
@@ -210,6 +224,17 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     return { release: await fetchFeed(platform, feed), selection: chosen ?? [] };
   };
 
+  /**
+   * The tool an extraction step needs, fetched and runnable. Resolved here rather than inside the install
+   * because a host with no build for it cannot install such a mod at all, and that is an answer the offer
+   * already carries - this is the same refusal, said where the work would otherwise start.
+   */
+  const extractionTool = async (manifest: ModManifest, progress: ModProgress): Promise<string> => {
+    const build = datToolFor(platform.os);
+    if (!build) throw new Error(noDatTool(manifest.name));
+    return ensureDatTool(platform, build, progress);
+  };
+
   /** The settings schemas the install's records carry. A snapshot a newer spec wrote is skipped, not fatal. */
   const installedModSettings = async (installPath: string): Promise<ModSettingsGroup[]> => {
     const groups: ModSettingsGroup[] = [];
@@ -264,14 +289,24 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       const sfall = await installedSfallVersion(platform, install);
       return listAvailableMods(platform, install, record, sfall);
     },
-    planMod: async (install, modId, choices) => {
+    planMod: async (install, modId, choices, answers) => {
       const { release, selection } = await releaseForMod(install, modId, choices);
       const progress = reporting();
+      if (release.manifest.creates) {
+        return planCreateInstall(
+          platform,
+          install,
+          release,
+          answers ?? {},
+          await extractionTool(release.manifest, progress),
+          progress,
+        );
+      }
       return release.manifest.type === "base"
         ? planBaseInstall(platform, install, release, selection, progress)
         : planModInstall(platform, install, release, selection, progress);
     },
-    installMod: async (install, modId, fingerprint, choices) => {
+    installMod: async (install, modId, fingerprint, choices, answers) => {
       const { release, selection } = await releaseForMod(install, modId, choices);
       const progress = reporting();
       // Re-planned rather than trusting a plan the renderer held: the directory may have moved on since the
@@ -281,6 +316,12 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         new Error(
           `What installing ${release.manifest.name} would do has changed since you confirmed it - the game folder or the release moved on. Look at the new plan and confirm again.`,
         );
+      if (release.manifest.creates) {
+        const tool = await extractionTool(release.manifest, progress);
+        const plan = await planCreateInstall(platform, install, release, answers ?? {}, tool, progress);
+        if (plan.fingerprint !== fingerprint) throw stale();
+        return applyCreateInstall(platform, install, release, plan, tool, progress, new Date());
+      }
       if (release.manifest.type === "base") {
         const plan = await planBaseInstall(platform, install, release, selection, progress);
         if (plan.fingerprint !== fingerprint) throw stale();

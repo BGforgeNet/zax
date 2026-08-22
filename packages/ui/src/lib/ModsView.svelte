@@ -20,10 +20,15 @@
     const state = offer.availability;
     switch (state.kind) {
       case "install":
+        // A mod that creates an install leaves this one alone, so it says what appears rather than what
+        // this becomes - the two read almost the same and mean opposite things.
+        if (offer.creates && offer.becomes)
+          return `Not installed. Creates ${gameName(offer.becomes)} in ${offer.creates}, beside this installation.`;
         return offer.becomes
           ? `Not installed. Turns this installation into ${gameName(offer.becomes)}.`
           : "Not installed.";
       case "install-over":
+        if (offer.creates) return `${offer.creates} is already here, at a version it does not state.`;
         // A base mod's directory is the record it has not got: this install already is what the mod makes.
         return offer.becomes
           ? `This installation is already ${gameName(offer.becomes)}, at a version it does not state. Installing lays this release over it.`
@@ -82,6 +87,9 @@
     const options = (offer.choices?.groups ?? []).flatMap((group) => group.options);
     return ids.map((id) => options.find((part) => part.id === id)?.label ?? id);
   }
+
+  /** An input id as the manifest labels it, for a plan naming the folders it was pointed at. */
+  const inputLabel = (offer: ModOffer, id: string): string => offer.asks?.find((input) => input.id === id)?.label ?? id;
 
   function installLabel(offer: ModOffer): string | null {
     switch (offer.availability.kind) {
@@ -417,6 +425,41 @@
   {/snippet}
 </Dialog>
 
+<!-- What the mod cannot know and ZAX cannot find: where the user keeps the other game it reads from. Asked
+     before the download, since a folder that is not the right one is the likeliest thing to be wrong. -->
+<Dialog
+  open={store.modInputs !== null}
+  title="Point {store.modInputs?.offer.name ?? ''} at what it needs"
+  dismiss={() => store.dismissModInputs()}
+>
+  {#if store.modInputs}
+    {@const answers = store.modInputs.answers}
+    {#each store.modInputs.offer.asks ?? [] as input (input.id)}
+      <div class="ask">
+        <span class="part-name">{input.label}</span>
+        {#if input.help}<span class="note">{input.help}</span>{/if}
+        <div class="ask-row">
+          <!-- Read-only rather than a typed path: the picker is the shell's, and a folder typed by hand is a
+             refusal from the install rather than an answer. -->
+          <input type="text" readonly value={answers[input.id] ?? ""} placeholder="No folder chosen" />
+          <button onclick={() => void store.browseForModInput(input.id)}>Browse...</button>
+        </div>
+        <span class="note">The folder holding <code>{input.holds}</code>.</span>
+      </div>
+    {/each}
+  {/if}
+  {#snippet footer()}
+    <button onclick={() => store.dismissModInputs()}>Cancel</button>
+    <button
+      class="primary"
+      disabled={(store.modInputs?.offer.asks ?? []).some((input) => !store.modInputs?.answers[input.id])}
+      onclick={() => void store.confirmModInputs()}
+    >
+      Continue
+    </button>
+  {/snippet}
+</Dialog>
+
 <!-- The resolved plan is the confirmation: what will land, what moves aside, which lines change - before
      anything is written. Cancelling keeps the download, so saying no costs nothing. -->
 <Dialog
@@ -451,7 +494,25 @@
     <p class="plan-lead warn">
       This cannot be undone. ZAX will not be able to remove it - going back means a fresh copy of the game.
     </p>
-  {:else if store.modPlan}
+  {:else if store.modPlan?.plan.kind === "creates"}
+    {@const plan = store.modPlan.plan}
+    <!-- Thicker than a delegated base mod's plan, because ZAX performs this one: what it makes, what it
+       reads, and what both cost. Not a file list - ten thousand entries is not something anybody reads. -->
+    <p class="plan-lead">
+      Creates {gameName(plan.becomes)} in <code>{plan.directory}</code>, inside this game folder. This installation is
+      not changed.
+    </p>
+    <ul class="plan">
+      <li>Download: {megabytes(plan.download)}, unpacking to {megabytes(plan.unpacked)}</li>
+      {#if plan.free !== undefined}<li>Free on this drive: {megabytes(plan.free)}</li>{/if}
+      {#each Object.entries(plan.inputs) as [id, folder] (id)}
+        <li>
+          {inputLabel(store.modPlan.offer, id)}: <code>{folder}</code>
+          {#if plan.extracts}<span class="note">{plan.extracts} file(s) unpacked from it</span>{/if}
+        </li>
+      {/each}
+    </ul>
+  {:else if store.modPlan?.plan.kind === "stacking"}
     {@const plan = store.modPlan.plan}
     <p class="plan-lead">Lands in the game folder:</p>
     <ul class="plan">
@@ -495,6 +556,24 @@
 </Dialog>
 
 <style>
+  /* One question per folder the mod asks for: what it is, the picker, and the file that says it is right. */
+  .ask {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .ask-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .ask-row input {
+    flex: 1;
+    min-width: 0;
+  }
+
   /*
     Fixed tracks rather than a flex row, for the reason the settings rows have them: with the badge following
     the name it sat at a different place on every row, and a column of badges that never lines up reads as

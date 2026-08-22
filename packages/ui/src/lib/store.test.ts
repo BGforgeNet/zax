@@ -886,3 +886,35 @@ describe("a running mod flow", () => {
     expect(store.modWorking("fo2tweaks", "restore"), "and the mark went with the operation").toBe(false);
   });
 });
+
+describe("a mod that must be pointed at another game", () => {
+  const offer = {
+    id: "fo2tweaks",
+    name: "Fallout et tu",
+    version: "1.16.3771",
+    type: "base" as const,
+    becomes: "fo1in2" as const,
+    creates: "Fallout1in2",
+    asks: [{ id: "fallout1", label: "Your Fallout 1 folder", holds: "master.dat" }],
+    availability: { kind: "install" as const },
+  };
+
+  test("asks for the folder before anything is downloaded", async () => {
+    await store.prepareMod(offer);
+    expect(store.modInputs?.offer.id).toBe("fo2tweaks");
+    expect(store.modInputs?.answers).toEqual({});
+    expect(store.modPlan, "nothing is planned until the question is answered").toBeNull();
+    store.dismissModInputs();
+    expect(store.modInputs).toBeNull();
+  });
+
+  test("carries the answers on to the plan, which is where they are checked", async () => {
+    await store.prepareMod(offer);
+    store.modInputs = { offer, chosen: [], answers: { fallout1: "/games/fallout1" } };
+    // The preview refuses the feed's network, so the flow ends in that refusal - which is past the point
+    // this is about: the question was closed and the plan was attempted with what was answered.
+    await store.confirmModInputs();
+    expect(store.modInputs).toBeNull();
+    expect(store.notice?.kind).toBe("problem");
+  });
+});

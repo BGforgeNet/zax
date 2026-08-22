@@ -39,6 +39,7 @@ import {
   type MachineDescription,
   type Mod,
   type BaseInstallPlan,
+  type CreateInstallPlan,
   type ModInstallPlan,
   type ModListing,
   type ModOffer,
@@ -214,9 +215,15 @@ class Store {
    * A resolved install plan awaiting the user's word, with the offer it belongs to. Two shapes: a stacking
    * mod's names every file, and a base mod's names the release and the space, the installer owning the rest.
    */
-  modPlan = $state<{ offer: ModOffer; plan: ModInstallPlan | BaseInstallPlan } | null>(null);
+  modPlan = $state<{ offer: ModOffer; plan: ModInstallPlan | BaseInstallPlan | CreateInstallPlan } | null>(null);
   /** The chooser while it is open: the offer whose choice is being made, and what is ticked in it. */
   modParts = $state<{ offer: ModOffer; chosen: readonly string[] } | null>(null);
+  /**
+   * The folders a mod has to be pointed at before it can be planned, while that question is open. Its own
+   * dialog rather than the chooser's: what is being asked for is a path on this machine, not a choice
+   * between things the release publishes.
+   */
+  modInputs = $state<{ offer: ModOffer; chosen: readonly string[]; answers: Record<string, string> } | null>(null);
   /** The installed mods' settings schemas, rendered with the same per-kind controls the catalog gets. */
   modSettings = $state<readonly ModSettingsGroup[]>([]);
   /** Which of the Mods view's tabs is showing. */
@@ -350,6 +357,7 @@ class Store {
     this.modListing = null;
     this.modPlan = null;
     this.modParts = null;
+    this.modInputs = null;
     if (!install) {
       this.contents = {};
       this.modSettings = [];
@@ -713,7 +721,11 @@ class Store {
    * offers parts is asked about first, unless the record's choice carried over - which is what "an upgrade
    * re-installs the same choices without asking" means.
    */
-  async prepareMod(offer: ModOffer, chosen?: readonly string[]): Promise<void> {
+  async prepareMod(
+    offer: ModOffer,
+    chosen?: readonly string[],
+    answers?: Readonly<Record<string, string>>,
+  ): Promise<void> {
     const install = this.install;
     if (!install) return;
     const refusal = this.modFlowRefusal();
@@ -726,15 +738,44 @@ class Store {
       return;
     }
     const parts = chosen ?? offer.choices?.selection;
+    // After the choice rather than before it: what a release publishes is its own question, and the folders
+    // on this machine are asked for once that is settled.
+    if (answers === undefined && offer.asks?.length) {
+      this.modInputs = { offer, chosen: parts ?? [], answers: {} };
+      return;
+    }
     await this.run(
       `Preparing ${offer.name} ${offer.version}`,
       async () => {
-        const plan = await backend.planMod(install, offer.id, parts);
+        const plan = await backend.planMod(install, offer.id, parts, answers);
         this.modPlan = { offer, plan };
         return null;
       },
       { id: offer.id, action: "prepare" },
     );
+  }
+
+  /** Opens the shell's folder picker for one of a mod's questions, and keeps what comes back. */
+  async browseForModInput(id: string): Promise<void> {
+    const held = this.modInputs;
+    if (!held) return;
+    const chosen = await backend.chooseFolder();
+    if (chosen === null) return;
+    // Re-read rather than closed over: the picker is a round trip, and the dialog may have moved on.
+    const open = this.modInputs;
+    if (open?.offer.id !== held.offer.id) return;
+    this.modInputs = { ...open, answers: { ...open.answers, [id]: chosen } };
+  }
+
+  /** The folders go on to the plan, which resolves them against the release and is the confirmation proper. */
+  async confirmModInputs(): Promise<void> {
+    const held = this.modInputs;
+    this.modInputs = null;
+    if (held) await this.prepareMod(held.offer, held.chosen, held.answers);
+  }
+
+  dismissModInputs(): void {
+    this.modInputs = null;
   }
 
   /**
@@ -786,19 +827,33 @@ class Store {
       async () => {
         // The plan's own fingerprint, so what runs is what was on screen: the install re-plans, and one
         // that now resolves differently comes back as a refusal to look again rather than as a surprise.
-        // The plan's own choices, not the chooser's: what runs is what the resolved plan said it would.
-        const chosen = held.plan.kind === "base" ? held.plan.components : held.plan.parts;
-        const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint, chosen);
+        // The plan's own choices and folders, not the dialogs': what runs is what the resolved plan said it
+        // would, down to which folder it reads from.
+        const chosen =
+          held.plan.kind === "base"
+            ? held.plan.components
+            : held.plan.kind === "stacking"
+              ? held.plan.parts
+              : undefined;
+        const answers = held.plan.kind === "creates" ? held.plan.inputs : undefined;
+        const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint, chosen, answers);
+        // A mod that created an install is a second game to manage. Registered through the same path the Add
+        // button takes, so what it is comes from reading the directory rather than from what the manifest
+        // claimed it would make - and a refusal there is reported rather than swallowed. Not through
+        // `addInstall`, which opens an operation of its own and this one is already running.
+        const added = "created" in outcome ? await this.registerInstall(outcome.created) : null;
         // A base install makes this a different game, and nothing but the directory knows that: the stored
         // type came from a reading taken before the installer ran.
         if ("becomes" in outcome) await this.reidentify(install.path);
         await this.readInstall();
         await this.refreshModOffers(install);
+        if (added?.kind === "problem") return added;
         const conflicts =
           outcome.conflicts.length > 0
             ? ` ${outcome.conflicts.length} setting(s) you had changed were kept over the release's new defaults.`
             : "";
-        return { kind: "done", text: `${held.offer.name} ${outcome.version} installed.${conflicts}` };
+        const beside = "created" in outcome ? ` ${outcome.created} is now on the list of installations.` : "";
+        return { kind: "done", text: `${held.offer.name} ${outcome.version} installed.${conflicts}${beside}` };
       },
       { id: held.offer.id, action: "install" },
     );
@@ -1068,18 +1123,24 @@ class Store {
 
   /** Adds a directory the user pointed at, refusing one that does not hold a game. */
   async addInstall(path: string): Promise<void> {
-    await this.run("Adding the install", async () => {
-      const trimmed = path.trim();
-      if (trimmed === "") return null;
-      const type = await backend.identifyInstall(trimmed);
-      if (type === null) return { kind: "problem", text: `${trimmed} does not hold a Fallout 2 install.` };
-      const result = addInstall(this.installs, { path: trimmed, type });
-      if (!result.ok) return { kind: "problem", text: result.reason };
-      this.installs = result.installs;
-      await this.persist();
-      if (this.selectedInstall === "") await this.selectInstall(trimmed);
-      return { kind: "done", text: `Added ${trimmed}.` };
-    });
+    await this.run("Adding the install", () => this.registerInstall(path));
+  }
+
+  /**
+   * The registration itself, without an operation around it: an install ZAX has just created is added from
+   * inside the operation that made it, which is already the running one.
+   */
+  private async registerInstall(path: string): Promise<Notice | null> {
+    const trimmed = path.trim();
+    if (trimmed === "") return null;
+    const type = await backend.identifyInstall(trimmed);
+    if (type === null) return { kind: "problem", text: `${trimmed} does not hold a Fallout 2 install.` };
+    const result = addInstall(this.installs, { path: trimmed, type });
+    if (!result.ok) return { kind: "problem", text: result.reason };
+    this.installs = result.installs;
+    await this.persist();
+    if (this.selectedInstall === "") await this.selectInstall(trimmed);
+    return { kind: "done", text: `Added ${trimmed}.` };
   }
 
   async scan(): Promise<void> {

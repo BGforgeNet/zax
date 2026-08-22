@@ -43,6 +43,12 @@ export {
 export { baseVersionOf, installedBaseVersion, type BaseVersion } from "./base-version.js";
 export { applyBaseInstall, planBaseInstall, type BaseInstallOutcome, type BaseInstallPlan } from "./mod-base.js";
 export {
+  applyCreateInstall,
+  planCreateInstall,
+  type CreateInstallOutcome,
+  type CreateInstallPlan,
+} from "./mod-create.js";
+export {
   applyModInstall,
   planModInstall,
   restoreModInstall,
