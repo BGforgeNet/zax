@@ -68,12 +68,14 @@ const CONTENTS = {
   "mods_order.txt": "rpu.dat\n",
 };
 
+// The wholesale spread goes first, so the merged keys below it cannot be reinstated raw: with it last, a
+// caller passing `files` silently dropped the seeded `fallout2.exe` and the failure surfaced somewhere else.
 const basePlatform = (options: MemoryOptions = {}) =>
   new MemoryPlatform({
-    files: { [`${GAME}/fallout2.exe`]: "", ...options.files },
-    downloads: { [ZIP_URL]: PAYLOAD, [EXE_URL]: "EXE" },
-    archives: { [PAYLOAD]: CONTENTS },
     ...options,
+    files: { [`${GAME}/fallout2.exe`]: "", ...options.files },
+    downloads: { [ZIP_URL]: PAYLOAD, [EXE_URL]: "EXE", ...options.downloads },
+    archives: { [PAYLOAD]: CONTENTS, ...options.archives },
   });
 
 describe("planning a base install", () => {
