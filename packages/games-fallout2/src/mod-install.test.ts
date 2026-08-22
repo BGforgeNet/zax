@@ -698,7 +698,7 @@ describe("a mod that declares its entries", () => {
     expect(platform.textAt(`${GAME}/mods/InventoryFilter.dat/InvenFilter.ini`)).toBeUndefined();
   });
 
-  it("spells a nested entry the way the order file does, so re-installing does not add a second line", async () => {
+  it("spells a nested entry the way the order file does, on the way in and on the way out", async () => {
     const text = FOLDER_MANIFEST.replace("entries: [InventoryFilter.dat]", 'entries: ["patches/extra.dat"]');
     const platform = new MemoryPlatform({
       files: { [`${GAME}/fallout2.exe`]: "" },
@@ -724,6 +724,11 @@ describe("a mod that declares its entries", () => {
     await applyModInstall(platform, install, release, await planModInstall(platform, install, release));
     expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).toBe(first);
     expect(first.match(/extra\.dat/g)).toHaveLength(1);
+
+    // And out again. The record holds the entry as the manifest spelled it, so an uninstall that took that
+    // spelling to the order file matched no line and left one naming a file it had just deleted.
+    await uninstallMod(platform, install, "inventoryfilter");
+    expect(platform.textAt(`${GAME}/mods/mods_order.txt`) ?? "").not.toMatch(/extra\.dat/);
   });
 
   it("refuses an entry the payload does not ship, rather than ordering a name nothing answers to", async () => {
@@ -847,6 +852,178 @@ describe("a payload that is not an archive", () => {
     const release = await bareRelease();
     const wrong: ModRelease = { ...release, archive: { ...release.archive!, digest: `sha256:${"0".repeat(64)}` } };
     await expect(planModInstall(platform, install, wrong)).rejects.toThrow(/does not match the digest/);
+    expect(platform.textAt(`${GAME}/mods/cassidy_head.dat`)).toBeUndefined();
+  });
+});
+
+describe("a mod installed in parts", () => {
+  const PARTS_WORK = `${CACHE}/tmp/mod-${installKey(GAME)}-cassidy`;
+  const assetUrl = (version: string, name: string) => `https://example.test/cassidy/${version}/${name}`;
+  const headZip = (version: string) => `ZIP-head-${version}`;
+  const voice = (who: string, version: string) => `${who.toUpperCase()}-${version}`;
+
+  const partsManifest = (version: string, voices = "") => `spec: 1
+id: cassidy
+name: Cassidy
+version: "${version}"
+game: fallout2
+parts:
+  - label: Head
+    pick: any
+    options:
+      - id: head
+        label: New head
+        archive: cassidy_head.zip
+        entries: [cassidy_head.dat]
+  - label: Voice
+    pick: one
+    options:
+      - id: joey
+        label: Joey Bracken
+        archive: cassidy_voice_joey.dat
+        entries: [${voices || "cassidy_voice_joey.dat"}]
+        needs: head
+      - id: tom
+        label: Tom Regan
+        archive: cassidy_voice_tom.dat
+        entries: [${voices || "cassidy_voice_tom.dat"}]
+        needs: head
+`;
+
+  const partsRelease = async (version: string, voices?: string): Promise<ModRelease> => {
+    const text = partsManifest(version, voices);
+    const asset = async (name: string, body: string) => ({
+      name,
+      url: assetUrl(version, name),
+      digest: `sha256:${await sha(body)}`,
+      size: body.length,
+    });
+    return {
+      manifest: parseManifest(new TextEncoder().encode(text)),
+      manifestText: text,
+      manifestFromAsset: true,
+      parts: {
+        head: await asset("cassidy_head.zip", headZip(version)),
+        joey: await asset("cassidy_voice_joey.dat", voice("joey", version)),
+        tom: await asset("cassidy_voice_tom.dat", voice("tom", version)),
+      },
+    };
+  };
+
+  const partsPlatform = (versions: readonly string[] = ["1.2"]) =>
+    new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "" },
+      downloads: Object.fromEntries(
+        versions.flatMap((version) => [
+          [assetUrl(version, "cassidy_head.zip"), headZip(version)],
+          [assetUrl(version, "cassidy_voice_joey.dat"), voice("joey", version)],
+          [assetUrl(version, "cassidy_voice_tom.dat"), voice("tom", version)],
+        ]),
+      ),
+      archives: Object.fromEntries(
+        versions.map((version) => [headZip(version), { "mods/cassidy_head.dat": `HEAD-${version}` }]),
+      ),
+    });
+
+  const orderText = (platform: MemoryPlatform) => platform.textAt(`${GAME}/mods/mods_order.txt`) ?? "";
+
+  it("installs exactly the parts chosen, and records which they were", async () => {
+    const platform = partsPlatform();
+    const release = await partsRelease("1.2");
+    const plan = await planModInstall(platform, install, release, ["head", "joey"]);
+    expect(plan.files.map((file) => file.path)).toEqual(["mods/cassidy_head.dat", "mods/cassidy_voice_joey.dat"]);
+    expect(plan.orderLines).toEqual(["cassidy_head.dat", "cassidy_voice_joey.dat"]);
+    expect(plan.parts).toEqual(["head", "joey"]);
+
+    await applyModInstall(platform, install, release, plan);
+    expect(platform.textAt(`${GAME}/mods/cassidy_head.dat`)).toBe("HEAD-1.2");
+    expect(platform.textAt(`${GAME}/mods/cassidy_voice_joey.dat`)).toBe("JOEY-1.2");
+    expect(platform.textAt(`${GAME}/mods/cassidy_voice_tom.dat`)).toBeUndefined();
+    expect(orderText(platform)).toContain("cassidy_head.dat");
+    expect(orderText(platform)).toContain("cassidy_voice_joey.dat");
+
+    const recorded = (await loadRecord(platform, GAME)).mods[0];
+    expect(recorded?.parts).toEqual(["head", "joey"]);
+    expect(recorded?.entries).toEqual(["cassidy_head.dat", "cassidy_voice_joey.dat"]);
+    // The working directory holds both payloads while it runs, and none of it afterwards.
+    expect(await platform.fs.stat(PARTS_WORK)).toBeNull();
+  });
+
+  it("treats a changed selection as the upgrade it is - deselected parts go, chosen ones arrive", async () => {
+    const platform = partsPlatform(["1.2", "1.3"]);
+    const first = await partsRelease("1.2");
+    await applyModInstall(platform, install, first, await planModInstall(platform, install, first, ["head", "joey"]));
+
+    const next = await partsRelease("1.3");
+    const plan = await planModInstall(platform, install, next, ["head", "tom"]);
+    expect(plan.removes).toEqual(["mods/cassidy_voice_joey.dat"]);
+    await applyModInstall(platform, install, next, plan, undefined, new Date("2024-03-01T10:00:00Z"));
+
+    expect(platform.textAt(`${GAME}/mods/cassidy_voice_joey.dat`)).toBeUndefined();
+    expect(platform.textAt(`${GAME}/mods/cassidy_voice_tom.dat`)).toBe("TOM-1.3");
+    expect(orderText(platform)).not.toContain("cassidy_voice_joey.dat");
+    expect(orderText(platform)).toContain("cassidy_voice_tom.dat");
+    // What it replaced is recoverable, as anything an upgrade removes is.
+    const backup = `${CACHE}/backup/${stamp(new Date("2024-03-01T10:00:00Z"))}`;
+    expect(platform.textAt(`${backup}/mods/cassidy_voice_joey.dat`)).toBe("JOEY-1.2");
+    expect((await loadRecord(platform, GAME)).mods[0]?.parts).toEqual(["head", "tom"]);
+  });
+
+  it("removes exactly what the selection put there", async () => {
+    const platform = partsPlatform();
+    const release = await partsRelease("1.2");
+    await applyModInstall(
+      platform,
+      install,
+      release,
+      await planModInstall(platform, install, release, ["head", "tom"]),
+    );
+    await uninstallMod(platform, install, "cassidy");
+    expect(platform.textAt(`${GAME}/mods/cassidy_head.dat`)).toBeUndefined();
+    expect(platform.textAt(`${GAME}/mods/cassidy_voice_tom.dat`)).toBeUndefined();
+    expect(orderText(platform)).not.toContain("cassidy_voice_tom.dat");
+    expect((await loadRecord(platform, GAME)).mods).toEqual([]);
+  });
+
+  it("refuses a selection the release could not carry out", async () => {
+    const platform = partsPlatform();
+    const release = await partsRelease("1.2");
+    const refused = async (selection: readonly string[], cause: RegExp) =>
+      expect(planModInstall(platform, install, release, selection)).rejects.toThrow(cause);
+
+    await refused([], /nothing to install/);
+    await refused(["head", "beard"], /does not offer a part/);
+    await refused(["head", "joey", "tom"], /only one/i);
+    await refused(["joey"], /needs/);
+  });
+
+  it("refuses two parts that would land on one path, rather than letting the later one win", async () => {
+    const platform = partsPlatform();
+    // Both voices declaring the same entry: as bare payloads, both deploy to that one path.
+    const release = await partsRelease("1.2", "cassidy_voice.dat");
+    await expect(planModInstall(platform, install, release, ["head", "joey"])).resolves.toBeTruthy();
+    const voices = release.manifest
+      .parts!.flatMap((group) => group.options)
+      .filter((part) => part.id !== "head")
+      // Without the head there is nothing to need, and an unmet need would refuse before the collision does.
+      .map(({ needs: _needs, ...part }) => part);
+    const collides: ModRelease = {
+      ...release,
+      manifest: { ...release.manifest, parts: [{ label: "Voice", pick: "any", options: voices }] },
+    };
+    await expect(planModInstall(platform, install, collides, ["joey", "tom"])).rejects.toThrow(/both land on/);
+  });
+
+  it("leaves nothing installed when a later part's digest does not match", async () => {
+    const platform = partsPlatform();
+    const release = await partsRelease("1.2");
+    const tampered: ModRelease = {
+      ...release,
+      parts: { ...release.parts, joey: { ...release.parts!["joey"]!, digest: `sha256:${"0".repeat(64)}` } },
+    };
+    await expect(planModInstall(platform, install, tampered, ["head", "joey"])).rejects.toThrow(
+      /does not match the digest/,
+    );
     expect(platform.textAt(`${GAME}/mods/cassidy_head.dat`)).toBeUndefined();
   });
 });

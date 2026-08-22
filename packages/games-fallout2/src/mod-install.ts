@@ -26,7 +26,7 @@ import {
 } from "@zax/core";
 import type { ArchiveEntryInfo, DirEntry, DownloadOptions, Platform } from "@zax/platform";
 import { preflightArchive } from "./archive-preflight.js";
-import { MANIFEST_NAME, mayWrite, parseManifest, type ModManifest } from "./manifest.js";
+import { MANIFEST_NAME, mayWrite, parseManifest, type ModManifest, type ModPart } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 import {
   answersToId,
@@ -42,7 +42,8 @@ import {
 import { placeFor, recommendationFor } from "./recommended-order.js";
 import { assertUsable, loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 import { modWorkDirectory, readTransaction, writeTransaction, type ModTransaction } from "./mod-transaction.js";
-import { isArchiveName, type ModRelease } from "./mod-feed.js";
+import { isArchiveName, type ModRelease, type ReleaseAsset } from "./mod-feed.js";
+import { chosenParts } from "./mod-parts.js";
 
 export interface ModProgress extends DownloadOptions {
   onStep?: (step: string) => void;
@@ -54,13 +55,20 @@ export interface PlannedFile {
   size: number;
   /** Whether something already sits at the target - what restore would put back. */
   overwrites: boolean;
+  /** Which part ships it, for a mod that has them: deployment takes each file from its own payload. */
+  part?: string;
 }
 
 /** The resolved plan, shown before anything is written. */
 export interface ModInstallPlan {
   files: readonly PlannedFile[];
-  /** Order lines added or re-enabled: the payload's top-level dats. */
+  /**
+   * The mods-folder entries this install owns, as the manifest spells them - added or re-enabled in the
+   * order file, and recorded so an uninstall can drop the lines a folder entry's paths could never name.
+   */
   orderLines: readonly string[];
+  /** The parts this plan installs, by id, absent for a mod without them. What the record keeps. */
+  parts?: readonly string[];
   /** Recorded files the new release does not ship - an upgrade replaces, never overlays. */
   removes: readonly string[];
   /**
@@ -88,21 +96,63 @@ const REMOVED = "removed";
 const ORDER_DAT = /^mods\/([^/]+\.dat)$/i;
 
 /**
- * The order-file entries an install adds: what the manifest declares, or - for a manifest written before the
- * field existed - the payload's own top-level dats.
+ * One payload an install deploys: a whole mod, or one chosen part of it. A part is its own asset, its own
+ * digest and its own preflight, because that is how a release publishes them.
+ */
+interface ModPayload {
+  /** The part this belongs to, absent for a mod that declares none. */
+  part?: ModPart;
+  asset: ReleaseAsset;
+  /** Where a payload that is not an archive lands, or null for one that is. */
+  single: string | null;
+}
+
+/**
+ * Where a payload that is not an archive lands, or null for one that is. Cassidy publishes four loose `.dat`
+ * assets and the walk-speed and Goris fixes one each, and a single file carries no paths of its own - so the
+ * declared entries are the only thing that can say what it installs as, and there must be exactly one.
+ */
+function singleFileTarget(asset: ReleaseAsset, entries: readonly string[] | undefined, mod: string): string | null {
+  if (isArchiveName(asset.name)) return null;
+  const declared = entries ?? [];
+  if (declared.length !== 1)
+    throw new Error(
+      `${asset.name} is one file rather than an archive, so the ${mod} manifest has to declare the single "entries" name it installs as.`,
+    );
+  return `${MODS_DIRECTORY}/${declared[0]}`;
+}
+
+/** What this install downloads and deploys: the mod's own payload, or one per selected part. */
+function payloadsFor(release: ModRelease, selection: readonly string[]): readonly ModPayload[] {
+  const { manifest } = release;
+  if (manifest.parts) {
+    return chosenParts(release, selection).map((part) => {
+      const asset = release.parts?.[part.id];
+      // Unreachable through `chosenParts`, which offers only the parts the release published - kept because
+      // a caller could hand a release and a selection that were never resolved together.
+      if (!asset) throw new Error(`The ${manifest.name} release publishes no file for ${part.label}.`);
+      return { part, asset, single: singleFileTarget(asset, part.entries, manifest.name) };
+    });
+  }
+  const asset = release.archive;
+  if (!asset)
+    throw new Error(
+      `The ${manifest.name} release does not say which of its files is the mod - its manifest needs an "archive".`,
+    );
+  return [{ asset, single: singleFileTarget(asset, manifest.entries, manifest.name) }];
+}
+
+/**
+ * The entries one payload puts in the mods folder: what it declares, or - for a manifest written before the
+ * field existed - the top-level dats it ships.
  *
  * The derivation cannot see two things the declaration can. A mod whose entry is a folder ships only paths
  * below it (`mods/InventoryFilter.dat/InvenFilter.ini`), which match no top-level dat, so it would install and
  * never be loaded; and `mods/patches/extra.dat` reads either as a folder entry `patches` or as a nested dat,
  * which only the mod knows.
  */
-function orderEntriesFor(manifest: ModManifest, files: readonly PlannedFile[]): readonly string[] {
-  // Spelled the way the loader does. The manifest holds `/` like every other path-shaped field, while the
-  // order file's own separator is `\` - and `namedInOrder` reads its lines back normalized, so a nested
-  // entry written with the wrong one would never match the line it just added, and the next install would
-  // add it again.
-  if (manifest.entries) return manifest.entries.map((entry) => entry.replace(/\//g, "\\"));
-  return files.map((file) => ORDER_DAT.exec(file.path)?.[1]).filter((name): name is string => !!name);
+function entriesFor(payload: ModPayload, manifest: ModManifest, files: readonly PlannedFile[]): readonly string[] {
+  return (payload.part ? payload.part.entries : manifest.entries) ?? orderDats(files.map((file) => file.path));
 }
 
 /** Whether the payload actually carries a declared entry - the name itself, or anything under it. */
@@ -128,6 +178,8 @@ function fingerprintOf(
     [
       release.manifest.version,
       release.archive?.digest ?? "",
+      // The selection, so a plan confirmed for one set of parts cannot install another.
+      ...(plan.parts ?? []).map((id) => `=${id}:${release.parts?.[id]?.digest ?? ""}`),
       ...files.map((file) => `${file.path}:${file.size}:${file.overwrites ? "over" : "new"}`),
       ...plan.orderLines.map((name) => `+${name}`),
       ...plan.removes.map((path) => `-${path}`),
@@ -179,22 +231,6 @@ export async function refusalFor(platform: Platform, install: Install, release: 
 }
 
 /**
- * Where a payload that is not an archive lands, or null for one that is. Cassidy publishes four loose `.dat`
- * assets and the walk-speed and Goris fixes one each, and a single file carries no paths of its own - so the
- * manifest's `entries` is the only thing that can say what it installs as, and it must name exactly one.
- */
-function singleFileTarget(release: ModRelease): string | null {
-  const asset = release.archive;
-  if (!asset || isArchiveName(asset.name)) return null;
-  const entries = release.manifest.entries ?? [];
-  if (entries.length !== 1)
-    throw new Error(
-      `${asset.name} is one file rather than an archive, so the ${release.manifest.name} manifest has to declare the single "entries" name it installs as.`,
-    );
-  return `${MODS_DIRECTORY}/${entries[0]}`;
-}
-
-/**
  * Downloads and verifies the release, then resolves what installing it would do - without writing a byte
  * into the game directory. The archive is fetched into the working directory unless a verified copy is
  * already there, which is what makes a retry resume instead of paying the download again.
@@ -203,78 +239,71 @@ export async function planModInstall(
   platform: Platform,
   install: Install,
   release: ModRelease,
+  selection: readonly string[] = [],
   options?: ModProgress,
 ): Promise<ModInstallPlan> {
   const { manifest } = release;
   // Ahead of the download rather than after it: a record this version may not write is a refusal the user
   // should get before spending a transfer on it.
   assertUsable(await loadRecord(platform, install.path), manifest.id);
-  const asset = release.archive;
-  if (!asset)
-    throw new Error(
-      `The ${manifest.name} release does not say which of its files is the mod - its manifest needs an "archive".`,
-    );
-  const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest ?? "")?.[1]?.toLowerCase();
-  // Required rather than best-effort: the digest is what closes in-transit tampering, truncation and a
-  // corrupted resume in one check, and the feeds this list trusts all publish one.
-  if (!digest) throw new Error(`The ${manifest.name} release states no digest for ${asset.name}.`);
-
+  const payloads = payloadsFor(release, selection);
   const work = modWorkDirectory(platform, install, manifest.id);
-  const archivePath = platform.paths.join(work, asset.name);
-
-  const held = (await fileExists(platform, archivePath)) && (await platform.hash.sha256(archivePath)) === digest;
-  if (!held) {
-    options?.onStep?.(`Downloading ${manifest.name} ${manifest.version}`);
-    await platform.net.download(asset.url, archivePath, options);
-    const got = await platform.hash.sha256(archivePath);
-    if (got !== digest) {
-      await platform.fs.remove(archivePath);
-      throw new Error(
-        `What arrived for ${asset.name} does not match the digest its release states - the download may have been tampered with or corrupted. Nothing was installed.`,
-      );
-    }
-  }
-
-  const single = singleFileTarget(release);
-  let entries: readonly ArchiveEntryInfo[];
-  if (single !== null) {
-    // Every archive-shaped step is beside the point for one file: no directory to read, no entry count or
-    // unpacked total to bound, no symlink entry to refuse, and no embedded manifest to compare against. The
-    // manifest's own declaration says where it lands, which is what an archive's paths would have said.
-    entries = [{ name: single, kind: "file", size: asset.size ?? (await platform.fs.stat(archivePath))?.size ?? 0 }];
-  } else {
-    options?.onStep?.("Reading the archive");
-    entries = await preflightArchive(platform, archivePath, asset.name);
-
-    // The embedded copy must match the one eligibility was decided on, byte for byte - a difference means the
-    // archive is not the release the manifest described. Required only of a release that published a manifest
-    // asset, where CI writes both from one source; a manifest read from the repository is tied to the tag
-    // instead, and its payload is under no obligation to carry a copy. One that does is still checked.
-    const embeddedAt = platform.paths.join(work, "embedded");
-    await platform.archive.extract(archivePath, embeddedAt, { only: [MANIFEST_NAME] });
-    const embeddedPath = platform.paths.join(embeddedAt, MANIFEST_NAME);
-    if (await fileExists(platform, embeddedPath)) {
-      const embedded = new TextDecoder().decode(await platform.fs.read(embeddedPath));
-      if (embedded !== release.manifestText)
-        throw new Error(`The manifest inside ${asset.name} is not the one its release published - refused.`);
-    } else if (release.manifestFromAsset) {
-      throw new Error(`${asset.name} carries no ${MANIFEST_NAME} at its root - refused.`);
-    }
-  }
-
   const granted = grantsFor(manifest.id);
+
   const files: PlannedFile[] = [];
-  // One read per directory across the whole archive; planning writes nothing, so the cache cannot go stale.
+  const orderLines: string[] = [];
+  // One read per directory across every payload; planning writes nothing, so the cache cannot go stale.
   const listings = new Map<string, readonly DirEntry[] | null>();
-  for (const entry of entries) {
-    if (entry.kind !== "file" || !mayWrite(entry.name, granted)) continue;
-    const overwrites = (await realCasedPath(platform, install.path, entry.name, listings)) !== null;
-    files.push({ path: entry.name, size: entry.size, overwrites });
+
+  for (const payload of payloads) {
+    const { asset } = payload;
+    const archivePath = await fetchPayload(platform, work, payload, release, options);
+
+    let entries: readonly ArchiveEntryInfo[];
+    if (payload.single !== null) {
+      // Every archive-shaped step is beside the point for one file: no directory to read, no entry count or
+      // unpacked total to bound, no symlink entry to refuse, and no embedded manifest to compare against. The
+      // manifest's own declaration says where it lands, which is what an archive's paths would have said.
+      entries = [
+        { name: payload.single, kind: "file", size: asset.size ?? (await platform.fs.stat(archivePath))?.size ?? 0 },
+      ];
+    } else {
+      options?.onStep?.(`Reading ${asset.name}`);
+      entries = await preflightArchive(platform, archivePath, asset.name);
+      await checkEmbeddedManifest(platform, work, payload, release);
+    }
+
+    const mine: PlannedFile[] = [];
+    for (const entry of entries) {
+      if (entry.kind !== "file" || !mayWrite(entry.name, granted)) continue;
+      const overwrites = (await realCasedPath(platform, install.path, entry.name, listings)) !== null;
+      mine.push({ path: entry.name, size: entry.size, overwrites, ...(payload.part ? { part: payload.part.id } : {}) });
+    }
+    if (mine.length === 0)
+      throw new Error(
+        `${asset.name} ships nothing under mods/${granted.length > 0 ? ` or in ${granted.join(", ")}` : ""} - there is nothing to install.`,
+      );
+
+    // Two payloads writing one path is an ambiguity only the mod can settle, and last-writer-wins would
+    // resolve it silently - differently on a case-sensitive filesystem than elsewhere.
+    for (const file of mine) {
+      const held = files.find((other) => other.path.toLowerCase() === file.path.toLowerCase());
+      if (held)
+        throw new Error(
+          `${asset.name} and ${payloads.find((other) => other.part?.id === held.part)?.asset.name ?? "the payload"} both land on ${file.path}, so they cannot be installed together.`,
+        );
+    }
+
+    // A declared entry nothing carries would put a line in the order file naming something absent, which the
+    // loader skips with a log line nobody reads - so it refuses here, where the cause is still visible.
+    for (const entry of (payload.part ? payload.part.entries : manifest.entries) ?? []) {
+      if (!shipsEntry(mine, entry))
+        throw new Error(`${asset.name} does not carry "${entry}", which the ${manifest.name} manifest declares.`);
+    }
+
+    files.push(...mine);
+    orderLines.push(...entriesFor(payload, manifest, mine));
   }
-  if (files.length === 0)
-    throw new Error(
-      `${asset.name} ships nothing under mods/${granted.length > 0 ? ` or in ${granted.join(", ")}` : ""} - there is nothing to install.`,
-    );
 
   const planned = new Set(files.map((file) => file.path.toLowerCase()));
   // What this install replaces comes from the open transaction when there is one. Read from the record
@@ -286,15 +315,76 @@ export async function planModInstall(
     (await loadRecord(platform, install.path)).mods.find((mod) => mod.id === manifest.id && mod.complete);
   const removes = (replacing?.files ?? []).filter((path) => !planned.has(path.toLowerCase()));
 
-  // A declared entry nothing carries would put a line in the order file naming something absent, which the
-  // loader skips with a log line nobody reads - so it refuses here, where the cause is still visible.
-  for (const entry of manifest.entries ?? []) {
-    if (!shipsEntry(files, entry))
-      throw new Error(`${asset.name} does not carry "${entry}", which the ${manifest.name} manifest declares.`);
-  }
+  const parts = manifest.parts ? payloads.map((payload) => payload.part?.id ?? "") : undefined;
+  return {
+    files,
+    orderLines,
+    removes,
+    ...(parts ? { parts } : {}),
+    fingerprint: fingerprintOf(release, files, { orderLines, removes, ...(parts ? { parts } : {}) }),
+  };
+}
 
-  const orderLines = orderEntriesFor(manifest, files);
-  return { files, orderLines, removes, fingerprint: fingerprintOf(release, files, { orderLines, removes }) };
+/**
+ * One payload in the working directory, verified against the digest its release states. A verified copy
+ * already there is kept, which is what makes a retry resume instead of paying the download again.
+ */
+async function fetchPayload(
+  platform: Platform,
+  work: string,
+  payload: ModPayload,
+  release: ModRelease,
+  options?: ModProgress,
+): Promise<string> {
+  const { manifest } = release;
+  const { asset } = payload;
+  const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest ?? "")?.[1]?.toLowerCase();
+  // Required rather than best-effort: the digest is what closes in-transit tampering, truncation and a
+  // corrupted resume in one check, and the feeds this list trusts all publish one.
+  if (!digest) throw new Error(`The ${manifest.name} release states no digest for ${asset.name}.`);
+
+  const archivePath = platform.paths.join(work, asset.name);
+  const held = (await fileExists(platform, archivePath)) && (await platform.hash.sha256(archivePath)) === digest;
+  if (held) return archivePath;
+
+  const what = payload.part ? `${manifest.name} - ${payload.part.label}` : `${manifest.name} ${manifest.version}`;
+  options?.onStep?.(`Downloading ${what}`);
+  await platform.net.download(asset.url, archivePath, options);
+  if ((await platform.hash.sha256(archivePath)) !== digest) {
+    await platform.fs.remove(archivePath);
+    throw new Error(
+      `What arrived for ${asset.name} does not match the digest its release states - the download may have been tampered with or corrupted. Nothing was installed.`,
+    );
+  }
+  return archivePath;
+}
+
+/**
+ * The copy inside the archive against the one eligibility was decided on, byte for byte - a difference means
+ * the archive is not the release the manifest described.
+ *
+ * Required only of a release that published a manifest asset, where CI writes both from one source; a
+ * manifest read from the repository is tied to the tag instead, and its payload is under no obligation to
+ * carry a copy. A part's archive is never required to carry one either: the manifest names each part's asset
+ * outright, so there is no inference for an embedded copy to confirm, and demanding one would put a copy of
+ * the whole manifest inside every part a mod publishes. One that is there is still checked.
+ */
+async function checkEmbeddedManifest(
+  platform: Platform,
+  work: string,
+  payload: ModPayload,
+  release: ModRelease,
+): Promise<void> {
+  const at = platform.paths.join(work, "embedded", payload.part?.id ?? "mod");
+  await platform.archive.extract(platform.paths.join(work, payload.asset.name), at, { only: [MANIFEST_NAME] });
+  const embeddedPath = platform.paths.join(at, MANIFEST_NAME);
+  if (await fileExists(platform, embeddedPath)) {
+    const embedded = new TextDecoder().decode(await platform.fs.read(embeddedPath));
+    if (embedded !== release.manifestText)
+      throw new Error(`The manifest inside ${payload.asset.name} is not the one its release published - refused.`);
+  } else if (release.manifestFromAsset && !payload.part) {
+    throw new Error(`${payload.asset.name} carries no ${MANIFEST_NAME} at its root - refused.`);
+  }
 }
 
 /**
@@ -307,8 +397,13 @@ async function updateOrderLines(
   install: Install,
   changes: { enable?: readonly string[]; drop?: readonly string[] },
 ): Promise<void> {
-  const enable = changes.enable ?? [];
-  const drop = changes.drop ?? [];
+  // Spelled the way the loader does, here rather than at each caller: a manifest holds `/` like every other
+  // path-shaped field, the order file's own separator is `\`, and `namedInOrder` reads its lines back
+  // normalized - so a nested entry handed over with the wrong one matches no line, and neither the line it
+  // just added nor the one it means to drop would be found.
+  const spelled = (names: readonly string[]) => names.map((name) => name.replace(/\//g, "\\"));
+  const enable = spelled(changes.enable ?? []);
+  const drop = spelled(changes.drop ?? []);
   if (enable.length === 0 && drop.length === 0) return;
   const snapshot = await readMods(platform, install);
   const held = listMods(snapshot);
@@ -353,12 +448,11 @@ export async function applyModInstall(
   if (refusal !== null) throw new Error(refusal);
 
   const work = modWorkDirectory(platform, install, manifest.id);
-  const archivePath = platform.paths.join(work, release.archive?.name ?? "");
   const record = await loadRecord(platform, install.path);
   assertUsable(record, manifest.id);
   // Resolved here rather than at the deploy, so a release whose payload and manifest disagree about being
   // one file is refused before the transaction opens rather than part way through it.
-  const single = singleFileTarget(release);
+  const payloads = payloadsFor(release, plan.parts ?? []);
 
   // Phase 1, journal. Opened once and resumed thereafter: everything it holds describes the directory as it
   // was before the first byte landed, and a retry that re-derived it would be recording its own wreckage -
@@ -371,11 +465,28 @@ export async function applyModInstall(
     const snapshot = await readMods(platform, install);
     const opened: ModTransaction = {
       id: manifest.id,
-      archive: {
-        name: release.archive?.name ?? "",
-        url: release.archive?.url ?? "",
-        digest: release.archive?.digest ?? "",
-      },
+      ...(release.archive
+        ? {
+            archive: {
+              name: release.archive.name,
+              url: release.archive.url,
+              digest: release.archive.digest ?? "",
+            },
+          }
+        : {}),
+      // One pin per chosen part, and the selection beside them: a retry finishes these parts from these
+      // files rather than whatever a second answer to the dialog would have picked.
+      ...(plan.parts
+        ? {
+            parts: Object.fromEntries(
+              payloads.map((payload) => [
+                payload.part?.id ?? "",
+                { name: payload.asset.name, url: payload.asset.url, digest: payload.asset.digest ?? "" },
+              ]),
+            ),
+            selection: plan.parts,
+          }
+        : {}),
       manifestText: release.manifestText,
       version: manifest.version,
       manifestFromAsset: release.manifestFromAsset,
@@ -396,7 +507,11 @@ export async function applyModInstall(
     ...(manifest.reason !== undefined ? { reason: manifest.reason } : {}),
     complete: false,
     files: plan.files.map((file) => file.path),
-    ...(manifest.entries ? { entries: manifest.entries } : {}),
+    // A parts install records the entries its chosen parts resolved to, declared or derived: what an
+    // uninstall drops from the order file cannot be re-derived from a selection the release may have moved on
+    // from. A mod without parts records what its manifest declared, as it always has.
+    ...(plan.parts ? { entries: plan.orderLines } : manifest.entries ? { entries: manifest.entries } : {}),
+    ...(plan.parts ? { parts: plan.parts } : {}),
     manifest: release.manifestText,
     shipped: {},
   };
@@ -433,8 +548,17 @@ export async function applyModInstall(
     await platform.fs.remove(found);
   }
 
-  if (single !== null) await platform.fs.copy(archivePath, insidePath(platform, install.path, single));
-  else await platform.archive.extract(archivePath, install.path, { only: plan.files.map((file) => file.path) });
+  for (const payload of payloads) {
+    const archivePath = platform.paths.join(work, payload.asset.name);
+    if (payload.single !== null) {
+      await platform.fs.copy(archivePath, insidePath(platform, install.path, payload.single));
+      continue;
+    }
+    // Each payload extracts only its own planned files: an archive asked for another part's paths would be
+    // asked for paths it does not carry, which is a question with no useful answer.
+    const mine = plan.files.filter((file) => file.part === payload.part?.id);
+    await platform.archive.extract(archivePath, install.path, { only: mine.map((file) => file.path) });
+  }
 
   // Phase 3, merge.
   // State files: what the release shipped is recorded as the next upgrade's merge base, then the user's

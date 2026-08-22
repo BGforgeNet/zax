@@ -19,9 +19,16 @@ import type { ModRelease } from "./mod-feed.js";
 import { installKey, type InstalledMod } from "./records.js";
 
 /** Bumped when the meaning of a field changes; a journal this version cannot read is not resumed. */
-const TRANSACTION_FORMAT = 2;
+const TRANSACTION_FORMAT = 3;
 
 const JOURNAL = "transaction.json";
+
+/** Where one payload came from, kept verbatim so a retry fetches what the first attempt did. */
+export interface PinnedAsset {
+  name: string;
+  url: string;
+  digest: string;
+}
 
 export interface ModTransaction {
   id: string;
@@ -31,7 +38,14 @@ export interface ModTransaction {
    * aside against this version, and an install that changed release mid-flight would leave a recovery that
    * no longer matches what is on disk.
    */
-  archive: { name: string; url: string; digest: string };
+  archive?: PinnedAsset;
+  /**
+   * One pinned asset per chosen part, for a release that has them, and the selection that chose them. A retry
+   * finishes the same parts from the same files: the copies waiting beside them are those parts', and asking
+   * the interface again would let a second answer land on the first attempt's half-deployed directory.
+   */
+  parts?: Readonly<Record<string, PinnedAsset>>;
+  selection?: readonly string[];
   manifestText: string;
   /**
    * The version this install resolved to, and whether the release published the manifest. Both are part of
@@ -81,10 +95,13 @@ export async function readTransaction(
   if (journal.transaction !== TRANSACTION_FORMAT) return null;
   if (typeof journal.id !== "string" || typeof journal.manifestText !== "string") return null;
   if (typeof journal.version !== "string" || typeof journal.manifestFromAsset !== "boolean") return null;
-  if (journal.archive === undefined) return null;
+  // One or the other: a parts release has no single payload, and a journal with neither pins nothing.
+  if (journal.archive === undefined && journal.parts === undefined) return null;
   return {
     id: journal.id,
-    archive: journal.archive,
+    ...(journal.archive !== undefined ? { archive: journal.archive } : {}),
+    ...(journal.parts !== undefined ? { parts: journal.parts } : {}),
+    ...(journal.selection !== undefined ? { selection: journal.selection } : {}),
     manifestText: journal.manifestText,
     version: journal.version,
     manifestFromAsset: journal.manifestFromAsset,
@@ -112,10 +129,11 @@ export function releaseOf(transaction: ModTransaction): ModRelease {
   return {
     manifest: parseManifest(new TextEncoder().encode(transaction.manifestText), {
       version: transaction.version,
-      archive: transaction.archive.name,
+      ...(transaction.archive ? { archive: transaction.archive.name } : {}),
     }),
     manifestText: transaction.manifestText,
     manifestFromAsset: transaction.manifestFromAsset,
-    archive: transaction.archive,
+    ...(transaction.archive ? { archive: transaction.archive } : {}),
+    ...(transaction.parts ? { parts: transaction.parts } : {}),
   };
 }

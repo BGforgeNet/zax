@@ -103,10 +103,18 @@ export interface Backend {
   saveMods(request: ModsSaveRequest): Promise<SaveOutcome>;
   /** Every known mod against this install: what it is, and what can be done with it here. */
   availableMods(install: Install): Promise<ModListing>;
-  /** Downloads and verifies a mod's newest release, answering the resolved plan the confirmation shows. */
-  planMod(install: Install, modId: string): Promise<ModInstallPlan>;
+  /**
+   * Downloads and verifies a mod's newest release, answering the resolved plan the confirmation shows.
+   * `parts` names the chosen parts of a release that offers them, and is ignored by one that does not.
+   */
+  planMod(install: Install, modId: string, parts?: readonly string[]): Promise<ModInstallPlan>;
   /** Installs the plan whose fingerprint this is; one that no longer resolves the same is refused. */
-  installMod(install: Install, modId: string, fingerprint: string): Promise<ModInstallOutcome>;
+  installMod(
+    install: Install,
+    modId: string,
+    fingerprint: string,
+    parts?: readonly string[],
+  ): Promise<ModInstallOutcome>;
   /** Unwinds an install that never finished; the working directory holds everything it puts back. */
   restoreMod(install: Install, modId: string): Promise<void>;
   removeMod(install: Install, modId: string): Promise<ModRemoval>;
@@ -189,12 +197,14 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
    * that version's, and a feed that published a newer one meanwhile would otherwise leave a recovery
    * describing files that are no longer the ones on disk.
    */
-  const releaseForMod = async (install: Install, modId: string) => {
+  const releaseForMod = async (install: Install, modId: string, chosen?: readonly string[]) => {
     const open = await readTransaction(platform, install, modId);
-    if (open) return releaseOf(open);
+    // An unfinished attempt decides its own selection too, and for the same reason: the copies waiting
+    // beside it are those parts', and a second answer to the dialog would land on the first attempt's work.
+    if (open) return { release: releaseOf(open), selection: open.selection ?? [] };
     const feed = MOD_FEEDS.find((entry) => entry.id === modId);
     if (!feed) throw new Error(`No known feed carries "${modId}".`);
-    return fetchFeed(platform, feed);
+    return { release: await fetchFeed(platform, feed), selection: chosen ?? [] };
   };
 
   /** The settings schemas the install's records carry. A snapshot a newer spec wrote is skipped, not fatal. */
@@ -251,15 +261,17 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       const sfall = await installedSfallVersion(platform, install);
       return listAvailableMods(platform, install, record, sfall);
     },
-    planMod: async (install, modId) =>
-      planModInstall(platform, install, await releaseForMod(install, modId), reporting()),
-    installMod: async (install, modId, fingerprint) => {
-      const release = await releaseForMod(install, modId);
+    planMod: async (install, modId, parts) => {
+      const { release, selection } = await releaseForMod(install, modId, parts);
+      return planModInstall(platform, install, release, selection, reporting());
+    },
+    installMod: async (install, modId, fingerprint, parts) => {
+      const { release, selection } = await releaseForMod(install, modId, parts);
       const progress = reporting();
       // Re-planned rather than trusting a plan the renderer held: the directory may have moved on since the
       // confirmation, and the plan is cheap against the already-verified archive. What runs is still what
       // was agreed to - a plan that resolved differently is refused here rather than quietly carried out.
-      const plan = await planModInstall(platform, install, release, progress);
+      const plan = await planModInstall(platform, install, release, selection, progress);
       if (plan.fingerprint !== fingerprint) {
         throw new Error(
           `What installing ${release.manifest.name} would do has changed since you confirmed it - the game folder or the release moved on. Look at the new plan and confirm again.`,
