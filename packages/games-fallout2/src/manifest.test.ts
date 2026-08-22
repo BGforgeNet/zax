@@ -466,3 +466,9 @@ describe("parts", () => {
     refuses(CASSIDY.replace("entries: [cassidy_head.dat]", 'entries: ["../rpu.dat"]'), /leaves the game directory/);
   });
 });
+
+describe("parts and the mod's own entries", () => {
+  it("refuses a manifest declaring both, since each part declares what it puts in mods/", () => {
+    expect(() => parsed(`${CASSIDY}entries: [cassidy.dat]\n`)).toThrow(/"entries" and "parts"/);
+  });
+});

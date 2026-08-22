@@ -640,6 +640,8 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
   const parts = fields["parts"] === undefined ? undefined : parseParts(fields["parts"]);
   if (parts && fields["archive"] !== undefined)
     refuse(`it states both "archive" and "parts", where each part names the asset it deploys`);
+  if (parts && fields["entries"] !== undefined)
+    refuse(`it states both "entries" and "parts", where each part declares what it puts in the mods folder`);
   // A release supplies its sole archive as a default. For a parts manifest that asset describes nothing this
   // install would deploy, so it is passed over rather than refused - the release did nothing wrong.
   const archive = fields["archive"] ?? (parts ? undefined : defaults.archive);

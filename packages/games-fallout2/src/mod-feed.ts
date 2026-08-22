@@ -18,7 +18,14 @@
 
 import { compareVersions, GAME_TYPES, type Install } from "@zax/core";
 import { NetworkError, type Platform } from "@zax/platform";
-import { MANIFEST_NAME, isModVersion, parseManifest, type ModManifest } from "./manifest.js";
+import {
+  MANIFEST_NAME,
+  isModVersion,
+  parseManifest,
+  partOptions,
+  type ModManifest,
+  type ModPartGroup,
+} from "./manifest.js";
 import type { InstallRecord } from "./records.js";
 import { MODS_DIRECTORY, answersToId } from "./mods.js";
 
@@ -43,7 +50,34 @@ export interface ModRelease {
    */
   manifestFromAsset: boolean;
   /** The payload asset the manifest names, with what the release states about it. */
-  archive?: { name: string; url: string; digest?: string; size?: number };
+  archive?: ReleaseAsset;
+  /**
+   * A part's asset by part id, for a manifest that declares parts. Only the parts this release actually
+   * publishes are here: a release missing one asset still offers the others, rather than nothing.
+   */
+  parts?: Readonly<Record<string, ReleaseAsset>>;
+}
+
+/**
+ * The groups this release can offer: options whose asset it published, and no group left empty by that.
+ *
+ * The drop repeats until it settles, as the settings gates do, because a part is unselectable when what it
+ * `needs` is gone - offering Cassidy's voice without its head would be offering something no install could
+ * ever carry out.
+ */
+export function offeredParts(release: ModRelease): readonly ModPartGroup[] {
+  const published = new Set(Object.keys(release.parts ?? {}));
+  const declared = release.manifest.parts ?? [];
+  for (;;) {
+    const gone = partOptions(release.manifest).filter(
+      (part) => published.has(part.id) && part.needs !== undefined && !published.has(part.needs),
+    );
+    if (gone.length === 0) break;
+    for (const part of gone) published.delete(part.id);
+  }
+  return declared
+    .map((group) => ({ ...group, options: group.options.filter((part) => published.has(part.id)) }))
+    .filter((group) => group.options.length > 0);
 }
 
 const FEED_CACHE_MS = 30 * 60 * 1000;
@@ -63,7 +97,7 @@ const feedsDirectory = (platform: Platform): string => platform.paths.join(platf
  */
 const releasesUrl = (repository: string): string => `https://api.github.com/repos/${repository}/releases?per_page=100`;
 
-interface ReleaseAsset {
+export interface ReleaseAsset {
   name: string;
   url: string;
   digest?: string;
@@ -223,7 +257,18 @@ export async function fetchFeed(platform: Platform, feed: ModFeed, now: Date = n
     // Strictly higher, so a version published twice keeps its newest release's assets.
     if (best !== null && compareVersions(manifest.version, best.manifest.version) <= 0) continue;
     const archive = manifest.archive ? release.assets.find((asset) => asset.name === manifest.archive) : undefined;
-    best = { manifest, manifestText: found.text, manifestFromAsset: found.fromAsset, ...(archive ? { archive } : {}) };
+    const parts: Record<string, ReleaseAsset> = {};
+    for (const part of partOptions(manifest)) {
+      const asset = release.assets.find((entry) => entry.name === part.archive);
+      if (asset) parts[part.id] = asset;
+    }
+    best = {
+      manifest,
+      manifestText: found.text,
+      manifestFromAsset: found.fromAsset,
+      ...(archive ? { archive } : {}),
+      ...(manifest.parts ? { parts } : {}),
+    };
   }
 
   if (best !== null) return best;
@@ -291,8 +336,14 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   }
 
   // Everything from here on is an offer to download, which a release that never names its payload cannot make.
-  if (!release.archive) {
-    return { kind: "blocked", why: `The ${manifest.name} release does not say which of its files is the mod.` };
+  // For a parts release the payload is whatever parts resolved: one asset short is not nothing to install.
+  if (!release.archive && offeredParts(release).length === 0) {
+    return {
+      kind: "blocked",
+      why: manifest.parts
+        ? `The ${manifest.name} release publishes none of the files its parts name.`
+        : `The ${manifest.name} release does not say which of its files is the mod.`,
+    };
   }
 
   if (recorded) {
@@ -355,6 +406,10 @@ export interface ModOffer {
   type: "pluggable" | "permanent";
   /** A permanent mod's declared reason, standing where the Remove control would be. */
   reason?: string;
+  /** The choices this release can deliver. Absent for a mod without parts, which is most of them. */
+  parts?: readonly ModPartGroup[];
+  /** The part ids this install already recorded - what an upgrade carries over, and what the dialog shows. */
+  chosen?: readonly string[];
   availability: Availability;
 }
 
@@ -380,13 +435,20 @@ export async function listAvailableMods(
   for (const feed of MOD_FEEDS) {
     try {
       const release = await fetchFeed(platform, feed, now);
-      const present = await presentInMods(platform, install.path, feed.id, release.manifest.entries);
+      // A parts mod declares nothing at the top level, so presence is judged against every part's entries:
+      // any one of them in the folder is the mod being there.
+      const declared = release.manifest.entries ?? partOptions(release.manifest).flatMap((part) => part.entries ?? []);
+      const present = await presentInMods(platform, install.path, feed.id, declared);
+      const groups = offeredParts(release);
+      const chosen = record.mods.find((mod) => mod.id === release.manifest.id)?.parts;
       offers.push({
         id: release.manifest.id,
         name: release.manifest.name,
         version: release.manifest.version,
         type: release.manifest.type,
         ...(release.manifest.reason !== undefined ? { reason: release.manifest.reason } : {}),
+        ...(groups.length > 0 ? { parts: groups } : {}),
+        ...(chosen ? { chosen } : {}),
         availability: availability(release, { install, record, sfall, present }),
       });
     } catch (error) {

@@ -6,6 +6,7 @@ import {
   MOD_FEEDS,
   fetchFeed,
   listAvailableMods,
+  offeredParts,
   presentInMods,
   type ModContext,
   type ModRelease,
@@ -444,5 +445,138 @@ describe("the grants list", () => {
     // Empty today, since the two mods known to need a grant publish no manifest and so have no id yet. This
     // is the same check against an id that would be wrong, so the one above is not passing on an empty list.
     expect(followed.has("hqmusic")).toBe(false);
+  });
+});
+
+describe("a release with several payloads", () => {
+  const install: Install = { path: "/games/fallout2", type: "fallout2" };
+
+  /** Cassidy as it publishes: a manifest asset, and one `.dat` per part. */
+  const CASSIDY = `spec: 1
+id: cassidy
+name: Cassidy Restoration
+version: "1.2"
+game: fallout2
+parts:
+  - label: Head
+    pick: any
+    options:
+      - id: head
+        label: New head
+        archive: cassidy_head.dat
+        entries: [cassidy_head.dat]
+  - label: Voice
+    pick: one
+    options:
+      - id: voice-joey
+        label: Joey Bracken
+        archive: cassidy_voice_joey.dat
+        entries: [cassidy_voice_joey.dat]
+        needs: head
+      - id: voice-tom
+        label: Tom Regan
+        archive: cassidy_voice_tom.dat
+        entries: [cassidy_voice_tom.dat]
+        needs: head
+`;
+
+  const CASSIDY_FEED = { repository: "someone/cassidy", id: "cassidy" };
+  const CASSIDY_RELEASES = "https://api.github.com/repos/someone/cassidy/releases?per_page=100";
+  const asset = (name: string) => ({
+    name,
+    browser_download_url: `https://example.test/v1.2/${name}`,
+    digest: "sha256:bb",
+    size: 4,
+  });
+  const cassidyRelease = (names: readonly string[]) => ({
+    tag_name: "v1.2",
+    assets: [asset("f2mod.yml"), ...names.map(asset)],
+  });
+  const cassidyPlatform = (names: readonly string[]) =>
+    new MemoryPlatform({
+      responses: {
+        [CASSIDY_RELEASES]: JSON.stringify([cassidyRelease(names)]),
+        "https://example.test/v1.2/f2mod.yml": CASSIDY,
+      },
+    });
+  const ALL = ["cassidy_head.dat", "cassidy_voice_joey.dat", "cassidy_voice_tom.dat"];
+
+  it("resolves one asset per part, and no top-level payload", async () => {
+    const found = await fetchFeed(cassidyPlatform(ALL), CASSIDY_FEED);
+    expect(found.archive).toBeUndefined();
+    expect(Object.keys(found.parts ?? {})).toEqual(["head", "voice-joey", "voice-tom"]);
+    expect(found.parts?.["head"]).toEqual({
+      name: "cassidy_head.dat",
+      url: "https://example.test/v1.2/cassidy_head.dat",
+      digest: "sha256:bb",
+      size: 4,
+    });
+  });
+
+  it("offers the parts that resolved, and not the one the release did not publish", async () => {
+    const found = await fetchFeed(cassidyPlatform(["cassidy_head.dat", "cassidy_voice_joey.dat"]), CASSIDY_FEED);
+    expect(offeredParts(found).map((group) => group.options.map((part) => part.id))).toEqual([
+      ["head"],
+      ["voice-joey"],
+    ]);
+    expect(
+      availability(found, { install, record: { path: install.path, mods: [] }, sfall: null, present: false }),
+    ).toEqual({ kind: "install" });
+  });
+
+  it("drops a part whose needs went with it, and the group it emptied", async () => {
+    // The same fixpoint the settings gates take: a part offered while what it needs is not could be picked
+    // and could never be installed.
+    const found = await fetchFeed(cassidyPlatform(["cassidy_voice_joey.dat"]), CASSIDY_FEED);
+    expect(offeredParts(found)).toEqual([]);
+  });
+
+  it("blocks a parts release publishing none of the files its parts name", async () => {
+    const found = await fetchFeed(cassidyPlatform([]), CASSIDY_FEED);
+    const state = availability(found, {
+      install,
+      record: { path: install.path, mods: [] },
+      sfall: null,
+      present: false,
+    });
+    expect(state).toMatchObject({ kind: "blocked" });
+    expect((state as { why: string }).why).toMatch(/none of the files its parts name/);
+  });
+
+  it("carries the offered choice and the one already recorded to the interface", async () => {
+    // Through the one followed feed, since the list of them is ZAX's own data rather than an argument: the
+    // manifest is the parts one with the followed id, which is all this assertion is about.
+    const manifest = CASSIDY.replace("id: cassidy", "id: fo2tweaks");
+    const platform = new MemoryPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([{ tag_name: "v1.2", assets: [asset("f2mod.yml"), ...ALL.map(asset)] }]),
+        "https://example.test/v1.2/f2mod.yml": manifest,
+      },
+    });
+    const record = {
+      path: install.path,
+      mods: [
+        {
+          id: "fo2tweaks",
+          version: "1.1",
+          complete: true,
+          files: ["mods/cassidy_head.dat"],
+          parts: ["head"],
+          manifest,
+          shipped: {},
+        },
+      ],
+    };
+    // The renderer never reads a manifest, so the choice has to reach it through the offer or not at all.
+    const listing = await listAvailableMods(platform, install, record, null);
+    const offer = listing.offers.find((one) => one.id === "fo2tweaks");
+    expect(offer?.parts?.map((group) => group.label)).toEqual(["Head", "Voice"]);
+    expect(offer?.chosen).toEqual(["head"]);
+  });
+
+  it("sees the mod as installed when any part of it is in the mods folder", async () => {
+    const platform = new MemoryPlatform({ files: { "/game/mods/cassidy_voice_tom.dat": "x" } });
+    expect(await presentInMods(platform, "/game", "cassidy")).toBe(false);
+    expect(await presentInMods(platform, "/game", "cassidy", ALL)).toBe(true);
   });
 });

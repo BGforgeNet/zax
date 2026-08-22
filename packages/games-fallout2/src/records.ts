@@ -40,14 +40,19 @@ export interface InstalledMod {
    * the order file. Held rather than re-derived from `files`, which cannot name a folder entry at all.
    */
   entries?: readonly string[];
+  /**
+   * Which parts were chosen, by id. What an upgrade re-installs without asking, and the reason a part id is
+   * permanent: a renamed part reads here as one part removed and another added.
+   */
+  parts?: readonly string[];
   /** The manifest exactly as the release carried it: schema and state list readable without the network. */
   manifest: string;
   /** State files as that release shipped them, latin1 text - the base an upgrade's merge compares against. */
   shipped: Readonly<Record<string, string>>;
   /**
    * Fields this version has no rule for, kept as read and written back unchanged. A later ZAX records more
-   * per mod than this one knows - a part selection, say - and rewriting the file for an unrelated install
-   * would otherwise throw that away while every field this version does know round-tripped perfectly.
+   * per mod than this one knows - the profile a mod was installed under, say - and rewriting the file for an
+   * unrelated install would otherwise throw that away while every field this one knows round-tripped.
    */
   carried?: Readonly<Record<string, unknown>>;
 }
@@ -118,7 +123,7 @@ function recordPath(platform: Platform, installPath: string): string {
 const asText = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
 /** What this version writes per mod - everything else in an entry is carried rather than understood. */
-const MOD_FIELDS = ["id", "version", "type", "reason", "complete", "files", "entries", "manifest", "shipped"];
+const MOD_FIELDS = ["id", "version", "type", "reason", "complete", "files", "entries", "parts", "manifest", "shipped"];
 
 /**
  * One recorded mod, or null when the entry cannot be trusted. Entries are judged one at a time rather than
@@ -162,6 +167,14 @@ function readMod(entry: unknown): InstalledMod | null {
     entries.push(name);
   }
 
+  // Bound the way the manifest's own part ids are: a selection names them, and an install reads them back.
+  const parts: string[] = [];
+  for (const part of Array.isArray(fields["parts"]) ? fields["parts"] : []) {
+    const id = asText(part);
+    if (id === undefined || !isModId(id)) return null;
+    parts.push(id);
+  }
+
   // Anything this version has no rule for rides along untouched rather than being lost on the next write.
   const carried: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(fields)) if (!MOD_FIELDS.includes(key)) carried[key] = value;
@@ -184,6 +197,7 @@ function readMod(entry: unknown): InstalledMod | null {
     complete: fields["complete"] === true,
     files,
     ...(entries.length > 0 ? { entries } : {}),
+    ...(parts.length > 0 ? { parts } : {}),
     manifest,
     shipped,
     ...(Object.keys(carried).length > 0 ? { carried } : {}),
@@ -251,6 +265,7 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
           complete: mod.complete,
           files: [...mod.files],
           ...(mod.entries ? { entries: [...mod.entries] } : {}),
+          ...(mod.parts ? { parts: [...mod.parts] } : {}),
           manifest: mod.manifest,
           shipped: { ...mod.shipped },
         })),

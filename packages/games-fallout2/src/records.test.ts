@@ -153,12 +153,26 @@ describe("a record a later ZAX wrote", () => {
     expect(again.mods).toEqual(loaded.mods);
   });
 
+  it("round-trips a part selection, and drops an entry whose selection could not have been minted", async () => {
+    const platform = new MemoryPlatform();
+    await saveRecord(platform, { path: GAME, mods: [mod({ parts: ["head", "voice-joey"] })] });
+    expect((await loadRecord(platform, GAME)).mods[0]?.parts).toEqual(["head", "voice-joey"]);
+
+    // The same bound the manifest puts on a part id, for the one route into this field that skipped it.
+    await saveRecord(platform, { path: GAME, mods: [mod({ parts: ["../elsewhere"] })] });
+    const loaded = await loadRecord(platform, GAME);
+    expect(loaded.mods).toEqual([]);
+    expect(loaded.opaque?.map((entry) => entry.id)).toEqual(["fo2tweaks"]);
+  });
+
   it("carries a per-mod field it has no rule for through a rewrite", async () => {
     const platform = new MemoryPlatform();
-    await saveRecord(platform, { path: GAME, mods: [mod({ carried: { parts: ["head"] } })] });
+    // A field this version has no rule for - a profile the mod was installed under, say. It was `parts`
+    // until this version learned to read those, which is the point: the stand-in has to be genuinely unknown.
+    await saveRecord(platform, { path: GAME, mods: [mod({ carried: { profile: "hardcore" } })] });
     const loaded = await loadRecord(platform, GAME);
-    expect(loaded.mods[0]?.carried).toEqual({ parts: ["head"] });
+    expect(loaded.mods[0]?.carried).toEqual({ profile: "hardcore" });
     await saveRecord(platform, loaded);
-    expect((await loadRecord(platform, GAME)).mods[0]?.carried).toEqual({ parts: ["head"] });
+    expect((await loadRecord(platform, GAME)).mods[0]?.carried).toEqual({ profile: "hardcore" });
   });
 });
