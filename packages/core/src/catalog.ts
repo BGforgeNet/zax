@@ -37,10 +37,32 @@ export function matchesValueTest(def: SettingDef, value: string | undefined, tes
   return "is" in test ? test.is.includes(raw) : !test.isNot.includes(raw);
 }
 
+/**
+ * A value that would make `test` pass, or undefined where it names none to write - "any key but 0" is every
+ * key, and picking one would rebind the user's keyboard on their behalf. Where several pass, the first the
+ * test lists: a gate naming a range states them in the order its author meant them to be read.
+ */
+export function valueSatisfying(def: SettingDef, test: ValueTest): string | undefined {
+  if ("is" in test) return test.is[0];
+  // Only a kind whose values can be listed has a complement to offer; a number or a key has an open range.
+  const kind = def.kind;
+  const listed =
+    kind.type === "bool"
+      ? [kind.onValue, kind.offValue]
+      : kind.type === "choice"
+        ? kind.options.map((option) => option.value)
+        : [];
+  return listed.find((value) => !test.isNot.includes(value));
+}
+
+/** What a value is called in the interface: its sentinel name where it has one, since that is what it means. */
+export function valueLabel(def: SettingDef, raw: string): string {
+  return sentinelLabel(def, raw) ?? displayValue(def, raw);
+}
+
 /** The values a test accepts, phrased for a note: "DX9 fullscreen or DX9 windowed", "anything but Disabled". */
 export function describeValueTest(def: SettingDef, test: ValueTest): string {
-  // A sentinel is what the raw number means, and these values are almost always sentinels.
-  const name = (v: string) => sentinelLabel(def, v) ?? displayValue(def, v);
+  const name = (v: string) => valueLabel(def, v);
   if ("is" in test) return test.is.map(name).join(" or ");
   if (def.kind.type === "key") return "a key";
   return `anything but ${test.isNot.map(name).join(" or ")}`;

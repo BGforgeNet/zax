@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { displayValue, sentinelLabel, validate, type SettingDef } from "@zax/core";
+  import { displayValue, sentinelLabel, validate, valueLabel, type SettingDef } from "@zax/core";
   import Control from "./Control.svelte";
   import { store } from "./store.svelte.js";
 
@@ -19,6 +19,38 @@
   const sentinel = $derived(sentinelLabel(def, value));
   const absent = $derived(store.isAbsent(def.id) && !store.isModified(def.id));
   const gate = $derived(store.gateOf(def));
+  // Null where the chain cannot be written from here - a pinned value, a missing file, a gate naming no one
+  // value. The note then stands alone and the user sets the controller themselves, as they did before.
+  const requirements = $derived(store.requirementsFor(def));
+  // Where the note pins one value, "set it" says enough. Where it names a range - "DX9 fullscreen or DX9
+  // windowed or ..." - the link says which of them the click writes, rather than leaving the user to find out.
+  /**
+   * Everything the row waits on, listed flat and each phrased the same way. A controller that is itself gated
+   * blocks this row just as much, and which of them waits on which is not something the reader has to work
+   * out - what matters is that all of them have to be set, which is what the button does.
+   */
+  const needs = $derived.by(() => {
+    if (!gate) return "";
+    // Only the first link is known when the chain cannot be walked to the end.
+    const links = requirements ?? [{ def: gate.controller, wants: gate.wants }];
+    return links
+      .map((link, at) =>
+        // A controller in another file carries its address inline - the one exemption from the same-tab rule.
+        nested && at === 0
+          ? `${link.wants} above`
+          : `${link.def.label}${link.def.file !== def.file ? ` (${link.def.file})` : ""} = ${link.wants}`,
+      )
+      .join(", ");
+  });
+
+  const fixWord = $derived.by(() => {
+    const first = requirements?.[0];
+    if (!requirements || !first || !gate) return "";
+    if (requirements.length === 2) return "set both";
+    if (requirements.length > 2) return `set all ${requirements.length}`;
+    const pinned = "is" in gate.test && gate.test.is.length === 1;
+    return pinned ? "set it" : `set ${valueLabel(first.def, first.value)}`;
+  });
   const conflict = $derived(store.conflictOf(def));
   const managed = $derived(def.managed);
   const inert = $derived(gate !== null && !gate.active);
@@ -58,13 +90,13 @@
   <div class="notes">
     {#if def.help}<span class="help">{def.help}</span>{/if}
     {#if managed}<span class="note">{managed.reason}</span>{/if}
-    {#if inert && gate && !nested}
-      <!-- A controller in another file carries its address inline - the one exemption from the same-tab rule. -->
-      <span class="gate"
-        >needs {gate.controller.label}{gate.controller.file !== def.file ? ` (${gate.controller.file})` : ""} = {gate.wants}</span
-      >
-    {:else if inert && gate}
-      <span class="gate">needs {gate.wants} above</span>
+    {#if inert && gate}
+      <span class="gate">
+        needs {needs}
+        {#if requirements && fixWord}
+          <button class="fix" onclick={() => store.satisfyGate(def)}>{fixWord}</button>
+        {/if}
+      </span>
     {/if}
     {#if conflict}
       <span class="clash" role="alert">clashes with {conflict.other.label}: {conflict.note}</span>

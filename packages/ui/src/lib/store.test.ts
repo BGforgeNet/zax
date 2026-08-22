@@ -676,6 +676,12 @@ describe("a long operation", () => {
 });
 
 describe("mod settings", () => {
+  const settingOf = (id: string) => {
+    const found = store.modSettings.flatMap((group) => group.settings).find((setting) => setting.id === id);
+    if (!found) throw new Error(`${id} is not in the seeded schema`);
+    return found;
+  };
+
   test("an installed mod's schema loads with its values read from its own ini", () => {
     expect(store.modSettings.map((group) => group.name)).toEqual(["FO2tweaks"]);
     expect(store.modSettings[0]?.files).toEqual(["mods/fo2tweaks.ini"]);
@@ -703,6 +709,32 @@ describe("mod settings", () => {
     expect(gate?.controller.id).toBe("sfall.Misc.DamageFormula");
     // Active exactly when the install's ddraw.ini holds the value the gate names - read, not assumed.
     expect(gate?.active).toBe(store.valueOf("sfall.Misc.DamageFormula") === "0");
+  });
+
+  test("one click sets the whole chain a gated setting waits on", () => {
+    // The party toggle waits on the mod's own run speed component, which waits on sfall's filesystem
+    // override. The note names only the first, so a fix stopping there would leave the setting as inert.
+    const dude = settingOf("fo2tweaks.run_speed.dude");
+    expect(store.requirementsFor(dude)?.map((r) => [r.def.id, r.value])).toEqual([
+      ["fo2tweaks.main.run_speed", "1"],
+      ["sfall.Misc.UseFileSystemOverride", "1"],
+    ]);
+
+    store.satisfyGate(dude);
+
+    expect(store.valueOf("fo2tweaks.main.run_speed")).toBe("1");
+    expect(store.valueOf("sfall.Misc.UseFileSystemOverride"), "the one in another file, and another tab").toBe("1");
+    expect(store.gateOf(dude)?.active).toBe(true);
+    expect(store.notice?.kind).toBe("done");
+    expect(store.notice?.text).toContain("2 settings");
+  });
+
+  test("offers nothing where the gate names no one value to write", () => {
+    // "any key but none" cannot be answered by writing a value, and picking a key here would rebind the
+    // user's keyboard for them - so the row keeps its note and no button.
+    const fastMove = store.defOf("sfall.Input.FastMoveFromContainer");
+    expect(fastMove && store.gateOf(fastMove)?.active).toBe(false);
+    expect(fastMove && store.requirementsFor(fastMove)).toBeNull();
   });
 
   test("opening the mod's own file refuses in the preview, with the reason named", async () => {

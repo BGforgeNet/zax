@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeValueTest, matchesValueTest } from "./catalog.js";
+import { describeValueTest, matchesValueTest, valueSatisfying } from "./catalog.js";
 import type { SettingDef } from "./catalog.js";
 
 const def = (kind: SettingDef["kind"], label = "Controller"): SettingDef => ({
@@ -59,5 +59,22 @@ describe("isNot", () => {
   it("phrases a key binding as a key rather than as a list of exclusions", () => {
     expect(describeValueTest(binding, { isNot: ["0"] })).toBe("a key");
     expect(describeValueTest(idle, { isNot: ["-1"] })).toBe("anything but Disabled");
+  });
+});
+
+describe("valueSatisfying", () => {
+  it("writes the first value a listed test names", () => {
+    // The graphics gates accept three modes; the order is the catalog author's, so the first is the answer.
+    expect(valueSatisfying(mode, { is: ["4", "5"] })).toBe("4");
+  });
+
+  it("inverts an excluded value where the kind's values can be listed", () => {
+    expect(valueSatisfying(mode, { isNot: ["0", "4"] })).toBe("5");
+  });
+
+  it("offers nothing where the test leaves an open range", () => {
+    // "a key is bound" is every key but none - choosing one would rebind the keyboard on the user's behalf.
+    expect(valueSatisfying(binding, { isNot: ["0"] })).toBeUndefined();
+    expect(valueSatisfying(idle, { isNot: ["-1"] })).toBeUndefined();
   });
 });

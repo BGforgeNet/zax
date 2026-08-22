@@ -8,6 +8,8 @@ import {
   removeInstall,
   searchText,
   setAlias,
+  valueLabel,
+  valueSatisfying,
   withWine,
   type Action,
   type ActionGroup,
@@ -479,7 +481,7 @@ class Store {
    * Whether a gated setting currently has any effect, and what would make it live. Returns null for settings
    * that are not gated at all.
    */
-  gateOf(def: SettingDef): { active: boolean; controller: SettingDef; wants: string } | null {
+  gateOf(def: SettingDef): { active: boolean; controller: SettingDef; wants: string; test: ValueTest } | null {
     if (!def.gatedBy) return null;
     // Through `defOf` rather than the catalog alone: a mod setting may gate on a sibling of its own schema,
     // or across files on a catalog id - the manifest validator has already refused anything else.
@@ -489,7 +491,50 @@ class Store {
       active: matchesValueTest(controller, this.valueOf(controller.id), def.gatedBy),
       controller,
       wants: describeValueTest(controller, def.gatedBy),
+      test: def.gatedBy,
     };
+  }
+
+  /**
+   * Every setting that has to change before `def` takes effect, nearest first - or null where one of them
+   * cannot be set from here: a value ZAX pins, a file this install does not have, a gate naming no single
+   * value, or a cycle. Each controller's own gate is followed too, since setting one that is itself inert
+   * writes a value the game goes on ignoring; the chain is what a one-click fix has to cover.
+   */
+  requirementsFor(def: SettingDef): { def: SettingDef; value: string; wants: string }[] | null {
+    const out: { def: SettingDef; value: string; wants: string }[] = [];
+    // An array rather than a set: a chain runs to two or three links, and a set here would be a reactive one.
+    const seen = [def.id];
+    let current = def;
+    for (;;) {
+      const gate = this.gateOf(current);
+      if (!gate || gate.active) return out;
+      const controller = gate.controller;
+      if (seen.includes(controller.id)) return null;
+      seen.push(controller.id);
+      if (controller.managed !== undefined || !this.hasFile(controller.file)) return null;
+      const value = valueSatisfying(controller, gate.test);
+      if (value === undefined) return null;
+      out.push({ def: controller, value, wants: gate.wants });
+      current = controller;
+    }
+  }
+
+  /**
+   * Sets everything `def` waits on, as ordinary unsaved edits so save and revert behave as they do for a
+   * typed one. The notice is not decoration: the settings changed can sit in another tab or another file,
+   * where nothing on screen would otherwise show that anything happened.
+   */
+  satisfyGate(def: SettingDef): void {
+    const needed = this.requirementsFor(def);
+    if (!needed || needed.length === 0) return;
+    for (const requirement of needed) this.set(requirement.def.id, requirement.value);
+    const first = needed[0];
+    if (!first) return;
+    this.notice =
+      needed.length === 1
+        ? { kind: "done", text: `Set ${first.def.label} to ${valueLabel(first.def, first.value)}.` }
+        : { kind: "done", text: `Set ${needed.length} settings: ${needed.map((r) => r.def.label).join(", ")}.` };
   }
 
   private clashing(a: SettingDef, aTest: ValueTest, b: SettingDef, bTest: ValueTest): boolean {

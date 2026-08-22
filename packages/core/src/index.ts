@@ -44,6 +44,8 @@ export {
   parseScancode,
   searchText,
   sentinelLabel,
+  valueLabel,
+  valueSatisfying,
   percentToScale,
   scaleToPercent,
   type SettingDef,

@@ -103,7 +103,9 @@ section name cannot contain a dot, a key can. An entry may name its `file` (unde
 A setting's id is the mod's id plus the address verbatim (`fo2tweaks.main.autodoors`), the rule ZAX's own
 catalog uses, so `gated-by` addresses a sibling entry or a catalog setting with no transform. A gate naming
 neither refuses as "needs a newer ZAX", since a control gated on nothing would render live and never take
-effect. A partial schema is fine, and a mod without one simply has no settings surface.
+effect. A gated control carries a link that sets what it waits on, following the chain where the controller is
+gated in turn, so list `is` values in the order you would recommend them - the first is the one that link
+writes. A partial schema is fine, and a mod without one simply has no settings surface.
 
 ## How ZAX chooses a release
 
