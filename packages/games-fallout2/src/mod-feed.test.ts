@@ -12,6 +12,7 @@ import {
   type ModRelease,
 } from "./mod-feed.js";
 import { MOD_GRANTS } from "./mod-grants.js";
+import { parseManifest } from "./manifest.js";
 
 const REPO = "BGforgeNet/FO2tweaks";
 const FEED = { repository: REPO, id: "fo2tweaks" };
@@ -672,5 +673,95 @@ installer:
       kind: "upgrade",
       from: "2.4.33",
     });
+  });
+});
+
+describe("a base install ZAX did not perform", () => {
+  const install: Install = { path: "/games/fallout2", type: "fallout2rpu" };
+  const BASE = `spec: 1
+id: fo2tweaks
+name: Restoration Project, updated
+version: "2.4.34"
+game: fallout2
+type: base
+becomes: fallout2rpu
+installer:
+  other: { asset: rpu.zip, run: rpu-install.sh }
+`;
+  const found = (): ModRelease => ({
+    manifest: parseManifest(new TextEncoder().encode(BASE)),
+    manifestText: BASE,
+    manifestFromAsset: true,
+    installer: { route: "other", asset: { name: "rpu.zip", url: "https://example.test/rpu.zip" } },
+  });
+  const context = (over: Partial<ModContext>): ModContext => ({
+    install,
+    record: { path: install.path, mods: [] },
+    sfall: null,
+    present: false,
+    ...over,
+  });
+
+  it("reads the version it stamped, and offers the release against it", () => {
+    expect(availability(found(), context({ baseVersion: { version: "2.4.33", line: "2.4" } }))).toEqual({
+      kind: "upgrade",
+      from: "2.4.33",
+    });
+    expect(availability(found(), context({ baseVersion: { version: "2.4.34", line: "2.4" } }))).toEqual({
+      kind: "installed",
+    });
+    expect(availability(found(), context({ baseVersion: { version: "2.4.35", line: "2.4" } }))).toEqual({
+      kind: "downgrade",
+      from: "2.4.35",
+    });
+  });
+
+  it("does not offer the other line as an upgrade - the two never cross", () => {
+    // A 2.3 install meeting a 2.4 release: not its next version, and switching is the user's explicit pick.
+    expect(availability(found(), context({ baseVersion: { version: "2.3.34", line: "2.3" } }))).toEqual({
+      kind: "install-over",
+    });
+  });
+
+  it("offers a pre-split install the choice rather than a line it was never on", () => {
+    expect(availability(found(), context({ baseVersion: { version: "2.3.3u30" } }))).toEqual({
+      kind: "install-over",
+    });
+  });
+
+  it("falls back to installing over where the install says nothing about its version", () => {
+    expect(availability(found(), context({ baseVersion: null }))).toEqual({ kind: "install-over" });
+  });
+});
+
+describe("a base mod with no lines at all", () => {
+  it("compares its versions straight, having no line for either side to be on", async () => {
+    // UPU stamps `FALLOUT II 1.02.34`, whose version is a patch number and belongs to no line - so the
+    // strictness that keeps RPU's 2.3 and 2.4 apart must not stop UPU upgrading at all.
+    const UPU = `spec: 1
+id: fo2tweaks
+name: Unofficial Patch, updated
+version: "35"
+game: fallout2
+type: base
+becomes: fallout2upu
+installer:
+  other: { asset: upu.zip, run: upu-install.sh }
+`;
+    const install: Install = { path: "/games/fallout2", type: "fallout2upu" };
+    const release: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(UPU)),
+      manifestText: UPU,
+      manifestFromAsset: true,
+      installer: { route: "other", asset: { name: "upu.zip", url: "https://example.test/upu.zip" } },
+    };
+    const state = availability(release, {
+      install,
+      record: { path: install.path, mods: [] },
+      sfall: null,
+      present: false,
+      baseVersion: { version: "34" },
+    });
+    expect(state).toEqual({ kind: "upgrade", from: "34" });
   });
 });

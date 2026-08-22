@@ -27,6 +27,7 @@ import {
   type ModPartGroup,
   type ModType,
 } from "./manifest.js";
+import { installedBaseVersion, type BaseVersion } from "./base-version.js";
 import { carryOver, type CarriedSelection } from "./mod-parts.js";
 import type { InstallRecord } from "./records.js";
 import { MODS_DIRECTORY, answersToId } from "./mods.js";
@@ -332,7 +333,19 @@ export interface ModContext {
   sfall: string | null;
   /** Whether anything under `mods/` answers to the mod's name - the hand-installed case. */
   present: boolean;
+  /**
+   * What a base install says about itself in `ddraw.ini`, where ZAX has no record of installing it. This is
+   * the common state rather than an edge: upstream's Windows route is an exe installer, so most base installs
+   * were never ZAX's, and without this they are a game type with no version and no update on offer.
+   */
+  baseVersion?: BaseVersion | null;
 }
+
+/** Which sequence of releases a version belongs to - `2.4.34` is the 2.4 line, which never crosses to 2.3. */
+const lineOf = (version: string): string | undefined => {
+  const pieces = version.split(".");
+  return pieces.length >= 3 ? pieces.slice(0, 2).join(".") : undefined;
+};
 
 export function availability(release: ModRelease, context: ModContext): Availability {
   const { manifest } = release;
@@ -388,8 +401,24 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   // Presence always comes from the directory; a mod there without a record upgrades by installing over.
   // For a base mod the directory says so by having become what the mod makes: a hand-installed RPU is the
   // common state, and this arm is both its upgrade path and its repair - laying the release down again.
-  if (context.present || (manifest.becomes !== undefined && context.install.type === manifest.becomes))
+  if (manifest.becomes !== undefined && context.install.type === manifest.becomes) {
+    const held = context.baseVersion;
+    // What the install stamped into `ddraw.ini` stands in for the record it has not got - but only within
+    // its own line. RPU's 2.3 and 2.4 ship in lockstep and never upgrade across, so a 2.4 release meeting a
+    // 2.3 install is not that install's next version; it is the other line, and picking it is the user's.
+    // Both sides agreeing about lines, undefined included: UPU's versions have no line at all and compare
+    // straight, while a pre-split RPU install has none and the release has one - which is the whole point of
+    // the pre-split trap. That install belongs to no line, so its first update is the same choice a fresh
+    // install makes, and ZAX puts it to the user rather than picking a line for them.
+    const sameLine = held?.line === lineOf(manifest.version);
+    if (held && sameLine) {
+      const newness = compareVersions(manifest.version, held.version);
+      if (newness === 0) return { kind: "installed" };
+      return newness > 0 ? { kind: "upgrade", from: held.version } : { kind: "downgrade", from: held.version };
+    }
     return { kind: "install-over" };
+  }
+  if (context.present) return { kind: "install-over" };
 
   // The game-type gate protects a first install alone - install-over and upgrades are the same mod already.
   if (manifest.installOn !== undefined && !manifest.installOn.includes(context.install.type)) {
@@ -477,6 +506,8 @@ export async function listAvailableMods(
       // any one of them in the folder is the mod being there.
       const declared = release.manifest.entries ?? partOptions(release.manifest).flatMap((part) => part.entries ?? []);
       const present = await presentInMods(platform, install.path, feed.id, declared);
+      // Read only for a base mod, and only where it could answer: a stacking mod's version is the record's.
+      const baseVersion = release.manifest.type === "base" ? await installedBaseVersion(platform, install) : undefined;
       const groups = offeredParts(release);
       const carried = carryOver(release, record.mods.find((mod) => mod.id === release.manifest.id)?.parts);
       offers.push({
@@ -486,7 +517,13 @@ export async function listAvailableMods(
         type: release.manifest.type,
         ...(release.manifest.reason !== undefined ? { reason: release.manifest.reason } : {}),
         ...(groups.length > 0 ? { parts: { groups, ...carried } } : {}),
-        availability: availability(release, { install, record, sfall, present }),
+        availability: availability(release, {
+          install,
+          record,
+          sfall,
+          present,
+          ...(baseVersion !== undefined ? { baseVersion } : {}),
+        }),
       });
     } catch (error) {
       failures.push({ ...feed, why: error instanceof Error ? error.message : String(error) });

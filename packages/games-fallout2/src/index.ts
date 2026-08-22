@@ -40,6 +40,7 @@ export {
   type ModOffer,
   type ModRelease,
 } from "./mod-feed.js";
+export { baseVersionOf, installedBaseVersion, type BaseVersion } from "./base-version.js";
 export { applyBaseInstall, planBaseInstall, type BaseInstallOutcome, type BaseInstallPlan } from "./mod-base.js";
 export {
   applyModInstall,
