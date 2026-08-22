@@ -209,6 +209,7 @@ describe("availability", () => {
       type: "pluggable",
       refuse: [],
       settings: [],
+      dropped: [],
       archive: "fo2tweaks.zip",
       ...(text.includes("requiresSfall") ? { requiresSfall: "4.4.5" } : {}),
     },

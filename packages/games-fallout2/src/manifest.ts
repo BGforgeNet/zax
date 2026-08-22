@@ -58,6 +58,21 @@ export interface ModSetting extends SettingDef {
   default?: string;
 }
 
+/**
+ * A settings entry this version cannot draw, kept so the interface can say so rather than say nothing.
+ *
+ * The two classes of ignorance are not alike, and this is the second. A field that decides what lands on disk
+ * refuses the manifest when unknown, because ignoring it writes the wrong thing. A settings entry only ever
+ * edits a key in the mod's own ini, and the release ships its own default there - so a control this version
+ * cannot render costs the user a knob and never costs correctness, and refusing the mod over one would make a
+ * mod uninstallable for sitting on the wrong side of a ZAX release.
+ */
+export interface DroppedSetting {
+  /** The address the manifest spelled, `section.key`. */
+  address: string;
+  why: string;
+}
+
 export interface RefuseRule {
   /** Fires when every `present` path exists and every `absent` path does not. At least one list is non-empty. */
   present: readonly string[];
@@ -92,6 +107,8 @@ export interface ModManifest {
   entries?: readonly string[];
   refuse: readonly RefuseRule[];
   settings: readonly ModSetting[];
+  /** Entries the schema declares that this version cannot draw. The mod installs; these controls do not. */
+  dropped: readonly DroppedSetting[];
 }
 
 const CATALOG_IDS = new Set(SETTINGS.map((setting) => setting.id));
@@ -257,7 +274,7 @@ function parseSentinels(value: unknown, where: string): Record<string, string> {
   return out;
 }
 
-function parseKind(fields: Record<string, unknown>, where: string): SettingKind {
+function parseKind(fields: Record<string, unknown>, where: string): SettingKind | null {
   const type = text(fields["kind"], `${where}'s kind`, SHORT_TEXT);
   switch (type) {
     case "scale":
@@ -300,8 +317,9 @@ function parseKind(fields: Record<string, unknown>, where: string): SettingKind 
     case "key":
       return { type };
     default:
-      // A kind this version has never heard of is the settings schema's form of an unknown op.
-      return needsNewerZax(`${where}'s kind "${type}" is not one this version knows`);
+      // Unreachable: the caller drops an entry whose kind is not a key of KIND_FIELDS, which is the same set
+      // this switch covers. Kept so adding a kind to one and not the other cannot pass silently.
+      return null;
   }
 }
 
@@ -310,15 +328,23 @@ const ENTRY_FIELDS = ["file", "kind", "label", "help", "default", "gated-by"];
 /** The address becomes the id verbatim, so its characters are bounded the way an id's are. */
 const ADDRESS_SHAPE = /^[A-Za-z0-9._-]+$/;
 
+interface ParsedSettings {
+  settings: readonly ModSetting[];
+  dropped: readonly DroppedSetting[];
+}
+
+/** Said once, because two guards below reach the same conclusion and a second copy would drift from this one. */
+const unknownKind = (kind: string): string => `its kind "${kind}" is not one this version knows`;
+
 /**
  * A flat mapping keyed by each entry's real address in the ini, `section.key`, split at the first dot - so a
  * section name cannot carry one, a key can. The id is the mod's id plus the address, verbatim - a gate names
  * a sibling with no transform - the same rule the catalog's generator applies to the engine's own files.
  */
-function parseSettings(value: unknown, modId: string, granted: readonly string[]): readonly ModSetting[] {
+function parseSettings(value: unknown, modId: string, granted: readonly string[]): ParsedSettings {
   if (value === null || typeof value !== "object" || Array.isArray(value)) refuse(`"settings" must be a mapping`);
   const out: ModSetting[] = [];
-  const gates: { setting: ModSetting; where: string }[] = [];
+  const dropped: DroppedSetting[] = [];
 
   for (const [rawAddress, entry] of Object.entries(value as Record<string, unknown>)) {
     const address = text(rawAddress, `a "settings" address`, SHORT_TEXT);
@@ -330,11 +356,27 @@ function parseSettings(value: unknown, modId: string, granted: readonly string[]
 
     const loose = entry as Record<string, unknown>;
     const kindName = typeof loose?.["kind"] === "string" ? loose["kind"] : "";
+    if (!(kindName in KIND_FIELDS)) {
+      // Dropped without checking its other fields, which is deliberate: they belong to a shape this version
+      // has no rule for, and the strictness that refuses an unknown field is there to stop a misspelling
+      // dropping a safety rule. This entry carries none, and it is going anyway.
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) refuse(`${where} must be a mapping`);
+      dropped.push({ address, why: unknownKind(kindName) });
+      continue;
+    }
     const parts = record(entry, where, [...ENTRY_FIELDS, ...(KIND_FIELDS[kindName] ?? [])]);
 
     if (!ADDRESS_SHAPE.test(address)) refuse(`${where} cannot become an id`);
     // Cannot collide with a catalog id: the mod id's first piece was refused out of the catalog's prefixes.
     const id = `${modId}.${address}`;
+
+    // Unreachable behind the check above, which covers the same set of kinds - narrowed rather than asserted,
+    // so a kind added to one of the two and not the other drops a control instead of crashing.
+    const kind = parseKind(parts, where);
+    if (kind === null) {
+      dropped.push({ address, why: unknownKind(kindName) });
+      continue;
+    }
 
     const setting: ModSetting = {
       id,
@@ -344,28 +386,33 @@ function parseSettings(value: unknown, modId: string, granted: readonly string[]
           : writablePath(parts["file"], `${where}'s file`, modId, granted),
       section,
       key,
-      kind: parseKind(parts, where),
+      kind,
       label: text(parts["label"], `${where}'s label`, SHORT_TEXT),
       ...(parts["help"] !== undefined ? { help: text(parts["help"], `${where}'s help`, LONG_TEXT) } : {}),
       ...(parts["default"] !== undefined ? { default: literal(parts["default"], `${where}'s default`) } : {}),
     };
-    if (parts["gated-by"] !== undefined) {
-      setting.gatedBy = parseGate(parts["gated-by"], `${where}'s gate`);
-      gates.push({ setting, where });
-    }
+    if (parts["gated-by"] !== undefined) setting.gatedBy = parseGate(parts["gated-by"], `${where}'s gate`);
     out.push(setting);
   }
 
-  // After every entry exists, so a gate may name a sibling defined later in the file. An id neither here nor
-  // in the catalog refuses: a control gated on nothing would render but silently never take effect, which is
-  // the failure gates exist to prevent - and a genuinely newer catalog id means a newer ZAX has it.
-  const ids = new Set(out.map((setting) => setting.id));
-  for (const { setting, where } of gates) {
-    const target = setting.gatedBy?.id ?? "";
-    if (!ids.has(target) && !CATALOG_IDS.has(target))
-      needsNewerZax(`${where} names "${target}", which is not a setting this version knows`);
+  // Judged after every entry exists, so a gate may name a sibling defined later in the file, and repeated
+  // because dropping a control drops whatever waited on it. A control gated on something absent would render
+  // but silently never take effect, which is the failure gates exist to prevent.
+  let kept: readonly ModSetting[] = out;
+  for (;;) {
+    const ids = new Set(kept.map((setting) => setting.id));
+    const shown = (setting: ModSetting) =>
+      !setting.gatedBy || ids.has(setting.gatedBy.id) || CATALOG_IDS.has(setting.gatedBy.id);
+    const survivors = kept.filter(shown);
+    if (survivors.length === kept.length) break;
+    for (const gone of kept.filter((setting) => !shown(setting)))
+      dropped.push({
+        address: `${gone.section}.${gone.key}`,
+        why: `it waits on "${gone.gatedBy?.id ?? ""}", which this version cannot show`,
+      });
+    kept = survivors;
   }
-  return out;
+  return { settings: kept, dropped };
 }
 
 /**
@@ -513,6 +560,8 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
       : {}),
     ...(fields["entries"] !== undefined ? { entries: parseEntries(fields["entries"]) } : {}),
     refuse: fields["refuse"] === undefined ? [] : parseRefuse(fields["refuse"]),
-    settings: fields["settings"] === undefined ? [] : parseSettings(fields["settings"], id, granted),
+    ...(fields["settings"] === undefined
+      ? { settings: [], dropped: [] }
+      : parseSettings(fields["settings"], id, granted)),
   };
 }

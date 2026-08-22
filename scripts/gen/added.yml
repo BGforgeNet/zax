@@ -1,0 +1,105 @@
+# Settings ZAX carries that the previous implementation's format definitions do not.
+#
+# Same shape as formats/*.yml and read after them by gen-catalog.mjs, but hand-authored rather than extracted -
+# which is the whole distinction between this file and those. Edit this one; never those, whose value is being
+# byte-identical to the `python` branch so a re-extraction stays a comparison rather than a merge.
+#
+# Every name, bound and description below is read off the artifact that defines the key: sfall's own
+# artifacts/ddraw.ini for the sfall keys, and fallout2-ce's src/game.cc for [debug] mode, which dispatches on
+# exactly the five strings listed here and treats anything else as no debug output.
+#
+# A setting added here also needs a placement in gen-layout.mjs, or layout.test.ts fails: the interface has
+# nowhere to draw it, and the previous implementation's extracted layout cannot know about it.
+
+fallout2.cfg:
+  debug:
+    mode:
+      name: Debug output
+      desc: Where the engine sends its debug output. Any other value turns it off.
+      display_type: dropdown
+      options:
+        - value: environment
+          name: Whatever DEBUGACTIVE says
+          desc: Follows the environment variable, which selects one of the others. Nothing is written without it.
+        - value: screen
+          name: The screen
+        - value: log
+          name: debug.log
+        - value: mono
+          name: A monochrome monitor
+        - value: gnw
+          name: The game window
+
+ddraw.ini:
+  Main:
+    TranslationsINI:
+      name: Translations file
+      desc: >-
+        Alternate translations for some of sfall's own messages. Put it under text\<language>\ for sfall to
+        follow the game's language.
+      type: string
+
+  Sound:
+    NumSoundBuffers:
+      name: Simultaneous sound effects
+      desc: Zero leaves the engine's own eight in place.
+      type: int
+      min: 0
+      max: 32
+    AllowSoundForFloats:
+      name: Sound with combat float messages
+    AllowDShowSound:
+      name: Play mp3, wma or wav in place of ACM
+      desc: >-
+        Looks for an alternative format whenever the game asks for an ACM, whether or not the ACM is there.
+        The play_sfall_sound and stop_sfall_sound script functions are unaffected.
+
+  Misc:
+    PartyMemberNonRandomLevelUp:
+      name: Party members level at set intervals
+      desc: Drops the random element, which otherwise levels them up early.
+    EnableHeroAppearanceMod:
+      name: Hero Appearance mod
+      display_type: dropdown
+      options:
+        - value: 0
+          name: "Off"
+        - value: 1
+          name: "On"
+        - value: 2
+          name: On, for scripts that fix the art themselves
+          desc: >-
+            For older scripts that correct obj_art_fid and art_change_fid_num for dude_obj on their own.
+            AppChCrt.frm and AppChEdt.frm in art\intrface\ set a custom character-screen background.
+    SpeedInventoryPCRotation:
+      name: Character rotation
+      desc: How quickly the player turns on the inventory and character screens. Lower is faster; 166 is the default.
+      type: int
+      min: 0
+      max: 1000
+    ItemCounterAutoCaps:
+      name: Pre-fill the barter balance
+      desc: >-
+        Moving money to or from the table pre-fills the Move Items window with the amount that balances the
+        trade.
+
+  Scripts:
+    IniConfigFolder:
+      name: Script ini folder
+      desc: >-
+        Searched before the game folder for the ini files scripts read. At most 61 characters.
+      type: string
+
+  Debugging:
+    AllowUnsafeScripting:
+      name: Unsafe script functions
+      desc: Does not need sfall's debugging mode.
+      display_type: dropdown
+      options:
+        - value: 0
+          name: "Off"
+        - value: 1
+          name: "On"
+          desc: Gives scripts direct access to the game's address space, and lets them call into its code.
+        - value: 2
+          name: On, without the memory address check

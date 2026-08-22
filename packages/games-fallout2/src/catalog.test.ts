@@ -5,9 +5,10 @@ import { SETTINGS } from "./catalog.js";
 import { CONFIG_FILES } from "./files.js";
 
 describe("catalog", () => {
-  it("covers every setting the previous implementation exposed", () => {
-    // A dropped setting is otherwise a silent regression: nothing else in the suite counts them.
-    expect(SETTINGS.length).toBe(166);
+  it("covers every setting the previous implementation exposed, plus the ones ZAX added", () => {
+    // A dropped setting is otherwise a silent regression: nothing else in the suite counts them. The 166 the
+    // previous implementation exposed, and 11 from scripts/gen/added.yml that it never had.
+    expect(SETTINGS.length).toBe(177);
   });
 
   it("has unique ids", () => {
@@ -59,6 +60,8 @@ describe("catalog", () => {
       "sfall.Misc.CorpseDeleteTime", // sfall: "the timer (in days) ... valid range: 0..13"
       "sfall.Misc.UseWalkDistance", // sfall: "valid range: 0..3"
       "sfall.Misc.WorldMapDelay2", // sfall: "Default is 66 milliseconds, and the maximum is 150"
+      "sfall.Sound.NumSoundBuffers", // sfall: "Set to 0 to leave the default unchanged (i.e. 8). The maximum is 32"
+      "sfall.Misc.SpeedInventoryPCRotation", // sfall: "Default is 166 (lower - faster; valid range: 0..1000)"
       "game.sound.cache_size", // fallout2-ce rejects >= 0x40000
       "game.system.splash", // fallout2-ce wraps the index at SPLASH_COUNT, which is 10
     ]);
@@ -149,11 +152,16 @@ describe("catalog against real config files", () => {
     // Config files vary by component version - the bundled ddraw.ini is sfall 3.3, which predates the
     // [Debugging] and [Interface] sections that 4.x added. An absent section is normal; a section that is
     // present but from which nothing resolves means the catalog spells it or its keys wrongly.
+    // Two keys sfall ships commented out, so they resolve nowhere until someone sets them. `TranslationsINI`
+    // is the only catalog key in ddraw's [Main], which would otherwise read as a section that spells nothing
+    // right rather than one whose single key is off by default.
+    const COMMENTED_UPSTREAM = new Set(["sfall.Main.TranslationsINI", "sfall.Scripts.IniConfigFolder"]);
     for (const s of SETTINGS) {
       const doc = docs.get(s.file as never)!;
       const sectionPresent = doc.sections().some((x) => x.toLowerCase() === s.section.toLowerCase());
       if (!sectionPresent) continue;
       const siblings = SETTINGS.filter((o) => o.file === s.file && o.section === s.section);
+      if (siblings.every((o) => COMMENTED_UPSTREAM.has(o.id))) continue;
       expect(
         siblings.some((o) => doc.get(o.section, o.key) !== undefined),
         `${s.file} contains [${s.section}] but no catalog key in it resolves`,

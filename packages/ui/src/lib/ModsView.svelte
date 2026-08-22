@@ -313,6 +313,16 @@
                 <SettingRow {def} />
               {/each}
             </div>
+            <!-- Said once for the mod rather than per control: what is missing is the same answer each time,
+               and a list of apologies down the section would drown the settings that do work. -->
+            {#if group.dropped.length > 0}
+              <p class="status">
+                {group.dropped.length === 1 ? "One setting needs" : `${group.dropped.length} settings need`} a newer ZAX,
+                and {group.dropped.length === 1 ? "is" : "are"} not shown: {group.dropped
+                  .map((entry) => entry.address)
+                  .join(", ")}.
+              </p>
+            {/if}
           </section>
         {:else}
           <p class="empty">

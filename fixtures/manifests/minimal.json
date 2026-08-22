@@ -5,6 +5,7 @@
     "version": "14.7",
     "type": "pluggable",
     "refuse": [],
-    "settings": []
+    "settings": [],
+    "dropped": []
   }
 }

@@ -310,6 +310,11 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
+        "id": "game.debug.mode",
+        "control": "dropdown"
+       },
+       {
+        "kind": "setting",
         "id": "game.debug.output_map_data_info",
         "control": "checkbox"
        },
@@ -821,6 +826,11 @@ export const LAYOUT: readonly LayoutFile[] = [
        },
        {
         "kind": "setting",
+        "id": "sfall.Misc.PartyMemberNonRandomLevelUp",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
         "id": "sfall.Misc.SingleCore",
         "control": "checkbox"
        },
@@ -868,6 +878,48 @@ export const LAYOUT: readonly LayoutFile[] = [
         "kind": "setting",
         "id": "sfall.Misc.SkipLoadingGameSettings",
         "control": "dropdown"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.EnableHeroAppearanceMod",
+        "control": "dropdown"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Sound",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Sound.NumSoundBuffers",
+        "control": "spin"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Sound.AllowSoundForFloats",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Sound.AllowDShowSound",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Paths",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Main.TranslationsINI",
+        "control": "qinput"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Scripts.IniConfigFolder",
+        "control": "qinput"
        }
       ]
      }
@@ -992,6 +1044,11 @@ export const LAYOUT: readonly LayoutFile[] = [
         "kind": "setting",
         "id": "sfall.Misc.DisplayBonusDamage",
         "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.SpeedInventoryPCRotation",
+        "control": "spin"
        }
       ]
      },
@@ -1002,6 +1059,11 @@ export const LAYOUT: readonly LayoutFile[] = [
        {
         "kind": "setting",
         "id": "sfall.Misc.FullItemDescInBarter",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.ItemCounterAutoCaps",
         "control": "checkbox"
        }
       ]
@@ -1106,6 +1168,11 @@ export const LAYOUT: readonly LayoutFile[] = [
      {
       "kind": "setting",
       "id": "sfall.Debugging.DebugMode",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "sfall.Debugging.AllowUnsafeScripting",
       "control": "dropdown"
      },
      {

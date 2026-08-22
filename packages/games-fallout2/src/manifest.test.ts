@@ -22,6 +22,7 @@ describe("parseManifest", () => {
       type: "pluggable",
       refuse: [],
       settings: [],
+      dropped: [],
     });
   });
 
@@ -221,11 +222,30 @@ describe("parseManifest refusals", () => {
     refuses(entry("section."), /not a "section.key" address/);
   });
 
-  it("refuses a gate naming a setting nobody defines", () => {
+  it("drops a control gated on a setting nobody defines, and the mod with it stays installable", () => {
     const gated = `${FO2TWEAKS}settings:
   main.a: { kind: bool, label: A, gated-by: { id: nothing.known, is: [1] } }
+  main.b: { kind: bool, label: B }
 `;
-    refuses(gated, /not a setting this version knows/);
+    const manifest = parsed(gated);
+    expect(manifest.settings.map((s) => s.id)).toEqual(["fo2tweaks.main.b"]);
+    expect(manifest.dropped).toEqual([
+      { address: "main.a", why: 'it waits on "nothing.known", which this version cannot show' },
+    ]);
+  });
+
+  it("drops whatever waited on a control it dropped, however deep the chain", () => {
+    const chain = `${FO2TWEAKS}settings:
+  main.a: { kind: table, label: A }
+  main.b: { kind: bool, label: B, gated-by: { id: fo2tweaks.main.a, is: [1] } }
+  main.c: { kind: bool, label: C, gated-by: { id: fo2tweaks.main.b, is: [1] } }
+  main.d: { kind: bool, label: D }
+`;
+    const manifest = parsed(chain);
+    // A control gated on one that is not there would render live and never take effect, which is the failure
+    // gates exist to prevent - so the whole chain goes and the ungated sibling stays.
+    expect(manifest.settings.map((s) => s.id)).toEqual(["fo2tweaks.main.d"]);
+    expect(manifest.dropped.map((d) => d.address).sort()).toEqual(["main.a", "main.b", "main.c"]);
   });
 
   it("refuses gates that test both ways or neither", () => {
@@ -247,8 +267,16 @@ describe("parseManifest refusals", () => {
     refuses(FO2TWEAKS.replace("id: fo2tweaks", "id: game"), /catalog's "game" namespace/);
   });
 
-  it("refuses a kind this version does not know as needing a newer ZAX", () => {
-    refuses(`${FO2TWEAKS}settings:\n  main.a: { kind: table, label: A }\n`, /newer version of ZAX/);
+  it("drops a control whose kind it does not know, carrying the rest of the schema", () => {
+    // A settings entry only ever edits a key in the mod's own ini, and the release ships its own default
+    // there - so an unrenderable control costs a knob, never correctness, and refusing the mod over one
+    // would make it uninstallable for sitting on the wrong side of a ZAX release.
+    const manifest = parsed(`${FO2TWEAKS}settings:
+  main.a: { kind: table, label: A, columns: 3 }
+  main.b: { kind: bool, label: B }
+`);
+    expect(manifest.settings.map((s) => s.id)).toEqual(["fo2tweaks.main.b"]);
+    expect(manifest.dropped).toEqual([{ address: "main.a", why: 'its kind "table" is not one this version knows' }]);
   });
 
   it("refuses a kind payload field on the wrong kind", () => {

@@ -14,6 +14,56 @@ import { idFor } from "./ids.mjs";
 */
 const ALSO_HIDDEN = new Set(["fallout2.cfg|system|free_space"]);
 
+/*
+  Where a setting from added.yml joins the layout. The extracted trees cannot know about a setting the
+  previous implementation never had, and `layout.test.ts` holds every catalog setting to exactly one place -
+  so an addition without a row here fails the suite rather than rendering nowhere.
+
+  `tab` is the tab's title on that file's own tab strip, `frame` the group inside it, created at the end of
+  the tab where it does not exist yet. Position inside a frame is `after` a named setting, `first`, or - with
+  neither - the end. `control` is a judgement this file makes, the way the extraction made it for the rest:
+  the catalog's kind does not imply it.
+*/
+const ADDED = [
+  // The master switch for the four it already holds, so it reads before them rather than after.
+  { id: "game.debug.mode", file: "fallout2.cfg", tab: "Debug", frame: "Main", first: true, control: "dropdown" },
+
+  { id: "sfall.Sound.NumSoundBuffers", file: "ddraw.ini", tab: "Main", frame: "Sound", control: "spin" },
+  { id: "sfall.Sound.AllowSoundForFloats", file: "ddraw.ini", tab: "Main", frame: "Sound", control: "checkbox" },
+  { id: "sfall.Sound.AllowDShowSound", file: "ddraw.ini", tab: "Main", frame: "Sound", control: "checkbox" },
+
+  // Two file paths from different ini sections, which the frames do not track - Combat already holds Misc keys.
+  { id: "sfall.Main.TranslationsINI", file: "ddraw.ini", tab: "Main", frame: "Paths", control: "qinput" },
+  { id: "sfall.Scripts.IniConfigFolder", file: "ddraw.ini", tab: "Main", frame: "Paths", control: "qinput" },
+
+  {
+    id: "sfall.Misc.PartyMemberNonRandomLevelUp",
+    file: "ddraw.ini",
+    tab: "Main",
+    frame: "Misc",
+    after: "sfall.Misc.NPCAutoLevel",
+    control: "checkbox",
+  },
+  { id: "sfall.Misc.EnableHeroAppearanceMod", file: "ddraw.ini", tab: "Main", frame: "Misc", control: "dropdown" },
+
+  {
+    id: "sfall.Misc.SpeedInventoryPCRotation",
+    file: "ddraw.ini",
+    tab: "Interface",
+    frame: "Inventory",
+    control: "spin",
+  },
+  { id: "sfall.Misc.ItemCounterAutoCaps", file: "ddraw.ini", tab: "Interface", frame: "Barter", control: "checkbox" },
+
+  {
+    id: "sfall.Debugging.AllowUnsafeScripting",
+    file: "ddraw.ini",
+    tab: "Debug",
+    after: "sfall.Debugging.DebugMode",
+    control: "dropdown",
+  },
+];
+
 const layout = JSON.parse(fs.readFileSync("scripts/gen/py-layout.json", "utf8"));
 const catalog = fs.readFileSync("packages/games-fallout2/src/catalog.ts", "utf8");
 const known = new Set([...catalog.matchAll(/\{id: "([^"]+)"/g)].map((m) => m[1]));
@@ -41,6 +91,33 @@ const files = layout.map((f) => ({
   label: f.label,
   tabs: f.tabs.map((t) => ({ title: t.title, items: t.items.map((i) => node(i, f.file)) })),
 }));
+
+for (const add of ADDED) {
+  if (!known.has(add.id)) throw new Error(`ADDED: ${add.id} is not a catalog setting`);
+  const file = files.find((f) => f.file === add.file);
+  const tab = file?.tabs.find((t) => t.title === add.tab);
+  if (!tab) throw new Error(`ADDED: ${add.id} names no tab "${add.file} / ${add.tab}"`);
+
+  let into = tab.items;
+  if (add.frame) {
+    let frame = tab.items.find((i) => i.kind === "frame" && i.title === add.frame);
+    if (!frame) {
+      frame = { kind: "frame", title: add.frame, items: [] };
+      tab.items.push(frame);
+    }
+    into = frame.items;
+  }
+
+  const node = { kind: "setting", id: add.id, control: add.control };
+  if (add.first) into.unshift(node);
+  else if (add.after === undefined) into.push(node);
+  else {
+    const at = into.findIndex((i) => i.kind === "setting" && i.id === add.after);
+    if (at === -1) throw new Error(`ADDED: ${add.id} follows ${add.after}, which is not in that frame`);
+    into.splice(at + 1, 0, node);
+  }
+  settings++;
+}
 
 // A control the layout places but the catalog does not describe would render as a blank row, so fail here.
 if (missing.length) {

@@ -36,6 +36,9 @@ try {
     `OK: ${manifest.id} ${version} (${manifest.type}); payload: ${payload}; ` +
       `${manifest.settings.length} setting(s), ${manifest.refuse.length} refusal rule(s)`,
   );
+  // Not a refusal: the mod installs and these controls do not appear. Reported because an author writing to a
+  // later spec than the checkout has would otherwise see a clean OK and no sign the schema was trimmed.
+  for (const entry of manifest.dropped) console.log(`  dropped "${entry.address}": ${entry.why}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);

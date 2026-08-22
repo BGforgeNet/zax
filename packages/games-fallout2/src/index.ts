@@ -24,6 +24,7 @@ export {
   MANIFEST_NAME,
   insideMods,
   parseManifest,
+  type DroppedSetting,
   type ModManifest,
   type ModSetting,
 } from "./manifest.js";

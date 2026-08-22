@@ -136,8 +136,13 @@ section name cannot contain a dot, a key can. An entry may name its `file` (unde
 
 A setting's id is the mod's id plus the address verbatim (`fo2tweaks.main.autodoors`), the rule ZAX's own
 catalog uses, so `gated-by` addresses a sibling entry or a catalog setting with no transform. A gate naming
-neither refuses as "needs a newer ZAX", since a control gated on nothing would render live and never take
-effect. A gated control carries a link that sets what it waits on, following the chain where the controller is
+neither drops that control - and whatever was gated on it in turn - rather than refusing the mod, since a
+control gated on nothing would render live and never take effect. A `kind` this version does not implement
+goes the same way. The mod still installs, and ZAX says how many controls it left out and which: a settings
+entry only ever edits a key in the mod's own ini, where the release ships its own default, so one ZAX cannot
+draw costs a knob rather than correctness. Which settings a version knows changes with every ZAX release, and
+a mod must not become uninstallable for having sat on the wrong side of one. A gated control carries a link
+that sets what it waits on, following the chain where the controller is
 gated in turn, so list `is` values in the order you would recommend them - the first is the one that link
 writes. A partial schema is fine, and a mod without one simply has no settings surface.
 
@@ -172,7 +177,8 @@ field plus a retirement, and only a removal needs a new major.
 What ZAX does with something it does not recognise follows from what ignoring it would cost. A field that
 decides what lands on disk - `entries`, `state`, `install-on`, `type`, `refuse` - refuses the manifest, because
 ignoring it would write the wrong thing; that is why an unknown field refuses at all rather than being passed
-over. `extra` is the one place ignorance is free, by contract.
+over. Inside `settings` the cost is a control rather than a file, so an entry ZAX cannot draw is dropped and
+named instead. `extra` is the one place ignorance is free outright, by contract.
 
 ## The id is forever
 

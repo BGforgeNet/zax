@@ -9,6 +9,7 @@
       "patches/extra.dat"
     ],
     "refuse": [],
-    "settings": []
+    "settings": [],
+    "dropped": []
   }
 }

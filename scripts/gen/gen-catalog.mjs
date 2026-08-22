@@ -250,6 +250,8 @@ const MANAGED = {
 };
 
 const PATHS = new Set([
+  "TranslationsINI",
+  "IniConfigFolder",
   "music_path1",
   "music_path2",
   "critter_dat",
@@ -301,6 +303,8 @@ const KNOWN_MAX = {
   FOG_LIGHT_LEVEL: "Set FOG_LIGHT_LEVEL between 0-10 ... 0 = Off, 1 = darkest, 10 = brightest",
 
   // sfall's ddraw.ini states each of these outright.
+  NumSoundBuffers: "Set to 0 to leave the default unchanged (i.e. 8). The maximum is 32",
+  SpeedInventoryPCRotation: "Default is 166 (lower - faster; valid range: 0..1000)",
   CombatPanelAnimDelay: "valid range: 0..65535",
   DialogPanelAnimDelay: "valid range: 0..255",
   PipboyTimeAnimDelay: "valid range: 0..127",
@@ -374,39 +378,44 @@ const titleCase = (key) =>
 const layout = JSON.parse(fs.readFileSync("scripts/gen/layout.json", "utf8"));
 const orderOf = new Map(layout.map((r, i) => [`${r.file}|${r.section}|${r.key}`, i]));
 
+function defFor(file, section, key, item) {
+  const at = `${file}|${section}|${key}`;
+  return {
+    id: idFor(file, section, key),
+    file,
+    section,
+    key,
+    kind: kindFor(item, key),
+    label: LABEL[at] ?? stripUnit((item && item.name) || titleCase(key)),
+    ...helpFor(at, item),
+    ...(MANAGED[at] ? { managed: MANAGED[at] } : {}),
+    ...(GATED_BY[at] ? { gatedBy: { id: idFor(...GATED_BY[at][0].split("|")), ...GATED_BY[at][1] } } : {}),
+    ...(CONFLICTS[at] ? { conflictsWith: { ...CONFLICTS[at], id: idFor(...CONFLICTS[at].id.split("|")) } } : {}),
+  };
+}
+
 const defs = [];
 for (const file of FILES) {
   const doc = YAML.parse(fs.readFileSync(`scripts/gen/formats/${file}.yml`, "utf8"));
   for (const section of Object.keys(doc)) {
     if (section === "zax" || doc[section] == null) continue;
-    for (const key of Object.keys(doc[section])) {
-      const item = doc[section][key];
-      defs.push({
-        id: idFor(file, section, key),
-        file,
-        section,
-        key,
-        kind: kindFor(item, key),
-        label: LABEL[`${file}|${section}|${key}`] ?? stripUnit((item && item.name) || titleCase(key)),
-        ...helpFor(`${file}|${section}|${key}`, item),
-        ...(MANAGED[`${file}|${section}|${key}`] ? { managed: MANAGED[`${file}|${section}|${key}`] } : {}),
-        ...(GATED_BY[`${file}|${section}|${key}`]
-          ? {
-              gatedBy: {
-                id: idFor(...GATED_BY[`${file}|${section}|${key}`][0].split("|")),
-                ...GATED_BY[`${file}|${section}|${key}`][1],
-              },
-            }
-          : {}),
-        ...(CONFLICTS[`${file}|${section}|${key}`]
-          ? {
-              conflictsWith: {
-                ...CONFLICTS[`${file}|${section}|${key}`],
-                id: idFor(...CONFLICTS[`${file}|${section}|${key}`].id.split("|")),
-              },
-            }
-          : {}),
-      });
+    for (const key of Object.keys(doc[section])) defs.push(defFor(file, section, key, doc[section][key]));
+  }
+}
+
+// Settings ZAX carries that the previous implementation never had. Read after the format definitions and
+// through the same tables, so an addition is described in one place rather than two - the only difference is
+// that added.yml is hand-authored, where formats/*.yml are copies held byte-identical to their source.
+const added = YAML.parse(fs.readFileSync("scripts/gen/added.yml", "utf8"));
+const addedOrder = new Map();
+for (const file of Object.keys(added)) {
+  if (!FILES.includes(file)) throw new Error(`added.yml: "${file}" is not a config file ZAX edits`);
+  for (const section of Object.keys(added[file] ?? {})) {
+    for (const key of Object.keys(added[file][section])) {
+      const def = defFor(file, section, key, added[file][section][key]);
+      // Placed after everything the previous layout ordered, since none of these appear in it.
+      addedOrder.set(`${file}|${section}|${key}`, addedOrder.size);
+      defs.push(def);
     }
   }
 }
@@ -430,7 +439,11 @@ for (const [k, clash] of Object.entries(CONFLICTS)) {
 
 // Emitted in the order the previous interface laid them out, so the file diffs readably against that layout.
 // Nothing reads this order: where a setting appears is the layout's business.
-defs.sort((a, b) => orderOf.get(`${a.file}|${a.section}|${a.key}`) - orderOf.get(`${b.file}|${b.section}|${b.key}`));
+const rank = (d) => {
+  const at = `${d.file}|${d.section}|${d.key}`;
+  return orderOf.has(at) ? orderOf.get(at) : orderOf.size + addedOrder.get(at);
+};
+defs.sort((a, b) => rank(a) - rank(b));
 
 // One setting per line: the file is read by diffing it against the previous generation, and a pretty-printed
 // object per setting would make a one-field change a twenty-line diff.

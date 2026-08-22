@@ -32,7 +32,7 @@ import {
 } from "@zax/core";
 import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
-import { mayWrite, parseManifest, type ModSetting } from "./manifest.js";
+import { mayWrite, parseManifest, type DroppedSetting, type ModSetting } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 import { MOD_FEEDS, fetchFeed, listAvailableMods, type ModListing } from "./mod-feed.js";
 import {
@@ -83,6 +83,11 @@ export interface ModSettingsGroup {
   /** The ini files the schema describes - what the open-the-file affordance opens. */
   files: readonly string[];
   settings: readonly ModSetting[];
+  /**
+   * Entries the schema declares that this version cannot draw. Carried so the surface can say what is
+   * missing and why: a control quietly absent reads as a mod that never offered it.
+   */
+  dropped: readonly DroppedSetting[];
 }
 
 export interface Backend {
@@ -199,13 +204,15 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       if (!mod.complete) continue;
       try {
         const manifest = parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version });
-        // A mod without a schema gets no configuration surface - the schema is the convention.
-        if (manifest.settings.length === 0) continue;
+        // A mod without a schema gets no configuration surface - the schema is the convention. One whose
+        // whole schema this version cannot draw still gets a section, or the reason would have nowhere to go.
+        if (manifest.settings.length === 0 && manifest.dropped.length === 0) continue;
         groups.push({
           modId: manifest.id,
           name: manifest.name,
           files: [...new Set(manifest.settings.map((setting) => setting.file))],
           settings: manifest.settings,
+          dropped: manifest.dropped,
         });
       } catch {
         // The mod stays installed and listed; only its configuration surface is missing, as it is for any
