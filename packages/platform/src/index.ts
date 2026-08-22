@@ -46,6 +46,17 @@ export interface FileSystem {
   copy(from: string, to: string): Promise<void>;
   /** Recursive, and silent when the path is already gone. */
   remove(path: string): Promise<void>;
+  /**
+   * Moves a file or directory. Distinct from copy-and-delete because a rename that only changes case is not a
+   * copy anywhere - on a case-insensitive filesystem the two paths are one file - and because copying RPU's
+   * gigabyte to change a letter is not something to do at all.
+   */
+  rename(from: string, to: string): Promise<void>;
+  /**
+   * Bytes available on the filesystem holding this path, or null where the host cannot say - a browser has no
+   * answer, and neither has a path that is not there. A check that cannot run is not a check that failed.
+   */
+  freeSpace(path: string): Promise<number | null>;
 }
 
 /**
@@ -70,12 +81,30 @@ export interface LaunchOptions {
   env?: Readonly<Record<string, string>>;
 }
 
+/** What a program that ran to completion left behind. */
+export interface RunOutcome {
+  /** Its exit code, or null when a signal killed it rather than it exiting. */
+  code: number | null;
+  /**
+   * What it wrote, both streams interleaved as they arrived, and the tail where there was too much of it: a
+   * failing installer says why at the end, and the beginning of its log is the part nobody needs.
+   */
+  output: string;
+}
+
 export interface ProcessLauncher {
   /**
    * Starts a program and resolves once it has started, not once it has exited: the game outlives the click that
    * launched it, and a manager that blocks until the user quits Fallout is not a manager.
    */
   launch(program: string, args: readonly string[], options?: LaunchOptions): Promise<void>;
+  /**
+   * Starts a program and resolves once it has EXITED, with its code and its output - the opposite of `launch`
+   * and for the opposite case: an installer's whole result is what it did and what it said about it, and
+   * everything ZAX does afterwards reads what it wrote. A program that could not be started at all rejects; a
+   * program that ran and failed answers with its code, which is a result rather than an error.
+   */
+  run(program: string, args: readonly string[], options?: LaunchOptions): Promise<RunOutcome>;
   /** Hands a file or directory to the desktop's own handler - the file manager, the text editor, the browser. */
   open(target: string): Promise<void>;
 }

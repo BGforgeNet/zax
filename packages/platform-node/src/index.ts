@@ -5,7 +5,7 @@
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
-import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, readFile, readdir, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -34,6 +34,9 @@ export interface PlatformOptions {
 }
 
 const APP_NAME = "zax";
+
+/** How much of a run's output is kept. An Inno log runs to tens of kilobytes; a bomb of one is not evidence. */
+const RUN_OUTPUT_CAP = 64 * 1024;
 
 /** A hung mirror without this leaves the interface's busy state stuck with no failure to show. */
 const FETCH_TIMEOUT_MS = 30_000;
@@ -187,6 +190,21 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
         await copyFile(from, to);
       },
       remove: (path) => rm(path, { recursive: true, force: true }),
+      rename: async (from, to) => {
+        await mkdir(dirname(to), { recursive: true });
+        await rename(from, to);
+      },
+      freeSpace: async (path) => {
+        try {
+          const info = await statfs(path);
+          // Available to this user rather than free in total: the difference is the reserve only root may
+          // spend, and an install that fills it is not an install that succeeded.
+          return Number(info.bsize) * Number(info.bavail);
+        } catch {
+          // A path that is not there says nothing about the disk, and neither does a host without statfs.
+          return null;
+        }
+      },
     },
 
     process: {
@@ -204,6 +222,27 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
           child.once("error", reject);
         });
         child.unref();
+      },
+      run: async (program, args, options?: LaunchOptions) => {
+        // Attached rather than detached, with its output captured: the caller is waiting for this one, and
+        // what it printed is the only account of a failure that exists afterwards.
+        const child = spawn(program, [...args], {
+          stdio: ["ignore", "pipe", "pipe"],
+          ...(options?.cwd !== undefined ? { cwd: options.cwd } : {}),
+          ...(options?.env ? { env: { ...process.env, ...options.env } } : {}),
+        });
+        let output = "";
+        const keep = (chunk: Buffer | string) => {
+          output += String(chunk);
+          // The tail, because the end of an installer's log is where it says what went wrong.
+          if (output.length > RUN_OUTPUT_CAP) output = output.slice(-RUN_OUTPUT_CAP);
+        };
+        child.stdout?.on("data", keep);
+        child.stderr?.on("data", keep);
+        return new Promise((resolve, reject) => {
+          child.once("error", reject);
+          child.once("close", (code) => resolve({ code, output }));
+        });
       },
       open: async (target) => {
         const { program, args } = openCommand(os);

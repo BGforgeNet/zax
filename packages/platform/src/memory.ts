@@ -24,6 +24,7 @@ import {
   type Platform,
   type ProcessLauncher,
   type Registry,
+  type RunOutcome,
 } from "./index.js";
 
 /** Bytes for a string, one byte per code point. Lossless for the latin1 config files, and ASCII is ASCII. */
@@ -87,6 +88,16 @@ export interface MemoryOptions {
   listings?: Readonly<Record<string, readonly ArchiveEntryInfo[]>>;
   /** Registry values, by key and then by value name. Both are matched case-insensitively, as Windows does. */
   registry?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /**
+   * What `process.run` answers, by program. A program with no entry rejects, as a host answers one that is
+   * not installed - so a test reaches the installer path only by saying what the installer does.
+   */
+  runs?: Readonly<Record<string, RunOutcome>>;
+  /**
+   * What `fs.freeSpace` answers. Null by default because this platform has no disk, which is also the arm
+   * where a preflight's check cannot run; a test that means to exercise the refusal states a number.
+   */
+  freeSpace?: number;
 }
 
 export class MemoryPlatform implements Platform {
@@ -101,6 +112,8 @@ export class MemoryPlatform implements Platform {
 
   /** Everything the outside world was asked to do, in the order it was asked. */
   readonly launched: Array<{ program: string; args: readonly string[]; options?: LaunchOptions }> = [];
+  /** Programs run to completion, which is what asserts the command an installer was invoked with. */
+  readonly ran: Array<{ program: string; args: readonly string[]; options?: LaunchOptions }> = [];
   readonly opened: string[] = [];
   readonly fetched: string[] = [];
   readonly downloaded: Array<{ url: string; destination: string }> = [];
@@ -176,6 +189,8 @@ export class MemoryPlatform implements Platform {
         this.put(normalize(to), found);
       },
       remove: async (path) => this.removeAt(normalize(path)),
+      rename: async (from, to) => this.renameAt(normalize(from), normalize(to)),
+      freeSpace: async () => options.freeSpace ?? null,
     };
 
     this.registry = {
@@ -193,6 +208,12 @@ export class MemoryPlatform implements Platform {
     this.process = {
       launch: async (program, args, launchOptions) => {
         this.launched.push({ program, args, ...(launchOptions ? { options: launchOptions } : {}) });
+      },
+      run: async (program, args, launchOptions) => {
+        this.ran.push({ program, args, ...(launchOptions ? { options: launchOptions } : {}) });
+        const canned = options.runs?.[program];
+        if (canned === undefined) throw new Error(`No such program: ${program}`);
+        return canned;
       },
       open: async (target) => {
         this.opened.push(target);
@@ -331,6 +352,24 @@ export class MemoryPlatform implements Platform {
       names.set(key.slice(prefix.length).split("/")[0]!, "dir");
     }
     return [...names].map(([name, kind]) => ({ name, kind })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Moves a file, or a directory with everything under it - one pass over the keys, as a real rename is. */
+  private renameAt(from: string, to: string): void {
+    if (this.statOf(from) === null) throw new Error(`No such file or directory: ${from}`);
+    for (const key of [...this.files.keys()]) {
+      if (key !== from && !key.startsWith(`${from}/`)) continue;
+      const moved = key === from ? to : `${to}${key.slice(from.length)}`;
+      const held = this.files.get(key);
+      this.files.delete(key);
+      this.times.delete(key);
+      if (held) this.put(moved, held);
+    }
+    for (const key of [...this.dirs]) {
+      if (key !== from && !key.startsWith(`${from}/`)) continue;
+      this.dirs.delete(key);
+      this.makeDirs(key === from ? to : `${to}${key.slice(from.length)}`);
+    }
   }
 
   private removeAt(path: string): void {

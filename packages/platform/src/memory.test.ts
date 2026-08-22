@@ -140,3 +140,44 @@ describe("memory platform", () => {
     await expect(platform.hash.sha256("/downloads/absent.bin")).rejects.toThrow(/No such file/);
   });
 });
+
+describe("the memory platform's new seam members", () => {
+  it("renames a file, and a directory with everything under it", async () => {
+    const platform = new MemoryPlatform({
+      files: { "/game/Mods/RPU.dat": "DAT", "/game/Mods/deep/Inner.ini": "[main]" },
+    });
+    await platform.fs.rename("/game/Mods/RPU.dat", "/game/Mods/rpu.dat");
+    expect(await platform.fs.stat("/game/Mods/RPU.dat")).toBeNull();
+    expect(platform.textAt("/game/Mods/rpu.dat")).toBe("DAT");
+
+    await platform.fs.rename("/game/Mods", "/game/mods");
+    expect(await platform.fs.stat("/game/Mods")).toBeNull();
+    expect(platform.textAt("/game/mods/rpu.dat")).toBe("DAT");
+    // Everything below it moves with it, which is what makes this a rename rather than a copy of one entry.
+    expect(platform.textAt("/game/mods/deep/Inner.ini")).toBe("[main]");
+  });
+
+  it("rejects renaming what is not there", async () => {
+    const platform = new MemoryPlatform();
+    await expect(platform.fs.rename("/game/absent.dat", "/game/other.dat")).rejects.toThrow(/No such/);
+  });
+
+  it("answers free space only where a test said what it should be", async () => {
+    // Null is the honest default: this platform has no disk. A test that means to exercise the preflight's
+    // refusal says so, and one that does not gets the arm where the check cannot run.
+    expect(await new MemoryPlatform().fs.freeSpace("/game")).toBeNull();
+    expect(await new MemoryPlatform({ freeSpace: 5_000 }).fs.freeSpace("/game")).toBe(5_000);
+  });
+
+  it("runs a program by recording it, and answers with whatever the test canned", async () => {
+    const platform = new MemoryPlatform({ runs: { "/game/rpu-install.sh": { code: 0, output: "RPU installed." } } });
+    const done = await platform.process.run("/game/rpu-install.sh", ["--quiet"], { cwd: "/game" });
+    expect(done).toEqual({ code: 0, output: "RPU installed." });
+    expect(platform.ran).toEqual([{ program: "/game/rpu-install.sh", args: ["--quiet"], options: { cwd: "/game" } }]);
+  });
+
+  it("answers a program nothing canned the way a host answers one that is not installed", async () => {
+    const platform = new MemoryPlatform();
+    await expect(platform.process.run("/game/absent.exe", [])).rejects.toThrow(/absent\.exe/);
+  });
+});

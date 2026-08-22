@@ -127,3 +127,53 @@ describe("node processes", () => {
     await expect(platform.process.launch("zax-no-such-program", [])).rejects.toThrow();
   });
 });
+
+describe("running a program to completion", () => {
+  it("waits for the exit and answers with the code and what it wrote", async () => {
+    // `launch` resolves at spawn, which is right for the game and useless for an installer: everything ZAX
+    // does after an install - merging state files, re-identifying the directory - reads what it wrote.
+    const done = await platform.process.run(process.execPath, ["-e", "console.log('installed'); process.exit(0)"]);
+    expect(done.code).toBe(0);
+    expect(done.output).toContain("installed");
+  });
+
+  it("reports a non-zero exit rather than rejecting - a failed installer is an answer, not an error", async () => {
+    const failed = await platform.process.run(process.execPath, ["-e", "console.error('no room'); process.exit(4)"]);
+    expect(failed.code).toBe(4);
+    // Both streams, because an installer's complaint is as likely to be on one as the other.
+    expect(failed.output).toContain("no room");
+  });
+
+  it("runs in the directory it is given, which is how an installer finds the game around it", async () => {
+    await platform.fs.write(at("run-here", "marker.txt"), new TextEncoder().encode("x"));
+    const done = await platform.process.run(process.execPath, ["-e", "console.log(process.cwd())"], {
+      cwd: at("run-here"),
+    });
+    expect(done.output.trim()).toContain("run-here");
+  });
+
+  it("rejects when the program is not there at all, which is not an exit code", async () => {
+    await expect(platform.process.run(at("no-such-program"), [])).rejects.toThrow();
+  });
+});
+
+describe("renaming and free space", () => {
+  it("renames a file and a directory in place", async () => {
+    await platform.fs.write(at("rename", "one.dat"), new TextEncoder().encode("DAT"));
+    await platform.fs.rename(at("rename", "one.dat"), at("rename", "two.dat"));
+    expect(await platform.fs.stat(at("rename", "one.dat"))).toBeNull();
+    expect(utf8.decode(await platform.fs.read(at("rename", "two.dat")))).toBe("DAT");
+
+    await platform.fs.mkdir(at("rename", "Folder"));
+    await platform.fs.rename(at("rename", "Folder"), at("rename", "folder"));
+    expect((await platform.fs.stat(at("rename", "folder")))?.kind).toBe("dir");
+  });
+
+  it("answers free space as a positive number, and null for a path that is not there", async () => {
+    const free = await platform.fs.freeSpace(scratch);
+    expect(free).not.toBeNull();
+    expect(free ?? 0).toBeGreaterThan(0);
+    // Null rather than a rejection: a check that cannot run is not a check that failed.
+    expect(await platform.fs.freeSpace(at("no-such-directory"))).toBeNull();
+  });
+});
