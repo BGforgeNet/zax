@@ -511,7 +511,10 @@ export async function applyModInstall(
     // uninstall drops from the order file cannot be re-derived from a selection the release may have moved on
     // from. A mod without parts records what its manifest declared, as it always has.
     ...(plan.parts ? { entries: plan.orderLines } : manifest.entries ? { entries: manifest.entries } : {}),
-    ...(plan.parts ? { parts: plan.parts } : {}),
+    // Kept when this release has no parts to choose: a mod that folded its parts into one payload has not
+    // unmade the choice, and an older ZAX reading this record - or a release that goes back to parts - still
+    // needs it. Nothing here reads it while the release has none.
+    ...(plan.parts ? { parts: plan.parts } : previous?.parts ? { parts: previous.parts } : {}),
     manifest: release.manifestText,
     shipped: {},
   };

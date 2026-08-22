@@ -927,6 +927,17 @@ parts:
 
   const orderText = (platform: MemoryPlatform) => platform.textAt(`${GAME}/mods/mods_order.txt`) ?? "";
 
+  /** Every file under a directory, so one platform's game folder can be re-seeded into another. */
+  const listEverything = async (platform: MemoryPlatform, root: string): Promise<string[]> => {
+    const out: string[] = [];
+    for (const entry of await platform.fs.list(root)) {
+      const at = `${root}/${entry.name}`;
+      if (entry.kind === "dir") out.push(...(await listEverything(platform, at)));
+      else out.push(at);
+    }
+    return out;
+  };
+
   it("installs exactly the parts chosen, and records which they were", async () => {
     const platform = partsPlatform();
     const release = await partsRelease("1.2");
@@ -983,6 +994,42 @@ parts:
     expect(platform.textAt(`${GAME}/mods/cassidy_voice_tom.dat`)).toBeUndefined();
     expect(orderText(platform)).not.toContain("cassidy_voice_tom.dat");
     expect((await loadRecord(platform, GAME)).mods).toEqual([]);
+  });
+
+  it("keeps the recorded selection when the mod stops publishing parts", async () => {
+    // Cassidy's four assets becoming one file: the release has no parts, so nothing is chosen and the whole
+    // payload installs. The selection stays in the record - an older ZAX reading it still needs it, and a
+    // release that goes back to parts finds the choice the user made.
+    const platform = partsPlatform();
+    const first = await partsRelease("1.2");
+    await applyModInstall(platform, install, first, await planModInstall(platform, install, first, ["head", "joey"]));
+
+    const text = `spec: 1\nid: cassidy\nname: Cassidy\nversion: "2"\ngame: fallout2\narchive: cassidy.dat\nentries: [cassidy.dat]\n`;
+    const body = "CASSIDY-ONE-FILE";
+    const single: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(text)),
+      manifestText: text,
+      manifestFromAsset: true,
+      archive: {
+        name: "cassidy.dat",
+        url: "https://example.test/cassidy/2/cassidy.dat",
+        digest: `sha256:${await sha(body)}`,
+        size: body.length,
+      },
+    };
+    const merged = new MemoryPlatform({
+      files: Object.fromEntries(
+        (await listEverything(platform, GAME)).map((path) => [path, platform.textAt(path) ?? ""]),
+      ),
+      downloads: { "https://example.test/cassidy/2/cassidy.dat": body },
+    });
+    await saveRecord(merged, await loadRecord(platform, GAME));
+
+    const plan = await planModInstall(merged, install, single);
+    expect(plan.parts).toBeUndefined();
+    await applyModInstall(merged, install, single, plan);
+    expect(merged.textAt(`${GAME}/mods/cassidy.dat`)).toBe(body);
+    expect((await loadRecord(merged, GAME)).mods[0]?.parts).toEqual(["head", "joey"]);
   });
 
   it("refuses a selection the release could not carry out", async () => {
