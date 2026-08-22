@@ -1,0 +1,19 @@
+spec: 1
+id: fo1in2
+name: Fallout et tu
+version: "1.16.3771"
+game: fallout2
+type: base
+becomes: fo1in2
+archive: Fallout1in2.zip
+creates:
+  directory: Fallout1in2
+inputs:
+  - id: fallout1
+    label: Your Fallout 1 folder
+    help: The folder holding Fallout 1's MASTER.DAT. Its art and sound are unpacked into the new install.
+    holds: master.dat
+extract-dat:
+  from: fallout1
+  list: undat_files.txt
+  into: data

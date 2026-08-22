@@ -38,26 +38,29 @@ name: FO2tweaks
 game: fallout2
 ```
 
-| Field        | Required         | Meaning                                                                                  |
-| ------------ | ---------------- | ---------------------------------------------------------------------------------------- |
-| `spec`       | yes              | Format version, currently `1`. An earlier one reads; a later needs a newer ZAX.          |
-| `id`         | yes              | Permanent identity: lowercase `a-z0-9.-`. See "The id is forever".                       |
-| `name`       | yes              | Display name.                                                                            |
-| `version`    | unless tagged    | Digit-led. Quote it - YAML reads `14.7` as a number, and the literal wins.               |
-| `game`       | yes              | `fallout2`. Anything else refuses.                                                       |
-| `type`       | no               | `pluggable` (default), `permanent` or `base`. See "Base mods".                           |
-| `reason`     | with `permanent` | Why it cannot be uninstalled. Shown before install as well as after.                     |
-| `archive`    | unless sole      | The asset carrying the payload. Needed unless the release has one archive and no more.   |
-| `install-on` | no               | Game types it installs on, e.g. `[fallout2rpu]`. Absent means any; gates first installs. |
-| `requires`   | no               | `sfall: ">=4.4.5"`, the lowest sfall version it works with. ZAX's updater is the answer. |
-| `state`      | no               | Files belonging to the user, merged across upgrades. Default: every payload `.ini`.      |
-| `entries`    | no               | What the mod puts in `mods/`, as the loader names them; see below. Default: derived.     |
-| `parts`      | no               | Choices the release offers, each naming its own asset; see below. Excludes `archive`.    |
-| `becomes`    | with `base`      | The game type the install reports afterwards, e.g. `fallout2rpu`.                        |
-| `installer`  | with `base`      | The installer to run, per platform; see "Base mods".                                     |
-| `refuse`     | no               | When installing refuses; see below.                                                      |
-| `settings`   | no               | The settings schema; see below.                                                          |
-| `extra`      | no               | Ignored by contract - where an author's or a tool's own data may ride along.             |
+| Field         | Required         | Meaning                                                                                  |
+| ------------- | ---------------- | ---------------------------------------------------------------------------------------- |
+| `spec`        | yes              | Format version, currently `1`. An earlier one reads; a later needs a newer ZAX.          |
+| `id`          | yes              | Permanent identity: lowercase `a-z0-9.-`. See "The id is forever".                       |
+| `name`        | yes              | Display name.                                                                            |
+| `version`     | unless tagged    | Digit-led. Quote it - YAML reads `14.7` as a number, and the literal wins.               |
+| `game`        | yes              | `fallout2`. Anything else refuses.                                                       |
+| `type`        | no               | `pluggable` (default), `permanent` or `base`. See "Base mods".                           |
+| `reason`      | with `permanent` | Why it cannot be uninstalled. Shown before install as well as after.                     |
+| `archive`     | unless sole      | The asset carrying the payload. Needed unless the release has one archive and no more.   |
+| `install-on`  | no               | Game types it installs on, e.g. `[fallout2rpu]`. Absent means any; gates first installs. |
+| `requires`    | no               | `sfall: ">=4.4.5"`, the lowest sfall version it works with. ZAX's updater is the answer. |
+| `state`       | no               | Files belonging to the user, merged across upgrades. Default: every payload `.ini`.      |
+| `entries`     | no               | What the mod puts in `mods/`, as the loader names them; see below. Default: derived.     |
+| `parts`       | no               | Choices the release offers, each naming its own asset; see below. Excludes `archive`.    |
+| `becomes`     | with `base`      | The game type the install reports afterwards, e.g. `fallout2rpu`.                        |
+| `installer`   | one of the two   | The installer to run, per platform; see "Base mods".                                     |
+| `creates`     | one of the two   | The install this one makes beside the host; see "Base mods that create an install".      |
+| `inputs`      | with `creates`   | What ZAX asks the user for before installing, each with the file that checks it.         |
+| `extract-dat` | with `creates`   | An archive out of one of those inputs, unpacked into the created install.                |
+| `refuse`      | no               | When installing refuses; see below.                                                      |
+| `settings`    | no               | The settings schema; see below.                                                          |
+| `extra`       | no               | Ignored by contract - where an author's or a tool's own data may ride along.             |
 
 Parsing is strict: an unknown field refuses the manifest, so a misspelling cannot silently drop a safety rule
 (`extra` is the escape hatch). UTF-8, at most 256 KB; text fields cap at 200 characters, 1000 for help and
@@ -178,6 +181,44 @@ nothing safe to assume about either.
 
 Nothing about a base install is undone: there is no uninstall, and a failed one is reported with how far it
 got and where the installer's own backup directory is, rather than unwound.
+
+### Base mods that create an install
+
+The other kind of base mod does not transform the install it is offered on: it creates a second one inside it,
+with its own executable, its own `mods/` and its own config files. Fallout et tu is the case. There is no
+installer to delegate to and none is needed - nothing is overlaid or moved aside - so the manifest states what
+it creates instead, and ZAX performs it.
+
+```yaml
+type: base
+becomes: fo1in2
+archive: Fallout1in2.zip
+creates:
+  directory: Fallout1in2
+inputs:
+  - id: fallout1
+    label: Your Fallout 1 folder
+    help: The folder holding Fallout 1's MASTER.DAT.
+    holds: master.dat
+extract-dat:
+  from: fallout1
+  list: undat_files.txt
+  into: data
+```
+
+A base manifest names `installer` or `creates`, never both and never neither. With `creates`, `becomes` names
+the type the **created** install reports - the host stays exactly what it was - and `install-on` goes back to
+its default of any type, since nothing outside the created directory is written.
+
+`creates.directory` is one folder of the install, and it is the confinement bound for everything this mod
+writes: the payload's own entries are checked against it before anything is extracted, and a release that
+carries an entry outside it is refused.
+
+Each entry of `inputs` is a folder ZAX asks the user for, checked by the file it `holds`. `extract-dat` unpacks
+one input's archive into the created install: `from` names the input, `list` is the response file the payload
+ships - one path per line, as the archive spells them - and `into` is where they land. Both paths are read
+inside the created directory. The extraction is all-or-nothing: every path the list names must be in the
+archive, so a folder that is not the game the mod asked for is refused rather than half-unpacked.
 
 ### Refusal rules
 

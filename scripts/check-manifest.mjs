@@ -56,6 +56,17 @@ try {
       `  ${group.label} (pick ${group.pick}): ` +
         group.options.map((part) => `${part.id} -> ${part.archive}`).join(", "),
     );
+  // What a creating mod makes and asks for, since neither is visible in the payload it names: the directory
+  // is the bound every write passes, and each input is a question the user will be put in front of.
+  if (manifest.creates) {
+    console.log(`  creates ${manifest.creates.directory}/ beside the install, reporting as ${manifest.becomes}`);
+    for (const input of manifest.inputs ?? []) console.log(`  asks for ${input.id}: ${input.label} (${input.holds})`);
+    if (manifest.extractDat)
+      console.log(
+        `  unpacks ${manifest.extractDat.from}'s archive into ${manifest.creates.directory}/${manifest.extractDat.into}, ` +
+          `as ${manifest.extractDat.list} names`,
+      );
+  }
   // Not a refusal: the mod installs and these controls do not appear. Reported because an author writing to a
   // later spec than the checkout has would otherwise see a clean OK and no sign the schema was trimmed.
   for (const entry of manifest.dropped) console.log(`  dropped "${entry.address}": ${entry.why}`);

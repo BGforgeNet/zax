@@ -30,6 +30,7 @@ describe("the manifest corpus", () => {
   it("covers every publishing shape the format has", () => {
     expect(specimens).toEqual([
       "base.yml",
+      "creates.yml",
       "entries.yml",
       "full.yml",
       "minimal.yml",

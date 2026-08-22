@@ -1,0 +1,23 @@
+{
+  "parses": {
+    "id": "fo1in2",
+    "name": "Fallout et tu",
+    "version": "1.16.3771",
+    "type": "base",
+    "archive": "Fallout1in2.zip",
+    "becomes": "fo1in2",
+    "creates": { "directory": "Fallout1in2" },
+    "inputs": [
+      {
+        "id": "fallout1",
+        "label": "Your Fallout 1 folder",
+        "help": "The folder holding Fallout 1's MASTER.DAT. Its art and sound are unpacked into the new install.",
+        "holds": "master.dat"
+      }
+    ],
+    "extractDat": { "from": "fallout1", "list": "undat_files.txt", "into": "data" },
+    "refuse": [],
+    "settings": [],
+    "dropped": []
+  }
+}

@@ -150,6 +150,37 @@ export interface ModInstaller {
   };
 }
 
+/**
+ * A mod that produces a new install inside this one rather than transforming it. The directory is one segment
+ * because that is what the payload's own root is - Fallout et tu's zip holds nothing but `Fallout1in2/` - and
+ * it becomes the confinement bound for everything the install writes, exactly as `mods/` is for a stacking mod.
+ */
+export interface ModCreates {
+  directory: string;
+}
+
+/** A value ZAX must ask the user for, with the file that says the answer is the right one. */
+export interface ModInput {
+  id: string;
+  label: string;
+  help?: string;
+  /** A file the chosen folder must hold - Fallout 1's `master.dat` for the archive Fo1in2 unpacks. */
+  holds: string;
+}
+
+/**
+ * Unpacking an archive the user owns into the created install. `list` and `into` are read inside the created
+ * directory, so the response file that is used is the one the payload shipped and the extraction cannot aim
+ * anywhere else.
+ */
+export interface ModExtractDat {
+  /** The input whose `holds` file is unpacked. */
+  from: string;
+  /** The file naming what to lift out of it, one path per line. */
+  list: string;
+  into: string;
+}
+
 export interface ModManifest {
   id: string;
   name: string;
@@ -163,8 +194,14 @@ export interface ModManifest {
   installOn?: readonly GameType[];
   /** The game type the install reports afterwards. Base mods only, where it is required. */
   becomes?: GameType;
-  /** How to install it, per platform. Present exactly when the type is base. */
+  /** How to install it, per platform. A base mod names this or `creates`, never both and never neither. */
   installer?: ModInstaller;
+  /** The install this one creates beside the host, for a base mod ZAX performs rather than delegates. */
+  creates?: ModCreates;
+  /** What the user must be asked for before it can run. A creating mod's alone. */
+  inputs?: readonly ModInput[];
+  /** The archive out of one of those inputs that is unpacked into the created install. */
+  extractDat?: ModExtractDat;
   /** The lowest sfall version the mod works with, answered by the updater rather than a refusal. */
   requiresSfall?: string;
   /** Files that belong to the user and survive upgrades by merging. Absent means every payload `.ini`. */
@@ -665,6 +702,58 @@ function parseInstaller(value: unknown): ModInstaller {
   return out;
 }
 
+/**
+ * The directory a creating mod makes. One segment, because it is the payload's own root and the bound every
+ * later write is judged against: a name with a separator in it would be a bound with a path inside it, and
+ * "confined to `Fallout1in2/games`" is not something a reader of the manifest would expect to have declared.
+ */
+function parseCreates(value: unknown): ModCreates {
+  const fields = record(value, `"creates"`, ["directory"]);
+  const directory = confinedPath(fields["directory"], `"creates" directory`);
+  if (directory.includes("/"))
+    refuse(`"creates" directory ("${directory}") is not one folder of the install it sits in`);
+  return { directory };
+}
+
+const INPUT_FIELDS = ["id", "label", "help", "holds"];
+
+/** What the user is asked for, each answer checked against a file the folder must hold. */
+function parseInputs(value: unknown): readonly ModInput[] {
+  const inputs = items(value, `"inputs"`).map((raw, at) => {
+    const where = `"inputs" entry ${at + 1}`;
+    const fields = record(raw, where, INPUT_FIELDS);
+    const id = text(fields["id"], `${where}'s id`, SHORT_TEXT);
+    // The same bound the mod's own id passes: it names an answer that reaches the install as a path.
+    if (!ID_SHAPE.test(id)) refuse(`${where}'s id ("${id}") is not an id`);
+    return {
+      id,
+      label: text(fields["label"], `${where}'s label`, SHORT_TEXT),
+      ...(fields["help"] !== undefined ? { help: text(fields["help"], `${where}'s help`, LONG_TEXT) } : {}),
+      // A file the folder holds, so a name rather than a path: what is checked is that folder, not a tree.
+      holds: assetName(fields["holds"], `${where}'s holds`),
+    };
+  });
+  if (inputs.length === 0) refuse(`"inputs" is empty, so it asks for nothing while claiming to`);
+  const named = new Set<string>();
+  for (const input of inputs) {
+    if (named.has(input.id)) refuse(`"inputs" names "${input.id}" twice`);
+    named.add(input.id);
+  }
+  return inputs;
+}
+
+function parseExtractDat(value: unknown, inputs: readonly ModInput[]): ModExtractDat {
+  const fields = record(value, `"extract-dat"`, ["from", "list", "into"]);
+  const from = text(fields["from"], `"extract-dat" from`, SHORT_TEXT);
+  if (!inputs.some((input) => input.id === from))
+    refuse(`"extract-dat" unpacks "${from}", which this mod does not ask for`);
+  return {
+    from,
+    list: confinedPath(fields["list"], `"extract-dat" list`),
+    into: confinedPath(fields["into"], `"extract-dat" into`),
+  };
+}
+
 function parseRefuse(value: unknown): readonly RefuseRule[] {
   return items(value, `"refuse"`).map((rule, at) => {
     const where = `"refuse" entry ${at + 1}`;
@@ -704,6 +793,9 @@ const MANIFEST_FIELDS = [
   "parts",
   "becomes",
   "installer",
+  "creates",
+  "inputs",
+  "extract-dat",
   "refuse",
   "settings",
   "install",
@@ -762,16 +854,31 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     refuse(`a permanent mod must say why it cannot be uninstalled ("reason")`);
   if (type !== "permanent" && fields["reason"] !== undefined) refuse(`"reason" belongs to permanent mods alone`);
 
-  // A base mod is the only one that names an installer, and the only one that has to: the two fields below
-  // are what makes the install something ZAX hands over rather than performs.
-  for (const field of ["becomes", "installer"]) {
+  // A base mod is the only one that names an installer or creates an install, and the only one that has to:
+  // these fields are what makes the install something ZAX hands over, or performs, rather than stacks.
+  for (const field of ["becomes", "installer", "creates"]) {
     if (type !== "base" && fields[field] !== undefined) refuse(`"${field}" belongs to a base mod alone`);
   }
   let becomes: GameType | undefined;
   let installer: ModInstaller | undefined;
+  let creates: ModCreates | undefined;
+  let inputs: readonly ModInput[] | undefined;
+  let extractDat: ModExtractDat | undefined;
   if (type === "base") {
-    if (fields["installer"] === undefined) refuse(`a base mod names no "installer", so nothing could install it`);
-    installer = parseInstaller(fields["installer"]);
+    // The two shapes of base mod, and a manifest is one or the other: an installer to hand the game over to,
+    // or a directory to create beside it. Both would be two installs described as one; neither installs
+    // nothing at all.
+    if (fields["installer"] !== undefined && fields["creates"] !== undefined)
+      refuse(`it names both an "installer" and what it "creates", which are the two ways of being a base mod`);
+    if (fields["installer"] === undefined && fields["creates"] === undefined)
+      refuse(`a base mod names no "installer" and creates nothing, so nothing could install it`);
+    if (fields["installer"] !== undefined) installer = parseInstaller(fields["installer"]);
+    if (fields["creates"] !== undefined) {
+      creates = parseCreates(fields["creates"]);
+      inputs = fields["inputs"] === undefined ? undefined : parseInputs(fields["inputs"]);
+      extractDat =
+        fields["extract-dat"] === undefined ? undefined : parseExtractDat(fields["extract-dat"], inputs ?? []);
+    }
     // Required rather than defaulted to the id, which is what `mods.md` proposed: the two namespaces do not
     // coincide - RPU's id is "rpu" and the type it becomes is "fallout2rpu" - so that default would refuse
     // every real manifest. Named outright, and checked against the types this version can detect, since the
@@ -780,6 +887,12 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     if (!(named in GAME_TYPES))
       needsNewerZax(`"becomes" names the game type "${named}", which this version cannot detect`);
     becomes = named as GameType;
+  }
+  // Both belong to the install a mod creates, and neither means anything without one: an installer ZAX does
+  // not run cannot be handed an answer, and there is nowhere for an extraction to land.
+  for (const field of ["inputs", "extract-dat"]) {
+    if (creates === undefined && fields[field] !== undefined)
+      refuse(`"${field}" belongs to a mod that creates an install`);
   }
 
   let requiresSfall: string | undefined;
@@ -791,9 +904,10 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     requiresSfall = match[1];
   }
 
-  // Vanilla alone for a base mod that says nothing - the direction both upstream scripts enforce themselves,
-  // and the opposite of a stacking mod's silence, which means anywhere.
-  let installOn: readonly GameType[] | undefined = type === "base" ? ["fallout2"] : undefined;
+  // Vanilla alone for a delegated base mod that says nothing - the direction both upstream scripts enforce
+  // themselves, and the opposite of a stacking mod's silence, which means anywhere. A creating mod goes back
+  // to anywhere: it writes only inside the directory it makes, so what the host already is does not reach it.
+  let installOn: readonly GameType[] | undefined = installer !== undefined ? ["fallout2"] : undefined;
   if (fields["install-on"] !== undefined) {
     installOn = items(fields["install-on"], `"install-on"`).map((entry, at) => {
       const name = text(entry, `"install-on" entry ${at + 1}`, SHORT_TEXT);
@@ -824,6 +938,9 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     ...(installOn !== undefined ? { installOn } : {}),
     ...(becomes !== undefined ? { becomes } : {}),
     ...(installer !== undefined ? { installer } : {}),
+    ...(creates !== undefined ? { creates } : {}),
+    ...(inputs !== undefined ? { inputs } : {}),
+    ...(extractDat !== undefined ? { extractDat } : {}),
     ...(requiresSfall !== undefined ? { requiresSfall } : {}),
     ...(fields["state"] !== undefined
       ? {

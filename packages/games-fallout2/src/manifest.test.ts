@@ -573,3 +573,90 @@ describe("a base mod's manifest", () => {
     expect(parsed(plain).installer?.windows?.components).toBeUndefined();
   });
 });
+
+/** Fallout et tu as it would publish itself: a base mod that creates its install rather than delegating one. */
+const FO1IN2 = `spec: 1
+id: fo1in2
+name: Fallout et tu
+version: "1.16.3771"
+game: fallout2
+type: base
+becomes: fo1in2
+archive: Fallout1in2.zip
+creates:
+  directory: Fallout1in2
+inputs:
+  - id: fallout1
+    label: Your Fallout 1 folder
+    help: The folder holding Fallout 1's MASTER.DAT.
+    holds: master.dat
+extract-dat:
+  from: fallout1
+  list: undat_files.txt
+  into: data
+`;
+
+describe("a mod that creates an install", () => {
+  const refuses = (text: string, cause: RegExp) => expect(() => parsed(text)).toThrow(cause);
+
+  it("reads what it creates, what it asks for, and what it unpacks", () => {
+    const manifest = parsed(FO1IN2);
+    expect(manifest.creates).toEqual({ directory: "Fallout1in2" });
+    expect(manifest.inputs).toEqual([
+      {
+        id: "fallout1",
+        label: "Your Fallout 1 folder",
+        help: "The folder holding Fallout 1's MASTER.DAT.",
+        holds: "master.dat",
+      },
+    ]);
+    expect(manifest.extractDat).toEqual({ from: "fallout1", list: "undat_files.txt", into: "data" });
+    // The type it becomes is the created install's, not this one's - the host stays exactly what it was.
+    expect(manifest.becomes).toBe("fo1in2");
+  });
+
+  it("installs anywhere, where a delegated base mod installs on vanilla alone", () => {
+    // The two defaults differ because the installs do: a delegated one transforms the directory, and this one
+    // writes only inside the directory it makes, so what the host already is does not matter to it.
+    expect(parsed(FO1IN2).installOn).toBeUndefined();
+    expect(parsed(RPU).installOn).toEqual(["fallout2"]);
+  });
+
+  it("requires a base mod to name exactly one of installer and creates", () => {
+    refuses(`${FO1IN2}installer:\n  other: { asset: x.zip, run: go.sh }\n`, /both/);
+    refuses(FO1IN2.replace(/creates:[\s\S]*$/, ""), /names no "installer"/);
+  });
+
+  it("refuses what it creates, asks for, or unpacks anywhere but a base mod", () => {
+    refuses(`${FO2TWEAKS}creates:\n  directory: Elsewhere\n`, /belongs to a base mod/);
+    refuses(`${FO2TWEAKS}inputs:\n  - { id: a, label: A, holds: master.dat }\n`, /creates an install/);
+    refuses(`${RPU}extract-dat:\n  from: a\n  list: l.txt\n  into: data\n`, /creates an install/);
+  });
+
+  it("confines the created directory to one segment of the install it sits in", () => {
+    refuses(FO1IN2.replace("directory: Fallout1in2", "directory: ../Fallout1in2"), /leaves the game directory/);
+    refuses(FO1IN2.replace("directory: Fallout1in2", "directory: /opt/fo1in2"), /leaves the game directory/);
+    refuses(FO1IN2.replace("directory: Fallout1in2", "directory: games/Fallout1in2"), /one folder/);
+  });
+
+  it("requires the extraction to name an input the manifest declares", () => {
+    refuses(FO1IN2.replace("from: fallout1", "from: fallout2"), /"fallout2", which this mod does not ask for/);
+    refuses(FO1IN2.replace(/inputs:[\s\S]*?holds: master\.dat\n/, ""), /does not ask for/);
+  });
+
+  it("keeps the extraction inside the directory it created", () => {
+    refuses(FO1IN2.replace("list: undat_files.txt", "list: ../undat_files.txt"), /leaves the game directory/);
+    refuses(FO1IN2.replace("into: data", "into: ../data"), /leaves the game directory/);
+  });
+
+  it("refuses inputs that could not be asked for or checked", () => {
+    refuses(FO1IN2.replace("id: fallout1", "id: Fallout 1"), /is not an id/);
+    refuses(FO1IN2.replace("holds: master.dat", "holds: sub/master.dat"), /is not a file name/);
+    refuses(FO1IN2.replace(/inputs:[\s\S]*?holds: master\.dat\n/, "inputs: []\n"), /asks for nothing/);
+  });
+
+  it("refuses one input asked for twice, which would ask the same question of two answers", () => {
+    const twice = FO1IN2.replace("extract-dat:", "  - { id: fallout1, label: Again, holds: master.dat }\nextract-dat:");
+    refuses(twice, /names "fallout1" twice/);
+  });
+});
