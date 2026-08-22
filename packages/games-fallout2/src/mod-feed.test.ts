@@ -898,3 +898,45 @@ extract-dat:
     expect(found.manifest.inputs?.[0]?.label).toBe("Your Fallout 1 folder");
   });
 });
+
+describe("a created install that is no longer there", () => {
+  it("offers a fresh install rather than reporting the record's version for good", () => {
+    // Deleting the folder is what ZAX tells the user to do, since it will not remove one itself - so the
+    // record outliving the directory is the ordinary case rather than a corrupted state.
+    const CREATES = `spec: 1
+id: fo1in2
+name: Fallout et tu
+version: "1.16.3771"
+game: fallout2
+type: base
+becomes: fo1in2
+archive: Fallout1in2.zip
+creates:
+  directory: Fallout1in2
+`;
+    const release: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(CREATES)),
+      manifestText: CREATES,
+      manifestFromAsset: true,
+      archive: { name: "Fallout1in2.zip", url: "https://example.test/Fallout1in2.zip" },
+    };
+    const install: Install = { path: "/games/fallout2", type: "fallout2" };
+    const record = {
+      path: install.path,
+      mods: [
+        {
+          id: "fo1in2",
+          version: "1.16.3771",
+          type: "base" as const,
+          complete: true,
+          files: [],
+          manifest: CREATES,
+          shipped: {},
+        },
+      ],
+    };
+    expect(availability(release, { install, record, sfall: null, present: false })).toEqual({ kind: "install" });
+    // With the directory there, the record answers as it does for every other mod.
+    expect(availability(release, { install, record, sfall: null, present: true })).toEqual({ kind: "installed" });
+  });
+});

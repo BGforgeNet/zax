@@ -358,7 +358,11 @@ const lineOf = (version: string): string | undefined => {
 
 export function availability(release: ModRelease, context: ModContext): Availability {
   const { manifest } = release;
-  const recorded = context.record.mods.find((mod) => mod.id === manifest.id);
+  const held = context.record.mods.find((mod) => mod.id === manifest.id);
+  // A created install the user deleted by hand is gone, whatever the record says - and deleting that folder
+  // is exactly what ZAX tells them to do, since it will not remove one itself. The directory decides, and a
+  // record describing a folder that is not there would otherwise report it installed for good.
+  const recorded = manifest.creates && !context.present ? undefined : held;
 
   if (recorded && !recorded.complete) return { kind: "retry", version: recorded.version };
 

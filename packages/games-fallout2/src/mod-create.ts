@@ -13,7 +13,7 @@
  */
 
 import { backupDirectory, fnv1a, stamp, type GameType, type Install, type MergeConflict } from "@zax/core";
-import type { Platform } from "@zax/platform";
+import type { ArchiveEntryInfo, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
 import { preflightArchive } from "./archive-preflight.js";
 import { assertDatHolds, datReadError, extractFromDat } from "./dat-tool.js";
@@ -145,6 +145,27 @@ const insideCreated = (name: string, directory: string): boolean =>
   name.toLowerCase() === directory.toLowerCase() || name.toLowerCase().startsWith(`${directory.toLowerCase()}/`);
 
 /**
+ * The payload's directory, refused unless every entry of it sits inside what the manifest says this mod
+ * creates. The confinement this shape promises, and the reason it is checked on both sides: the plan's answer
+ * is what the user agreed to, and this one runs where the writing happens.
+ */
+async function confinedEntries(
+  platform: Platform,
+  archivePath: string,
+  archive: ReleaseAsset,
+  manifest: ModManifest,
+  creates: ModCreates,
+): Promise<readonly ArchiveEntryInfo[]> {
+  const entries = await preflightArchive(platform, archivePath, archive.name);
+  const outside = entries.find((entry) => !insideCreated(entry.name, creates.directory));
+  if (outside)
+    throw new Error(
+      `${archive.name} carries "${outside.name}", which is outside the ${creates.directory} folder ${manifest.name} creates - refused.`,
+    );
+  return entries;
+}
+
+/**
  * Resolves what creating this install would do, and downloads what it needs to say so - without writing
  * anything into the game folder.
  *
@@ -196,14 +217,7 @@ export async function planCreateInstall(
   );
 
   options?.onStep?.(`Reading ${archive.name}`);
-  const entries = await preflightArchive(platform, archivePath, archive.name);
-  // The confinement this shape promises, checked rather than trusted: the directory the manifest declares is
-  // the whole of what this install may write, and one entry outside it would be a write into the host.
-  const outside = entries.find((entry) => !insideCreated(entry.name, creates.directory));
-  if (outside)
-    throw new Error(
-      `${archive.name} carries "${outside.name}", which is outside the ${creates.directory} folder ${manifest.name} creates - refused.`,
-    );
+  const entries = await confinedEntries(platform, archivePath, archive, manifest, creates);
   const unpacked = entries.reduce((total, entry) => total + entry.size, 0);
   if (free !== null && free < unpacked)
     throw new Error(
@@ -312,6 +326,9 @@ export async function applyCreateInstall(
   const mine = await holdUserFiles(platform, install.path, stateFiles, backup);
 
   options?.onStep?.(`Installing ${manifest.name} ${manifest.version}`);
+  // Again here, not only in the plan: this is the call that writes, and what keeps a payload out of the host
+  // install is this list rather than anything the archive itself promises.
+  await confinedEntries(platform, archivePath, archive, manifest, creates);
   await platform.archive.extract(archivePath, install.path);
 
   let extracted = 0;
