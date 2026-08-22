@@ -619,6 +619,13 @@ describe("uninstall", () => {
       expect(platform.textAt(`${GAME}/mods/fo2tweaks.dat`)).toBe("DAT");
     });
 
+    it("refuses a base mod, which replaced the game rather than adding to it", async () => {
+      // No declared reason and none needed: what a base mod did is not a thing that can be taken back off.
+      const platform = await recorded({ type: "base", manifest: "{{{" });
+      await expect(uninstallMod(platform, install, "fo2tweaks")).rejects.toThrow(/fresh copy of the game/);
+      expect(platform.textAt(`${GAME}/mods/fo2tweaks.dat`)).toBe("DAT");
+    });
+
     it("refuses when nothing readable says which it is, rather than assuming it may go", async () => {
       // A record from a version this one cannot read: no type field, and a manifest written to a later spec.
       const platform = await recorded({ manifest: "spec: 99\nid: fo2tweaks\n" });

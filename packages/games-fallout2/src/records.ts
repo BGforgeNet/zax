@@ -11,7 +11,7 @@
 import { parse, stringify } from "yaml";
 import { fnv1a } from "@zax/core";
 import type { Platform } from "@zax/platform";
-import { insideMods, isModId, isModVersion, mayWrite, parseManifest } from "./manifest.js";
+import { insideMods, isModId, isModVersion, mayWrite, parseManifest, type ModType } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 
 /**
@@ -29,7 +29,7 @@ export interface InstalledMod {
    * its own field rather than read back out of the manifest snapshot below, so a removal is judged against
    * something this version parsed rather than against a document a newer ZAX may have written.
    */
-  type?: "pluggable" | "permanent";
+  type?: ModType;
   reason?: string;
   /** False from the first byte deployed until the install finished, so a relaunch offers retry or restore. */
   complete: boolean;
@@ -143,7 +143,8 @@ function readMod(entry: unknown): InstalledMod | null {
   if (!isModId(id) || !isModVersion(version)) return null;
 
   const declared = asText(fields["type"]);
-  const type = declared === "pluggable" || declared === "permanent" ? declared : undefined;
+  const type =
+    declared === "pluggable" || declared === "permanent" || declared === "base" ? (declared as ModType) : undefined;
   const reason = asText(fields["reason"]);
 
   // Judged against what ZAX grants this id, not against what the entry claims: a record is the one route

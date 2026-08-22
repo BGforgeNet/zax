@@ -25,6 +25,7 @@ import {
   partOptions,
   type ModManifest,
   type ModPartGroup,
+  type ModType,
 } from "./manifest.js";
 import { carryOver, type CarriedSelection } from "./mod-parts.js";
 import type { InstallRecord } from "./records.js";
@@ -294,7 +295,7 @@ export type Availability =
    * names the change instead of calling it an update. `was` is what is on disk, which is what decides
    * whether it can still be removed.
    */
-  | { kind: "convert"; from: string; was: "pluggable" | "permanent" }
+  | { kind: "convert"; from: string; was: ModType }
   /** A feed answering with an older version than the record - what a rolled-back feed looks like. */
   | { kind: "downgrade"; from: string }
   /** An install that never finished; the working directory decides between resume and restore. */
@@ -404,7 +405,7 @@ export interface ModOffer {
   id: string;
   name: string;
   version: string;
-  type: "pluggable" | "permanent";
+  type: ModType;
   /** A permanent mod's declared reason, standing where the Remove control would be. */
   reason?: string;
   /** The choice this release offers and where this install stands in it. Absent for a mod without parts. */

@@ -105,17 +105,66 @@ export interface ModPartGroup {
   options: readonly ModPart[];
 }
 
+/**
+ * What installing this mod does to the install. Pluggable stacks and comes off again, permanent stacks and
+ * never does, base transforms the game into another one - which is why only a base mod names an installer.
+ */
+export type ModType = "pluggable" | "permanent" | "base";
+
+/**
+ * One choice inside the installer's own component list. Not a part: a part names a release asset and this
+ * names a string passed to one installer, so the two are different fields whatever their shape has in common.
+ */
+export interface ModComponent {
+  /** The installer's own name for it, verbatim - `walk_speed\low_fps` as the Inno script spells it. */
+  id: string;
+  label: string;
+  help?: string;
+  /** Selected whatever the user picks. Inno's `/COMPONENTS` deselects everything it does not name. */
+  required?: boolean;
+}
+
+export interface ModComponentGroup {
+  label: string;
+  pick: "one" | "any";
+  options: readonly ModComponent[];
+}
+
+/**
+ * How a base mod installs, per platform. Both routes exist because upstream publishes both, and they are not
+ * the same install: the Windows one is an installer program that takes the game directory as an argument,
+ * while the other is a payload extracted over the game with a script inside it that finishes the job.
+ */
+export interface ModInstaller {
+  windows?: {
+    asset: string;
+    /** The convention ZAX invokes it by. `inno` is the only one this version knows. */
+    silent: "inno";
+    /** The choices that installer offers. Windows-only, because only the Inno route has them. */
+    components?: readonly ModComponentGroup[];
+  };
+  other?: {
+    asset: string;
+    /** What to run once the payload is extracted, relative to the install - the script the payload ships. */
+    run: string;
+  };
+}
+
 export interface ModManifest {
   id: string;
   name: string;
   version: string;
-  type: "pluggable" | "permanent";
+  type: ModType;
   /** Why the mod can never be uninstalled. Present exactly when the type is permanent. */
   reason?: string;
   /** The release asset carrying the payload, stamped by CI. An authored file has none; installing needs it. */
   archive?: string;
-  /** Game types the mod installs on. Absent means any - the stacking default. */
+  /** Game types the mod installs on. Absent means any - the stacking default; a base mod's is vanilla alone. */
   installOn?: readonly GameType[];
+  /** The game type the install reports afterwards. Base mods only, where it is required. */
+  becomes?: GameType;
+  /** How to install it, per platform. Present exactly when the type is base. */
+  installer?: ModInstaller;
   /** The lowest sfall version the mod works with, answered by the updater rather than a refusal. */
   requiresSfall?: string;
   /** Files that belong to the user and survive upgrades by merging. Absent means every payload `.ini`. */
@@ -479,25 +528,38 @@ export function partOptions(manifest: ModManifest): readonly ModPart[] {
 }
 
 /**
- * The choices a release offers. Groups and options keep the order the manifest declares them in: that order
- * is the author's one lever over how the choice reads, and nothing here has a better one to impose.
+ * A grouped choice, whatever is being chosen: the manifest's parts and the installer's components are the
+ * same question in two places, and one reader keeps them the same question for the interface too.
  */
-function parseParts(value: unknown): readonly ModPartGroup[] {
-  const groups = items(value, `"parts"`).map((raw, at): ModPartGroup => {
-    const where = `"parts" group ${at + 1}`;
+function parseGroups<T>(
+  value: unknown,
+  what: string,
+  option: (raw: unknown, where: string) => T,
+): readonly { label: string; pick: "one" | "any"; options: readonly T[] }[] {
+  const groups = items(value, what).map((raw, at): { label: string; pick: "one" | "any"; options: readonly T[] } => {
+    const where = `${what} group ${at + 1}`;
     const fields = record(raw, where, GROUP_FIELDS);
     const pick = text(fields["pick"], `${where}'s pick`, SHORT_TEXT);
     // On the refusing side of the ignorance rule, and the settings entries' opposite: `pick` decides what
     // lands on disk, so reading an unknown one as `any` would install what the author never described.
     if (pick !== "one" && pick !== "any")
-      needsNewerZax(`a "parts" group picks "${pick}", which this version does not implement`);
-    const options = items(fields["options"], `${where}'s options`).map((option, i) =>
-      parsePart(option, `${where} option ${i + 1}`),
+      needsNewerZax(`a ${what} group picks "${pick}", which this version does not implement`);
+    const options = items(fields["options"], `${where}'s options`).map((entry, i) =>
+      option(entry, `${where} option ${i + 1}`),
     );
     if (options.length === 0) refuse(`${where} is empty, so it offers nothing to pick`);
     return { label: text(fields["label"], `${where}'s label`, SHORT_TEXT), pick, options };
   });
-  if (groups.length === 0) refuse(`"parts" is empty, so it offers nothing to pick`);
+  if (groups.length === 0) refuse(`${what} is empty, so it offers nothing to pick`);
+  return groups;
+}
+
+/**
+ * The choices a release offers. Groups and options keep the order the manifest declares them in: that order
+ * is the author's one lever over how the choice reads, and nothing here has a better one to impose.
+ */
+function parseParts(value: unknown): readonly ModPartGroup[] {
+  const groups = parseGroups(value, `"parts"`, parsePart);
 
   // Unique across the manifest rather than per group: the recorded selection names ids flat, and a group is
   // no part of the address.
@@ -519,6 +581,78 @@ function parseParts(value: unknown): readonly ModPartGroup[] {
     }
   }
   return groups;
+}
+
+const COMPONENT_FIELDS = ["id", "label", "help", "required"];
+const INSTALLER_PLATFORMS = ["windows", "other"];
+
+/**
+ * One component of the installer's own list. Its id is the installer's name for it rather than an id ZAX
+ * mints, so the shapes ZAX bounds elsewhere do not apply - Inno spells a child component `walk_speed\low_fps`.
+ * What is bounded is what the command line can carry: the names go into one comma-separated quoted argument,
+ * and either character in a name would break that argument apart.
+ */
+function parseComponent(value: unknown, where: string): ModComponent {
+  const fields = record(value, where, COMPONENT_FIELDS);
+  const id = text(fields["id"], `${where}'s id`, SHORT_TEXT);
+  if (/[",]/.test(id)) refuse(`${where}'s id ("${id}") cannot be passed to an installer`);
+  return {
+    id,
+    label: text(fields["label"], `${where}'s label`, SHORT_TEXT),
+    ...(fields["help"] !== undefined ? { help: text(fields["help"], `${where}'s help`, LONG_TEXT) } : {}),
+    ...(fields["required"] === true ? { required: true } : {}),
+  };
+}
+
+/**
+ * How a base mod installs, per platform. An unknown platform key takes the newer-ZAX wording rather than the
+ * unknown-field one, and so does an unknown `silent`: both decide what ZAX executes, and reading either as
+ * "not for me" would run the wrong thing rather than nothing.
+ */
+function parseInstaller(value: unknown): ModInstaller {
+  // Ahead of the unknown-field pass, the way a later spec is: a platform key this version has no name for is
+  // a platform a newer ZAX runs on, and calling it a misspelling would send the reader to fix the manifest.
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      if (!INSTALLER_PLATFORMS.includes(key))
+        needsNewerZax(`its "installer" names the platform "${key}", which this version cannot run`);
+    }
+  }
+  const platforms = record(value, `"installer"`, INSTALLER_PLATFORMS);
+
+  const out: ModInstaller = {};
+  if (platforms["windows"] !== undefined) {
+    const fields = record(platforms["windows"], `"installer" windows`, ["asset", "silent", "components"]);
+    const silent = text(fields["silent"], `"installer" windows silent`, SHORT_TEXT);
+    if (silent !== "inno")
+      needsNewerZax(`its Windows installer is run as "${silent}", which this version does not know how to run`);
+    const components =
+      fields["components"] === undefined
+        ? undefined
+        : parseGroups(fields["components"], `"components"`, parseComponent);
+    const named = new Set<string>();
+    for (const component of components?.flatMap((group) => group.options) ?? []) {
+      if (named.has(component.id)) refuse(`"components" names "${component.id}" twice`);
+      named.add(component.id);
+    }
+    out.windows = {
+      asset: assetName(fields["asset"], `"installer" windows asset`),
+      silent,
+      ...(components ? { components } : {}),
+    };
+  }
+  if (platforms["other"] !== undefined) {
+    const fields = record(platforms["other"], `"installer" other`, ["asset", "run"]);
+    out.other = {
+      asset: assetName(fields["asset"], `"installer" other asset`),
+      // Confined like every path-shaped field: it is run from inside the game directory after the payload
+      // lands there, so a path leaving it would run something the payload never shipped.
+      run: confinedPath(fields["run"], `"installer" other run`),
+    };
+  }
+  if (out.windows === undefined && out.other === undefined)
+    refuse(`"installer" names no platform, so there is nothing to run anywhere`);
+  return out;
 }
 
 function parseRefuse(value: unknown): readonly RefuseRule[] {
@@ -558,6 +692,8 @@ const MANIFEST_FIELDS = [
   "state",
   "entries",
   "parts",
+  "becomes",
+  "installer",
   "refuse",
   "settings",
   "install",
@@ -606,15 +742,35 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
   if (!VERSION_SHAPE.test(version)) refuse(`"version" ("${version}") is not a version`);
 
   const type = fields["type"] === undefined ? "pluggable" : text(fields["type"], `"type"`, SHORT_TEXT);
-  // Base mods are in the spec; installing one is not in this version. The same words as an unknown type,
-  // because from here the two are the same fact: a capability a newer ZAX has.
-  if (type === "base" || fields["install"] !== undefined)
-    needsNewerZax("it is a base mod, and this version installs pluggable and permanent mods only");
-  if (type !== "pluggable" && type !== "permanent") needsNewerZax(`"${type}" is not a mod type this version knows`);
+  // The Fo1in2 operations are in the spec and not in this version - a capability a newer ZAX has.
+  if (fields["install"] !== undefined)
+    needsNewerZax("it describes an install procedure, which this version does not perform");
+  if (type !== "pluggable" && type !== "permanent" && type !== "base")
+    needsNewerZax(`"${type}" is not a mod type this version knows`);
 
   if (type === "permanent" && fields["reason"] === undefined)
     refuse(`a permanent mod must say why it cannot be uninstalled ("reason")`);
-  if (type === "pluggable" && fields["reason"] !== undefined) refuse(`"reason" belongs to permanent mods alone`);
+  if (type !== "permanent" && fields["reason"] !== undefined) refuse(`"reason" belongs to permanent mods alone`);
+
+  // A base mod is the only one that names an installer, and the only one that has to: the two fields below
+  // are what makes the install something ZAX hands over rather than performs.
+  for (const field of ["becomes", "installer"]) {
+    if (type !== "base" && fields[field] !== undefined) refuse(`"${field}" belongs to a base mod alone`);
+  }
+  let becomes: GameType | undefined;
+  let installer: ModInstaller | undefined;
+  if (type === "base") {
+    if (fields["installer"] === undefined) refuse(`a base mod names no "installer", so nothing could install it`);
+    installer = parseInstaller(fields["installer"]);
+    // Required rather than defaulted to the id, which is what `mods.md` proposed: the two namespaces do not
+    // coincide - RPU's id is "rpu" and the type it becomes is "fallout2rpu" - so that default would refuse
+    // every real manifest. Named outright, and checked against the types this version can detect, since the
+    // detected type is what every later gate reads.
+    const named = text(fields["becomes"], `"becomes"`, SHORT_TEXT);
+    if (!(named in GAME_TYPES))
+      needsNewerZax(`"becomes" names the game type "${named}", which this version cannot detect`);
+    becomes = named as GameType;
+  }
 
   let requiresSfall: string | undefined;
   if (fields["requires"] !== undefined) {
@@ -625,7 +781,9 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     requiresSfall = match[1];
   }
 
-  let installOn: readonly GameType[] | undefined;
+  // Vanilla alone for a base mod that says nothing - the direction both upstream scripts enforce themselves,
+  // and the opposite of a stacking mod's silence, which means anywhere.
+  let installOn: readonly GameType[] | undefined = type === "base" ? ["fallout2"] : undefined;
   if (fields["install-on"] !== undefined) {
     installOn = items(fields["install-on"], `"install-on"`).map((entry, at) => {
       const name = text(entry, `"install-on" entry ${at + 1}`, SHORT_TEXT);
@@ -654,6 +812,8 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     ...(type === "permanent" ? { reason: text(fields["reason"], `"reason"`, LONG_TEXT) } : {}),
     ...(archive !== undefined ? { archive: assetName(archive, `"archive"`) } : {}),
     ...(installOn !== undefined ? { installOn } : {}),
+    ...(becomes !== undefined ? { becomes } : {}),
+    ...(installer !== undefined ? { installer } : {}),
     ...(requiresSfall !== undefined ? { requiresSfall } : {}),
     ...(fields["state"] !== undefined
       ? {

@@ -1,0 +1,28 @@
+spec: 1
+id: rpu
+name: Fallout 2 Restoration Project, updated
+version: "2.4.34"
+game: fallout2
+type: base
+becomes: fallout2rpu
+refuse:
+  - when: { present: [up-changelog.txt], absent: [rp-changelog.txt] }
+    reason: RPU cannot be installed over killap's Unofficial Patch.
+installer:
+  windows:
+    asset: rpu_v2.4.34.exe
+    silent: inno
+    components:
+      - label: Included
+        pick: any
+        options:
+          - { id: core, label: Core, required: true }
+          - { id: worldmap, label: Visually enhanced world map }
+      - label: Walk speed fix
+        pick: one
+        options:
+          - { id: "walk_speed\\high_fps", label: High FPS }
+          - { id: "walk_speed\\low_fps", label: Low FPS }
+  other:
+    asset: rpu_v2.4.34.zip
+    run: rpu-install.sh

@@ -26,7 +26,7 @@ import {
 } from "@zax/core";
 import type { ArchiveEntryInfo, DirEntry, DownloadOptions, Platform } from "@zax/platform";
 import { preflightArchive } from "./archive-preflight.js";
-import { MANIFEST_NAME, mayWrite, parseManifest, type ModManifest, type ModPart } from "./manifest.js";
+import { MANIFEST_NAME, mayWrite, parseManifest, type ModManifest, type ModPart, type ModType } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 import {
   answersToId,
@@ -693,7 +693,7 @@ async function listRecursively(platform: Platform, root: string): Promise<string
  * which is a distinct answer from "pluggable" and is treated as one.
  */
 function permanenceOf(recorded: InstalledMod): {
-  type: "pluggable" | "permanent" | null;
+  type: ModType | null;
   name: string;
   reason?: string;
 } {
@@ -747,6 +747,12 @@ export async function uninstallMod(
     const verdict = permanenceOf(recorded);
     if (verdict.type === "permanent")
       throw new Error(`${verdict.name} cannot be uninstalled: ${verdict.reason ?? "its manifest says so"}`);
+    // A base mod's own answer, and it needs no declared reason: it replaced the game rather than stacking on
+    // it, so there is nothing to take away and leave the install as it was. Upstream says the same thing.
+    if (verdict.type === "base")
+      throw new Error(
+        `${verdict.name} cannot be uninstalled: it replaced this installation rather than adding to it. Starting from a fresh copy of the game is the way back.`,
+      );
     // Closed rather than open: a record that cannot be read is exactly the state where a permanent mod would
     // look removable, and a wrong refusal costs a message while a wrong removal costs the install.
     if (verdict.type === null)

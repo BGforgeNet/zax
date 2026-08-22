@@ -28,7 +28,15 @@ const specimens = readdirSync(CORPUS)
 
 describe("the manifest corpus", () => {
   it("covers every publishing shape the format has", () => {
-    expect(specimens).toEqual(["entries.yml", "full.yml", "minimal.yml", "parts.yml", "settings.yml", "tagged.yml"]);
+    expect(specimens).toEqual([
+      "base.yml",
+      "entries.yml",
+      "full.yml",
+      "minimal.yml",
+      "parts.yml",
+      "settings.yml",
+      "tagged.yml",
+    ]);
   });
 
   for (const name of specimens) {

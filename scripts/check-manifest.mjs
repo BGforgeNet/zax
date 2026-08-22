@@ -29,15 +29,26 @@ try {
     tagged = true;
   }
   const version = tagged ? "(version from the tag)" : manifest.version;
-  const payload = manifest.parts
-    ? `${manifest.parts.flatMap((group) => group.options).length} part(s), each naming its own asset`
-    : tagged
-      ? "(payload from the release)"
-      : (manifest.archive ?? 'no "archive" named - valid, but a release without one cannot offer a download');
+  const payload = manifest.installer
+    ? Object.entries(manifest.installer)
+        .map(([platform, route]) => `${platform}: ${route.asset}`)
+        .join(", ")
+    : manifest.parts
+      ? `${manifest.parts.flatMap((group) => group.options).length} part(s), each naming its own asset`
+      : tagged
+        ? "(payload from the release)"
+        : (manifest.archive ?? 'no "archive" named - valid, but a release without one cannot offer a download');
   console.log(
     `OK: ${manifest.id} ${version} (${manifest.type}); payload: ${payload}; ` +
       `${manifest.settings.length} setting(s), ${manifest.refuse.length} refusal rule(s)`,
   );
+  // The components, spelled the way the installer's command line will carry them: an author checking a base
+  // manifest is checking exactly this list, and a name that is wrong here installs the wrong thing silently.
+  for (const group of manifest.installer?.windows?.components ?? [])
+    console.log(
+      `  ${group.label} (pick ${group.pick}): ` +
+        group.options.map((one) => `${one.id}${one.required ? " [always]" : ""}`).join(", "),
+    );
   // Spelled out because a part id is permanent and an author's first sight of one is here: what this prints
   // is what every future release has to keep naming, and what an install records.
   for (const group of manifest.parts ?? [])

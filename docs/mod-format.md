@@ -45,7 +45,7 @@ game: fallout2
 | `name`       | yes              | Display name.                                                                            |
 | `version`    | unless tagged    | Digit-led. Quote it - YAML reads `14.7` as a number, and the literal wins.               |
 | `game`       | yes              | `fallout2`. Anything else refuses.                                                       |
-| `type`       | no               | `pluggable` (default) or `permanent`. A permanent mod is never offered removal.          |
+| `type`       | no               | `pluggable` (default), `permanent` or `base`. See "Base mods".                           |
 | `reason`     | with `permanent` | Why it cannot be uninstalled. Shown before install as well as after.                     |
 | `archive`    | unless sole      | The asset carrying the payload. Needed unless the release has one archive and no more.   |
 | `install-on` | no               | Game types it installs on, e.g. `[fallout2rpu]`. Absent means any; gates first installs. |
@@ -53,6 +53,8 @@ game: fallout2
 | `state`      | no               | Files belonging to the user, merged across upgrades. Default: every payload `.ini`.      |
 | `entries`    | no               | What the mod puts in `mods/`, as the loader names them; see below. Default: derived.     |
 | `parts`      | no               | Choices the release offers, each naming its own asset; see below. Excludes `archive`.    |
+| `becomes`    | with `base`      | The game type the install reports afterwards, e.g. `fallout2rpu`.                        |
+| `installer`  | with `base`      | The installer to run, per platform; see "Base mods".                                     |
 | `refuse`     | no               | When installing refuses; see below.                                                      |
 | `settings`   | no               | The settings schema; see below.                                                          |
 | `extra`      | no               | Ignored by contract - where an author's or a tool's own data may ride along.             |
@@ -130,6 +132,52 @@ newly offered starts off; a `one` group whose choice is gone puts the question b
 A group asking for something ZAX does not implement - any `pick` beyond these two - refuses as needing a newer
 ZAX. Unlike a settings entry, what a group picks decides what lands on disk, so there is nothing safe to
 assume about one that cannot be read.
+
+### Base mods
+
+A base mod transforms an install into a different game - RPU and UPU are the cases - so it installs on a
+vanilla game, cannot be uninstalled, and does not describe what it does: it names the installer its release
+already ships, and ZAX runs that.
+
+```yaml
+type: base
+becomes: fallout2rpu
+installer:
+  windows:
+    asset: rpu_v2.4.34.exe
+    silent: inno
+    components:
+      - label: Walk speed fix
+        pick: one
+        options:
+          - { id: core, label: Core, required: true }
+          - { id: "walk_speed\low_fps", label: Low FPS }
+  other:
+    asset: rpu_v2.4.34.zip
+    run: rpu-install.sh
+```
+
+`becomes` names the game type the install reports afterwards and must be one ZAX can detect; it is what every
+later gate reads. `install-on` defaults to `[fallout2]` for a base mod rather than to every type.
+
+The two routes are not the same install, which is why they are declared separately:
+
+- **`windows`** names an installer program. `silent: inno` is the convention ZAX invokes it by, and the only
+  one it knows today. ZAX passes the install directory to it, along with the components chosen.
+- **`other`** names a payload and a script inside it. ZAX extracts the payload over the game directory and
+  runs `run` there, which is exactly what the manual instructions say to do by hand.
+
+**Components are the Windows route's alone**, because that is where they exist: RPU's build moves its optional
+dats out of `mods/` for the Inno installer only, and the zip ships all of them. Each component's `id` is the
+installer's own name for it, verbatim, and `required: true` marks one that is selected whatever the user
+picks - Inno's component switch deselects everything it does not name.
+
+An installer this version cannot run - a `silent` convention it does not know, a platform key it has no name
+for - refuses as needing a newer ZAX rather than as a misspelling. Both decide what gets executed, so there is
+nothing safe to assume about either.
+
+Nothing about a base install is undone: there is no uninstall, and a failed one is reported with how far it
+got and where the installer's own backup directory is, rather than unwound.
 
 ### Refusal rules
 

@@ -179,8 +179,9 @@ describe("parseManifest refusals", () => {
     refuses(FO2TWEAKS.replace("game: fallout2", "game: arcanum"), /not Fallout 2/);
   });
 
-  it("refuses a base mod as needing a newer ZAX", () => {
-    refuses(`${FO2TWEAKS}type: base\n`, /newer version of ZAX/);
+  it("refuses a mod type or an install procedure this version does not implement", () => {
+    // Base mods install now; what a base manifest still owes is an installer to run.
+    refuses(`${FO2TWEAKS}type: base\n`, /names no "installer"/);
     refuses(`${FO2TWEAKS}install:\n  - deploy: {}\n`, /newer version of ZAX/);
     refuses(`${FO2TWEAKS}type: overlay\n`, /newer version of ZAX/);
   });
@@ -470,5 +471,105 @@ describe("parts", () => {
 describe("parts and the mod's own entries", () => {
   it("refuses a manifest declaring both, since each part declares what it puts in mods/", () => {
     expect(() => parsed(`${CASSIDY}entries: [cassidy.dat]\n`)).toThrow(/"entries" and "parts"/);
+  });
+});
+
+/** RPU as it would publish itself: an Inno installer on Windows, a script beside a zip everywhere else. */
+const RPU = `spec: 1
+id: rpu
+name: Fallout 2 Restoration Project, updated
+version: "2.4.34"
+game: fallout2
+type: base
+becomes: fallout2rpu
+refuse:
+  - when: { present: [up-changelog.txt], absent: [rp-changelog.txt] }
+    reason: RPU cannot be installed over killap's Unofficial Patch.
+installer:
+  windows:
+    asset: rpu_v2.4.34.exe
+    silent: inno
+    components:
+      - label: Extras
+        pick: any
+        options:
+          - { id: core, label: Core, required: true }
+          - { id: "wpn_anims\\\\rifle", label: New rifle animations, help: Replaces the rifle animations. }
+      - label: Walk speed fix
+        pick: one
+        options:
+          - { id: "walk_speed\\\\high_fps", label: High FPS }
+          - { id: "walk_speed\\\\low_fps", label: Low FPS }
+  other:
+    asset: rpu_v2.4.34.zip
+    run: rpu-install.sh
+`;
+
+describe("a base mod's manifest", () => {
+  const refuses = (text: string, cause: RegExp) => expect(() => parsed(text)).toThrow(cause);
+
+  it("reads the installer per platform, and the components only the Windows one has", () => {
+    const manifest = parsed(RPU);
+    expect(manifest.type).toBe("base");
+    expect(manifest.becomes).toBe("fallout2rpu");
+    // A base mod installs on a vanilla game and nowhere else unless it says otherwise - the direction both
+    // upstream scripts enforce themselves, and the opposite of a stacking mod's "anywhere".
+    expect(manifest.installOn).toEqual(["fallout2"]);
+    expect(manifest.installer?.other).toEqual({ asset: "rpu_v2.4.34.zip", run: "rpu-install.sh" });
+    expect(manifest.installer?.windows?.silent).toBe("inno");
+    expect(manifest.installer?.windows?.components?.map((group) => group.options.map((one) => one.id))).toEqual([
+      ["core", "wpn_anims\\rifle"],
+      ["walk_speed\\high_fps", "walk_speed\\low_fps"],
+    ]);
+    expect(manifest.installer?.windows?.components?.[0]?.options[0]).toEqual({
+      id: "core",
+      label: "Core",
+      required: true,
+    });
+  });
+
+  it("keeps a stacking mod's defaults where a base mod's differ", () => {
+    // The type is the only field that decides this, so the two are asserted against one another.
+    expect(parsed(FO2TWEAKS).installOn).toBeUndefined();
+    expect(parsed(FO2TWEAKS).installer).toBeUndefined();
+  });
+
+  it("requires an installer of a base mod, and refuses one anywhere else", () => {
+    refuses(RPU.replace(/installer:[\s\S]*$/, ""), /names no "installer"/);
+    refuses(`${FO2TWEAKS}installer:\n  other: { asset: x.zip, run: go.sh }\n`, /belongs to a base mod/);
+  });
+
+  it("requires becomes to name a game type this version can detect", () => {
+    refuses(RPU.replace("becomes: fallout2rpu", "becomes: fallout9"), /newer version of ZAX/);
+    refuses(RPU.replace("becomes: fallout2rpu\n", ""), /"becomes"/);
+    // A stacking mod becomes nothing: the field would be a claim it cannot make good on.
+    refuses(`${FO2TWEAKS}becomes: fallout2rpu\n`, /belongs to a base mod/);
+  });
+
+  it("asks for a newer ZAX when the installer needs something this version cannot run", () => {
+    // Each of these decides what ZAX executes: reading an unknown platform key as "not mine" would run the
+    // other platform's installer, and an unknown silent convention would put a wizard in front of the user.
+    refuses(RPU.replace("silent: inno", "silent: nsis"), /newer version of ZAX/);
+    refuses(RPU.replace("  other:", "  haiku:"), /newer version of ZAX/);
+    refuses(RPU.replace("pick: one", "pick: at-least-one"), /newer version of ZAX/);
+  });
+
+  it("refuses a component name the installer's command line could not carry", () => {
+    // The names go into one comma-separated, quoted argument; either character in a name breaks it apart.
+    refuses(RPU.replace("id: core", 'id: "core,extra"'), /cannot be passed/);
+    refuses(RPU.replace("id: core", "id: 'co\"re'"), /cannot be passed/);
+  });
+
+  it("refuses a component named twice, wherever the two sit", () => {
+    refuses(RPU.replace('id: "walk_speed\\\\high_fps"', "id: core"), /names "core" twice/);
+  });
+
+  it("refuses an installer that runs something outside what its payload deploys", () => {
+    refuses(RPU.replace("run: rpu-install.sh", "run: ../rpu-install.sh"), /leaves the game directory/);
+  });
+
+  it("takes an installer with no components at all - not every one offers a choice", () => {
+    const plain = `${RPU.slice(0, RPU.indexOf("    components:"))}${RPU.slice(RPU.indexOf("  other:"))}`;
+    expect(parsed(plain).installer?.windows?.components).toBeUndefined();
   });
 });
