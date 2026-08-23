@@ -29,6 +29,7 @@ import {
   type ModType,
 } from "./manifest.js";
 import { datToolFor, noDatTool } from "./dat-tool.js";
+import { vendoredManifestFor } from "./mod-vendored.js";
 import type { ChoiceGroup } from "./mod-choice.js";
 import { installedBaseVersion, type BaseVersion } from "./base-version.js";
 import { carryOver, type CarriedSelection } from "./mod-parts.js";
@@ -42,7 +43,13 @@ export interface ModFeed {
   id: string;
 }
 
-export const MOD_FEEDS: readonly ModFeed[] = [{ repository: "BGforgeNet/FO2tweaks", id: "fo2tweaks" }];
+/** Base mods first: what an install is comes before what is stacked on it, and that is the order it is read in. */
+export const MOD_FEEDS: readonly ModFeed[] = [
+  { repository: "BGforgeNet/Fallout2_Restoration_Project", id: "rpu" },
+  { repository: "BGforgeNet/Fallout2_Unofficial_Patch", id: "upu" },
+  { repository: "rotators/Fo1in2", id: "fo1in2" },
+  { repository: "BGforgeNet/FO2tweaks", id: "fo2tweaks" },
+];
 
 /** One release as ZAX holds it: the parsed manifest, its exact bytes, and where the payload is. */
 export interface ModRelease {
@@ -204,30 +211,41 @@ interface FetchedManifest {
 /**
  * A release's manifest, fetched once - neither a published asset nor a tagged tree changes afterwards. The
  * repository route is tried only when the release publishes no manifest, and its absence is kept too: a
- * repository that ships none would otherwise cost one request per release on every listing refresh.
+ * repository that ships none would otherwise cost one request per release on every listing refresh. Where
+ * both routes come up empty, ZAX's own copy answers for the mods that have one.
  */
 async function fetchManifestText(
   platform: Platform,
-  repository: string,
+  feed: ModFeed,
   release: FeedRelease,
+  version: string | undefined,
 ): Promise<FetchedManifest | null> {
   const asset = release.assets.find((entry) => entry.name === MANIFEST_NAME);
   const fromAsset = asset !== undefined;
-  const base = platform.paths.join(feedsDirectory(platform), `${slug(repository)}-${slug(release.tag)}`);
+  const base = platform.paths.join(feedsDirectory(platform), `${slug(feed.repository)}-${slug(release.tag)}`);
   const kept = `${base}.yml`;
   if ((await platform.fs.stat(kept))?.kind === "file")
     return { text: new TextDecoder().decode(await platform.fs.read(kept)), fromAsset };
+
+  // ZAX's own copy, for a mod that describes itself nowhere. Last rather than first: wherever the author has
+  // said anything, their word is the description, so adopting the format takes effect by publishing rather
+  // than by ZAX noticing. A tag naming no version gets no copy, a vendored document stating none of its own.
+  const carried = fromAsset || version === undefined ? undefined : vendoredManifestFor(feed.id)?.(version);
+  const fallback = carried === undefined ? null : { text: carried, fromAsset: false };
+
   const missing = `${base}.none`;
-  if (!fromAsset && (await platform.fs.stat(missing))?.kind === "file") return null;
+  if (!fromAsset && (await platform.fs.stat(missing))?.kind === "file") return fallback;
 
   let text: string;
   try {
-    text = await platform.net.fetchText(asset ? asset.url : repositoryManifestUrl(repository, release.tag));
+    text = await platform.net.fetchText(asset ? asset.url : repositoryManifestUrl(feed.repository, release.tag));
   } catch (error) {
-    // A tag with no manifest is a release that is not for ZAX, not a broken feed - every other failure is.
+    // A tag with no manifest is a release that is not for ZAX, not a broken feed - every other failure is,
+    // ZAX carrying a copy or not: offering from a copy while the network is down would offer an install that
+    // cannot be downloaded, and would hide an author's own manifest behind ZAX's guess at the same time.
     if (!fromAsset && error instanceof NetworkError && error.status === 404) {
       await platform.fs.write(missing, new Uint8Array());
-      return null;
+      return fallback;
     }
     throw error;
   }
@@ -256,17 +274,42 @@ function installerFor(
   return asset ? { route, asset } : undefined;
 }
 
+/**
+ * The releases worth asking about. Every one of them, normally: what a release says about itself is knowable
+ * only by asking it. For a row ZAX carries a document for, a release that cannot win is not worth a request -
+ * the carried document states no version, so such a release's version is its tag's, and only the highest of
+ * those can win. A release publishing a manifest asset stays a candidate whatever its tag names, since its own
+ * document decides its version and the listing already carries the asset's name.
+ *
+ * This is what keeps a first listing from costing one 404 per release across a repository's whole history.
+ */
+function worthAsking(feed: ModFeed, releases: readonly FeedRelease[]): readonly FeedRelease[] {
+  if (vendoredManifestFor(feed.id) === undefined) return releases;
+  let highest: string | undefined;
+  for (const release of releases) {
+    const tagged = versionFromTag(release.tag);
+    if (tagged !== undefined && (highest === undefined || compareVersions(tagged, highest) > 0)) highest = tagged;
+  }
+  return releases.filter(
+    (release) =>
+      release.assets.some((asset) => asset.name === MANIFEST_NAME) ||
+      // Guarded rather than compared straight: with no version-shaped tag anywhere, `highest` is undefined and
+      // every tag that names no version would match it.
+      (highest !== undefined && versionFromTag(release.tag) === highest),
+  );
+}
+
 export async function fetchFeed(platform: Platform, feed: ModFeed, now: Date = new Date()): Promise<ModRelease> {
-  const releases = await fetchReleases(platform, feed.repository, now);
+  const releases = worthAsking(feed, await fetchReleases(platform, feed.repository, now));
   let firstRefusal: Error | null = null;
   let sawManifest = false;
   let best: ModRelease | null = null;
 
   for (const release of releases) {
-    const found = await fetchManifestText(platform, feed.repository, release);
+    const tagged = versionFromTag(release.tag);
+    const found = await fetchManifestText(platform, feed, release, tagged);
     if (found === null) continue;
     sawManifest = true;
-    const tagged = versionFromTag(release.tag);
     const inferred = soleArchive(release.assets);
     let manifest: ModManifest;
     try {

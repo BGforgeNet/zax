@@ -326,8 +326,8 @@ describe("listAvailableMods", () => {
     expect(offer).toMatchObject({ name: "Old Mod", version: "3", type: "pluggable" });
     expect(offer?.availability).toEqual({ kind: "unfollowed" });
     expect(listing.offers.find((one) => one.id === "older")).toMatchObject({ name: "older", type: "pluggable" });
-    // The followed feed still gets its own row - here a failure, this network being empty.
-    expect(listing.failures.map((failure) => failure.id)).toEqual(["fo2tweaks"]);
+    // Every followed feed still gets its own row - here all failures, this network being empty.
+    expect(listing.failures.map((failure) => failure.id)).toEqual(MOD_FEEDS.map((feed) => feed.id));
   });
 
   it("offers retry, not removal, for a stranded install that never finished", async () => {
@@ -938,5 +938,168 @@ creates:
     expect(availability(release, { install, record, sfall: null, present: false })).toEqual({ kind: "install" });
     // With the directory there, the record answers as it does for every other mod.
     expect(availability(release, { install, record, sfall: null, present: true })).toEqual({ kind: "installed" });
+  });
+});
+
+describe("fetchFeed with a manifest ZAX carries", () => {
+  const RPU_REPO = "BGforgeNet/Fallout2_Restoration_Project";
+  const RPU_FEED = { repository: RPU_REPO, id: "rpu" };
+  const RPU_RELEASES = `https://api.github.com/repos/${RPU_REPO}/releases?per_page=100`;
+  const rpuAtTag = (tag: string) => `https://raw.githubusercontent.com/${RPU_REPO}/${tag}/f2mod.yml`;
+
+  /** A release as BGforge publishes it: the installer, the payload, and no manifest of any kind. */
+  const rpuRelease = (tag: string, assets: object[] = []) => ({
+    tag_name: tag,
+    assets: [
+      { name: `rpu_${tag}.exe`, browser_download_url: `https://example.test/${tag}/rpu_${tag}.exe` },
+      { name: `rpu_${tag}.zip`, browser_download_url: `https://example.test/${tag}/rpu_${tag}.zip`, size: 4 },
+      ...assets,
+    ],
+  });
+
+  it("describes a mod that describes itself nowhere, at the version its tag names", async () => {
+    const platform = feedPlatform({
+      responses: { [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34")]), [rpuAtTag("v2.4.34")]: 404 },
+    });
+    const found = await fetchFeed(platform, RPU_FEED);
+    expect(found.manifest).toMatchObject({ id: "rpu", name: "Restoration Project Updated", version: "2.4.34" });
+    // Not from an asset, so the payload is never expected to carry a copy of it.
+    expect(found.manifestFromAsset).toBe(false);
+    // This host is not Windows, so the route resolved is the script one, and it names the release's own zip.
+    expect(found.installer).toEqual({
+      route: "other",
+      asset: { name: "rpu_v2.4.34.zip", url: "https://example.test/v2.4.34/rpu_v2.4.34.zip", size: 4 },
+    });
+  });
+
+  it("gives way to a manifest committed to the repository, which is the cheaper route to adopt", async () => {
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34")]),
+        [rpuAtTag("v2.4.34")]: "spec: 1\nid: rpu\nname: RPU as its author describes it\ngame: fallout2\n",
+      },
+    });
+    const found = await fetchFeed(platform, RPU_FEED);
+    expect(found.manifest.name).toBe("RPU as its author describes it");
+  });
+
+  it("asks the repository once per release and remembers the answer", async () => {
+    const platform = feedPlatform({
+      responses: { [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34")]), [rpuAtTag("v2.4.34")]: 404 },
+    });
+    await fetchFeed(platform, RPU_FEED);
+    const asked = platform.fetched.filter((url) => url === rpuAtTag("v2.4.34")).length;
+    // The listing is cached too, so the second call reaches neither - what matters is that the 404 is not
+    // paid again for a tag already answered.
+    await fetchFeed(platform, RPU_FEED);
+    expect(asked).toBe(1);
+    expect(platform.fetched.filter((url) => url === rpuAtTag("v2.4.34"))).toHaveLength(1);
+  });
+
+  it("gives way to a manifest the release publishes as an asset", async () => {
+    const asset = { name: "f2mod.yml", browser_download_url: "https://example.test/v2.4.34/f2mod.yml" };
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34", [asset])]),
+        "https://example.test/v2.4.34/f2mod.yml":
+          "spec: 1\nid: rpu\nname: RPU as its author describes it\ngame: fallout2\narchive: rpu.zip\n",
+      },
+    });
+    const found = await fetchFeed(platform, RPU_FEED);
+    expect(found.manifest.name).toBe("RPU as its author describes it");
+    expect(found.manifestFromAsset).toBe(true);
+  });
+
+  it("passes over a release whose tag names no version, rather than describing it", async () => {
+    // A vendored document states no version, so such a release could name none either. It is not a candidate
+    // and is never asked about, which leaves the feed saying nobody has adopted the format.
+    const platform = feedPlatform({
+      responses: { [RPU_RELEASES]: JSON.stringify([rpuRelease("latest")]), [rpuAtTag("latest")]: 404 },
+    });
+    await expect(fetchFeed(platform, RPU_FEED)).rejects.toThrow("ships a ZAX manifest yet");
+    expect(platform.fetched).toEqual([RPU_RELEASES]);
+  });
+
+  it("asks only about the release that could win, rather than one per release ever published", async () => {
+    // Every release of a repository ZAX describes would answer with the same document, so the winner is the
+    // highest version its tags name - and the rest are not worth a request. This is the whole first-listing
+    // cost: without it, following a repository costs one 404 per release in its history.
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([
+          rpuRelease("v2.3.34"),
+          rpuRelease("v2.4.34"),
+          rpuRelease("v2.4.33"),
+          rpuRelease("v2.2.30"),
+        ]),
+        [rpuAtTag("v2.4.34")]: 404,
+      },
+    });
+    const found = await fetchFeed(platform, RPU_FEED);
+    expect(found.manifest.version).toBe("2.4.34");
+    // The three that could not win are not in the list, and none of them is canned - an unasked URL would
+    // reject as an unreachable host, so asking one would fail this outright rather than merely count wrong.
+    expect(platform.fetched).toEqual([RPU_RELEASES, rpuAtTag("v2.4.34")]);
+  });
+
+  it("still asks about a release that publishes its own manifest, whatever its tag names", async () => {
+    // The listing already carries the asset's name, so honouring an author's own document costs nothing -
+    // and its version is the document's to state, which no tag can rule out in advance.
+    const asset = { name: "f2mod.yml", browser_download_url: "https://example.test/old/f2mod.yml" };
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34"), rpuRelease("v2.3.34", [asset])]),
+        [rpuAtTag("v2.4.34")]: 404,
+        "https://example.test/old/f2mod.yml":
+          'spec: 1\nid: rpu\nname: RPU as its author describes it\nversion: "9.9"\ngame: fallout2\n',
+      },
+    });
+    const found = await fetchFeed(platform, RPU_FEED);
+    expect(found.manifest).toMatchObject({ name: "RPU as its author describes it", version: "9.9" });
+    expect(found.manifestFromAsset).toBe(true);
+  });
+});
+
+describe("listAvailableMods over the vendored rows", () => {
+  const install: Install = { path: "/games/fallout2", type: "fallout2" };
+  const listing = (repository: string) => `https://api.github.com/repos/${repository}/releases?per_page=100`;
+  const bgforge = (mod: string, tag: string) => ({
+    tag_name: tag,
+    assets: [
+      { name: `${mod}_${tag}.exe`, browser_download_url: `https://example.test/${mod}/${tag}.exe` },
+      { name: `${mod}_${tag}.zip`, browser_download_url: `https://example.test/${mod}/${tag}.zip` },
+    ],
+  });
+
+  it("offers all three base mods on a vanilla install, each as the install it would make", async () => {
+    const platform = new MemoryPlatform({
+      files: { [`${install.path}/fallout2.exe`]: "" },
+      responses: {
+        [listing("BGforgeNet/Fallout2_Restoration_Project")]: JSON.stringify([bgforge("rpu", "v2.4.34")]),
+        [listing("BGforgeNet/Fallout2_Unofficial_Patch")]: JSON.stringify([bgforge("upu", "v34")]),
+        [listing("rotators/Fo1in2")]: JSON.stringify([
+          {
+            tag_name: "v1.16.3771",
+            assets: [{ name: "Fallout1in2.zip", browser_download_url: "https://example.test/fo1in2/Fallout1in2.zip" }],
+          },
+        ]),
+        [listing("BGforgeNet/FO2tweaks")]: JSON.stringify([]),
+        // None of the three has committed a manifest, which is the answer ZAX's own copy stands in for.
+        ["https://raw.githubusercontent.com/BGforgeNet/Fallout2_Restoration_Project/v2.4.34/f2mod.yml"]: 404,
+        ["https://raw.githubusercontent.com/BGforgeNet/Fallout2_Unofficial_Patch/v34/f2mod.yml"]: 404,
+        ["https://raw.githubusercontent.com/rotators/Fo1in2/v1.16.3771/f2mod.yml"]: 404,
+      },
+    });
+    const found = await listAvailableMods(platform, install, { path: install.path, mods: [] }, null);
+    expect(found.offers.map((offer) => [offer.id, offer.version, offer.availability.kind])).toEqual([
+      ["rpu", "2.4.34", "install"],
+      ["upu", "34", "install"],
+      ["fo1in2", "1.16.3771", "install"],
+    ]);
+    // The one that creates an install says so, and it is the only one that asks the user for anything.
+    expect(found.offers.map((offer) => offer.creates)).toEqual([undefined, undefined, "Fallout1in2"]);
+    expect(found.offers[2]?.asks?.map((ask) => ask.id)).toEqual(["fallout1"]);
+    // The mod nobody has adopted the format for is still followed, and still says why it could not answer.
+    expect(found.failures.map((failure) => failure.id)).toEqual(["fo2tweaks"]);
   });
 });

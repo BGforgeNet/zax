@@ -15,6 +15,13 @@ release's sole archive asset is the payload. There is nothing per-release to mai
 byte-identical copy at its root, which ZAX compares before installing: a difference of one line ending
 refuses. Necessary where one repository publishes several mods, or a release carries several archives.
 
+**Or publish neither, for now.** ZAX carries manifests for the mods that describe themselves nowhere - the base
+mods, so far - so that they can be installed at all. Such a manifest is written by ZAX, ships in ZAX, and
+changes only with a ZAX release, which makes it a worse description of your mod than yours would be: it cannot
+know about a release until someone updates it. Publishing your own by either route above overrides it from the
+next release onward, with no coordination needed. The entry naming your mod is in
+`packages/games-fallout2/src/mod-vendored.ts`, and it is deleted once you publish.
+
 Either way:
 
 - **The payload** is a release asset. Where it is an archive, everything under `mods/` is deployed and
@@ -154,7 +161,7 @@ installer:
         pick: one
         options:
           - { id: core, label: Core, required: true }
-          - { id: "walk_speed\low_fps", label: Low FPS }
+          - { id: 'walk_speed\low_fps', label: Low FPS }
   other:
     asset: rpu_v2.4.34.zip
     run: rpu-install.sh
