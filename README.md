@@ -8,8 +8,8 @@
 [![IRC](https://img.shields.io/badge/%23IRC-join%20%20%20%20%E2%9D%B1%E2%9D%B1%E2%9D%B1-darkorange)](https://bgforge.net/irc)
 
 ZAX is a configuration and mod manager for Fallout 2 engine games. It unifies game and mod settings in one
-interface, updates sfall, and packages debug info for bug reports. It should work with any game based on the
-Fallout 2 engine.
+interface, installs and updates mods, updates sfall, and packages debug info for bug reports. It should work
+with any game based on the Fallout 2 engine.
 
 ### Installation
 

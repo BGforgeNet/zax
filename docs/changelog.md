@@ -16,6 +16,11 @@ mods as well as settings.
 - **Mods.** Install, upgrade and remove mods published as releases, with their settings edited like the game's
   own. Upgrades keep the changes you made to a mod's ini rather than overwriting them, an interrupted install
   can be resumed or put back exactly, and removal deletes only what was recorded as installed.
+- **Big mods too.** Restoration Project and the Unofficial Patch install through their own installers, with the
+  components they offer chosen in ZAX on Windows. Fallout et tu builds a second game beside this one out of
+  your own copy of Fallout 1, and joins the game list when it is done.
+- **What a release offers is asked before it downloads.** A mod publishing variants or add-ons asks which you
+  want, and carries the answer to the next upgrade.
 - **Load order.** Reorder and enable mods, see which installed mod each entry belongs to, sort to a
   recommended order, and forget entries whose files are gone.
 - **sfall updates.** See the installed version, update to the latest or to a version you pick, and keep your
