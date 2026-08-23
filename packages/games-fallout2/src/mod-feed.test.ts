@@ -326,8 +326,11 @@ describe("listAvailableMods", () => {
     expect(offer).toMatchObject({ name: "Old Mod", version: "3", type: "pluggable" });
     expect(offer?.availability).toEqual({ kind: "unfollowed" });
     expect(listing.offers.find((one) => one.id === "older")).toMatchObject({ name: "older", type: "pluggable" });
-    // Every followed feed still gets its own row - here all failures, this network being empty.
-    expect(listing.failures.map((failure) => failure.id)).toEqual(MOD_FEEDS.map((feed) => feed.id));
+    // Every base feed gets its own row - here all failures, this network being empty. The stacking mod is
+    // followed just the same and stays silent about it, which is the whole difference the row's flag makes.
+    expect(listing.failures.map((failure) => failure.name)).toEqual(
+      MOD_FEEDS.filter((feed) => feed.base).map((feed) => feed.name),
+    );
   });
 
   it("offers retry, not removal, for a stranded install that never finished", async () => {
@@ -1088,7 +1091,8 @@ describe("listAvailableMods over the vendored rows", () => {
     // The one that creates an install says so, and it is the only one that asks the user for anything.
     expect(found.offers.map((offer) => offer.creates)).toEqual([undefined, undefined, "Fallout1in2"]);
     expect(found.offers[2]?.asks?.map((ask) => ask.id)).toEqual(["fallout1"]);
-    // The mod nobody has adopted the format for is still followed, and still says why it could not answer.
-    expect(found.failures.map((failure) => failure.id)).toEqual(["fo2tweaks"]);
+    // The mod nobody has adopted the format for is still followed and still fails, but it is a stacking mod:
+    // a row saying a repository has not adopted the format is nothing the user can act on, so none is shown.
+    expect(found.failures).toEqual([]);
   });
 });

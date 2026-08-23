@@ -40,14 +40,31 @@ export interface ModFeed {
   repository: string;
   /** The manifest id this entry follows through that repository's releases. */
   id: string;
+  /**
+   * What to call the mod before any manifest has been read. A feed that could not answer has no document to
+   * take a name from, and its own id is not a name; where the manifest does arrive, the author's `name` wins.
+   */
+  name: string;
+  /**
+   * Whether the mod is the installation rather than something stacked on it. Declared on the row as well as
+   * in the manifest because a feed that failed has no manifest to ask: a base mod that cannot be read is
+   * worth saying so, and a stacking mod whose repository has simply not adopted the format is not.
+   */
+  base: boolean;
 }
+
+/**
+ * What reading a repository takes: the releases to list and the id to follow through them. The rest of a row
+ * describes the mod where no manifest arrives, which is the listing's business rather than the fetch's.
+ */
+export type FeedSource = Pick<ModFeed, "repository" | "id">;
 
 /** Base mods first: what an install is comes before what is stacked on it, and that is the order it is read in. */
 export const MOD_FEEDS: readonly ModFeed[] = [
-  { repository: "BGforgeNet/Fallout2_Restoration_Project", id: "rpu" },
-  { repository: "BGforgeNet/Fallout2_Unofficial_Patch", id: "upu" },
-  { repository: "rotators/Fo1in2", id: "fo1in2" },
-  { repository: "BGforgeNet/FO2tweaks", id: "fo2tweaks" },
+  { repository: "BGforgeNet/Fallout2_Restoration_Project", id: "rpu", name: "RPU", base: true },
+  { repository: "BGforgeNet/Fallout2_Unofficial_Patch", id: "upu", name: "UPU", base: true },
+  { repository: "rotators/Fo1in2", id: "fo1in2", name: "ET TU", base: true },
+  { repository: "BGforgeNet/FO2tweaks", id: "fo2tweaks", name: "FO2tweaks", base: false },
 ];
 
 /** One release as ZAX holds it: the parsed manifest, its exact bytes, and where the payload is. */
@@ -215,7 +232,7 @@ interface FetchedManifest {
  */
 async function fetchManifestText(
   platform: Platform,
-  feed: ModFeed,
+  feed: FeedSource,
   release: FeedRelease,
   version: string | undefined,
 ): Promise<FetchedManifest | null> {
@@ -282,7 +299,7 @@ function installerFor(
  *
  * This is what keeps a first listing from costing one 404 per release across a repository's whole history.
  */
-function worthAsking(feed: ModFeed, releases: readonly FeedRelease[]): readonly FeedRelease[] {
+function worthAsking(feed: FeedSource, releases: readonly FeedRelease[]): readonly FeedRelease[] {
   if (vendoredManifestFor(feed.id) === undefined) return releases;
   let highest: string | undefined;
   for (const release of releases) {
@@ -298,7 +315,7 @@ function worthAsking(feed: ModFeed, releases: readonly FeedRelease[]): readonly 
   );
 }
 
-export async function fetchFeed(platform: Platform, feed: ModFeed, now: Date = new Date()): Promise<ModRelease> {
+export async function fetchFeed(platform: Platform, feed: FeedSource, now: Date = new Date()): Promise<ModRelease> {
   const releases = worthAsking(feed, await fetchReleases(platform, feed.repository, now));
   let firstRefusal: Error | null = null;
   let sawManifest = false;
@@ -574,8 +591,11 @@ export interface ChoiceOffer extends CarriedSelection {
 
 export interface ModListing {
   offers: readonly ModOffer[];
-  /** Feeds that could not answer, each with why - offline, no manifest yet, needs a newer ZAX. */
-  failures: readonly { repository: string; id: string; why: string }[];
+  /**
+   * Feeds that could not answer, each with why - offline, no manifest yet, needs a newer ZAX. Base mods only:
+   * a stacking mod nobody can read is not news, and four such rows would bury the mods that did answer.
+   */
+  failures: readonly { repository: string; id: string; name: string; why: string }[];
 }
 
 /**
@@ -590,7 +610,7 @@ export async function listAvailableMods(
   now: Date = new Date(),
 ): Promise<ModListing> {
   const offers: ModOffer[] = [];
-  const failures: { repository: string; id: string; why: string }[] = [];
+  const failures: { repository: string; id: string; name: string; why: string }[] = [];
   for (const feed of MOD_FEEDS) {
     try {
       const release = await fetchFeed(platform, feed, now);
@@ -640,7 +660,12 @@ export async function listAvailableMods(
         }),
       });
     } catch (error) {
-      failures.push({ ...feed, why: error instanceof Error ? error.message : String(error) });
+      // Only a base mod earns a row here: that one is the whole installation, so a user who cannot get it
+      // needs to know why. A stacking mod that is unreachable or has not adopted the format offers the same
+      // sentence about a repository they never asked after.
+      if (!feed.base) continue;
+      const { repository, id, name } = feed;
+      failures.push({ repository, id, name, why: error instanceof Error ? error.message : String(error) });
     }
   }
 

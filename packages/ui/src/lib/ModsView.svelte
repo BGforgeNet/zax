@@ -230,7 +230,7 @@
           {#each store.modListing.failures as failure (failure.id)}
             <div class="offer">
               <div class="about">
-                <span class="mod-name">{failure.id}</span>
+                <span class="mod-name">{failure.name}</span>
                 <p class="status">{failure.why}</p>
               </div>
             </div>
