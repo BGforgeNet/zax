@@ -36,6 +36,8 @@ import {
   recommendedOrder,
   wrapMethods,
   type Backend,
+  type EngineListing,
+  type EngineRelease,
   type MachineDescription,
   type Mod,
   type BaseInstallPlan,
@@ -155,7 +157,7 @@ export type Panel = "games" | "zax";
  * config files, mods are what the engine loads - so the switch between them sits above the tab strips both
  * carry, not inside either.
  */
-export type View = "settings" | "mods";
+export type View = "settings" | "mods" | "engines";
 
 /** The Mods view's own tabs: getting mods, ordering them, and configuring them are three different jobs. */
 export type ModsTab = "installation" | "order" | "settings";
@@ -271,6 +273,10 @@ class Store {
 
   sfallInstalled = $state<string | null>(null);
   sfallLatest = $state<SfallRelease | null>(null);
+  /** Every engine ZAX knows, against the selected install. Read with the install: it costs no network. */
+  engines = $state<readonly EngineListing[]>([]);
+  /** What each engine has published, by id, once it has been asked. A check is a request nobody owes. */
+  engineLatest = $state<Record<string, EngineRelease>>({});
   /** The hi-res patch's version, or null when the install does not have it. There is no latest to compare. */
   hiresInstalled = $state<string | null>(null);
   zaxLatest = $state<string | null>(null);
@@ -348,11 +354,13 @@ class Store {
     this.loaded = true;
   }
 
-  /** Rereads the selected install: its config files and which sfall and hi-res patch it has. */
+  /** Rereads the selected install: its config files, which sfall and hi-res patch it has, and its engines. */
   private async readInstall(): Promise<void> {
     const install = this.install;
     this.sfallInstalled = null;
     this.hiresInstalled = null;
+    this.engines = [];
+    this.engineLatest = {};
     // Another install's offers would be wrong here, and a held plan doubly so; the view re-asks on demand.
     this.modListing = null;
     this.modPlan = null;
@@ -376,6 +384,7 @@ class Store {
     await this.readMods(install);
     this.sfallInstalled = await backend.installedSfallVersion(install);
     this.hiresInstalled = await backend.installedHiresVersion(install);
+    this.engines = await backend.availableEngines(install);
   }
 
   /** Rereads the mod order alone, which is what a save of it has to do to leave a fresh baseline behind. */
@@ -1207,11 +1216,13 @@ class Store {
     });
   }
 
-  async play(): Promise<void> {
+  /** Starts the game, through an installed engine when one is named and the original executable otherwise. */
+  async play(engineId: string | null = null): Promise<void> {
     const install = this.install;
     if (!install) return;
-    await this.run("Starting the game", async () => {
-      await backend.launch(install, this.sfallInstalled);
+    const engine = engineId === null ? null : this.engines.find((one) => one.id === engineId);
+    await this.run(engine ? `Starting the game in ${engine.short}` : "Starting the game", async () => {
+      await backend.launch(install, this.sfallInstalled, engineId);
       return null;
     });
   }
@@ -1296,6 +1307,55 @@ class Store {
       await this.readInstall();
       return { kind: "done", text: `sfall ${result.version} is installed.` };
     });
+  }
+
+  /** What an engine has published. Its own request: nothing needs the answer until someone asks for it. */
+  async checkEngine(engineId: string): Promise<void> {
+    const engine = this.engines.find((one) => one.id === engineId);
+    await this.run(`Checking for a newer ${engine?.short ?? "engine"}`, async () => {
+      this.engineLatest = { ...this.engineLatest, [engineId]: await backend.latestEngine(engineId) };
+      return null;
+    });
+  }
+
+  /** Installs an engine, or replaces the build that is there. One operation, as changing sfall version is. */
+  async installEngine(engineId: string): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    const engine = this.engines.find((one) => one.id === engineId);
+    await this.run(`Installing ${engine?.name ?? "the engine"}`, async () => {
+      const outcome = await backend.installEngine(install, engineId);
+      await this.readInstall();
+      const kept = outcome.backup === null ? "" : ` Replaced files are in ${outcome.backup}.`;
+      return { kind: "done", text: `${engine?.name ?? engineId} is installed.${kept}` };
+    });
+  }
+
+  async removeEngine(engineId: string): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    const engine = this.engines.find((one) => one.id === engineId);
+    await this.run(`Removing ${engine?.name ?? "the engine"}`, async () => {
+      const outcome = await backend.removeEngine(install, engineId);
+      await this.readInstall();
+      // Where it replaced something, the originals are still there and the user is the one who decides.
+      const kept = outcome.backup === null ? "" : ` What it replaced is in ${outcome.backup}.`;
+      return { kind: "done", text: `Removed ${outcome.removed.length} file(s).${kept}` };
+    });
+  }
+
+  /**
+   * Whether the installed build is behind what was found - false until someone has checked. Repeats the
+   * comparison `engine-release.ts` makes because the store holds only the listing, not the catalog entry
+   * that decides which comparison applies.
+   */
+  engineOutdated(engineId: string): boolean {
+    const engine = this.engines.find((one) => one.id === engineId);
+    const latest = this.engineLatest[engineId];
+    if (!engine?.installed || !latest) return false;
+    const had = Date.parse(engine.installed.published);
+    const now = Date.parse(latest.published);
+    return !Number.isNaN(had) && !Number.isNaN(now) && now > had;
   }
 
   async saveSlots(): Promise<readonly string[]> {

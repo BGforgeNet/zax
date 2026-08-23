@@ -1020,3 +1020,33 @@ describe("what an installed base mod does to the list of games", () => {
     expect(store.notice?.text).toContain("is now on the list of installations");
   });
 });
+
+describe("engines", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const launching = () => vi.spyOn(hostBackend, "launch").mockResolvedValue(undefined as never);
+
+  test("Run starts the game on its own executable", async () => {
+    const launch = launching();
+    await store.play();
+    expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, null);
+  });
+
+  test("Run in CE starts it through the engine", async () => {
+    const launch = launching();
+    await store.play("fallout2-ce");
+    expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, "fallout2-ce");
+  });
+
+  test("holds no engine state from the install it just left", async () => {
+    // selectInstall is a no-op on the already-selected path (it would otherwise drop unsaved edits on a
+    // re-click), so leaving has to mean an actual other install, not PREVIEW_INSTALL a second time.
+    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([] as never);
+    store.installs = [...store.installs, { path: "/games/other", type: "fallout2" }];
+    store.engineLatest = {
+      "fallout2-ce": { release: "continious", published: "2026-08-23T09:37:22Z", asset: null },
+    };
+    await store.selectInstall("/games/other");
+    expect(store.engineLatest).toEqual({});
+  });
+});

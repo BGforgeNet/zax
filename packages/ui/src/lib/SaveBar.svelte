@@ -9,7 +9,7 @@
   that wrote only half of that would be a different Save wearing the same word.
 -->
 <div class="footer">
-  <!-- Disabled rather than hidden under autosave: a button that vanished would move Play under the pointer. -->
+  <!-- Disabled rather than hidden under autosave: a button that vanished would move Run under the pointer. -->
   <button
     class="primary"
     disabled={store.autosave || !store.install || store.modifiedCount === 0 || store.busy !== null}
@@ -23,8 +23,21 @@
     title={isPreview ? "The browser preview cannot start a program - this needs the desktop build" : null}
     onclick={() => void store.play()}
   >
-    Play
+    Run
   </button>
+  <!--
+    Only for an engine that is actually installed: installing is a deliberate act in another tab, so this
+    appears once and stays, rather than blinking in and out under the pointer.
+  -->
+  {#each store.engines.filter((engine) => engine.installed) as engine (engine.id)}
+    <button
+      disabled={!store.install || isPreview || store.busy !== null}
+      title={isPreview ? "The browser preview cannot start a program - this needs the desktop build" : null}
+      onclick={() => void store.play(engine.id)}
+    >
+      Run in {engine.short}
+    </button>
+  {/each}
   {#if store.modifiedCount > 0}
     <button class="link" onclick={() => store.revertAll()}>Revert all</button>
   {/if}

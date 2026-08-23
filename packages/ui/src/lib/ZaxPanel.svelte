@@ -20,7 +20,10 @@
   */
   const WIPES: Record<OwnDirectory, { title: string; what: string }> = {
     backup: { title: "Backup directory", what: "Every copy ZAX kept of a config file before it wrote to it." },
-    packages: { title: "sfall packages", what: "Downloaded sfall releases. They are fetched again when needed." },
+    packages: {
+      title: "Downloaded packages",
+      what: "Downloaded sfall and engine releases. They are fetched again when needed.",
+    },
     debug: { title: "Debug archive directory", what: "The archives built for bug reports." },
   };
 
@@ -73,7 +76,7 @@
     <button disabled={store.busy !== null} onclick={() => (confirming = "backup")}>Wipe</button>
   </div>
 
-  <h2 class="section">sfall packages</h2>
+  <h2 class="section">Downloaded packages</h2>
   <p class="path">{store.paths.packages}</p>
   <div class="buttons">
     <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("packages")}>

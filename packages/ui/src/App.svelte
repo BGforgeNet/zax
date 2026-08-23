@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import bgforgeLogo from "./assets/bgforge.png";
   import zaxMark from "./assets/zax.svg";
+  import EnginesView from "./lib/EnginesView.svelte";
   import ModsView from "./lib/ModsView.svelte";
   import NoInstall from "./lib/NoInstall.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
@@ -83,6 +84,9 @@
           title={store.modsViewChanged ? "Mods have unsaved changes" : null}
         ></span>
       </button>
+      <button role="tab" class="view" aria-selected={store.view === "engines"} onclick={() => (store.view = "engines")}>
+        Engines
+      </button>
     </div>
 
     <!--
@@ -127,6 +131,8 @@
       <NoInstall />
     {:else if store.view === "mods"}
       <ModsView />
+    {:else if store.view === "engines"}
+      <EnginesView />
     {:else}
       <SettingsView />
     {/if}
