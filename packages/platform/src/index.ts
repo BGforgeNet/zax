@@ -8,6 +8,13 @@
 
 export type OperatingSystem = "windows" | "macos" | "linux";
 
+/**
+ * The processor a build has to match. `other` is every architecture ZAX names no build for, which is a real
+ * answer rather than a gap: a caller that has no build for the pair falls back to a portable one, and a wrong
+ * guess here would hand a host a binary it cannot execute.
+ */
+export type Architecture = "x64" | "arm64" | "other";
+
 export type FileKind = "file" | "dir" | "other";
 
 export interface FileStat {
@@ -113,6 +120,16 @@ export interface ProcessLauncher {
   run(program: string, args: readonly string[], options?: LaunchOptions): Promise<RunOutcome>;
   /** Hands a file or directory to the desktop's own handler - the file manager, the text editor, the browser. */
   open(target: string): Promise<void>;
+  /**
+   * Runs a WebAssembly module compiled against WASI and answers as `run` does. Separate from `run` because a
+   * module is not a program the operating system can start: something has to host it, and which something is
+   * the host's business rather than the caller's.
+   *
+   * The module is given the whole filesystem, which is the authority a native build of the same tool would
+   * have had - the point of running one is that ZAX has no native build for this machine, not that it trusts
+   * the tool less.
+   */
+  runWasm(module: string, args: readonly string[]): Promise<RunOutcome>;
 }
 
 /**
@@ -231,6 +248,7 @@ export interface Registry {
 
 export interface Platform {
   readonly os: OperatingSystem;
+  readonly arch: Architecture;
   readonly fs: FileSystem;
   readonly paths: Paths;
   readonly process: ProcessLauncher;

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { nodePlatform } from "./index.js";
@@ -154,6 +154,69 @@ describe("running a program to completion", () => {
 
   it("rejects when the program is not there at all, which is not an exit code", async () => {
     await expect(platform.process.run(at("no-such-program"), [])).rejects.toThrow();
+  });
+});
+
+/**
+ * The archive tool ships a WebAssembly build for the systems it has no native one for, and this is the route
+ * that runs it. The module below is the smallest program that exercises the whole route: it writes a line and
+ * exits with a code, which is exactly what the callers of this read.
+ *
+ * Hand-assembled rather than compiled, so the test carries no toolchain. In WebAssembly's text format:
+ *
+ *   (module
+ *     (import "wasi_snapshot_preview1" "fd_write" (func $write (param i32 i32 i32 i32) (result i32)))
+ *     (import "wasi_snapshot_preview1" "proc_exit" (func $exit (param i32)))
+ *     (memory (export "memory") 1)
+ *     (data (i32.const 100) "hello from wasi\n")
+ *     (func (export "_start")
+ *       (i32.store (i32.const 0) (i32.const 100))   ;; iovec: where the text is
+ *       (i32.store (i32.const 4) (i32.const 16))    ;; iovec: how much of it
+ *       (drop (call $write (i32.const 1) (i32.const 0) (i32.const 1) (i32.const 8)))
+ *       (call $exit (i32.const 3))))
+ */
+const TINY_WASI =
+  "AGFzbQEAAAABEANgBH9/f38Bf2ABfwBgAAACRgIWd2FzaV9zbmFwc2hvdF9wcmV2aWV3MQhmZF93cml0ZQAAFndhc2lfc25hcHNob3" +
+  "RfcHJldmlldzEJcHJvY19leGl0AAEDAgECBQMBAAEHEwIGbWVtb3J5AgAGX3N0YXJ0AAIKIgEgAEEAQeQANgIAQQRBEDYCAEEBQQBB" +
+  "AUEIEAAaQQMQAQsLFwEAQeQACxBoZWxsbyBmcm9tIHdhc2kK";
+
+describe("running a WebAssembly module", () => {
+  it("hosts it, answers with its exit code, and keeps what it wrote", async () => {
+    const module = at("tiny.wasm");
+    await platform.fs.write(module, Uint8Array.from(Buffer.from(TINY_WASI, "base64")));
+    const done = await platform.process.runWasm(module, []);
+    // A module that exits non-zero is an answer, as a program that does is: the archive tool says a DAT is
+    // the wrong one by exiting, and what it printed is the whole account of why.
+    expect(done.code).toBe(3);
+    expect(done.output).toContain("hello from wasi");
+  });
+
+  it("rejects when the module is not there, rather than answering as though it ran", async () => {
+    await expect(platform.process.runWasm(at("no-such.wasm"), [])).rejects.toThrow(/no-such\.wasm/);
+  });
+
+  it("rejects what is not a module at all", async () => {
+    const junk = at("junk.wasm");
+    await platform.fs.write(junk, new TextEncoder().encode("this is not WebAssembly"));
+    await expect(platform.process.runWasm(junk, [])).rejects.toThrow();
+  });
+
+  it("has already tidied up by the time it answers, either way out", async () => {
+    // What the module wrote is captured through a file, and the caller stops the worker the moment it
+    // answers - so the removal has to happen before the answer or it is a race the file loses. Counted the
+    // instant each call resolves rather than at the end of the test, which is the difference between
+    // asserting the order and hoping the loser's thread was slow.
+    const strays = async () => (await readdir(tmpdir())).filter((name) => name.startsWith("zax-wasi-")).length;
+    const before = await strays();
+
+    const module = at("tidy.wasm");
+    await platform.fs.write(module, Uint8Array.from(Buffer.from(TINY_WASI, "base64")));
+    for (let round = 0; round < 5; round++) {
+      await platform.process.runWasm(module, []);
+      expect(await strays()).toBe(before);
+      await expect(platform.process.runWasm(at("no-such.wasm"), [])).rejects.toThrow();
+      expect(await strays()).toBe(before);
+    }
   });
 });
 

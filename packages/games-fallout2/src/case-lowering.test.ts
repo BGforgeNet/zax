@@ -15,6 +15,7 @@ const gamePlatform = (files: Record<string, string>) =>
  */
 const folding = (platform: MemoryPlatform): Platform => ({
   os: platform.os,
+  arch: platform.arch,
   fs: {
     ...platform.fs,
     stat: async (path: string): Promise<FileStat | null> => {

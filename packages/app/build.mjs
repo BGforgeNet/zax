@@ -42,14 +42,16 @@ await build({
     js: "import { createRequire as zaxCreateRequire } from 'node:module';\nconst require = zaxCreateRequire(import.meta.url);",
   },
 });
-// Both workers are loaded by path at runtime rather than imported, so the bundler never sees them through the
+// The workers are loaded by path at runtime rather than imported, so the bundler never sees them through the
 // main entry point; each lands beside the bundle, where `new URL` resolution expects it.
 //
-// They are treated differently because of what they need at runtime. The extraction worker is copied as it is:
-// its one dependency stays external, for the reason `common` gives. The zip worker is bundled, because fflate
-// reaches it through the workspace packages, which ship as devDependencies - so nothing would resolve
-// `require("fflate")` in a packaged copy, and a plain copy would work everywhere except a distributable.
+// They are treated differently because of what they need at runtime. The extraction and WASI workers are
+// copied as they are - the first keeps its one dependency external, for the reason `common` gives, and the
+// second needs nothing but Node's own built-ins. The zip worker is bundled, because fflate reaches it through
+// the workspace packages, which ship as devDependencies - so nothing would resolve `require("fflate")` in a
+// packaged copy, and a plain copy would work everywhere except a distributable.
 await copyFile(join(here, "../platform-node/src/extract-worker.cjs"), join(dist, "extract-worker.cjs"));
+await copyFile(join(here, "../platform-node/src/wasi-worker.cjs"), join(dist, "wasi-worker.cjs"));
 
 await build({
   ...common,

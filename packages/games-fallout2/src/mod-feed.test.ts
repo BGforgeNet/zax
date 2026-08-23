@@ -832,7 +832,6 @@ extract-dat:
     record: { path: install.path, mods: [] },
     sfall: null,
     present: false,
-    canExtract: true,
     ...over,
   });
 
@@ -861,16 +860,6 @@ extract-dat:
 
   it("offers the release over a directory that is there but says nothing about itself", () => {
     expect(availability(release, where({ present: true }))).toEqual({ kind: "install-over" });
-  });
-
-  it("says so where the extraction step has no build for this system", () => {
-    const blocked = availability(release, where({ canExtract: false }));
-    expect(blocked).toMatchObject({ kind: "blocked" });
-    expect((blocked as { why: string }).why).toMatch(/no build for this system/);
-    // An install already at this version is still installed, whatever a later step could not do here.
-    expect(
-      availability(release, where({ canExtract: false, baseVersion: { version: "1.16.3771", line: "1.16" } })),
-    ).toEqual({ kind: "installed" });
   });
 
   it("carries what to ask the user for, so the interface never reads a manifest", async () => {

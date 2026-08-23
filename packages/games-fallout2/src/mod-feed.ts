@@ -28,7 +28,6 @@ import {
   type ModPartGroup,
   type ModType,
 } from "./manifest.js";
-import { datToolFor, noDatTool } from "./dat-tool.js";
 import { vendoredManifestFor } from "./mod-vendored.js";
 import type { ChoiceGroup } from "./mod-choice.js";
 import { installedBaseVersion, type BaseVersion } from "./base-version.js";
@@ -385,12 +384,6 @@ export interface ModContext {
    * were never ZAX's, and without this they are a game type with no version and no update on offer.
    */
   baseVersion?: BaseVersion | null;
-  /**
-   * Whether this host has a build of the tool a mod's extraction step needs. Read only where a mod declares
-   * one, and false is a refusal rather than a silence: the step would be skipped otherwise, and an install
-   * missing what it was meant to unpack is worse than one that did not happen.
-   */
-  canExtract?: boolean;
 }
 
 /** Which sequence of releases a version belongs to - `2.4.34` is the 2.4 line, which never crosses to 2.3. */
@@ -440,7 +433,6 @@ export function availability(release: ModRelease, context: ModContext): Availabi
 
   // Everything from here on is an offer to download, which a release that never names its payload cannot make.
   // For a parts release the payload is whatever parts resolved: one asset short is not nothing to install.
-  if (manifest.extractDat && context.canExtract === false) return { kind: "blocked", why: noDatTool(manifest.name) };
   if (manifest.creates) {
     // Its payload is an ordinary archive, so the archive check below is the one that applies - said here
     // because the installer arm is the other kind of base mod's and does not fit this one.
@@ -645,7 +637,6 @@ export async function listAvailableMods(
           sfall,
           present,
           ...(baseVersion !== undefined ? { baseVersion } : {}),
-          ...(release.manifest.extractDat ? { canExtract: datToolFor(platform.os) !== undefined } : {}),
         }),
       });
     } catch (error) {

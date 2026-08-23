@@ -32,7 +32,7 @@ import {
 } from "@zax/core";
 import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
-import { mayWrite, parseManifest, type DroppedSetting, type ModManifest, type ModSetting } from "./manifest.js";
+import { mayWrite, parseManifest, type DroppedSetting, type ModSetting } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 import { MOD_FEEDS, fetchFeed, listAvailableMods, type ModListing } from "./mod-feed.js";
 import { applyBaseInstall, planBaseInstall, type BaseInstallOutcome, type BaseInstallPlan } from "./mod-base.js";
@@ -42,7 +42,7 @@ import {
   type CreateInstallOutcome,
   type CreateInstallPlan,
 } from "./mod-create.js";
-import { datToolFor, ensureDatTool, noDatTool } from "./dat-tool.js";
+import { datToolFor, ensureDatTool, type ReadyDatTool } from "./dat-tool.js";
 import type { ModProgress } from "./mod-asset.js";
 import {
   applyModInstall,
@@ -225,15 +225,12 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
   };
 
   /**
-   * The tool an extraction step needs, fetched and runnable. Resolved here rather than inside the install
-   * because a host with no build for it cannot install such a mod at all, and that is an answer the offer
-   * already carries - this is the same refusal, said where the work would otherwise start.
+   * The tool an extraction step needs, fetched and runnable. Which of its builds this machine gets is the
+   * pin's business: a native one where upstream publishes it for this system and processor, and the portable
+   * WebAssembly one otherwise, so every host can carry out the step.
    */
-  const extractionTool = async (manifest: ModManifest, progress: ModProgress): Promise<string> => {
-    const build = datToolFor(platform.os);
-    if (!build) throw new Error(noDatTool(manifest.name));
-    return ensureDatTool(platform, build, progress);
-  };
+  const extractionTool = async (progress: ModProgress): Promise<ReadyDatTool> =>
+    ensureDatTool(platform, datToolFor(platform.os, platform.arch), progress);
 
   /** The settings schemas the install's records carry. A snapshot a newer spec wrote is skipped, not fatal. */
   const installedModSettings = async (installPath: string): Promise<ModSettingsGroup[]> => {
@@ -293,14 +290,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       const { release, selection } = await releaseForMod(install, modId, choices);
       const progress = reporting();
       if (release.manifest.creates) {
-        return planCreateInstall(
-          platform,
-          install,
-          release,
-          answers ?? {},
-          await extractionTool(release.manifest, progress),
-          progress,
-        );
+        return planCreateInstall(platform, install, release, answers ?? {}, await extractionTool(progress), progress);
       }
       return release.manifest.type === "base"
         ? planBaseInstall(platform, install, release, selection, progress)
@@ -317,7 +307,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
           `What installing ${release.manifest.name} would do has changed since you confirmed it - the game folder or the release moved on. Look at the new plan and confirm again.`,
         );
       if (release.manifest.creates) {
-        const tool = await extractionTool(release.manifest, progress);
+        const tool = await extractionTool(progress);
         const plan = await planCreateInstall(platform, install, release, answers ?? {}, tool, progress);
         if (plan.fingerprint !== fingerprint) throw stale();
         return applyCreateInstall(platform, install, release, plan, tool, progress, new Date());

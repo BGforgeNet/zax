@@ -5,11 +5,13 @@ import { parseManifest } from "./manifest.js";
 import type { ModRelease } from "./mod-feed.js";
 import { loadRecord } from "./records.js";
 import { applyCreateInstall, planCreateInstall } from "./mod-create.js";
+import type { ReadyDatTool } from "./dat-tool.js";
 import { uninstallMod } from "./mod-install.js";
 
 const GAME = "/game";
 const FO1 = "/fallout1";
-const TOOL = "/cache/tools/dat3";
+const TOOL_PATH = "/cache/tools/dat3";
+const TOOL: ReadyDatTool = { path: TOOL_PATH, kind: "native" };
 const install: Install = { path: GAME, type: "fallout2" };
 const ZIP_URL = "https://example.test/Fallout1in2.zip";
 const PAYLOAD = "ZIP-FO1IN2";
@@ -65,7 +67,7 @@ const createPlatform = (options: MemoryOptions = {}) =>
     downloads: { [ZIP_URL]: PAYLOAD, ...options.downloads },
     archives: { [PAYLOAD]: CONTENTS, ...options.archives },
     // The extraction tool, answering as dat3 does when everything it was asked for is there.
-    runs: { [TOOL]: { code: 0, output: "2 files" }, ...options.runs },
+    runs: { [TOOL_PATH]: { code: 0, output: "2 files" }, ...options.runs },
   });
 
 const inputs = { fallout1: FO1 };
@@ -107,7 +109,7 @@ describe("planning an install that creates another", () => {
   });
 
   it("refuses an archive the tool cannot read, saying what it said", async () => {
-    const platform = createPlatform({ runs: { [TOOL]: { code: 1, output: "Error: DAT size mismatch" } } });
+    const platform = createPlatform({ runs: { [TOOL_PATH]: { code: 1, output: "Error: DAT size mismatch" } } });
     await expect(planCreateInstall(platform, install, await release(), inputs, TOOL)).rejects.toThrow(
       /DAT size mismatch/,
     );
@@ -181,7 +183,7 @@ describe("performing an install that creates another", () => {
     const found = await release();
     const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
     const missing = createPlatform({
-      runs: { [TOOL]: { code: 1, output: "Files not found:\n  ART/SCENERY/CSTALAG2.FRM" } },
+      runs: { [TOOL_PATH]: { code: 1, output: "Files not found:\n  ART/SCENERY/CSTALAG2.FRM" } },
     });
     await expect(applyCreateInstall(missing, install, found, plan, TOOL)).rejects.toThrow(/CSTALAG2\.FRM/);
     expect(await missing.fs.stat(`${GAME}/Fallout1in2/Fallout2.exe`)).toBeNull();

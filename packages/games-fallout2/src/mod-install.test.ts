@@ -65,6 +65,7 @@ const gamePlatform = (options: MemoryOptions = {}) =>
 
 const wrapping = (platform: MemoryPlatform, parts: Partial<Platform>): Platform => ({
   os: platform.os,
+  arch: platform.arch,
   fs: platform.fs,
   paths: platform.paths,
   process: platform.process,

@@ -3,7 +3,7 @@
  */
 
 import { execFile, spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
 import {
   appendFile,
@@ -24,6 +24,7 @@ import { promisify } from "node:util";
 import { Worker } from "node:worker_threads";
 import {
   NetworkError,
+  type Architecture,
   type ArchiveEntry,
   type ArchiveEntryInfo,
   type DirEntry,
@@ -32,6 +33,7 @@ import {
   type LaunchOptions,
   type OperatingSystem,
   type Platform,
+  type RunOutcome,
 } from "@zax/platform";
 import { downloadFile, type AttemptNote } from "./download.js";
 import { applicationDirectories } from "./paths.js";
@@ -57,6 +59,17 @@ function operatingSystem(os: NodeJS.Platform): OperatingSystem {
   if (os === "win32") return "windows";
   if (os === "darwin") return "macos";
   return "linux";
+}
+
+/**
+ * Only the two ZAX has builds for. Anything else answers `other` rather than being rounded to the nearer of
+ * them: a 32-bit ARM host told it is `arm64` gets handed a binary it cannot run, where `other` gets it the
+ * portable route.
+ */
+function architecture(arch: NodeJS.Architecture): Architecture {
+  if (arch === "x64") return "x64";
+  if (arch === "arm64") return "arm64";
+  return "other";
 }
 
 /** The desktop's own way of handing a path to whatever handles it - the file manager, the default editor. */
@@ -85,6 +98,9 @@ const EXTRACT_WORKER = new URL("./extract-worker.cjs", import.meta.url);
  * 850 ms of frozen window on a debug package carrying 24 MB of saves.
  */
 const ZIP_WORKER = new URL("./zip-worker.cjs", import.meta.url);
+
+/** Where a WASI module runs, off the main process for the reason the other two are. */
+const WASI_WORKER = new URL("./wasi-worker.cjs", import.meta.url);
 
 /**
  * Runs one throwaway worker and answers with its message, or with why there was not one. Resolve-once:
@@ -166,6 +182,7 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
 
   return {
     os: operatingSystem(os),
+    arch: architecture(process.arch),
 
     paths: { config, cache, home, separator: os === "win32" ? "\\" : "/", join, dirname, basename },
 
@@ -262,6 +279,21 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
           child.once("error", reject);
           child.once("close", (code) => resolve({ code, output }));
         });
+      },
+      runWasm: async (module, args) => {
+        // A nonce so two concurrent runs cannot land on one another's capture file; the worker names it from
+        // this and its own pid.
+        const answer = await inWorker<RunOutcome>(WASI_WORKER, "WebAssembly", {
+          module,
+          args: [...args],
+          name: basename(module),
+          nonce: randomUUID(),
+        });
+        if ("error" in answer) throw new Error(`Could not run ${basename(module)}: ${answer.error}`);
+        // Capped as a spawned program's output is, and for the same reason.
+        return answer.output.length > RUN_OUTPUT_CAP
+          ? { ...answer, output: answer.output.slice(-RUN_OUTPUT_CAP) }
+          : answer;
       },
       open: async (target) => {
         const { program, args } = openCommand(os);

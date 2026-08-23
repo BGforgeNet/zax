@@ -86,6 +86,7 @@ export const previewPlatform: Platform = (() => {
 
   return {
     os: memory.os,
+    arch: memory.arch,
     fs: memory.fs,
     paths: memory.paths,
     archive: memory.archive,
@@ -94,7 +95,7 @@ export const previewPlatform: Platform = (() => {
     // is what a scan does with every machine that has none of these launchers.
     registry: memory.registry,
     // Nothing here can be simulated honestly: a recorded launch and an invented release both read as success.
-    process: { launch: refuses, run: refuses, open: refuses },
+    process: { launch: refuses, run: refuses, open: refuses, runWasm: refuses },
     net: { fetchText: refuses, download: refuses },
   };
 })();

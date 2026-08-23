@@ -16,7 +16,7 @@ import { backupDirectory, fnv1a, stamp, type GameType, type Install, type MergeC
 import type { ArchiveEntryInfo, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
 import { preflightArchive } from "./archive-preflight.js";
-import { assertDatHolds, datReadError, extractFromDat } from "./dat-tool.js";
+import { assertDatHolds, datReadError, extractFromDat, type ReadyDatTool } from "./dat-tool.js";
 import type { ModCreates, ModInput, ModManifest } from "./manifest.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import type { ModRelease, ReleaseAsset } from "./mod-feed.js";
@@ -169,15 +169,15 @@ async function confinedEntries(
  * Resolves what creating this install would do, and downloads what it needs to say so - without writing
  * anything into the game folder.
  *
- * `tool` is the extraction tool, already fetched: obtaining it is the caller's, because a host with no build
- * for it cannot install this mod at all and that answer belongs before the plan rather than inside it.
+ * `tool` is the extraction tool, already fetched: obtaining it costs a download, and the same copy serves the
+ * plan and the install that follows it.
  */
 export async function planCreateInstall(
   platform: Platform,
   install: Install,
   release: ModRelease,
   answers: Readonly<Record<string, string>>,
-  tool: string,
+  tool: ReadyDatTool,
   options?: ModProgress,
 ): Promise<CreateInstallPlan> {
   const { manifest, creates, becomes, archive } = creatingRelease(release);
@@ -266,7 +266,7 @@ export async function applyCreateInstall(
   install: Install,
   release: ModRelease,
   plan: CreateInstallPlan,
-  tool: string,
+  tool: ReadyDatTool,
   options?: ModProgress,
   now: Date = new Date(),
 ): Promise<CreateInstallOutcome> {

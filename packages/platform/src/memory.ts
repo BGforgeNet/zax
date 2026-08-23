@@ -10,6 +10,7 @@
 
 import {
   NetworkError,
+  type Architecture,
   type Archive,
   type ArchiveEntry,
   type ArchiveEntryInfo,
@@ -61,6 +62,7 @@ function dirname(path: string): string {
 
 export interface MemoryOptions {
   os?: OperatingSystem;
+  arch?: Architecture;
   home?: string;
   config?: string;
   cache?: string;
@@ -102,6 +104,7 @@ export interface MemoryOptions {
 
 export class MemoryPlatform implements Platform {
   readonly os: OperatingSystem;
+  readonly arch: Architecture;
   readonly fs: FileSystem;
   readonly paths: Paths;
   readonly process: ProcessLauncher;
@@ -112,8 +115,12 @@ export class MemoryPlatform implements Platform {
 
   /** Everything the outside world was asked to do, in the order it was asked. */
   readonly launched: Array<{ program: string; args: readonly string[]; options?: LaunchOptions }> = [];
-  /** Programs run to completion, which is what asserts the command an installer was invoked with. */
-  readonly ran: Array<{ program: string; args: readonly string[]; options?: LaunchOptions }> = [];
+  /**
+   * Programs run to completion, which is what asserts the command an installer was invoked with. A module run
+   * through `runWasm` is recorded here too, marked, so a test asserting the command need not know the route
+   * and one asserting the route can.
+   */
+  readonly ran: Array<{ program: string; args: readonly string[]; options?: LaunchOptions; wasm?: true }> = [];
   /** Paths marked runnable - there is no mode here, so the record is the effect. */
   readonly executable: string[] = [];
   readonly opened: string[] = [];
@@ -143,6 +150,7 @@ export class MemoryPlatform implements Platform {
 
   constructor(options: MemoryOptions = {}) {
     this.os = options.os ?? "linux";
+    this.arch = options.arch ?? "x64";
     const home = normalize(options.home ?? "/home/tester");
     const config = normalize(options.config ?? `${home}/.config/zax`);
     const cache = normalize(options.cache ?? `${home}/.cache/zax`);
@@ -222,6 +230,14 @@ export class MemoryPlatform implements Platform {
       },
       open: async (target) => {
         this.opened.push(target);
+      },
+      // Answered from the same table as `run`, keyed by the module's path: which of the two routes a tool
+      // took is the host's business, and a test that stated what the tool says should not have to know.
+      runWasm: async (module, args) => {
+        this.ran.push({ program: module, args, wasm: true });
+        const canned = options.runs?.[module];
+        if (canned === undefined) throw new Error(`No such program: ${module}`);
+        return canned;
       },
     };
 

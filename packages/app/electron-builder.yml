@@ -23,13 +23,14 @@ files:
   - dist/**
   - package.json
 
-# Both of these are reached by path at runtime rather than imported, and a path inside the archive is not a path
-# the operating system can open: the worker is started with `new Worker(url)`, and 7z-wasm loads its `.wasm` from
-# beside its own module. Left packed, both fail only when a user first extracts an archive.
+# These are reached by path at runtime rather than imported, and a path inside the archive is not a path the
+# operating system can open: each worker is started with `new Worker(url)`, and 7z-wasm loads its `.wasm` from
+# beside its own module. Left packed, they fail only when a user first extracts an archive.
 asarUnpack:
   - "**/node_modules/7z-wasm/**"
   - "**/extract-worker.cjs"
   - "**/zip-worker.cjs"
+  - "**/wasi-worker.cjs"
 
 # Nothing here is a native module - the one piece of native code is WebAssembly, which needs no rebuild.
 npmRebuild: false
