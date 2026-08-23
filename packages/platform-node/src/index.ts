@@ -36,6 +36,7 @@ import {
   type RunOutcome,
 } from "@zax/platform";
 import { downloadFile, type AttemptNote } from "./download.js";
+import { throughGzip } from "./gunzip.js";
 import { applicationDirectories } from "./paths.js";
 import { registryValue } from "./registry.js";
 
@@ -116,15 +117,17 @@ async function inWorker<T>(script: URL, what: string, workerData: unknown): Prom
 }
 
 /**
- * One entry from 7-Zip's `-slt` listing: field-per-line blocks, blank lines between entries. A symlink shows
- * as a `Symbolic Link` field (tar) or a mode string starting `l` in `Attributes` (zip with Unix attributes);
- * both spellings are folded to the one kind, since what a caller does with a link is refuse it.
+ * One entry from 7-Zip's `-slt` listing: field-per-line blocks, blank lines between entries. A symlink names
+ * its target in `Symbolic Link` (tar, which prints the field empty for everything else) or carries a mode
+ * string starting `l` in `Attributes` (zip with Unix attributes); both are folded to the one kind.
  */
 function listedEntry(fields: Readonly<Record<string, string>>): ArchiveEntryInfo | null {
   const name = fields["Path"];
   if (name === undefined) return null;
   const attributes = fields["Attributes"] ?? "";
-  const link = fields["Symbolic Link"] !== undefined || /(^|\s)l[rwxst-]{9}$/.test(attributes);
+  // A tar prints this field for every entry and leaves it empty unless the entry really is a link; a zip with
+  // Unix attributes says so in the mode string instead.
+  const link = (fields["Symbolic Link"] ?? "") !== "" || /(^|\s)l[rwxst-]{9}$/.test(attributes);
   const kind = link
     ? "link"
     : fields["Folder"] === "+" || /(^|\s)D/.test(attributes.split(" ")[0] ?? "")
@@ -360,26 +363,29 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
     archive: {
       extract: async (archive, destination, options) => {
         await mkdir(destination, { recursive: true });
-        const outcome = await inWorker<{ code: number }>(EXTRACT_WORKER, "extraction", {
-          archive,
-          destination,
-          // Spread rather than passed through: a readonly array from the caller may be a reactive proxy by
-          // the time it gets here, and the structured clone into the worker refuses one.
-          only: options?.only ? [...options.only] : [],
+        return throughGzip(archive, async (path) => {
+          const outcome = await inWorker<{ code: number }>(EXTRACT_WORKER, "extraction", {
+            archive: path,
+            destination,
+            // Spread rather than passed through: a readonly array from the caller may be a reactive proxy by
+            // the time it gets here, and the structured clone into the worker refuses one.
+            only: options?.only ? [...options.only] : [],
+          });
+          if ("error" in outcome) throw new Error(`Could not extract ${archive}: ${outcome.error}`);
+          if (outcome.code !== 0) throw new Error(`Could not extract ${archive}: 7-Zip exited with ${outcome.code}`);
         });
-        if ("error" in outcome) throw new Error(`Could not extract ${archive}: ${outcome.error}`);
-        if (outcome.code !== 0) throw new Error(`Could not extract ${archive}: 7-Zip exited with ${outcome.code}`);
       },
 
-      list: async (archive) => {
-        const outcome = await inWorker<{ code: number; lines: string[] }>(EXTRACT_WORKER, "listing", {
-          archive,
-          list: true,
-        });
-        if ("error" in outcome) throw new Error(`Could not read ${archive}: ${outcome.error}`);
-        if (outcome.code !== 0) throw new Error(`Could not read ${archive}: 7-Zip exited with ${outcome.code}`);
-        return parseListing(outcome.lines);
-      },
+      list: async (archive) =>
+        throughGzip(archive, async (path) => {
+          const outcome = await inWorker<{ code: number; lines: string[] }>(EXTRACT_WORKER, "listing", {
+            archive: path,
+            list: true,
+          });
+          if ("error" in outcome) throw new Error(`Could not read ${archive}: ${outcome.error}`);
+          if (outcome.code !== 0) throw new Error(`Could not read ${archive}: 7-Zip exited with ${outcome.code}`);
+          return parseListing(outcome.lines);
+        }),
 
       createZip: async (destination, entries: readonly ArchiveEntry[]) => {
         const outcome = await inWorker<{ ok: true }>(ZIP_WORKER, "zip", {
