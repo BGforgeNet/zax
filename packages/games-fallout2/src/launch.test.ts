@@ -43,3 +43,34 @@ describe("planning a launch", () => {
     expect(planLaunch("linux", INSTALL, null).env).not.toHaveProperty("WINEDLLOVERRIDES");
   });
 });
+
+describe("planning a launch through an engine", () => {
+  it("runs the engine's own executable on Windows", () => {
+    expect(planLaunch("windows", INSTALL, "4.5", "fallout2-ce.exe")).toEqual({
+      program: "fallout2-ce.exe",
+      args: [],
+      cwd: "/games/one",
+      env: {},
+    });
+  });
+
+  it("runs it from the install directory elsewhere, with no Wine at all", () => {
+    const plan = planLaunch("linux", { ...INSTALL, wine: { prefix: "/home/t/.wine" } }, "4.5", "fallout2-ce");
+    expect(plan.program).toBe("./fallout2-ce");
+    expect(plan.args).toEqual([]);
+    expect(plan.cwd).toBe("/games/one");
+    // A native build loads no DirectDraw wrapper and needs no prefix; passing either would be a claim about
+    // an engine that is not running under Wine at all.
+    expect(plan.env).toEqual({});
+  });
+
+  it("runs the binary inside a macOS bundle, so the working directory is the install", () => {
+    const plan = planLaunch("macos", INSTALL, null, "Fallout II Community Edition.app/Contents/MacOS/fallout2-ce");
+    expect(plan.program).toBe("./Fallout II Community Edition.app/Contents/MacOS/fallout2-ce");
+    expect(plan.cwd).toBe("/games/one");
+  });
+
+  it("still plans the original executable when no engine is named", () => {
+    expect(planLaunch("windows", INSTALL, "4.5", null)).toEqual(planLaunch("windows", INSTALL, "4.5"));
+  });
+});

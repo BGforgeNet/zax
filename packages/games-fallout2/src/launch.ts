@@ -25,8 +25,23 @@ export interface LaunchPlan {
  * `sfallVersion` is what is installed, or null when no `ddraw.dll` is there. It decides how Wine is told to
  * load that DLL: sfall replaces DirectDraw, and before 4.1.2 loading the builtin alongside the native one broke
  * it. With no sfall installed there is nothing to override, so the variable is left off entirely.
+ *
+ * `engineProgram` is an installed alternative engine's own program, relative to the install, or null for the
+ * game's own executable. An engine is a native build of this system, so it takes no Wine and no DirectDraw
+ * override however the install is configured - both would be claims about a process that is not under Wine.
  */
-export function planLaunch(os: OperatingSystem, install: Install, sfallVersion: string | null): LaunchPlan {
+export function planLaunch(
+  os: OperatingSystem,
+  install: Install,
+  sfallVersion: string | null,
+  engineProgram: string | null = null,
+): LaunchPlan {
+  if (engineProgram !== null) {
+    // Prefixed off Windows because a bare name is a PATH lookup there, and this program is in the install.
+    const program = os === "windows" ? engineProgram : `./${engineProgram}`;
+    return { program, args: [], cwd: install.path, env: {} };
+  }
+
   if (os === "windows") return { program: EXECUTABLE, args: [], cwd: install.path, env: {} };
 
   const overrides =
