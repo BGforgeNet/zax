@@ -29,6 +29,8 @@ import {
   SETTINGS,
   againstRecommendation,
   describePlace,
+  engineById,
+  engineOutdated,
   hiddenIds,
   listMods,
   placesById,
@@ -1344,18 +1346,12 @@ class Store {
     });
   }
 
-  /**
-   * Whether the installed build is behind what was found - false until someone has checked. Repeats the
-   * comparison `engine-release.ts` makes because the store holds only the listing, not the catalog entry
-   * that decides which comparison applies.
-   */
+  /** Whether the installed build is behind what was found - false until someone has checked, or nothing is. */
   engineOutdated(engineId: string): boolean {
     const engine = this.engines.find((one) => one.id === engineId);
     const latest = this.engineLatest[engineId];
     if (!engine?.installed || !latest) return false;
-    const had = Date.parse(engine.installed.published);
-    const now = Date.parse(latest.published);
-    return !Number.isNaN(had) && !Number.isNaN(now) && now > had;
+    return engineOutdated(engineById(engineId), engine.installed, latest);
   }
 
   async saveSlots(): Promise<readonly string[]> {
