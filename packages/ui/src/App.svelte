@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import bgforgeLogo from "./assets/bgforge.png";
-  import zaxMark from "./assets/zax.svg";
   import EnginesView from "./lib/EnginesView.svelte";
   import ModsView from "./lib/ModsView.svelte";
   import NoInstall from "./lib/NoInstall.svelte";
@@ -9,7 +8,6 @@
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
   import { store } from "./lib/store.svelte.js";
-  import { BUILD } from "./lib/version.js";
 
   // Reading the state file and the selected install's config files is the first thing that happens, and it is
   // a filesystem read, so the interface renders its empty shape until it lands rather than blocking on it.
@@ -41,82 +39,11 @@
 <svelte:window onkeydown={onWindowKey} />
 
 <div class="shell">
-  <header class="top">
-    <!-- Decorative: the word beside it is the name, so a second one read out would only be a stutter. -->
-    <div class="brand">
-      <img class="mark" src={zaxMark} alt="" width="18" height="18" />
-      ZAX <span class="version">{BUILD}</span>
-    </div>
-
-    <!--
-      Above the tab strips rather than beside them: settings are keys in config files and mods are what the
-      engine loads, so this is a change of subject rather than another tab of one. Both halves are always
-      offered - an install with no mods folder yet is exactly the one whose owner is about to add one.
-    -->
-    <div class="views" role="tablist">
-      <button
-        role="tab"
-        class="view"
-        aria-selected={store.view === "settings"}
-        onclick={() => (store.view = "settings")}
-      >
-        <!--
-          Ahead of the label rather than after it, which is what makes the pair symmetric: each half reserves
-          its mark on its own outer edge, so the two labels sit the same distance from the ends of the control.
-        -->
-        <span
-          class="dot"
-          class:unsaved={store.settingsChanged}
-          aria-hidden="true"
-          title={store.settingsChanged ? "Settings have unsaved changes" : null}
-        ></span>
-        Settings
-      </button>
-      <button role="tab" class="view" aria-selected={store.view === "mods"} onclick={() => (store.view = "mods")}>
-        Mods
-        <!--
-          Held in the markup shown or not, for the reason the settings tabs hold theirs: it must not resize.
-          Both halves carry one, which is what keeps the pair evenly padded whichever of them is marked.
-        -->
-        <span
-          class="dot"
-          class:unsaved={store.modsViewChanged}
-          aria-hidden="true"
-          title={store.modsViewChanged ? "Mods have unsaved changes" : null}
-        ></span>
-      </button>
-      <button role="tab" class="view" aria-selected={store.view === "engines"} onclick={() => (store.view = "engines")}>
-        Engines
-      </button>
-    </div>
-
-    <!--
-      What is running, for every operation rather than only the ones whose own button changes label. An sfall
-      update is minutes of work on a poor connection, and the buttons that start it are in a panel the user may
-      well have scrolled away from - without this the whole window simply sat there.
-
-      Between the brand and the spacer, so appearing and disappearing does not move the chip on the right.
-    -->
-    {#if store.busy}
-      <span class="working" role="status">
-        <span class="busy-dot" aria-hidden="true"></span>
-        {store.progressText ?? store.busy}
-      </span>
-    {/if}
-
-    <div class="spacer"></div>
-
-    <!-- The shell hands a web link to the browser rather than following it, so this needs no operation of its own. -->
-    <span class="powered">
-      Powered by <a href="https://bgforge.net/" target="_blank" rel="noreferrer">BGforge</a>
-      <img class="logo" src={bgforgeLogo} alt="" width="18" height="18" />
-    </span>
-  </header>
-
   <!--
     Outcomes of anything that reached the machine - a save, a refusal, a failed version check - land here
     rather than beside the button that started them: several of those buttons live in the sidebar, and a
-    message that scrolls away with its panel is a message the user never reads.
+    message that scrolls away with its panel is a message the user never reads. Above both columns, since
+    either can produce one.
   -->
   {#if store.notice}
     <div class="notice" class:problem={store.notice.kind === "problem"} role="status">
@@ -127,32 +54,100 @@
 
   <div class="body">
     <Sidebar />
-    <!-- Everything here acts on the selected install, so there is nothing to show until there is one. -->
-    {#if store.loaded && !store.install}
-      <NoInstall />
-    {:else if store.view === "mods"}
-      <ModsView />
-    {:else if store.view === "engines"}
-      <EnginesView />
-    {:else}
-      <SettingsView />
-    {/if}
-  </div>
 
-  <!--
-    Chrome rather than part of a view: Save writes the config files and the mod order together whichever tab
-    is open, and Run starts the game from any of them. Left out only on the no-install screen, which has
-    nothing for either button to act on - while the state file is still being read the views draw their empty
-    shape, so the bar draws with them rather than appearing under the pointer a moment later.
-  -->
-  {#if !store.loaded || store.install}
-    <SaveBar />
-  {/if}
+    <!--
+      The second column: which view is open, what the machine is doing, and the two buttons that act on the
+      selected install. Its strip belongs to this column the way the sidebar's belongs to that one, so the
+      boundary between them runs the whole height rather than starting below a bar that spanned both.
+    -->
+    <div class="column">
+      <div class="tabbar topbar">
+        <!--
+          Settings are keys in config files, mods are what the engine loads and an engine is what runs them:
+          a change of subject rather than another tab of one. All three are always offered - an install with
+          no mods folder yet is exactly the one whose owner is about to add one.
+        -->
+        <div class="tabs" role="tablist">
+          <button
+            role="tab"
+            class="tab"
+            aria-selected={store.view === "settings"}
+            onclick={() => (store.view = "settings")}
+          >
+            Settings
+            <!-- Held in the markup shown or not: selection must not resize a tab and shift the ones after it. -->
+            <span
+              class="dot"
+              class:unsaved={store.settingsChanged}
+              aria-hidden="true"
+              title={store.settingsChanged ? "Settings have unsaved changes" : null}
+            ></span>
+          </button>
+          <button role="tab" class="tab" aria-selected={store.view === "mods"} onclick={() => (store.view = "mods")}>
+            Mods
+            <span
+              class="dot"
+              class:unsaved={store.modsViewChanged}
+              aria-hidden="true"
+              title={store.modsViewChanged ? "Mods have unsaved changes" : null}
+            ></span>
+          </button>
+          <button
+            role="tab"
+            class="tab"
+            aria-selected={store.view === "engines"}
+            onclick={() => (store.view = "engines")}
+          >
+            Engines
+          </button>
+        </div>
+
+        <!--
+          What is running, for every operation rather than only the ones whose own button changes label. An
+          sfall update is minutes of work on a poor connection, and the buttons that start it are in a panel
+          the user may well have scrolled away from - without this the whole window simply sat there.
+        -->
+        {#if store.busy}
+          <span class="working" role="status">
+            <span class="busy-dot" aria-hidden="true"></span>
+            {store.progressText ?? store.busy}
+          </span>
+        {/if}
+
+        <!-- The shell hands a web link to the browser rather than following it, so this needs no operation. -->
+        <span class="powered">
+          Powered by <a href="https://bgforge.net/" target="_blank" rel="noreferrer">BGforge</a>
+          <img class="logo" src={bgforgeLogo} alt="" width="18" height="18" />
+        </span>
+      </div>
+
+      <!-- Everything here acts on the selected install, so there is nothing to show until there is one. -->
+      {#if store.loaded && !store.install}
+        <NoInstall />
+      {:else if store.view === "mods"}
+        <ModsView />
+      {:else if store.view === "engines"}
+        <EnginesView />
+      {:else}
+        <SettingsView />
+      {/if}
+
+      <!--
+        Chrome rather than part of a view: Save writes the config files and the mod order together whichever
+        tab is open, and Run starts the game from any of them. Left out only on the no-install screen, which
+        has nothing for either button to act on - while the state file is still being read the views draw
+        their empty shape, so the bar draws with them rather than appearing under the pointer a moment later.
+      -->
+      {#if !store.loaded || store.install}
+        <SaveBar />
+      {/if}
+    </div>
+  </div>
 </div>
 
 <style>
   .shell {
-    /* The header sits outside the pane, so it needs its own reference for `--gutter`. */
+    /* `--gutter` is measured against this, which is what holds both columns and so what centres them. */
     container-type: inline-size;
     height: 100%;
     display: flex;
@@ -160,77 +155,41 @@
     min-width: 0;
   }
 
-  .top {
+  /*
+    The second column, and the block the sidebar's border opens. Its own gutter, which the strip above, the
+    view inside and the bar below all inset by, so the three share one left edge.
+  */
+  .column {
+    --gutter: 14px;
+    flex: 1 1 auto;
+    min-width: 430px;
+    min-height: 0;
     display: flex;
-    align-items: center;
-    gap: 8px 12px;
-    /*
-      Indented past the gutter by the column's own border and the inset its tab strip adds, which puts the mark
-      here on the same left edge as the Games tab below it. Both ends, so the bar stays evenly padded.
-    */
-    padding: 9px calc(var(--gutter) + 1px + var(--tab-inset));
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    flex: 0 0 auto;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--border);
   }
 
-  /* Nothing in the bar shrinks; the spacer takes the slack. */
-  .top > * {
+  /*
+    The shared strip plus what sits at the far end of its row. The tabs take the slack rather than a spacer
+    doing it, so the credit stays pinned right and the progress text lands beside it without moving the tabs.
+  */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-right: var(--gutter);
+  }
+
+  .topbar .tabs {
+    flex: 1 1 auto;
+  }
+
+  .topbar > :not(.tabs) {
     flex: 0 0 auto;
     white-space: nowrap;
   }
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-weight: 650;
-    letter-spacing: 0.02em;
-  }
-
-  /* Both marks sit on the text's own line rather than on the bar's, so neither drags the row taller. */
-  .mark,
-  .logo {
-    display: block;
-    flex: 0 0 auto;
-  }
-
-  /*
-    A segmented pair rather than the tab shape used below: those hang off the edge of the strip they sit on,
-    and there is no edge here to hang from. It reads as one control with two halves, which is what it is.
-  */
-  .views {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--border-strong);
-    border-radius: 7px;
-    background: var(--panel-alt);
-  }
-
-  .view {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: none;
-    border: none;
-    border-radius: 5px;
-    padding: 3px 13px;
-    font-size: 12.5px;
-    color: var(--text-dim);
-  }
-
-  .view:hover {
-    color: var(--text);
-  }
-
-  /* Selection changes no metric here either - weight would resize the half and shift the other one along. */
-  .view[aria-selected="true"] {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-
-  /* Holds its space whether it is showing or not, so switching views never re-lays-out the bar. */
   .dot {
     width: 6px;
     height: 6px;
@@ -275,12 +234,6 @@
     padding: 2px 9px;
   }
 
-  .version {
-    color: var(--text-faint);
-    font-weight: 400;
-    font-size: 12px;
-  }
-
   /*
     Dimmer than the brand but not the faint the version uses: that tone is under 4.5:1 on both palettes, which
     the half of this someone is meant to click should not be.
@@ -303,10 +256,6 @@
     color: var(--accent);
   }
 
-  .spacer {
-    flex: 1;
-  }
-
   .working {
     display: flex;
     align-items: center;
@@ -327,7 +276,7 @@
     background: var(--accent);
   }
 
-  /* The gutter is the same one the header and the notice inset by, so all three share one left edge. */
+  /* The outer gutter, which is the centring one: it is the margin outside the pair, not an inset within it. */
   .body {
     flex: 1;
     display: flex;

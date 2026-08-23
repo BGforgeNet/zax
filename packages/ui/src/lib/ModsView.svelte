@@ -124,10 +124,6 @@
 {/snippet}
 
 <div class="pane">
-  <div class="heading">
-    <h1>Mods</h1>
-  </div>
-
   <div class="tabbar">
     <div class="tabs" role="tablist">
       <button

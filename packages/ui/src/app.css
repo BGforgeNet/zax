@@ -30,11 +30,8 @@
   --col: calc(57rem + 60px);
   --sidebar: 264px;
 
-  /*
-    How far the column's tab strip sits inside the column's own border. Shared rather than written twice
-    because the top bar indents by it as well - that is what puts the mark in the bar on the same left edge as
-    the first tab below it, and a second copy would drift the two apart.
-  */
+  /* How far the sidebar's tab strip sits inside its own border: the shared strip's gutter is a pane's, and
+     too wide for a 264px column. */
   --tab-inset: 8px;
 
   /*
@@ -96,17 +93,13 @@ button {
   border-radius: 3px;
 }
 
-/* The shell every view is built from: a fixed heading over one scrolling list. */
+/* The shell every view is built from: a fixed strip over one scrolling list. */
 .pane {
-  /* Inside the column the gutter is a plain inset: the centring happens once, around both columns together. */
-  --gutter: 14px;
   flex: 1 1 auto;
-  min-width: 430px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* Closes the block the sidebar opens, so the centred pair reads as bounded on both sides. */
-  border-right: 1px solid var(--border);
 }
 
 .pane main {
@@ -115,16 +108,6 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.pane .heading {
-  padding: 16px var(--gutter) 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.pane .heading h1 {
-  margin: 0;
-  font-size: 17px;
 }
 
 .pane .list {
