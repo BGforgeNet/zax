@@ -1,0 +1,188 @@
+/**
+ * Putting an engine into a game folder, replacing it with a newer build, and taking it out again.
+ *
+ * The shape is the sfall updater's with the merge removed - an engine ships no settings file to merge: back up
+ * what is about to be replaced, unpack, copy the declared members in, record what was done.
+ */
+
+import { backupDirectory, copyTree, stamp, temporaryDirectory } from "@zax/core";
+import type { Install } from "@zax/core";
+import type { ArchiveEntryInfo, Platform } from "@zax/platform";
+import { preflightArchive } from "./archive-preflight.js";
+import { enginePackage, latestEngine, type EngineProgress } from "./engine-release.js";
+import { buildFor, engineById } from "./engines.js";
+import { loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
+
+export interface EngineInstallOutcome {
+  engine: string;
+  release: string;
+  published: string;
+  /** What was deployed, relative to the install. */
+  files: readonly string[];
+  /** Which of those were already there, and so were copied aside first. */
+  replaced: readonly string[];
+  backup: string | null;
+}
+
+export interface EngineRemoval {
+  engine: string;
+  removed: readonly string[];
+  /** Where that install's replaced originals are, when it replaced any. Said rather than restored. */
+  backup: string | null;
+}
+
+/** What the record says is here, judged against the directory - the same reconciliation the mods get. */
+export async function installedEngines(platform: Platform, install: Install): Promise<readonly InstalledEngine[]> {
+  const record = await reconcileRecord(platform, await loadRecord(platform, install.path));
+  return record.engines ?? [];
+}
+
+/** The record with this engine's entry replaced by `entry`, or removed when there is none. */
+function withEngine(
+  engines: readonly InstalledEngine[],
+  id: string,
+  entry: InstalledEngine | null,
+): readonly InstalledEngine[] {
+  const others = engines.filter((one) => one.id !== id);
+  return entry === null ? others : [...others, entry];
+}
+
+/**
+ * Runs `action`, discarding the cached archive first when it throws - a cache keyed on existence would
+ * otherwise fail preflight, or extraction, the same way on every attempt after this one.
+ */
+async function orDiscard<T>(platform: Platform, archive: string, action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    await platform.fs.remove(archive);
+    throw error;
+  }
+}
+
+/**
+ * Installs an engine, or replaces the build that is there with the published one. Both are the same operation:
+ * a previous copy is simply files the deployment replaces, and the backup covers them.
+ */
+export async function installEngine(
+  platform: Platform,
+  install: Install,
+  engineId: string,
+  now: Date = new Date(),
+  options?: EngineProgress,
+): Promise<EngineInstallOutcome> {
+  const engine = engineById(engineId);
+  const build = buildFor(engine, platform.os, platform.arch);
+  if (build === null) {
+    throw new Error(`${engine.name} publishes no build ZAX can install for this machine. See ${engine.page}.`);
+  }
+
+  options?.onStep?.(`Checking what ${engine.name} has published`);
+  const release = await latestEngine(platform, engineId);
+  if (release.asset === null) {
+    throw new Error(`The ${engine.name} release ${release.release} carries no ${build.asset}.`);
+  }
+
+  const archive = await enginePackage(platform, engine, release, release.asset, options);
+  const { join } = platform.paths;
+  const at = stamp(now);
+  const work = join(temporaryDirectory(platform), `engine-${engine.id}-${at}`);
+
+  try {
+    // Judged before it is opened: this is a third-party archive about to be unpacked over a game folder.
+    const entries: readonly ArchiveEntryInfo[] = await orDiscard(platform, archive, () =>
+      preflightArchive(platform, archive, `${engine.name} ${release.release}`),
+    );
+
+    // Null where the host cannot say - a check that cannot run is not a check that failed.
+    const needed = entries.reduce((sum, entry) => sum + entry.size, 0);
+    const free = await platform.fs.freeSpace(install.path);
+    if (free !== null && free < needed) {
+      throw new Error(
+        `${engine.name} ${release.release} needs ${needed} bytes unpacked, and the drive holding ${install.path} has ${free}.`,
+      );
+    }
+
+    options?.onStep?.(`Unpacking ${engine.name}`);
+    await orDiscard(platform, archive, () => platform.archive.extract(archive, work));
+
+    options?.onStep?.(`Installing ${engine.name}`);
+    const backup = join(backupDirectory(platform), at);
+    const replaced: string[] = [];
+    const files: string[] = [];
+
+    // Written before anything is deployed and marked complete after, so a crash leaves a record saying so
+    // rather than one that reads as a good copy of a release nobody can identify.
+    const record = await loadRecord(platform, install.path);
+    const entry: InstalledEngine = {
+      id: engine.id,
+      release: release.release,
+      published: release.published,
+      complete: false,
+      files: build.members.map((member) => member.to),
+    };
+    await saveRecord(platform, { ...record, engines: withEngine(record.engines ?? [], engine.id, entry) });
+
+    for (const member of build.members) {
+      const source = join(work, ...member.from.split("/"));
+      const found = await platform.fs.stat(source);
+      if (found === null) {
+        throw new Error(
+          `The ${engine.name} release does not contain ${member.from} - its layout has changed, and ZAX will not guess where that went.`,
+        );
+      }
+      const destination = join(install.path, ...member.to.split("/"));
+      const existing = await platform.fs.stat(destination);
+      if (existing !== null) {
+        const keep = join(backup, ...member.to.split("/"));
+        if (existing.kind === "dir") await copyTree(platform, destination, keep);
+        else await platform.fs.copy(destination, keep);
+        replaced.push(member.to);
+      }
+      if (found.kind === "dir") await copyTree(platform, source, destination);
+      else await platform.fs.copy(source, destination);
+      files.push(member.to);
+    }
+
+    // A binary that arrived inside an archive may arrive without its mode, and an engine that cannot be
+    // executed is an install that did not happen.
+    await platform.fs.makeExecutable(join(install.path, ...build.program.split("/")));
+
+    const done: InstalledEngine = {
+      ...entry,
+      complete: true,
+      ...(replaced.length > 0 ? { backup } : {}),
+    };
+    const written = await loadRecord(platform, install.path);
+    await saveRecord(platform, { ...written, engines: withEngine(written.engines ?? [], engine.id, done) });
+
+    return {
+      engine: engine.id,
+      release: release.release,
+      published: release.published,
+      files,
+      replaced,
+      backup: replaced.length > 0 ? backup : null,
+    };
+  } finally {
+    await platform.fs.remove(work);
+  }
+}
+
+/**
+ * Deletes what the record says this engine deployed, and nothing else. Where it replaced something, the
+ * message says where the originals are rather than putting them back: restoring is a separate promise, and an
+ * install onto a stock game - which is every ordinary one - replaced nothing to restore.
+ */
+export async function removeEngine(platform: Platform, install: Install, engineId: string): Promise<EngineRemoval> {
+  const engine = engineById(engineId);
+  const record = await loadRecord(platform, install.path);
+  const entry = (record.engines ?? []).find((one) => one.id === engineId);
+  if (!entry) throw new Error(`${engine.name} is not installed here, as far as ZAX's record goes.`);
+
+  for (const file of entry.files) {
+    await platform.fs.remove(platform.paths.join(install.path, ...file.split("/")));
+  }
+  await saveRecord(platform, { ...record, engines: withEngine(record.engines ?? [], engineId, null) });
+  return { engine: engineId, removed: entry.files, backup: entry.backup ?? null };
+}
