@@ -240,9 +240,15 @@ function readEngine(entry: unknown): InstalledEngine | null {
   const release = asText(fields["release"]);
   const published = asText(fields["published"]);
   if (id === undefined || release === undefined || published === undefined) return null;
-  const files = Array.isArray(fields["files"])
-    ? fields["files"].filter((one): one is string => typeof one === "string")
-    : [];
+
+  // Bound the way a base mod's paths are, not `mayWrite`'s narrower one: an engine deploys at the install
+  // root, not under `mods/`. A path that fails it refuses the whole entry, the same as `readMod` does.
+  const files: string[] = [];
+  for (const file of Array.isArray(fields["files"]) ? fields["files"] : []) {
+    const path = asText(file);
+    if (path === undefined || !isConfined(path)) return null;
+    files.push(path);
+  }
   const backup = asText(fields["backup"]);
   return {
     id,

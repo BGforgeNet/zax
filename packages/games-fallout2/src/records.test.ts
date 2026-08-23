@@ -207,6 +207,24 @@ describe("engines in the record", () => {
     ]);
   });
 
+  it("drops an engine entry whose files reach outside the install, the way a tampered mod entry is dropped", async () => {
+    const platform = new MemoryPlatform({ config: "cfg", cache: "cache" });
+    await saveRecord(platform, {
+      path: "/games/one",
+      mods: [],
+      engines: [
+        {
+          id: "fallout2-ce",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: ["../elsewhere"],
+        },
+      ],
+    });
+    expect((await loadRecord(platform, "/games/one")).engines ?? []).toEqual([]);
+  });
+
   it("keeps the file for an install that has an engine and no mods", async () => {
     const platform = new MemoryPlatform({ config: "cfg", cache: "cache" });
     await saveRecord(platform, {

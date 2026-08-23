@@ -2,7 +2,7 @@ import { MemoryPlatform } from "@zax/platform/memory";
 import type { Install } from "@zax/core";
 import { describe, expect, it } from "vitest";
 import { installEngine, installedEngines, removeEngine } from "./engine-install.js";
-import { loadRecord } from "./records.js";
+import { loadRecord, saveRecord } from "./records.js";
 
 const INSTALL: Install = { path: "/games/one", type: "fallout2" };
 const FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=1";
@@ -135,6 +135,23 @@ describe("installing an engine", () => {
     );
   });
 
+  it("deploys nothing when the archive is missing the second of two declared members", async () => {
+    const platform = new MemoryPlatform({
+      os: "linux",
+      arch: "x64",
+      config: "cfg",
+      cache: "cache",
+      responses: { [FEED]: RELEASE },
+      downloads: { [URL]: "payload" },
+      archives: { payload: { "fallout2-ce-linux-x64/fallout2-ce": "binary" } },
+      files: { "/games/one/fallout2.exe": "" },
+    });
+    await expect(installEngine(platform, INSTALL, "fallout2-ce", NOW)).rejects.toThrow(
+      /fallout2-ce-linux-x64\/ce\.dat/,
+    );
+    expect(await platform.fs.stat("/games/one/fallout2-ce"), "the first member must not land either").toBeNull();
+  });
+
   it("leaves the record incomplete when the deployment fails part-way", async () => {
     const platform = seeded();
     const broken = { ...platform, fs: { ...platform.fs, makeExecutable: () => Promise.reject(new Error("no")) } };
@@ -144,7 +161,7 @@ describe("installing an engine", () => {
   });
 });
 
-describe("the cached archive on a bad preflight", () => {
+describe("discarding a bad cached archive", () => {
   // Matches the derivation `enginePackage` uses: `packages/engines/<id>/<published, digits only>/<asset name>`,
   // the same path `engine-release.test.ts` computes to assert on the cache.
   const CACHE_PATH = "cache/packages/engines/fallout2-ce/20260823093722/fallout2-ce-linux-x64.tar.gz";
@@ -166,6 +183,20 @@ describe("the cached archive on a bad preflight", () => {
       await platform.fs.stat(CACHE_PATH),
       "a cache keyed on existence would fail the same way for ever",
     ).toBeNull();
+  });
+
+  it("discards a cached archive that fails to extract, not only one that fails preflight", async () => {
+    const platform = seeded();
+    // Preflight reads the same canned listing either way; only extraction is made to fail here.
+    const broken = {
+      ...platform,
+      archive: {
+        ...platform.archive,
+        extract: () => Promise.reject(new Error("disk error")),
+      },
+    };
+    await expect(installEngine(broken, INSTALL, "fallout2-ce", NOW)).rejects.toThrow(/disk error/);
+    expect(await platform.fs.stat(CACHE_PATH)).toBeNull();
   });
 });
 
@@ -237,6 +268,39 @@ describe("updating", () => {
     expect(again.replaced).toEqual(["fallout2-ce", "ce.dat"]);
     expect(await installedEngines(platform, INSTALL)).toHaveLength(1);
   });
+
+  it("replaces a directory member whole, rather than merging the new one over what is there", async () => {
+    // Set up as if a previous install already put the bundle down with a file the new release drops.
+    const MAC_URL = "https://example.invalid/mac.dmg";
+    const MAC_RELEASE = JSON.stringify([
+      {
+        tag_name: "continious",
+        published_at: "2026-08-24T09:37:22Z",
+        assets: [{ name: "Fallout.II.Community.Edition.dmg", size: 7, browser_download_url: MAC_URL }],
+      },
+    ]);
+    const bundle = "Fallout II Community Edition/Fallout II Community Edition.app";
+    const platform = new MemoryPlatform({
+      os: "macos",
+      arch: "arm64",
+      config: "cfg",
+      cache: "cache",
+      responses: { [FEED]: MAC_RELEASE },
+      downloads: { [MAC_URL]: "mac-payload" },
+      archives: { "mac-payload": { [`${bundle}/Contents/MacOS/fallout2-ce`]: "binary v2" } },
+      files: {
+        "/games/one/fallout2.exe": "",
+        "/games/one/Fallout II Community Edition.app/Contents/MacOS/fallout2-ce": "binary v1",
+        "/games/one/Fallout II Community Edition.app/Contents/Resources/stale.dat": "dropped from this release",
+      },
+    });
+
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+    expect(
+      await platform.fs.stat("/games/one/Fallout II Community Edition.app/Contents/Resources/stale.dat"),
+      "the release dropped this file - it must not survive merged into the new bundle",
+    ).toBeNull();
+  });
 });
 
 describe("removing", () => {
@@ -252,5 +316,41 @@ describe("removing", () => {
 
   it("refuses an engine that is not recorded here", async () => {
     await expect(removeEngine(seeded(), INSTALL, "fallout2-ce")).rejects.toThrow(/not installed/i);
+  });
+
+  it("refuses a record a later ZAX wrote, deleting nothing", async () => {
+    const platform = seeded();
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+    // Simulates the on-disk state a downgrade meets: the same trick `records.test.ts` uses for mods.
+    const file = platform.allFiles().find((path) => path.includes("installed-mods"));
+    if (file === undefined) throw new Error("no record was written");
+    const text = new TextDecoder().decode(await platform.fs.read(file));
+    await platform.fs.write(file, new TextEncoder().encode(text.replace("record: 1", "record: 2")));
+
+    await expect(removeEngine(platform, INSTALL, "fallout2-ce")).rejects.toThrow(/newer version of ZAX/i);
+    expect(await platform.fs.stat("/games/one/fallout2-ce")).not.toBeNull();
+    expect(await platform.fs.stat("/games/one/ce.dat")).not.toBeNull();
+  });
+
+  it("drops a tampered record naming a path outside the install, so removal touches nothing there", async () => {
+    const platform = seeded({ "/games/elsewhere": "untouched" });
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+    const record = await loadRecord(platform, INSTALL.path);
+    // A hand-edited record, not one ZAX would ever write - `saveRecord` itself applies no path bound.
+    await saveRecord(platform, {
+      ...record,
+      engines: [
+        {
+          id: "fallout2-ce",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: ["../elsewhere"],
+        },
+      ],
+    });
+
+    await expect(removeEngine(platform, INSTALL, "fallout2-ce")).rejects.toThrow(/not installed/i);
+    expect(await platform.fs.stat("/games/elsewhere")).not.toBeNull();
   });
 });

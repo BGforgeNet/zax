@@ -7,11 +7,11 @@
 
 import { backupDirectory, copyTree, stamp, temporaryDirectory } from "@zax/core";
 import type { Install } from "@zax/core";
-import type { ArchiveEntryInfo, Platform } from "@zax/platform";
+import type { ArchiveEntryInfo, FileStat, Platform } from "@zax/platform";
 import { preflightArchive } from "./archive-preflight.js";
 import { enginePackage, latestEngine, type EngineProgress } from "./engine-release.js";
-import { buildFor, engineById } from "./engines.js";
-import { loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
+import { buildFor, engineById, type EngineMember } from "./engines.js";
+import { assertUsable, loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
 
 export interface EngineInstallOutcome {
   engine: string;
@@ -123,6 +123,9 @@ export async function installEngine(
     };
     await saveRecord(platform, { ...record, engines: withEngine(record.engines ?? [], engine.id, entry) });
 
+    // Checked whole before anything is written: a release missing one declared member must fail without
+    // having already moved the user's original aside for the members that were there.
+    const resolved: Array<{ member: EngineMember; source: string; found: FileStat }> = [];
     for (const member of build.members) {
       const source = join(work, ...member.from.split("/"));
       const found = await platform.fs.stat(source);
@@ -131,12 +134,22 @@ export async function installEngine(
           `The ${engine.name} release does not contain ${member.from} - its layout has changed, and ZAX will not guess where that went.`,
         );
       }
+      resolved.push({ member, source, found });
+    }
+
+    for (const { member, source, found } of resolved) {
       const destination = join(install.path, ...member.to.split("/"));
       const existing = await platform.fs.stat(destination);
       if (existing !== null) {
         const keep = join(backup, ...member.to.split("/"));
-        if (existing.kind === "dir") await copyTree(platform, destination, keep);
-        else await platform.fs.copy(destination, keep);
+        if (existing.kind === "dir") {
+          await copyTree(platform, destination, keep);
+          // Removed rather than left for `copyTree` to merge into: it only ever adds files, so a release
+          // that drops one from the bundle would otherwise leave the old copy behind inside the new one.
+          await platform.fs.remove(destination);
+        } else {
+          await platform.fs.copy(destination, keep);
+        }
         replaced.push(member.to);
       }
       if (found.kind === "dir") await copyTree(platform, source, destination);
@@ -177,6 +190,7 @@ export async function installEngine(
 export async function removeEngine(platform: Platform, install: Install, engineId: string): Promise<EngineRemoval> {
   const engine = engineById(engineId);
   const record = await loadRecord(platform, install.path);
+  assertUsable(record, engineId);
   const entry = (record.engines ?? []).find((one) => one.id === engineId);
   if (!entry) throw new Error(`${engine.name} is not installed here, as far as ZAX's record goes.`);
 
