@@ -1,7 +1,7 @@
 import { MemoryPlatform } from "@zax/platform/memory";
 import type { Install } from "@zax/core";
 import { describe, expect, it } from "vitest";
-import { installEngine, installedEngines, removeEngine } from "./engine-install.js";
+import { installCachedEngine, installEngine, installedEngines, removeEngine } from "./engine-install.js";
 import { loadRecord, saveRecord } from "./records.js";
 
 const INSTALL: Install = { path: "/games/one", type: "fallout2" };
@@ -352,5 +352,43 @@ describe("removing", () => {
 
     await expect(removeEngine(platform, INSTALL, "fallout2-ce")).rejects.toThrow(/not installed/i);
     expect(await platform.fs.stat("/games/elsewhere")).not.toBeNull();
+  });
+});
+
+describe("installing from what the machine already holds", () => {
+  /** A second folder on the same machine: the archive is cached, this install has never seen the engine. */
+  const SECOND: Install = { path: "/games/two", type: "fallout2" };
+
+  const offline = (platform: MemoryPlatform): MemoryPlatform => {
+    // Any request at all is the defect this path exists to avoid, so make one fail the test rather than work.
+    platform.net.fetchText = () => Promise.reject(new Error("the cached install asked the network"));
+    platform.net.download = () => Promise.reject(new Error("the cached install downloaded again"));
+    return platform;
+  };
+
+  it("deploys into a folder that never had it, without asking the network anything", async () => {
+    const platform = seeded({ "/games/two/fallout2.exe": "" });
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+
+    const outcome = await installCachedEngine(offline(platform), SECOND, "fallout2-ce", NOW);
+    expect(outcome.files).toEqual(["fallout2-ce", "ce.dat"]);
+    expect(await platform.fs.stat("/games/two/fallout2-ce")).not.toBeNull();
+  });
+
+  it("records the release the cache holds, not a guess at it", async () => {
+    const platform = seeded({ "/games/two/fallout2.exe": "" });
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+
+    await installCachedEngine(offline(platform), SECOND, "fallout2-ce", NOW);
+    expect(await installedEngines(platform, SECOND)).toEqual([
+      expect.objectContaining({ id: "fallout2-ce", release: "continious", published: "2026-08-23T09:37:22Z" }),
+    ]);
+  });
+
+  it("says so rather than half-installing when the machine holds no copy", async () => {
+    const platform = seeded({ "/games/two/fallout2.exe": "" });
+    await expect(installCachedEngine(offline(platform), SECOND, "fallout2-ce", NOW)).rejects.toThrow(/no copy/i);
+    expect(await platform.fs.stat("/games/two/fallout2-ce")).toBeNull();
+    expect(await installedEngines(platform, SECOND)).toEqual([]);
   });
 });

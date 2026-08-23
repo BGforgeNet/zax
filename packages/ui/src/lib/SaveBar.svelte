@@ -26,10 +26,11 @@
     Run
   </button>
   <!--
-    Only for an engine that is actually installed: installing is a deliberate act in another tab, so this
-    appears once and stays, rather than blinking in and out under the pointer.
+    Installed here, or held in the machine's cache: one download serves every game folder, so an engine ZAX
+    already has is one this folder can run - the first run unpacks it in place. Offering it only where it was
+    already deployed made the user install the same archive once per game.
   -->
-  {#each store.engines.filter((engine) => engine.installed) as engine (engine.id)}
+  {#each store.engines.filter((engine) => engine.installed !== null || engine.cached) as engine (engine.id)}
     <button
       disabled={!store.install || isPreview || store.busy !== null}
       title={isPreview ? "The browser preview cannot start a program - this needs the desktop build" : null}

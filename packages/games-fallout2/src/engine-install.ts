@@ -9,8 +9,14 @@ import { backupDirectory, copyTree, stamp, temporaryDirectory } from "@zax/core"
 import type { Install } from "@zax/core";
 import type { ArchiveEntryInfo, FileStat, Platform } from "@zax/platform";
 import { preflightArchive } from "./archive-preflight.js";
-import { enginePackage, latestEngine, type EngineProgress } from "./engine-release.js";
-import { buildFor, engineById, type EngineMember } from "./engines.js";
+import {
+  cachedEngine,
+  enginePackage,
+  latestEngine,
+  type EngineProgress,
+  type EngineRelease,
+} from "./engine-release.js";
+import { buildFor, engineById, type EngineBuild, type EngineDefinition, type EngineMember } from "./engines.js";
 import { assertUsable, loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
 
 export interface EngineInstallOutcome {
@@ -84,6 +90,46 @@ export async function installEngine(
   }
 
   const archive = await enginePackage(platform, engine, release, release.asset, options);
+  return deployEngine(platform, install, engine, build, release, archive, now, options);
+}
+
+/**
+ * Installs from a release the cache already holds, without asking the network anything. One machine downloads
+ * an engine once; a second game folder is the same archive unpacked again, which is what makes running an
+ * engine in a folder that has never had one a copy rather than a download.
+ */
+export async function installCachedEngine(
+  platform: Platform,
+  install: Install,
+  engineId: string,
+  now: Date = new Date(),
+  options?: EngineProgress,
+): Promise<EngineInstallOutcome> {
+  const engine = engineById(engineId);
+  const build = buildFor(engine, platform.os, platform.arch);
+  if (build === null) {
+    throw new Error(`${engine.name} publishes no build ZAX can install for this machine. See ${engine.page}.`);
+  }
+  const held = await cachedEngine(platform, engine, build.asset);
+  if (held === null) throw new Error(`ZAX has no copy of ${engine.name} to install from. Check for one first.`);
+  return deployEngine(platform, install, engine, build, held.release, held.archive, now, options);
+}
+
+/**
+ * Unpacking an archive over a game folder and recording what that put there. Shared by the two ways a release
+ * is arrived at - asking the project, or finding it already cached - because only how the archive was obtained
+ * differs, and a second copy of this is a second place for the backup and the record to drift.
+ */
+async function deployEngine(
+  platform: Platform,
+  install: Install,
+  engine: EngineDefinition,
+  build: EngineBuild,
+  release: EngineRelease,
+  archive: string,
+  now: Date,
+  options?: EngineProgress,
+): Promise<EngineInstallOutcome> {
   const { join } = platform.paths;
   const at = stamp(now);
   const work = join(temporaryDirectory(platform), `engine-${engine.id}-${at}`);

@@ -1,7 +1,7 @@
 import { MemoryPlatform } from "@zax/platform/memory";
 import { describe, expect, it } from "vitest";
 import { engineById } from "./engines.js";
-import { enginePackage, engineOutdated, latestEngine } from "./engine-release.js";
+import { cachedEngine, enginePackage, engineOutdated, latestEngine } from "./engine-release.js";
 
 const CE = engineById("fallout2-ce");
 const FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=1";
@@ -160,5 +160,91 @@ describe("the package cache", () => {
     const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" } });
     await expect(enginePackage(platform, CE, release, asset)).rejects.toThrow(/was not an archive/i);
     expect(platform.fileAt(path(release.published)), "a bad answer must not be handed out again").toBeUndefined();
+  });
+});
+
+describe("the copy the machine already holds", () => {
+  const ASSET = "fallout2-ce-linux-x64.tar.gz";
+  const opensFine = { archives: { payload: { "fallout2-ce": "binary" } } };
+  const directory = (published: string) => `cache/packages/engines/fallout2-ce/${published.replace(/[^0-9]/g, "")}`;
+
+  /** A release as the cache would hold it: the archive, and the note naming what that archive is. */
+  const held = async (platform: MemoryPlatform, published: string, note: string | null, tag = "continious") => {
+    await platform.fs.write(`${directory(published)}/${ASSET}`, new TextEncoder().encode("payload"));
+    if (note !== null) {
+      await platform.fs.write(`${directory(published)}/release.json`, new TextEncoder().encode(note));
+    }
+    return tag;
+  };
+
+  const note = (release: string, published: string, commit: string | null = null) =>
+    JSON.stringify({ release, published, commit });
+
+  it("answers with nothing when nothing is cached", async () => {
+    expect(await cachedEngine(seeded(), CE, ASSET)).toBeNull();
+  });
+
+  it("reports the tag and commit from the note, which the directory name cannot carry", async () => {
+    const platform = seeded();
+    await held(platform, "2026-08-23T09:37:22Z", note("v1.2", "2026-08-23T09:37:22Z", COMMIT));
+    const found = await cachedEngine(platform, CE, ASSET);
+    expect(found?.release).toMatchObject({ release: "v1.2", published: "2026-08-23T09:37:22Z", commit: COMMIT });
+    expect(found?.archive).toBe(`${directory("2026-08-23T09:37:22Z")}/${ASSET}`);
+  });
+
+  it("names no asset, since the cache holds the file rather than a way to fetch it", async () => {
+    const platform = seeded();
+    await held(platform, "2026-08-23T09:37:22Z", note("continious", "2026-08-23T09:37:22Z"));
+    expect((await cachedEngine(platform, CE, ASSET))?.release.asset).toBeNull();
+  });
+
+  it("takes the newest of several the cache holds", async () => {
+    const platform = seeded();
+    await held(platform, "2026-07-01T00:00:00Z", note("old", "2026-07-01T00:00:00Z"));
+    await held(platform, "2026-08-23T09:37:22Z", note("new", "2026-08-23T09:37:22Z"));
+    expect((await cachedEngine(platform, CE, ASSET))?.release.release).toBe("new");
+  });
+
+  it("passes over a release with no note rather than guessing the tag from the directory", async () => {
+    const platform = seeded();
+    await held(platform, "2026-08-23T09:37:22Z", null);
+    expect(await cachedEngine(platform, CE, ASSET)).toBeNull();
+  });
+
+  it("passes over a note it cannot parse, which is one that was not finished", async () => {
+    const platform = seeded();
+    await held(platform, "2026-08-23T09:37:22Z", '{"release":"conti');
+    expect(await cachedEngine(platform, CE, ASSET)).toBeNull();
+  });
+
+  it("passes over an empty archive, which is a download that stopped at the first byte", async () => {
+    const platform = seeded();
+    await held(platform, "2026-08-23T09:37:22Z", note("continious", "2026-08-23T09:37:22Z"));
+    await platform.fs.write(`${directory("2026-08-23T09:37:22Z")}/${ASSET}`, new Uint8Array());
+    expect(await cachedEngine(platform, CE, ASSET)).toBeNull();
+  });
+
+  it("writes the note beside an archive cached before this version wrote them", async () => {
+    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" }, ...opensFine });
+    const asset = { name: ASSET, url: "https://example.invalid/linux.tar.gz", size: 7 };
+    const release = { release: "continious", published: "2026-08-23T09:37:22Z", asset, commit: COMMIT };
+    // The archive is there at the declared size, so the download is skipped - the route an existing cache takes.
+    await platform.fs.write(`${directory(release.published)}/${ASSET}`, new TextEncoder().encode("payload"));
+    await enginePackage(platform, CE, release, asset);
+    expect(platform.downloaded, "an archive already there is not fetched again").toHaveLength(0);
+    expect(await cachedEngine(platform, CE, ASSET)).not.toBeNull();
+  });
+
+  it("writes the note beside an archive it downloads, so a later run can identify it", async () => {
+    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" }, ...opensFine });
+    const asset = { name: ASSET, url: "https://example.invalid/linux.tar.gz", size: 7 };
+    const release = { release: "continious", published: "2026-08-23T09:37:22Z", asset, commit: COMMIT };
+    await enginePackage(platform, CE, release, asset);
+    const written = await platform.fs.read(`${directory(release.published)}/release.json`);
+    expect(JSON.parse(new TextDecoder().decode(written))).toEqual({
+      release: "continious",
+      published: "2026-08-23T09:37:22Z",
+      commit: COMMIT,
+    });
   });
 });

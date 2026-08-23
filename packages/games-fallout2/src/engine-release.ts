@@ -125,6 +125,17 @@ export function engineOutdated(engine: EngineDefinition, installed: InstalledEng
 /** Path-safe and stable: the instant with its punctuation dropped, which sorts and collides with nothing. */
 const releaseKey = (published: string): string => published.replace(/[^0-9]/g, "");
 
+/** One release's directory under the shared package cache. */
+const releaseDirectory = (platform: Platform, engine: EngineDefinition, published: string): string =>
+  platform.paths.join(packageDirectory(platform), "engines", engine.id, releaseKey(published));
+
+/**
+ * What the cache records beside an archive, so a copy already there can be identified without asking the
+ * network. The directory name carries the publication instant and nothing else, and a tagged project's tag is
+ * what decides whether an install is behind - so the tag and the commit have to be written down.
+ */
+const NOTE_NAME = "release.json";
+
 /**
  * The cached archive for a release, downloaded if this is the first time it is asked for. Under the shared
  * package directory rather than inside the install, so one download serves every install on the machine.
@@ -141,30 +152,96 @@ export async function enginePackage(
   asset: EngineAsset,
   options?: EngineProgress,
 ): Promise<string> {
-  const path = platform.paths.join(
-    packageDirectory(platform),
-    "engines",
-    engine.id,
-    releaseKey(release.published),
-    asset.name,
-  );
+  const directory = releaseDirectory(platform, engine, release.published);
+  const path = platform.paths.join(directory, asset.name);
   const found = await platform.fs.stat(path);
-  if (found?.kind === "file" && asset.size !== 0 && found.size === asset.size) return path;
-  await platform.fs.remove(path);
-
-  options?.onStep?.(`Downloading ${engine.name}`);
-  await platform.net.download(asset.url, path, options);
-
-  // Confirmed by opening it rather than by magic bytes: engines arrive as .zip, .tar.gz or .dmg, and a disk
-  // image has no leading signature to check the way sfall's .7z does.
-  try {
-    await platform.archive.list(path);
-  } catch (error) {
+  if (!(found?.kind === "file" && asset.size !== 0 && found.size === asset.size)) {
     await platform.fs.remove(path);
-    throw new Error(
-      `What ${new URL(asset.url).host} sent for ${engine.name} was not an archive - the mirror may have answered with an error page. Trying again may reach a different one.`,
-      { cause: error },
-    );
+
+    options?.onStep?.(`Downloading ${engine.name}`);
+    await platform.net.download(asset.url, path, options);
+
+    // Confirmed by opening it rather than by magic bytes: engines arrive as .zip, .tar.gz or .dmg, and a disk
+    // image has no leading signature to check the way sfall's .7z does.
+    try {
+      await platform.archive.list(path);
+    } catch (error) {
+      await platform.fs.remove(path);
+      throw new Error(
+        `What ${new URL(asset.url).host} sent for ${engine.name} was not an archive - the mirror may have answered with an error page. Trying again may reach a different one.`,
+        { cause: error },
+      );
+    }
   }
+
+  // Written on both routes, and only once the archive is known good: an archive cached by a version that
+  // wrote no note is otherwise unidentifiable for ever, since the release it came from is asked for by name
+  // and answered from the cache before anything could record what it is.
+  const note = { release: release.release, published: release.published, commit: release.commit };
+  await platform.fs.write(platform.paths.join(directory, NOTE_NAME), new TextEncoder().encode(JSON.stringify(note)));
   return path;
+}
+
+/** A release the cache already holds, with the archive this machine would install it from. */
+export interface CachedEngine {
+  release: EngineRelease;
+  archive: string;
+}
+
+/**
+ * The newest release of this engine already in the cache, or null where nothing there can be installed here.
+ * What makes a second game folder a copy rather than a download.
+ *
+ * A directory with no note is one an older ZAX cached, and is passed over rather than guessed at: it would
+ * take a tag and a commit this version cannot recover from the name. Its archive is downloaded again the next
+ * time that release is asked for, which writes the note.
+ */
+export async function cachedEngine(
+  platform: Platform,
+  engine: EngineDefinition,
+  assetName: string,
+): Promise<CachedEngine | null> {
+  const root = platform.paths.join(packageDirectory(platform), "engines", engine.id);
+  if ((await platform.fs.stat(root))?.kind !== "dir") return null;
+
+  let best: CachedEngine | null = null;
+  for (const entry of await platform.fs.list(root)) {
+    if (entry.kind !== "dir") continue;
+    const directory = platform.paths.join(root, entry.name);
+    const archive = platform.paths.join(directory, assetName);
+    // An empty file is what a download interrupted at the first byte leaves; it is not something to run.
+    const found = await platform.fs.stat(archive);
+    if (found?.kind !== "file" || found.size === 0) continue;
+
+    const note = await readNote(platform, platform.paths.join(directory, NOTE_NAME));
+    if (note === null) continue;
+    if (best === null || note.published > best.release.published) {
+      // No asset: the cache holds the file rather than a way to fetch it, and an invented url is one
+      // something downstream would eventually try to download.
+      best = { release: { ...note, asset: null }, archive };
+    }
+  }
+  return best;
+}
+
+/** The note's fields, or null for anything this version cannot read - a truncated file, or an older format. */
+async function readNote(
+  platform: Platform,
+  path: string,
+): Promise<{ release: string; published: string; commit: string | null } | null> {
+  if ((await platform.fs.stat(path))?.kind !== "file") return null;
+  let body: unknown;
+  try {
+    body = JSON.parse(new TextDecoder().decode(await platform.fs.read(path)));
+  } catch {
+    // A note ZAX cannot parse is one it did not finish writing. The archive beside it is fetched again.
+    return null;
+  }
+  const fields = body as { release?: unknown; published?: unknown; commit?: unknown };
+  if (typeof fields.release !== "string" || typeof fields.published !== "string") return null;
+  return {
+    release: fields.release,
+    published: fields.published,
+    commit: typeof fields.commit === "string" ? fields.commit : null,
+  };
 }

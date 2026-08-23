@@ -54,13 +54,14 @@ import {
   type ModRemoval,
 } from "./mod-install.js";
 import {
+  installCachedEngine,
   installEngine,
   installedEngines,
   removeEngine,
   type EngineInstallOutcome,
   type EngineRemoval,
 } from "./engine-install.js";
-import { latestEngine, type EngineRelease } from "./engine-release.js";
+import { cachedEngine, latestEngine, type EngineRelease } from "./engine-release.js";
 import { ENGINES, buildFor, engineById } from "./engines.js";
 import { loadRecord, reconcileRecord, type InstalledEngine } from "./records.js";
 import { readTransaction, releaseOf } from "./mod-transaction.js";
@@ -121,6 +122,12 @@ export interface EngineListing {
   build: { asset: string; program: string } | null;
   why?: string;
   installed: InstalledEngine | null;
+  /**
+   * Whether this machine already holds a copy to install from. Not this folder's business but the machine's,
+   * which is why it sits beside `installed` rather than in it: it says a run here costs a copy, not a
+   * download.
+   */
+  cached: boolean;
 }
 
 export interface Backend {
@@ -381,18 +388,23 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     listSfallVersions: () => listSfallVersions(platform),
     availableEngines: async (install) => {
       const installed = await installedEngines(platform, install);
-      return ENGINES.map((engine) => {
-        const build = buildFor(engine, platform.os, platform.arch);
-        return {
-          id: engine.id,
-          name: engine.name,
-          short: engine.short,
-          page: engine.page,
-          build: build === null ? null : { asset: build.asset, program: build.program },
-          ...(build === null ? { why: `${engine.name} publishes no build for this machine.` } : {}),
-          installed: installed.find((one) => one.id === engine.id) ?? null,
-        };
-      });
+      return Promise.all(
+        ENGINES.map(async (engine) => {
+          const build = buildFor(engine, platform.os, platform.arch);
+          return {
+            id: engine.id,
+            name: engine.name,
+            short: engine.short,
+            page: engine.page,
+            build: build === null ? null : { asset: build.asset, program: build.program },
+            ...(build === null ? { why: `${engine.name} publishes no build for this machine.` } : {}),
+            installed: installed.find((one) => one.id === engine.id) ?? null,
+            // Machine-wide rather than this folder's: one download serves every install, so a copy in the
+            // cache is what says this folder can run the engine without asking the network for anything.
+            cached: build !== null && (await cachedEngine(platform, engine, build.asset)) !== null,
+          };
+        }),
+      );
     },
     latestEngine: (engineId) => latestEngine(platform, engineId),
     installEngine: (install, engineId) => installEngine(platform, install, engineId, new Date(), reporting()),
@@ -410,8 +422,12 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       if (engineId !== null) {
         const engine = engineById(engineId);
         const build = buildFor(engine, platform.os, platform.arch);
+        if (!build) throw new Error(`${engine.name} publishes no build ZAX can run on this machine.`);
         const installed = (await installedEngines(platform, install)).find((one) => one.id === engineId);
-        if (!build || !installed) throw new Error(`${engine.name} is not installed here.`);
+        // Not in this folder, but on this machine: unpack the copy already cached rather than refusing. The
+        // engine is offered here precisely because that copy exists, so the first run is what puts it in
+        // place - the same deployment the Engines tab performs, and it records itself the same way.
+        if (!installed) await installCachedEngine(platform, install, engineId, new Date(), reporting());
         program = build.program;
       }
       const plan = planLaunch(platform.os, install, sfallVersion, program);
