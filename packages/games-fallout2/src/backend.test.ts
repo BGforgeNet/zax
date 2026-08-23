@@ -6,6 +6,34 @@ import type { Backend } from "./backend.js";
 
 const install = { path: "/games/one", type: "fallout2" as const };
 
+const ENGINE_FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=1";
+const ENGINE_URL = "https://example.invalid/linux.tar.gz";
+const ENGINE_RELEASE = JSON.stringify([
+  {
+    tag_name: "continious",
+    published_at: "2026-08-23T09:37:22Z",
+    assets: [{ name: "fallout2-ce-linux-x64.tar.gz", size: 7, browser_download_url: ENGINE_URL }],
+  },
+]);
+
+const enginePlatform = (extra: Record<string, unknown> = {}) =>
+  new MemoryPlatform({
+    os: "linux",
+    arch: "x64",
+    config: "cfg",
+    cache: "cache",
+    responses: { [ENGINE_FEED]: ENGINE_RELEASE },
+    downloads: { [ENGINE_URL]: "payload" },
+    archives: {
+      payload: {
+        "fallout2-ce-linux-x64/fallout2-ce": "binary",
+        "fallout2-ce-linux-x64/ce.dat": "data",
+      },
+    },
+    files: { "/games/one/fallout2.exe": "" },
+    ...extra,
+  });
+
 function ready() {
   return new MemoryPlatform({
     home: "/home/t",
@@ -60,7 +88,7 @@ describe("the operations", () => {
 
   it("launches through the plan for this machine", async () => {
     const platform = ready();
-    await createBackend(platform, noShell).launch({ ...install, wine: { prefix: "/p" } }, "4.5");
+    await createBackend(platform, noShell).launch({ ...install, wine: { prefix: "/p" } }, "4.5", null);
     expect(platform.launched).toEqual([
       {
         program: "wine",
@@ -222,6 +250,49 @@ describe("installing a mod", () => {
       createBackend(feed, noShell).installMod(install, "fo2tweaks", retry.fingerprint),
     ).resolves.toMatchObject({ version: "14.7" });
     expect(platform.textAt("/games/one/mods/fo2tweaks.dat")).toBe("DAT-14.7");
+  });
+});
+
+describe("engines across the boundary", () => {
+  it("offers the catalog with this machine's build and what is installed", async () => {
+    const platform = enginePlatform();
+    const backend = createBackend(platform, { chooseFolder: async () => null });
+    const listed = await backend.availableEngines(install);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]!.id).toBe("fallout2-ce");
+    expect(listed[0]!.build?.asset).toBe("fallout2-ce-linux-x64.tar.gz");
+    expect(listed[0]!.installed).toBeNull();
+  });
+
+  it("says why there is nothing to install where the machine has no build", async () => {
+    const platform = enginePlatform({ os: "windows", arch: "arm64" });
+    const backend = createBackend(platform, { chooseFolder: async () => null });
+    const listed = await backend.availableEngines(install);
+    expect(listed[0]!.build).toBeNull();
+    expect(listed[0]!.why).toMatch(/this machine/i);
+  });
+
+  it("reports what is installed after installing it", async () => {
+    const platform = enginePlatform();
+    const backend = createBackend(platform, { chooseFolder: async () => null });
+    await backend.installEngine(install, "fallout2-ce");
+    const listed = await backend.availableEngines(install);
+    expect(listed[0]!.installed?.release).toBe("continious");
+  });
+
+  it("launches the engine's program rather than the game's", async () => {
+    const platform = enginePlatform();
+    const backend = createBackend(platform, { chooseFolder: async () => null });
+    await backend.installEngine(install, "fallout2-ce");
+    await backend.launch(install, null, "fallout2-ce");
+    expect(platform.launched.at(-1)?.program).toBe("./fallout2-ce");
+  });
+
+  it("launches the game itself when no engine is named", async () => {
+    const platform = enginePlatform();
+    const backend = createBackend(platform, { chooseFolder: async () => null });
+    await backend.launch(install, null, null);
+    expect(platform.launched.at(-1)?.program).toBe("wine");
   });
 });
 

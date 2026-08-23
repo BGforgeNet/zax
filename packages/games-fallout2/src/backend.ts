@@ -53,7 +53,16 @@ import {
   type ModInstallPlan,
   type ModRemoval,
 } from "./mod-install.js";
-import { loadRecord, reconcileRecord } from "./records.js";
+import {
+  installEngine,
+  installedEngines,
+  removeEngine,
+  type EngineInstallOutcome,
+  type EngineRemoval,
+} from "./engine-install.js";
+import { latestEngine, type EngineRelease } from "./engine-release.js";
+import { ENGINES, buildFor, engineById } from "./engines.js";
+import { loadRecord, reconcileRecord, type InstalledEngine } from "./records.js";
 import { readTransaction, releaseOf } from "./mod-transaction.js";
 import { readMods, saveMods, type ModsSaveRequest, type ModsSnapshot } from "./mods.js";
 import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
@@ -97,6 +106,21 @@ export interface ModSettingsGroup {
    * missing and why: a control quietly absent reads as a mod that never offered it.
    */
   dropped: readonly DroppedSetting[];
+}
+
+/**
+ * One engine as the Engines tab needs it: what it is, what this machine would install, and what is installed
+ * already. One answer rather than two, so the catalog and the record cannot disagree about an install.
+ */
+export interface EngineListing {
+  id: string;
+  name: string;
+  short: string;
+  page: string;
+  /** What would be installed here, or null with `why` saying there is nothing. */
+  build: { asset: string; program: string } | null;
+  why?: string;
+  installed: InstalledEngine | null;
 }
 
 export interface Backend {
@@ -148,12 +172,19 @@ export interface Backend {
   latestSfall(): Promise<SfallRelease>;
   updateSfall(install: Install, version: string): Promise<SfallUpdate>;
   listSfallVersions(): Promise<readonly string[]>;
+  /** Every engine ZAX knows, against this install. Answers from the catalog and the record - no network. */
+  availableEngines(install: Install): Promise<readonly EngineListing[]>;
+  latestEngine(engineId: string): Promise<EngineRelease>;
+  /** Installs the published build, or replaces the one that is there with it. */
+  installEngine(install: Install, engineId: string): Promise<EngineInstallOutcome>;
+  removeEngine(install: Install, engineId: string): Promise<EngineRemoval>;
   /** Read only: nothing here installs the hi-res patch, so this reports what is there and stops. */
   installedHiresVersion(install: Install): Promise<string | null>;
   latestZax(): Promise<ZaxRelease>;
   listSaves(install: Install): Promise<readonly string[]>;
   createDebugPackage(install: Install, saves: readonly string[]): Promise<DebugPackage>;
-  launch(install: Install, sfallVersion: string | null): Promise<void>;
+  /** `engineId` names an installed alternative engine, or null for the game's own executable. */
+  launch(install: Install, sfallVersion: string | null, engineId: string | null): Promise<void>;
   open(target: OpenTarget): Promise<void>;
   wipe(which: OwnDirectory): Promise<void>;
 }
@@ -348,14 +379,42 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     latestSfall: () => latestSfall(platform),
     updateSfall: (install, version) => updateSfall(platform, install, version, new Date(), reporting()),
     listSfallVersions: () => listSfallVersions(platform),
+    availableEngines: async (install) => {
+      const installed = await installedEngines(platform, install);
+      return ENGINES.map((engine) => {
+        const build = buildFor(engine, platform.os, platform.arch);
+        return {
+          id: engine.id,
+          name: engine.name,
+          short: engine.short,
+          page: engine.page,
+          build: build === null ? null : { asset: build.asset, program: build.program },
+          ...(build === null ? { why: `${engine.name} publishes no build for this machine.` } : {}),
+          installed: installed.find((one) => one.id === engine.id) ?? null,
+        };
+      });
+    },
+    latestEngine: (engineId) => latestEngine(platform, engineId),
+    installEngine: (install, engineId) => installEngine(platform, install, engineId, new Date(), reporting()),
+    removeEngine: (install, engineId) => removeEngine(platform, install, engineId),
     installedHiresVersion: (install) => installedHiresVersion(platform, install),
     latestZax: () => latestZax(platform),
 
     listSaves: (install) => listSaves(platform, install),
     createDebugPackage: (install, saves) => createDebugPackage(platform, install, saves),
 
-    launch: async (install, sfallVersion) => {
-      const plan = planLaunch(platform.os, install, sfallVersion);
+    // The program comes from the record and the catalog, never from the renderer - a caller that could name
+    // the program would be naming a program for the machine to start.
+    launch: async (install, sfallVersion, engineId) => {
+      let program: string | null = null;
+      if (engineId !== null) {
+        const engine = engineById(engineId);
+        const build = buildFor(engine, platform.os, platform.arch);
+        const installed = (await installedEngines(platform, install)).find((one) => one.id === engineId);
+        if (!build || !installed) throw new Error(`${engine.name} is not installed here.`);
+        program = build.program;
+      }
+      const plan = planLaunch(platform.os, install, sfallVersion, program);
       await platform.process.launch(plan.program, plan.args, { cwd: plan.cwd, env: plan.env });
     },
 

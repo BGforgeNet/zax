@@ -7,6 +7,15 @@ export { describePlace, hiddenIds, placesById, type Place } from "./places.js";
 export { planLaunch } from "./launch.js";
 export { installedSfallVersion, latestSfall, updateSfall, type SfallRelease, type SfallUpdate } from "./sfall.js";
 export { installedHiresVersion } from "./hires.js";
+export { ENGINES, buildFor, engineById } from "./engines.js";
+export { engineOutdated, latestEngine, type EngineRelease } from "./engine-release.js";
+export {
+  installEngine,
+  installedEngines,
+  removeEngine,
+  type EngineInstallOutcome,
+  type EngineRemoval,
+} from "./engine-install.js";
 export {
   MODS_DIRECTORY,
   MODS_ORDER_PATH,
@@ -28,7 +37,14 @@ export {
   type ModManifest,
   type ModSetting,
 } from "./manifest.js";
-export { loadRecord, reconcileRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
+export {
+  loadRecord,
+  reconcileRecord,
+  saveRecord,
+  type InstallRecord,
+  type InstalledEngine,
+  type InstalledMod,
+} from "./records.js";
 export {
   MOD_FEEDS,
   availability,
@@ -62,6 +78,7 @@ export {
   RELEASES_PAGE,
   createBackend,
   type Backend,
+  type EngineListing,
   type MachineDescription,
   type ModSettingsGroup,
   type OperationProgress,
