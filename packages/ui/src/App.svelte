@@ -5,6 +5,7 @@
   import EnginesView from "./lib/EnginesView.svelte";
   import ModsView from "./lib/ModsView.svelte";
   import NoInstall from "./lib/NoInstall.svelte";
+  import SaveBar from "./lib/SaveBar.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
   import { store } from "./lib/store.svelte.js";
@@ -137,6 +138,16 @@
       <SettingsView />
     {/if}
   </div>
+
+  <!--
+    Chrome rather than part of a view: Save writes the config files and the mod order together whichever tab
+    is open, and Run starts the game from any of them. Left out only on the no-install screen, which has
+    nothing for either button to act on - while the state file is still being read the views draw their empty
+    shape, so the bar draws with them rather than appearing under the pointer a moment later.
+  -->
+  {#if !store.loaded || store.install}
+    <SaveBar />
+  {/if}
 </div>
 
 <style>

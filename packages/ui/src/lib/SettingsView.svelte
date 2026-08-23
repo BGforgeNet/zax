@@ -7,7 +7,6 @@
   import SettingRow from "./SettingRow.svelte";
   import InstallPanel from "./InstallPanel.svelte";
   import MissingFile from "./MissingFile.svelte";
-  import SaveBar from "./SaveBar.svelte";
   import { store } from "./store.svelte.js";
 
   // A fix is one click and a report is a sequence you work through, so they stay apart.
@@ -178,8 +177,6 @@
         <InstallPanel />
       {/if}
     </div>
-
-    <SaveBar />
   </main>
 </div>
 

@@ -9,76 +9,92 @@
     const at = Date.parse(instant);
     return Number.isNaN(at) ? instant : new Date(at).toLocaleDateString();
   };
+
+  /**
+   * A rolling project republishes one tag, so the date and this are the only things that tell two builds
+   * apart. Shortened the way git does: seven characters identify the commit and a full sha reads as noise.
+   */
+  const sha = (commit: string) => commit.slice(0, 7);
 </script>
 
-<div class="panel">
-  {#each store.engines as engine (engine.id)}
-    {@const latest = store.engineLatest[engine.id]}
-    <section class="engine">
-      <h2 class="section">{engine.name}</h2>
-      <p class="line">
-        <a href={engine.page} target="_blank" rel="noreferrer">{engine.page}</a>
-      </p>
+<!-- The same shell the other two tabs are built from, so the column is bounded where theirs are. -->
+<div class="pane">
+  <main>
+    <div class="panel list">
+      {#each store.engines as engine (engine.id)}
+        {@const latest = store.engineLatest[engine.id]}
+        <section class="engine">
+          <h2 class="section">{engine.name}</h2>
+          <p class="line">
+            <a href={engine.page} target="_blank" rel="noreferrer">{engine.page}</a>
+          </p>
 
-      {#if engine.build}
-        <p class="line">This machine gets <strong>{engine.build.asset}</strong></p>
-      {:else}
-        <p class="line problem">{engine.why}</p>
-      {/if}
+          {#if engine.build}
+            <p class="line">This machine gets <strong>{engine.build.asset}</strong></p>
+          {:else}
+            <p class="line problem">{engine.why}</p>
+          {/if}
 
-      <p class="line">
-        Installed
-        {#if engine.installed}
-          <strong>{day(engine.installed.published)}</strong>
-          {#if !engine.installed.complete}<span class="problem">- that install did not finish</span>{/if}
-        {:else}
-          <span class="unknown">not installed</span>
-        {/if}
-      </p>
-      <p class="line">
-        Latest
-        {#if latest}
-          <strong>{day(latest.published)}</strong>
-        {:else}
-          <span class="unknown">not checked</span>
-        {/if}
-      </p>
+          <p class="line">
+            Installed
+            {#if engine.installed}
+              <strong>{day(engine.installed.published)}</strong>
+              {#if engine.installed.commit}<code class="sha">{sha(engine.installed.commit)}</code>{/if}
+              {#if !engine.installed.complete}<span class="problem">- that install did not finish</span>{/if}
+            {:else}
+              <span class="unknown">not installed</span>
+            {/if}
+          </p>
+          <p class="line">
+            Latest
+            {#if latest}
+              <strong>{day(latest.published)}</strong>
+              {#if latest.commit}<code class="sha">{sha(latest.commit)}</code>{/if}
+            {:else}
+              <span class="unknown">not checked</span>
+            {/if}
+          </p>
 
-      <div class="buttons">
-        <button
-          disabled={isPreview || store.busy !== null || !engine.build}
-          title={isPreview ? OUTSIDE : null}
-          onclick={() => void store.checkEngine(engine.id)}
-        >
-          Check
-        </button>
-        <button
-          disabled={isPreview || store.busy !== null || !engine.build || !store.install}
-          title={isPreview ? OUTSIDE : null}
-          onclick={() => void store.installEngine(engine.id)}
-        >
-          {engine.installed ? "Update" : "Install"}
-        </button>
-        <button disabled={store.busy !== null || !engine.installed} onclick={() => void store.removeEngine(engine.id)}>
-          Remove
-        </button>
-      </div>
+          <div class="buttons">
+            <button
+              disabled={isPreview || store.busy !== null || !engine.build}
+              title={isPreview ? OUTSIDE : null}
+              onclick={() => void store.checkEngine(engine.id)}
+            >
+              Check
+            </button>
+            <button
+              disabled={isPreview || store.busy !== null || !engine.build || !store.install}
+              title={isPreview ? OUTSIDE : null}
+              onclick={() => void store.installEngine(engine.id)}
+            >
+              {engine.installed ? "Update" : "Install"}
+            </button>
+            <button
+              disabled={store.busy !== null || !engine.installed}
+              onclick={() => void store.removeEngine(engine.id)}
+            >
+              Remove
+            </button>
+          </div>
 
-      {#if store.engineOutdated(engine.id)}
-        <p class="note">A newer build has been published.</p>
-      {/if}
-      <!-- Said where it is relevant rather than done silently: it is the widest rename in the application. -->
-      <p class="note">
-        A native run on a case-sensitive filesystem wants a lowercased game folder. Quit the game before installing -
-        this writes into its directory.
-      </p>
-    </section>
-  {/each}
+          {#if store.engineOutdated(engine.id)}
+            <p class="note">A newer build has been published.</p>
+          {/if}
+          <!-- Said where it is relevant rather than done silently: it is the widest rename in the application. -->
+          <p class="note">
+            A native run on a case-sensitive filesystem wants a lowercased game folder. Quit the game before installing
+            - this writes into its directory.
+          </p>
+        </section>
+      {/each}
+    </div>
+  </main>
 </div>
 
 <style>
   .panel {
-    padding: 10px;
+    padding: 10px var(--gutter);
   }
 
   .section {
@@ -103,6 +119,12 @@
     margin: 0 0 2px;
     font-size: 12.5px;
     color: var(--text-dim);
+  }
+
+  .sha {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--text-faint);
   }
 
   .unknown {

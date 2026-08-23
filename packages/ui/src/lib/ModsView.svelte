@@ -3,7 +3,6 @@
   import { GAME_TYPES, type GameType } from "@zax/core";
   import { type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
-  import SaveBar from "./SaveBar.svelte";
   import SettingRow from "./SettingRow.svelte";
   import { store } from "./store.svelte.js";
 
@@ -369,8 +368,6 @@
         {/each}
       {/if}
     </div>
-
-    <SaveBar />
   </main>
 </div>
 
