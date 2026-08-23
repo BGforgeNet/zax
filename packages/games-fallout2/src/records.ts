@@ -94,6 +94,8 @@ export interface InstalledEngine {
   files: readonly string[];
   /** Where copies of anything replaced went, absent when nothing was. */
   backup?: string;
+  /** The commit that release was built from, absent where the project's tag did not resolve to one. */
+  commit?: string;
 }
 
 export interface InstallRecord {
@@ -250,6 +252,7 @@ function readEngine(entry: unknown): InstalledEngine | null {
     files.push(path);
   }
   const backup = asText(fields["backup"]);
+  const commit = asText(fields["commit"]);
   return {
     id,
     release,
@@ -257,6 +260,7 @@ function readEngine(entry: unknown): InstalledEngine | null {
     complete: fields["complete"] === true,
     files,
     ...(backup !== undefined ? { backup } : {}),
+    ...(commit !== undefined ? { commit } : {}),
   };
 }
 
@@ -340,6 +344,7 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
               complete: engine.complete,
               files: [...engine.files],
               ...(engine.backup !== undefined ? { backup: engine.backup } : {}),
+              ...(engine.commit !== undefined ? { commit: engine.commit } : {}),
             })),
           }
         : {}),

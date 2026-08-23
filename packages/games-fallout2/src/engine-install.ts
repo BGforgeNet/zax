@@ -120,6 +120,7 @@ export async function installEngine(
       published: release.published,
       complete: false,
       files: build.members.map((member) => member.to),
+      ...(release.commit !== null ? { commit: release.commit } : {}),
     };
     await saveRecord(platform, { ...record, engines: withEngine(record.engines ?? [], engine.id, entry) });
 

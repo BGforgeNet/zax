@@ -22,6 +22,12 @@ export interface EngineRelease {
   published: string;
   /** The asset for the machine asking, or null when the project publishes no build it can run. */
   asset: EngineAsset | null;
+  /**
+   * The commit the tag points at, or null where it could not be read. What actually identifies a rolling
+   * build: its tag and its release name never change, so the date and this are all that separate one from
+   * the next.
+   */
+  commit: string | null;
 }
 
 /**
@@ -38,6 +44,25 @@ export interface EngineProgress extends DownloadOptions {
  * what a rolling build is - answers 404 there, and the list's first entry is the newest either way.
  */
 const releasesUrl = (repo: string): string => `https://api.github.com/repos/${repo}/releases?per_page=1`;
+
+/** The singular form, which matches one ref exactly - the plural returns every ref the path is a prefix of. */
+const tagUrl = (repo: string, tag: string): string =>
+  `https://api.github.com/repos/${repo}/git/ref/tags/${encodeURIComponent(tag)}`;
+
+/**
+ * The commit a tag points at, or null for anything that did not resolve to one. Losing it costs a line of
+ * description, so a project whose tags this cannot read still installs and updates normally; an annotated tag
+ * answers with its own object rather than a commit, and reporting that sha would name a different thing.
+ */
+async function tagCommit(platform: Platform, repo: string, tag: string): Promise<string | null> {
+  try {
+    const body: unknown = JSON.parse(await platform.net.fetchText(tagUrl(repo, tag)));
+    const object = (body as { object?: unknown } | null)?.object as { sha?: unknown; type?: unknown } | undefined;
+    return object?.type === "commit" && typeof object.sha === "string" ? object.sha : null;
+  } catch {
+    return null;
+  }
+}
 
 interface PublishedAsset {
   name?: unknown;
@@ -59,16 +84,18 @@ export async function latestEngine(platform: Platform, engineId: string): Promis
   const published = typeof first?.published_at === "string" ? first.published_at : "";
   if (release === "" || published === "") throw new Error(`${engine.name} has published no release ZAX can read.`);
 
+  const commit = await tagCommit(platform, engine.repo, release);
   const build = buildFor(engine, platform.os, platform.arch);
-  if (build === null) return { release, published, asset: null };
+  if (build === null) return { release, published, commit, asset: null };
 
   const declared: unknown = first?.assets;
   const assets = Array.isArray(declared) ? (declared as PublishedAsset[]) : [];
   const wanted = assets.find((asset) => asset.name === build.asset);
-  if (!wanted || typeof wanted.browser_download_url !== "string") return { release, published, asset: null };
+  if (!wanted || typeof wanted.browser_download_url !== "string") return { release, published, commit, asset: null };
   return {
     release,
     published,
+    commit,
     asset: {
       name: build.asset,
       url: wanted.browser_download_url,

@@ -1044,7 +1044,7 @@ describe("engines", () => {
     vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([] as never);
     store.installs = [...store.installs, { path: "/games/other", type: "fallout2" }];
     store.engineLatest = {
-      "fallout2-ce": { release: "continious", published: "2026-08-23T09:37:22Z", asset: null },
+      "fallout2-ce": { release: "continious", published: "2026-08-23T09:37:22Z", asset: null, commit: null },
     };
     await store.selectInstall("/games/other");
     expect(store.engineLatest).toEqual({});

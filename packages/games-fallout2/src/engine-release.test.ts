@@ -5,6 +5,8 @@ import { enginePackage, engineOutdated, latestEngine } from "./engine-release.js
 
 const CE = engineById("fallout2-ce");
 const FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=1";
+const TAG = "https://api.github.com/repos/fallout2-ce/fallout2-ce/git/ref/tags/continious";
+const COMMIT = "5f737d8fff969c90ddc86b0235afbce044c79b2d";
 
 const RELEASE = JSON.stringify([
   {
@@ -27,7 +29,7 @@ const seeded = (extra: Record<string, unknown> = {}) =>
     arch: "x64",
     config: "cfg",
     cache: "cache",
-    responses: { [FEED]: RELEASE },
+    responses: { [FEED]: RELEASE, [TAG]: JSON.stringify({ object: { sha: COMMIT, type: "commit" } }) },
     ...extra,
   });
 
@@ -43,9 +45,30 @@ describe("finding the published release", () => {
     });
   });
 
+  it("reads the commit the release's tag points at, which is what identifies a rolling build", async () => {
+    expect((await latestEngine(seeded(), "fallout2-ce")).commit).toBe(COMMIT);
+  });
+
+  it("reports no commit rather than a tag object's own sha, which names a different thing", async () => {
+    const platform = seeded({
+      responses: { [FEED]: RELEASE, [TAG]: JSON.stringify({ object: { sha: COMMIT, type: "tag" } }) },
+    });
+    expect((await latestEngine(platform, "fallout2-ce")).commit).toBeNull();
+  });
+
+  it("still answers when the tag cannot be read at all - the commit is a description, not the release", async () => {
+    const platform = seeded({ responses: { [FEED]: RELEASE } });
+    const found = await latestEngine(platform, "fallout2-ce");
+    expect(found.commit).toBeNull();
+    expect(found.asset?.name).toBe("fallout2-ce-linux-x64.tar.gz");
+  });
+
   it("answers with no asset where this machine has no build", async () => {
     const platform = seeded({ os: "windows", arch: "arm64" });
-    expect((await latestEngine(platform, "fallout2-ce")).asset).toBeNull();
+    const found = await latestEngine(platform, "fallout2-ce");
+    expect(found.asset).toBeNull();
+    // Still described, because the release is real and it is this machine that has nothing to run.
+    expect(found.commit).toBe(COMMIT);
   });
 
   it("says so when the feed names no release at all", async () => {
@@ -65,24 +88,39 @@ describe("whether what is installed is behind", () => {
 
   it("compares publication instants for a rolling project", () => {
     expect(
-      engineOutdated(CE, installed, { release: "continious", published: "2026-08-23T09:37:22Z", asset: null }),
+      engineOutdated(CE, installed, {
+        release: "continious",
+        published: "2026-08-23T09:37:22Z",
+        asset: null,
+        commit: null,
+      }),
     ).toBe(true);
     expect(
-      engineOutdated(CE, installed, { release: "continious", published: "2026-08-01T00:00:00Z", asset: null }),
+      engineOutdated(CE, installed, {
+        release: "continious",
+        published: "2026-08-01T00:00:00Z",
+        asset: null,
+        commit: null,
+      }),
     ).toBe(false);
   });
 
   it("says nothing rather than guessing when a recorded instant will not parse", () => {
     const broken = { ...installed, published: "some time last year" };
-    expect(engineOutdated(CE, broken, { release: "continious", published: "2026-08-23T09:37:22Z", asset: null })).toBe(
-      false,
-    );
+    expect(
+      engineOutdated(CE, broken, {
+        release: "continious",
+        published: "2026-08-23T09:37:22Z",
+        asset: null,
+        commit: null,
+      }),
+    ).toBe(false);
   });
 });
 
 describe("the package cache", () => {
   const asset = { name: "fallout2-ce-linux-x64.tar.gz", url: "https://example.invalid/linux.tar.gz", size: 7 };
-  const release = { release: "continious", published: "2026-08-23T09:37:22Z", asset };
+  const release = { release: "continious", published: "2026-08-23T09:37:22Z", asset, commit: null };
   // Keyed by the downloaded text rather than by path, so it answers for the archive at whatever cache path a
   // test's release lands on: MemoryPlatform's `archive.list` falls back to a lookup by a file's own content.
   const opensFine = { archives: { payload: { "fallout2-ce": "binary" } } };

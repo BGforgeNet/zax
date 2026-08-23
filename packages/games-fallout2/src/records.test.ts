@@ -191,6 +191,7 @@ describe("engines in the record", () => {
           complete: true,
           files: ["fallout2-ce", "ce.dat"],
           backup: "2026-08-23_10-45-00",
+          commit: "5f737d8fff969c90ddc86b0235afbce044c79b2d",
         },
       ],
     });
@@ -203,6 +204,7 @@ describe("engines in the record", () => {
         complete: true,
         files: ["fallout2-ce", "ce.dat"],
         backup: "2026-08-23_10-45-00",
+        commit: "5f737d8fff969c90ddc86b0235afbce044c79b2d",
       },
     ]);
   });
