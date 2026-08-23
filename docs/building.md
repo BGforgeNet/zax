@@ -89,6 +89,19 @@ a start menu entry and cost administrator rights. Of the Windows pair, the `.zip
 place - the `.exe` unpacks itself into a temporary directory keyed to the version. The AppImage is a single
 file the kernel mounts rather than unpacks.
 
+## First run on Windows and macOS
+
+Nothing ZAX ships is code-signed, so both systems warn once. Neither warning means the download is damaged.
+
+- **Windows.** SmartScreen shows "Windows protected your PC". More info, then Run anyway.
+- **macOS.** Open the app, dismiss the refusal, then System Settings -> Privacy & Security -> Open Anyway ->
+  Open. First launch only. Sequoia removed the Control-click shortcut that used to do this, so the app's own
+  context menu no longer offers it.
+
+What a release does carry is build provenance. `gh attestation verify <file> --repo BGforgeNet/zax` says which
+workflow at which commit produced the file, which is the check that distinguishes a genuine build from a
+reupload - signing would not add that.
+
 ## Portable copies
 
 A directory named `data` beside the executable holds everything ZAX would otherwise keep in per-user
