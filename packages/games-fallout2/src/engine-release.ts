@@ -102,8 +102,10 @@ const releaseKey = (published: string): string => published.replace(/[^0-9]/g, "
  * The cached archive for a release, downloaded if this is the first time it is asked for. Under the shared
  * package directory rather than inside the install, so one download serves every install on the machine.
  *
- * A cached file whose size is not what the release declares came from an answer that was not the file - an
- * error page served with a 200, a body that stopped early - and is discarded rather than handed out for ever.
+ * A cached file is trusted only when the release declares a size and the file matches it - an unknown size is
+ * not license to trust whatever is already there, which is what a zero-byte file from a broken earlier
+ * response would otherwise pass for ever. A mismatch came from an answer that was not the file - an error page
+ * served with a 200, a body that stopped early - and is discarded rather than handed out again.
  */
 export async function enginePackage(
   platform: Platform,
@@ -120,10 +122,22 @@ export async function enginePackage(
     asset.name,
   );
   const found = await platform.fs.stat(path);
-  if (found?.kind === "file" && (asset.size === 0 || found.size === asset.size)) return path;
+  if (found?.kind === "file" && asset.size !== 0 && found.size === asset.size) return path;
   await platform.fs.remove(path);
 
   options?.onStep?.(`Downloading ${engine.name}`);
   await platform.net.download(asset.url, path, options);
+
+  // Confirmed by opening it rather than by magic bytes: engines arrive as .zip, .tar.gz or .dmg, and a disk
+  // image has no leading signature to check the way sfall's .7z does.
+  try {
+    await platform.archive.list(path);
+  } catch (error) {
+    await platform.fs.remove(path);
+    throw new Error(
+      `What ${new URL(asset.url).host} sent for ${engine.name} was not an archive - the mirror may have answered with an error page. Trying again may reach a different one.`,
+      { cause: error },
+    );
+  }
   return path;
 }

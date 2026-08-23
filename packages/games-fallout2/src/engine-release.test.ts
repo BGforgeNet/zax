@@ -83,9 +83,14 @@ describe("whether what is installed is behind", () => {
 describe("the package cache", () => {
   const asset = { name: "fallout2-ce-linux-x64.tar.gz", url: "https://example.invalid/linux.tar.gz", size: 7 };
   const release = { release: "continious", published: "2026-08-23T09:37:22Z", asset };
+  // Keyed by the downloaded text rather than by path, so it answers for the archive at whatever cache path a
+  // test's release lands on: MemoryPlatform's `archive.list` falls back to a lookup by a file's own content.
+  const opensFine = { archives: { payload: { "fallout2-ce": "binary" } } };
+  const path = (published: string) =>
+    `cache/packages/engines/fallout2-ce/${published.replace(/[^0-9]/g, "")}/fallout2-ce-linux-x64.tar.gz`;
 
   it("downloads once and answers from the cache after that", async () => {
-    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" } });
+    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" }, ...opensFine });
     const first = await enginePackage(platform, CE, release, asset);
     const second = await enginePackage(platform, CE, release, asset);
     expect(second).toBe(first);
@@ -93,16 +98,29 @@ describe("the package cache", () => {
   });
 
   it("keeps one release's archive apart from another's", async () => {
-    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" } });
+    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" }, ...opensFine });
     const august = await enginePackage(platform, CE, release, asset);
     const july = await enginePackage(platform, CE, { ...release, published: "2026-07-01T00:00:00Z" }, asset);
     expect(july).not.toBe(august);
   });
 
   it("fetches again when what is cached is not the size the release declares", async () => {
-    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" } });
+    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" }, ...opensFine });
     await enginePackage(platform, CE, release, { ...asset, size: 999 });
     await enginePackage(platform, CE, release, { ...asset, size: 999 });
     expect(platform.downloaded).toHaveLength(2);
+  });
+
+  it("fetches again when the release declares no size to check the cache against", async () => {
+    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" }, ...opensFine });
+    await enginePackage(platform, CE, release, asset);
+    await enginePackage(platform, CE, release, { ...asset, size: 0 });
+    expect(platform.downloaded).toHaveLength(2);
+  });
+
+  it("removes and reports a download that will not open as an archive", async () => {
+    const platform = seeded({ downloads: { "https://example.invalid/linux.tar.gz": "payload" } });
+    await expect(enginePackage(platform, CE, release, asset)).rejects.toThrow(/was not an archive/i);
+    expect(platform.fileAt(path(release.published)), "a bad answer must not be handed out again").toBeUndefined();
   });
 });
