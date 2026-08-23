@@ -176,3 +176,94 @@ describe("a record a later ZAX wrote", () => {
     expect((await loadRecord(platform, GAME)).mods[0]?.carried).toEqual({ profile: "hardcore" });
   });
 });
+
+describe("engines in the record", () => {
+  it("round-trips an engine beside the mods", async () => {
+    const platform = new MemoryPlatform({ config: "cfg", cache: "cache" });
+    await saveRecord(platform, {
+      path: "/games/one",
+      mods: [],
+      engines: [
+        {
+          id: "fallout2-ce",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: ["fallout2-ce", "ce.dat"],
+          backup: "2026-08-23_10-45-00",
+        },
+      ],
+    });
+    const read = await loadRecord(platform, "/games/one");
+    expect(read.engines).toEqual([
+      {
+        id: "fallout2-ce",
+        release: "continious",
+        published: "2026-08-23T09:37:22Z",
+        complete: true,
+        files: ["fallout2-ce", "ce.dat"],
+        backup: "2026-08-23_10-45-00",
+      },
+    ]);
+  });
+
+  it("keeps the file for an install that has an engine and no mods", async () => {
+    const platform = new MemoryPlatform({ config: "cfg", cache: "cache" });
+    await saveRecord(platform, {
+      path: "/games/one",
+      mods: [],
+      engines: [
+        {
+          id: "fallout2-ce",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: ["ce.dat"],
+        },
+      ],
+    });
+    expect((await loadRecord(platform, "/games/one")).engines).toHaveLength(1);
+  });
+
+  it("drops an engine whose files are all gone", async () => {
+    const platform = new MemoryPlatform({ config: "cfg", cache: "cache", dirs: ["/games/one"] });
+    await saveRecord(platform, {
+      path: "/games/one",
+      mods: [],
+      engines: [
+        {
+          id: "fallout2-ce",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: ["fallout2-ce"],
+        },
+      ],
+    });
+    const reconciled = await reconcileRecord(platform, await loadRecord(platform, "/games/one"));
+    expect(reconciled.engines ?? []).toEqual([]);
+  });
+
+  it("keeps one whose files are still there", async () => {
+    const platform = new MemoryPlatform({
+      config: "cfg",
+      cache: "cache",
+      files: { "/games/one/fallout2-ce": "binary" },
+    });
+    await saveRecord(platform, {
+      path: "/games/one",
+      mods: [],
+      engines: [
+        {
+          id: "fallout2-ce",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: ["fallout2-ce"],
+        },
+      ],
+    });
+    const reconciled = await reconcileRecord(platform, await loadRecord(platform, "/games/one"));
+    expect(reconciled.engines).toHaveLength(1);
+  });
+});

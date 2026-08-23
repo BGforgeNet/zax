@@ -77,10 +77,31 @@ export function modName(mod: InstalledMod): string {
   }
 }
 
+/**
+ * An engine ZAX put into this install. Not a mod: it deploys outside `mods/`, so none of the manifest
+ * machinery applies to it, and what it needs recording is only what the directory cannot say - which release
+ * these bytes are.
+ */
+export interface InstalledEngine {
+  id: string;
+  /** The release's tag, as published. `continious` for a project that republishes one release in place. */
+  release: string;
+  /** When that release was published, ISO 8601. The version, where a project publishes no version. */
+  published: string;
+  /** False from the first byte deployed until the install finished, so a crash is visible as one. */
+  complete: boolean;
+  /** Top-level entries deployed into the install, relative to it. A macOS bundle is one directory entry. */
+  files: readonly string[];
+  /** Where copies of anything replaced went, absent when nothing was. */
+  backup?: string;
+}
+
 export interface InstallRecord {
   /** The install directory, in clear - the filename is its hash, which nothing can read back. */
   path: string;
   mods: readonly InstalledMod[];
+  /** Engines installed here. Optional as `opaque` is: most records have none. */
+  engines?: readonly InstalledEngine[];
   /** Entries this version could not read. Carried through every rewrite and touched by nothing else. */
   opaque?: readonly OpaqueMod[];
   /** The format the file states, when that is later than this version writes - what makes it read-only. */
@@ -211,6 +232,28 @@ function readMod(entry: unknown): InstalledMod | null {
   };
 }
 
+/** One recorded engine, or null when the entry is not one this version can read. */
+function readEngine(entry: unknown): InstalledEngine | null {
+  if (entry === null || typeof entry !== "object") return null;
+  const fields = entry as Record<string, unknown>;
+  const id = asText(fields["id"]);
+  const release = asText(fields["release"]);
+  const published = asText(fields["published"]);
+  if (id === undefined || release === undefined || published === undefined) return null;
+  const files = Array.isArray(fields["files"])
+    ? fields["files"].filter((one): one is string => typeof one === "string")
+    : [];
+  const backup = asText(fields["backup"]);
+  return {
+    id,
+    release,
+    published,
+    complete: fields["complete"] === true,
+    files,
+    ...(backup !== undefined ? { backup } : {}),
+  };
+}
+
 /** The record for an install, or the empty one - a first install and a lost record read the same. */
 export async function loadRecord(platform: Platform, installPath: string): Promise<InstallRecord> {
   const path = normalizePath(installPath);
@@ -243,9 +286,13 @@ export async function loadRecord(platform: Platform, installPath: string): Promi
       entry !== null && typeof entry === "object" ? asText((entry as Record<string, unknown>)["id"]) : undefined;
     opaque.push({ ...(id !== undefined && isModId(id) ? { id } : {}), raw: entry });
   }
+  const engines = (Array.isArray(fields["engines"]) ? fields["engines"] : [])
+    .map(readEngine)
+    .filter((one): one is InstalledEngine => one !== null);
   return {
     path,
     mods,
+    ...(engines.length > 0 ? { engines } : {}),
     ...(opaque.length > 0 ? { opaque } : {}),
     ...(laterFormat !== undefined ? { laterFormat } : {}),
   };
@@ -256,7 +303,7 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
   if (record.laterFormat !== undefined) throw new Error(laterFormatMessage(record.laterFormat));
   const path = normalizePath(record.path);
   const at = recordPath(platform, path);
-  if (record.mods.length === 0 && !record.opaque?.length) return platform.fs.remove(at);
+  if (record.mods.length === 0 && !record.opaque?.length && !record.engines?.length) return platform.fs.remove(at);
   const body = stringify(
     {
       record: RECORD_FORMAT,
@@ -278,6 +325,18 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
         })),
         ...(record.opaque ?? []).map((entry) => entry.raw),
       ],
+      ...(record.engines?.length
+        ? {
+            engines: record.engines.map((engine) => ({
+              id: engine.id,
+              release: engine.release,
+              published: engine.published,
+              complete: engine.complete,
+              files: [...engine.files],
+              ...(engine.backup !== undefined ? { backup: engine.backup } : {}),
+            })),
+          }
+        : {}),
     },
     // Unwrapped for the same reason zax.yml is: folded long scalars are lossless but unreadable to hand-edit.
     { lineWidth: 0 },
@@ -308,8 +367,22 @@ export async function reconcileRecord(platform: Platform, record: InstallRecord)
     }
     if (present) kept.push(mod);
   }
-  if (kept.length === record.mods.length) return record;
-  const pruned: InstallRecord = { ...record, mods: kept };
+  const keptEngines: InstalledEngine[] = [];
+  for (const engine of record.engines ?? []) {
+    let present = engine.files.length === 0;
+    for (const file of engine.files) {
+      // Either kind of entry counts: a Windows build deploys files, a macOS one deploys a bundle directory.
+      if ((await platform.fs.stat(platform.paths.join(record.path, ...file.split("/")))) !== null) {
+        present = true;
+        break;
+      }
+    }
+    if (present) keptEngines.push(engine);
+  }
+  if (kept.length === record.mods.length && keptEngines.length === (record.engines?.length ?? 0)) return record;
+  // Assigned rather than spread conditionally: `exactOptionalPropertyTypes` refuses an explicit `undefined`,
+  // and an empty list is what both the write and the delete rule already read as none.
+  const pruned: InstallRecord = { ...record, mods: kept, engines: keptEngines };
   await saveRecord(platform, pruned);
   return pruned;
 }
