@@ -1038,15 +1038,18 @@ describe("engines", () => {
     expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, "fallout2-ce");
   });
 
-  test("holds no engine state from the install it just left", async () => {
+  test("keeps a check across installs, and re-reads what is deployed in the one arrived at", async () => {
     // selectInstall is a no-op on the already-selected path (it would otherwise drop unsaved edits on a
     // re-click), so leaving has to mean an actual other install, not PREVIEW_INSTALL a second time.
-    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([] as never);
+    const listing = vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([] as never);
     store.installs = [...store.installs, { path: "/games/other", type: "fallout2" }];
-    store.engineLatest = {
-      "fallout2-ce": { release: "continious", published: "2026-08-23T09:37:22Z", asset: null, commit: null },
-    };
+    const published = { release: "continious", published: "2026-08-23T09:37:22Z", asset: null, commit: null };
+    store.engineLatest = { "fallout2-ce": published };
     await store.selectInstall("/games/other");
-    expect(store.engineLatest).toEqual({});
+    // The project published one release, not one per game folder, so the check outlives the switch.
+    expect(store.engineLatest).toEqual({ "fallout2-ce": published });
+    // What is the folder's - which engine is deployed in it - is read again for the one arrived at.
+    expect(listing).toHaveBeenCalledWith(expect.objectContaining({ path: "/games/other" }));
+    expect(store.engines).toEqual([]);
   });
 });

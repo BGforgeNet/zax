@@ -361,8 +361,10 @@ class Store {
     const install = this.install;
     this.sfallInstalled = null;
     this.hiresInstalled = null;
+    // The listing goes because it carries what is deployed here. A check does not: what the project has
+    // published is the same answer whichever game folder is selected, and throwing it away asked the network
+    // again for a result already on screen - the same rule `sfallLatest` follows one field up.
     this.engines = [];
-    this.engineLatest = {};
     // Another install's offers would be wrong here, and a held plan doubly so; the view re-asks on demand.
     this.modListing = null;
     this.modPlan = null;
