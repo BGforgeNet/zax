@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { SETTINGS } from "@zax/fallout2";
-import { PREVIEW_INSTALL, previewPlatform } from "./host.js";
+import { PREVIEW_INSTALL, backend as hostBackend, previewPlatform } from "./host.js";
 import { store, unwrapArguments } from "./store.svelte.js";
 import { BACKEND_METHODS, loadRecord, saveRecord, type Backend } from "@zax/fallout2";
 import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
@@ -916,5 +916,107 @@ describe("a mod that must be pointed at another game", () => {
     await store.confirmModInputs();
     expect(store.modInputs).toBeNull();
     expect(store.notice?.kind).toBe("problem");
+  });
+});
+
+/**
+ * What an install of a base mod does to the list of games, which is the half of the flow that outlives the
+ * operation: everything else it reports is a notice the user dismisses.
+ *
+ * Driven against a stubbed backend rather than a real install, because the two outcomes being distinguished
+ * here are what the store does with what came back - and reaching them for real needs the network, an
+ * installer to run and, for the second, a copy of Fallout 1.
+ */
+describe("what an installed base mod does to the list of games", () => {
+  const settled = { offers: [], failures: [] };
+
+  /** Stands in for the operation, so what is asserted is the store's handling of the outcome. */
+  const answering = (outcome: unknown, identifiedAs: string) => {
+    vi.spyOn(hostBackend, "installMod").mockResolvedValue(outcome as never);
+    vi.spyOn(hostBackend, "identifyInstall").mockResolvedValue(identifiedAs as never);
+    // Re-read after any install; stubbed because the preview refuses the feeds' network and a refusal here
+    // would end the operation before the assertions below are about anything.
+    vi.spyOn(hostBackend, "availableMods").mockResolvedValue(settled as never);
+  };
+
+  const stored = async () => new TextDecoder().decode(await previewPlatform.fs.read("preview/config/zax.yml"));
+
+  afterEach(() => vi.restoreAllMocks());
+
+  test("relabels the install in place when the mod makes it a different game", async () => {
+    answering(
+      { version: "2.4.34", becomes: "fallout2rpu", renamed: 0, conflicts: [], backup: "preview/cache/backup" },
+      "fallout2rpu",
+    );
+    expect(store.installs.find((one) => one.path === PREVIEW_INSTALL)?.type).toBe("fallout2up");
+
+    store.modPlan = {
+      offer: {
+        id: "rpu",
+        name: "Restoration Project Updated",
+        version: "2.4.34",
+        type: "base",
+        availability: { kind: "install" },
+      },
+      plan: {
+        kind: "base",
+        version: "2.4.34",
+        asset: "rpu_v2.4.34.zip",
+        route: "other",
+        download: 1024,
+        becomes: "fallout2rpu",
+        fingerprint: "rpu-2.4.34",
+      },
+    };
+    await store.confirmModInstall();
+
+    // No second row: the game the user already had is the game the mod transformed.
+    expect(store.installs).toHaveLength(1);
+    expect(store.installs[0]?.type, "read back off the directory, not taken from the outcome").toBe("fallout2rpu");
+
+    // The type is not in the state file at all - only the path is, and startup identifies every stored path
+    // by reading it. So a restart reports what the directory holds rather than what was last shown: here
+    // that is still the patched fixture, since a stubbed install never touched it. The directory being the
+    // authority is also why a game modded outside ZAX reads correctly on the next run.
+    expect(await stored()).not.toContain("fallout2rpu");
+    await store.start();
+    expect(store.installs[0]?.type, "which a stub cannot fake - startup reads the folder itself").toBe("fallout2up");
+  });
+
+  test("adds a second game when the mod creates one beside this install", async () => {
+    const created = `${PREVIEW_INSTALL}/Fallout1in2`;
+    answering({ version: "1.16.3771", created, extracted: 8602, conflicts: [] }, "fo1in2");
+
+    store.modPlan = {
+      offer: {
+        id: "fo1in2",
+        name: "Fallout et tu",
+        version: "1.16.3771",
+        type: "base",
+        availability: { kind: "install" },
+      },
+      plan: {
+        kind: "creates",
+        version: "1.16.3771",
+        directory: "Fallout1in2",
+        asset: "Fallout1in2.zip",
+        download: 2048,
+        unpacked: 4096,
+        inputs: { fallout1: "/games/fallout1" },
+        becomes: "fo1in2",
+        fingerprint: "fo1in2-1.16.3771",
+      },
+    };
+    await store.confirmModInstall();
+
+    expect(store.installs.map((one) => one.path)).toEqual([PREVIEW_INSTALL, created]);
+    expect(store.installs[1]?.type).toBe("fo1in2");
+    // The host is untouched: what the mod made is a game inside it, not a change to it.
+    expect(store.installs[0]?.type).toBe("fallout2up");
+    // The path is stored, unlike the type: the second game has to be found again next time without the
+    // install that made it having to be consulted.
+    expect(await stored(), "and it survives a restart").toContain(created);
+    // Said in the notice too, since a game appearing in the sidebar unannounced is a surprise.
+    expect(store.notice?.text).toContain("is now on the list of installations");
   });
 });
