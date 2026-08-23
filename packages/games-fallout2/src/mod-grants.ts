@@ -13,9 +13,13 @@
  *
  * Two are known to need one and neither can be entered yet. HQ music writes `data/sound/music/`, which
  * `music_path1` names as a filesystem directory the engine reads, and Hero Appearance writes `appearance/`,
- * where sfall reads its sets as folders or dats. Neither publishes a manifest, so neither has an id, and the
- * id is the publisher's to declare - one guessed here would sit inert while the mod installed under another
- * name. Each goes in beside its `MOD_FEEDS` row when that row is added.
+ * where sfall reads its sets as folders or dats. Neither publishes a manifest, so neither has an id, and for a
+ * stacking mod the id is the publisher's to declare: it is also the name its files answer to in `mods/` and the
+ * prefix of every setting it exposes, so an id guessed here would sit inert while the mod installed under
+ * another name. Each goes in beside its `MOD_FEEDS` row when that row is added.
+ *
+ * `mod-vendored.ts` does mint ids, and this is not that case: those mods put nothing in `mods/` and expose no
+ * settings, so their id names only the feed row and the record, both of which ZAX owns.
  */
 
 export interface ModGrant {
