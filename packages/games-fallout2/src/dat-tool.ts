@@ -14,7 +14,7 @@ import type { ReleaseAsset } from "./mod-feed.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 
 /** The pinned release. Raising it is a ZAX change: new digests, and the invocation re-checked against them. */
-export const DAT_TOOL_VERSION = "0.9.0";
+export const DAT_TOOL_VERSION = "0.9.1";
 
 const RELEASE = `https://github.com/BGforgeNet/dat3/releases/download/v${DAT_TOOL_VERSION}`;
 
@@ -45,22 +45,22 @@ const BUILDS: Readonly<Partial<Record<`${OperatingSystem}-${Architecture}`, Rele
   "linux-x64": {
     name: "dat3",
     url: `${RELEASE}/dat3`,
-    digest: "sha256:8eaef7e2b398c3a740b03c812ad3a3efc85ed11819a0a3e3a7c9d1b7f42e0a64",
+    digest: "sha256:808527196fedd111fdc1f685ee80aa39419b2083b50a762c05efc547263ecec5",
   },
   "linux-arm64": {
     name: "dat3-arm64",
     url: `${RELEASE}/dat3-arm64`,
-    digest: "sha256:62948c94260702c9293fd9362791f756a3da12862272fc27a758a2664cbc0694",
+    digest: "sha256:7a65ee101f0c7906447c880e90c770d909475fd7371742e8c81b2bc66082610f",
   },
   "windows-x64": {
     name: "dat3.exe",
     url: `${RELEASE}/dat3.exe`,
-    digest: "sha256:676e775290ef5aa377787346b2a8756905ad915181c3380ec225fd4b806689cc",
+    digest: "sha256:c9070e59a78cf2c0e32563b0ff9c0582bfa26062d4bf2cbe90d87875511e4ea9",
   },
   "windows-arm64": {
     name: "dat3.exe",
     url: `${RELEASE}/dat3.exe`,
-    digest: "sha256:676e775290ef5aa377787346b2a8756905ad915181c3380ec225fd4b806689cc",
+    digest: "sha256:c9070e59a78cf2c0e32563b0ff9c0582bfa26062d4bf2cbe90d87875511e4ea9",
   },
 };
 
@@ -72,7 +72,7 @@ const BUILDS: Readonly<Partial<Record<`${OperatingSystem}-${Architecture}`, Rele
 const PORTABLE_BUILD: ReleaseAsset = {
   name: "dat3.wasm",
   url: `${RELEASE}/dat3.wasm`,
-  digest: "sha256:5f1c9a7e3e205acb65a7323f31075537674f454f95e21f0646b021a695cb9030",
+  digest: "sha256:acf013e39ea9efa4a72004ad9c214fe460c14aa10fb04c6476b1a8ed55af18f7",
 };
 
 /** How this machine runs the tool. Always an answer: the module covers every pair with no native build. */
