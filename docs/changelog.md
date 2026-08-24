@@ -27,6 +27,10 @@ mods as well as settings.
   `ddraw.ini` settings - the release's own defaults are merged in, so new keys arrive and your choices stay.
 - **A second engine.** Install Fallout II Community Edition alongside the game's own engine, keep it up to date,
   and run either one - no Wine needed even on Linux and macOS, since it is a native build.
+- **Update checks run at startup.** What ZAX, sfall, the engines and the mod feeds have published is asked for
+  when the window opens rather than waiting on a Check button - once, since none of it depends on which game is
+  selected. Switching games only re-checks that game's folder. A machine that cannot reach any of it is left as
+  it was: the versions read as unchecked, and the buttons still ask.
 - **Bug reports in one archive.** Configs, the game's logs, listings of the folder and of `mods/`, the load
   order, ZAX's own log, and any savegames you choose.
 - **Runs from anywhere.** Windows, Linux and macOS builds, none of them installers. A `data` directory beside

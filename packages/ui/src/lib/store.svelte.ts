@@ -33,6 +33,7 @@ import {
   engineOutdated,
   hiddenIds,
   listMods,
+  listingFrom,
   placesById,
   recommendationFor,
   recommendedOrder,
@@ -45,6 +46,8 @@ import {
   type BaseInstallPlan,
   type CreateInstallPlan,
   type ModInstallPlan,
+  type ModFeedListing,
+  type ModInstallState,
   type ModListing,
   type ModOffer,
   type ModSetting,
@@ -78,6 +81,19 @@ export function unwrapArguments(backend: Backend): Backend {
 }
 
 const backend: Backend = unwrapArguments(host);
+
+/**
+ * Runs a check for its effect alone. These reach the network on ZAX's own initiative rather than on a click,
+ * so the honest report of a failure is the field staying as it was - what every view renders before anyone
+ * has asked.
+ */
+async function quietly(work: () => Promise<void>): Promise<void> {
+  try {
+    await work();
+  } catch {
+    // Left unchecked. The view's own Check button is what reports why, when someone asks for the answer.
+  }
+}
 
 /*
   Long enough that a slider drag or a series of quick edits lands as one write, short enough that a user who
@@ -211,10 +227,36 @@ class Store {
   contents = $state<ConfigFileContents>({});
 
   /**
-   * What the feeds offer this install, or null before the first read. Read when asked rather than at
-   * startup: it costs the network, and the Mods view is where the answer means anything.
+   * What the feeds have published, or null before the first read. A repository publishes one release
+   * whichever game is selected, so this outlives a switch the way `sfallLatest` does.
    */
-  modListing = $state<ModListing | null>(null);
+  modFeeds = $state<ModFeedListing | null>(null);
+  /** Where the selected install stands against them, which is the half a change of game invalidates. */
+  modStanding = $state<ModInstallState | null>(null);
+  /**
+   * The two as the Mods tab reads them, or null until both halves are in. Derived rather than stored: the
+   * halves arrive from different reads, and a listing kept beside them is a third copy to keep in step. A
+   * rune rather than the cached getter `results` uses - that one caches against a value it also reads, which
+   * as a rune would loop; this is a function of two fields and nothing else.
+   */
+  modListing = $derived<ModListing | null>(
+    this.modFeeds && this.modStanding ? listingFrom(this.modFeeds, this.modStanding) : null,
+  );
+  /** How many reads of either half are out. Counted rather than flagged, since the two overlap. */
+  private modReads = $state(0);
+  /**
+   * Whether the Mods tab is waiting on one. Not `busy`: the read a change of game starts is not an operation
+   * the user asked for, so it holds no gate - and without this the tab spent that read saying the feeds had
+   * never been asked.
+   */
+  readingOffers = $derived(this.modReads > 0);
+  /**
+   * Which install the per-install state was last read for, so a reread can tell a change of game from a
+   * reread of the same one, and how many reads of it have been started. Plain, not `$state`: nothing renders
+   * either, and a reactive read here would tie every view that touches the install to them.
+   */
+  private readFor = "";
+  private standingRequest = 0;
   /**
    * A resolved install plan awaiting the user's word, with the offer it belongs to. Two shapes: a stacking
    * mod's names every file, and a base mod's names the release and the space, the installer owning the rest.
@@ -277,7 +319,7 @@ class Store {
   sfallLatest = $state<SfallRelease | null>(null);
   /** Every engine ZAX knows, against the selected install. Read with the install: it costs no network. */
   engines = $state<readonly EngineListing[]>([]);
-  /** What each engine has published, by id, once it has been asked. A check is a request nobody owes. */
+  /** What each engine has published, by id. Asked for at startup, and by the Check button after that. */
   engineLatest = $state<Record<string, EngineRelease>>({});
   /** The hi-res patch's version, or null when the install does not have it. There is no latest to compare. */
   hiresInstalled = $state<string | null>(null);
@@ -354,19 +396,64 @@ class Store {
     if (problem) this.notice = { kind: "problem", text: problem };
     await this.readInstall();
     this.loaded = true;
+    // Not awaited: the interface is usable without any of it, and each answer lands in its own field when it
+    // arrives. Awaiting here would hold the whole window open on the slowest of them.
+    void this.checkForUpdates();
+  }
+
+  /**
+   * Every check the views otherwise wait for a click to make: what ZAX, sfall, the engines and the mod feeds
+   * have published. Off the `busy` gate on purpose - nobody asked for these, so holding the gate would grey
+   * out the controls and refuse the user's first click over a request of ZAX's own making. All four are the
+   * same answer for every install, which is why they are asked here once and not per game.
+   *
+   * A failure leaves its field alone rather than reporting: the views already have a state for an answer that
+   * has not arrived, and several notices about an offline machine would bury the state file's own problems.
+   * Each of these still has a button behind it that reports properly when it is pressed.
+   */
+  async checkForUpdates(): Promise<void> {
+    await Promise.all([
+      quietly(async () => {
+        this.zaxLatest = (await backend.latestZax()).version;
+      }),
+      quietly(async () => {
+        this.sfallLatest = await backend.latestSfall();
+      }),
+      quietly(() => this.refreshModFeeds()),
+      // Only the ones this machine could actually install, which is the condition the Check button carries.
+      ...this.engines
+        .filter((engine) => engine.build !== null)
+        .map((engine) =>
+          quietly(async () => {
+            this.engineLatest = { ...this.engineLatest, [engine.id]: await backend.latestEngine(engine.id) };
+          }),
+        ),
+    ]);
   }
 
   /** Rereads the selected install: its config files, which sfall and hi-res patch it has, and its engines. */
   private async readInstall(): Promise<void> {
     const install = this.install;
+    // Every caller rereads the install, but only a few change which one it is - and where the mods stand is
+    // the one thing here that no other caller can have changed, since it is read from the folder this names.
+    // Saving a setting or installing an engine used to blank the Mods tab back to unread over it.
+    const switched = (install?.path ?? "") !== this.readFor;
+    this.readFor = install?.path ?? "";
     this.sfallInstalled = null;
     this.hiresInstalled = null;
     // The listing goes because it carries what is deployed here. A check does not: what the project has
     // published is the same answer whichever game folder is selected, and throwing it away asked the network
     // again for a result already on screen - the same rule `sfallLatest` follows one field up.
     this.engines = [];
-    // Another install's offers would be wrong here, and a held plan doubly so; the view re-asks on demand.
-    this.modListing = null;
+    // Another install's standing would be wrong here. What the feeds published is left alone: one release is
+    // published for every game, which is why the two are read apart in the first place.
+    if (switched) {
+      this.modStanding = null;
+      // Started on the line that empties the tab rather than after the rest of the install has been reread:
+      // nothing below feeds it, and the gap between the two is time spent saying the feeds were never asked.
+      if (install) void quietly(() => this.refreshModOffers(install));
+    }
+    // A held plan is dropped whichever install this is: it is how the flow that just ran closes its dialog.
     this.modPlan = null;
     this.modParts = null;
     this.modInputs = null;
@@ -696,22 +783,53 @@ class Store {
   }
 
   /**
-   * The fetch itself, apart from `run`: a flow that just installed or removed refreshes from inside its own
-   * `run`, whose busy gate would refuse a nested one - and silently, leaving the tab claiming the feeds were
-   * never read.
+   * Where an install stands against the published mods. Apart from `run`: a flow that just installed or
+   * removed refreshes from inside its own `run`, whose busy gate would refuse a nested one - and silently,
+   * leaving the tab claiming the feeds were never read.
+   *
+   * The feeds themselves are not read here. What is deployed in a folder is the only thing a change of game
+   * can change about an offer, and the backend holds one answer from the feeds for every install.
    */
   private async refreshModOffers(install: Install): Promise<void> {
-    this.modListing = await backend.availableMods(install);
+    const request = ++this.standingRequest;
+    this.modReads += 1;
+    try {
+      const standing = await backend.modInstallState(install);
+      // Only the newest read for the game still on screen writes. A switch starts one off the `busy` gate, so
+      // a slower earlier answer can still be out when it lands - and would arrive either on top of the answer
+      // the Refresh button just fetched, or under a game that is no longer selected, forgetting it having
+      // been dropped from the list among them.
+      if (request === this.standingRequest && this.selectedInstall === install.path) this.modStanding = standing;
+    } finally {
+      this.modReads -= 1;
+    }
   }
 
-  /** Reads what the feeds offer this install. On demand rather than at startup - it costs the network. */
-  async loadModOffers(): Promise<void> {
+  /** What the feeds published. Once per run unless asked again, since no install changes the answer. */
+  private async refreshModFeeds(refresh = false): Promise<void> {
+    this.modReads += 1;
+    try {
+      this.modFeeds = await backend.publishedMods(refresh);
+    } finally {
+      this.modReads -= 1;
+    }
+  }
+
+  /**
+   * Both halves, for the first read and for the Mods tab's Refresh button - which is the one control that
+   * asks the feeds again rather than be told what they said before.
+   */
+  async loadModOffers(refresh = false): Promise<void> {
     const install = this.install;
     if (!install) {
-      this.modListing = null;
+      this.modStanding = null;
       return;
     }
     await this.run("Reading the mod feeds", async () => {
+      // In order rather than together: where an install stands is read against what the feeds last published,
+      // so a refresh that replaces them has to land first - otherwise the tab draws the new set of mods
+      // against an answer taken about the old one, and a mod the refresh added has nothing to say about it.
+      await this.refreshModFeeds(refresh);
       await this.refreshModOffers(install);
       return null;
     });
@@ -1313,7 +1431,7 @@ class Store {
     });
   }
 
-  /** What an engine has published. Its own request: nothing needs the answer until someone asks for it. */
+  /** What one engine has published, for the button that asks again after the startup check. */
   async checkEngine(engineId: string): Promise<void> {
     const engine = this.engines.find((one) => one.id === engineId);
     await this.run(`Checking for a newer ${engine?.short ?? "engine"}`, async () => {

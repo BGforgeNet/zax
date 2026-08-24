@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { SETTINGS } from "@zax/fallout2";
 import { PREVIEW_INSTALL, backend as hostBackend, previewPlatform } from "./host.js";
 import { store, unwrapArguments } from "./store.svelte.js";
-import { BACKEND_METHODS, loadRecord, saveRecord, type Backend } from "@zax/fallout2";
+import {
+  BACKEND_METHODS,
+  loadRecord,
+  saveRecord,
+  type Backend,
+  type ModFeedListing,
+  type ModInstallState,
+} from "@zax/fallout2";
 import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
 import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
@@ -928,7 +935,7 @@ describe("a mod that must be pointed at another game", () => {
  * installer to run and, for the second, a copy of Fallout 1.
  */
 describe("what an installed base mod does to the list of games", () => {
-  const settled = { offers: [], failures: [] };
+  const settled = { standing: {}, unfollowed: [] };
 
   /** Stands in for the operation, so what is asserted is the store's handling of the outcome. */
   const answering = (outcome: unknown, identifiedAs: string) => {
@@ -936,7 +943,7 @@ describe("what an installed base mod does to the list of games", () => {
     vi.spyOn(hostBackend, "identifyInstall").mockResolvedValue(identifiedAs as never);
     // Re-read after any install; stubbed because the preview refuses the feeds' network and a refusal here
     // would end the operation before the assertions below are about anything.
-    vi.spyOn(hostBackend, "availableMods").mockResolvedValue(settled as never);
+    vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(settled as never);
   };
 
   const stored = async () => new TextDecoder().decode(await previewPlatform.fs.read("preview/config/zax.yml"));
@@ -1051,5 +1058,163 @@ describe("engines", () => {
     // What is the folder's - which engine is deployed in it - is read again for the one arrived at.
     expect(listing).toHaveBeenCalledWith(expect.objectContaining({ path: "/games/other" }));
     expect(store.engines).toEqual([]);
+  });
+});
+
+describe("the checks ZAX makes for itself at startup", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // The store is one object across the file, and these three outlive an install. Cleared here so a case
+    // below cannot read an answer this block put there.
+    store.zaxLatest = null;
+    store.sfallLatest = null;
+    store.engineLatest = {};
+  });
+
+  const published = { release: "continious", published: "2026-08-23T09:37:22Z", asset: null, commit: null };
+
+  const answering = () => {
+    vi.spyOn(hostBackend, "latestZax").mockResolvedValue({ version: "9.9.9", url: "https://example.invalid" });
+    vi.spyOn(hostBackend, "latestSfall").mockResolvedValue({ version: "4.4.9", url: "https://example.invalid" });
+    return vi.spyOn(hostBackend, "latestEngine").mockResolvedValue(published);
+  };
+
+  test("asks at once for what ZAX, sfall and the engines have published", async () => {
+    answering();
+    await store.checkForUpdates();
+
+    expect(store.zaxLatest).toBe("9.9.9");
+    expect(store.sfallLatest?.version).toBe("4.4.9");
+    expect(store.engineLatest["fallout2-ce"]).toEqual(published);
+  });
+
+  test("does not hold the busy gate, which would refuse the user's first click", async () => {
+    answering();
+    const during = store.checkForUpdates();
+    expect(store.busy, "nobody asked for these, so they must not lock the interface").toBeNull();
+    await during;
+    expect(store.notice, "nor report a result nobody is waiting for").toBeNull();
+  });
+
+  test("leaves the fields as they were when the machine cannot be reached, and says nothing", async () => {
+    // Nothing is stubbed, so the preview host refuses every one of them the way an offline machine would.
+    await store.checkForUpdates();
+
+    expect(store.zaxLatest).toBeNull();
+    expect(store.sfallLatest).toBeNull();
+    expect(store.engineLatest).toEqual({});
+    expect(store.notice, "several notices about being offline would bury the ones that matter").toBeNull();
+  });
+});
+
+describe("the feeds against a change of game", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const other = { path: "/games/other", type: "fallout2" } as const;
+  const feeds: ModFeedListing = { published: [], failures: [] };
+  /**
+   * Told apart by one recorded row: which install's answer arrived is the whole question in this block, and a
+   * mod no feed follows is the cheapest thing to write that only an install's own record can produce.
+   */
+  const standingOf = (id: string): ModInstallState => ({
+    standing: {},
+    unfollowed: [{ id, name: id, version: "1", type: "pluggable", availability: { kind: "unfollowed" } }],
+  });
+  /**
+   * What the tab draws for one install. The offers alone, not the whole listing: the failures come from the
+   * published half, which the startup read owns and can land on at any point in a case.
+   */
+  const offersFor = (id: string) => standingOf(id).unfollowed;
+
+  /** The published half in place, as it is a moment after startup, so a case is about the other half. */
+  const published = () => {
+    store.modFeeds = feeds;
+    return vi.spyOn(hostBackend, "publishedMods").mockResolvedValue(feeds);
+  };
+
+  test("are not read again for a change of game - one release is published for every install", async () => {
+    const asked = published();
+    vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(standingOf("mine"));
+    store.installs = [...store.installs, other];
+
+    await store.selectInstall(other.path);
+    await store.selectInstall(PREVIEW_INSTALL);
+
+    // The whole point of the two halves: a switch asks what changed - the folder - and nothing else.
+    expect(asked, "a repository publishes the same release whichever game is selected").not.toHaveBeenCalled();
+  });
+
+  test("are read again by Refresh, which is the one control that asks them", async () => {
+    const asked = published();
+    vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(standingOf("mine"));
+
+    await store.loadModOffers(true);
+
+    expect(asked).toHaveBeenCalledWith(true);
+  });
+
+  test("the game's own half is read again for the game arrived at, without waiting to be asked", async () => {
+    published();
+    // Held open so the switch is over while the read is still out, which is the state the tab has to describe.
+    let release = (): void => {};
+    const held = new Promise<ModInstallState>((resolve) => {
+      release = () => resolve(standingOf("mine"));
+    });
+    const asked = vi.spyOn(hostBackend, "modInstallState").mockReturnValue(held);
+    store.installs = [...store.installs, other];
+
+    // The switch reads the install itself before it reaches the feeds, and the tab is on screen throughout.
+    const switching = store.selectInstall(other.path);
+    expect(store.modListing, "the previous game's offers go at once").toBeNull();
+    expect(store.readingOffers, "and the tab says so from the same moment").toBe(true);
+    await switching;
+    // Off the `busy` gate: the switch itself is over before the answer is, and a read nobody asked for must
+    // not grey out the controls.
+    expect(store.busy).toBeNull();
+    // What the tab must not be left holding is the previous game's offers, nor - for however long the read
+    // takes - the claim that the feeds were never asked.
+    expect(store.modListing).toBeNull();
+    expect(store.readingOffers).toBe(true);
+
+    release();
+    await vi.waitFor(() => expect(store.modListing?.offers).toEqual(offersFor("mine")));
+    expect(store.readingOffers).toBe(false);
+    expect(asked).toHaveBeenCalledWith(expect.objectContaining({ path: other.path }));
+  });
+
+  test("survive a reread of the same game, which is what saving and installing do", async () => {
+    published();
+    vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(standingOf("read-once"));
+    await store.loadModOffers();
+    expect(store.modListing?.offers).toEqual(offersFor("read-once"));
+
+    // Installing an engine rereads the install. Nothing about which mods are on offer changed, and blanking
+    // the tab back to unread over it is the bug this pins.
+    vi.spyOn(hostBackend, "installEngine").mockResolvedValue({ backup: null } as never);
+    await store.installEngine("fallout2-ce");
+
+    expect(store.modListing?.offers, "the folder on screen is the one this was read for").toEqual(
+      offersFor("read-once"),
+    );
+  });
+
+  test("drop an answer that arrives for a game that is no longer the selected one", async () => {
+    published();
+    // Held open so the second switch lands while the first read is still out - the only way the two cross.
+    let release = (): void => {};
+    const held = new Promise<ModInstallState>((resolve) => {
+      release = () => resolve(standingOf("stale"));
+    });
+    vi.spyOn(hostBackend, "modInstallState").mockImplementation((install) =>
+      install.path === other.path ? held : Promise.resolve(standingOf("mine")),
+    );
+    store.installs = [...store.installs, other];
+
+    await store.selectInstall(other.path);
+    await store.selectInstall(PREVIEW_INSTALL);
+    release();
+    await held;
+
+    await vi.waitFor(() => expect(store.modListing?.offers).toEqual(offersFor("mine")));
   });
 });

@@ -599,66 +599,80 @@ export interface ModListing {
 }
 
 /**
- * Every known mod against one install. A feed that cannot answer costs its own row, not the listing: the
- * other mods are still installable while one repository is unreachable or unadopted.
+ * What one feed has published, with nothing of any install in it - a repository publishes one release,
+ * whichever game folder is on screen. This is the half of an offer that survives a change of game.
  */
-export async function listAvailableMods(
+export interface PublishedMod {
+  id: string;
+  name: string;
+  version: string;
+  type: ModType;
+  reason?: string;
+  becomes?: GameType;
+  creates?: string;
+  asks?: readonly ModInput[];
+  /** The choice this release offers, without an install's answer to it - `groups` and what they are. */
+  choice?: { what: "parts" | "components"; groups: readonly ChoiceGroup[] };
+}
+
+/** Every feed's current release, and the feeds that could not answer. Read once, not once per install. */
+export interface ModFeedListing {
+  published: readonly PublishedMod[];
+  failures: readonly { repository: string; id: string; name: string; why: string }[];
+}
+
+/** Where one install stands against the published mods, which is everything a change of game invalidates. */
+export interface ModInstallState {
+  /** By mod id, for the published mods this install could say something about. */
+  standing: Readonly<Record<string, { availability: Availability; carried?: CarriedSelection }>>;
+  /** Rows only this install's record knows about, complete as they are drawn - no feed describes them. */
+  unfollowed: readonly ModOffer[];
+}
+
+/** The per-app half of an offer: what the release says about itself, before any folder is considered. */
+function publishedFrom(release: ModRelease, components: readonly ChoiceGroup[] | undefined): PublishedMod {
+  const groups = components ?? offeredParts(release);
+  return {
+    id: release.manifest.id,
+    name: release.manifest.name,
+    version: release.manifest.version,
+    type: release.manifest.type,
+    ...(release.manifest.reason !== undefined ? { reason: release.manifest.reason } : {}),
+    ...(release.manifest.becomes !== undefined ? { becomes: release.manifest.becomes } : {}),
+    ...(release.manifest.creates ? { creates: release.manifest.creates.directory } : {}),
+    ...(release.manifest.inputs ? { asks: release.manifest.inputs } : {}),
+    ...(groups.length > 0 ? { choice: { what: components ? "components" : "parts", groups } } : {}),
+  };
+}
+
+/**
+ * A base mod's components are asked for every install rather than carried over: they are the installer's own
+ * list, ZAX records no selection for them, and the installer's wizard would ask too.
+ *
+ * Only where this host would actually run that installer. The choice exists in the Inno installer and nowhere
+ * else - RPU's build moves the optional dats out of `mods/` for that route alone, and the zip every other
+ * system takes ships all of them - so offering it here would be offering a choice that changes nothing.
+ */
+const componentsOf = (release: ModRelease): readonly ChoiceGroup[] | undefined =>
+  release.installer?.route === "windows" ? release.manifest.installer?.windows?.components : undefined;
+
+/**
+ * Every feed's current release. A feed that cannot answer costs its own row, not the listing: the other mods
+ * are still installable while one repository is unreachable or unadopted. The releases come back beside the
+ * listing because deciding where a mod stands needs the whole release, and only this reads the feeds.
+ */
+export async function readModFeeds(
   platform: Platform,
-  install: Install,
-  record: InstallRecord,
-  sfall: string | null,
   now: Date = new Date(),
-): Promise<ModListing> {
-  const offers: ModOffer[] = [];
+): Promise<{ listing: ModFeedListing; releases: readonly ModRelease[] }> {
+  const published: PublishedMod[] = [];
+  const releases: ModRelease[] = [];
   const failures: { repository: string; id: string; name: string; why: string }[] = [];
   for (const feed of MOD_FEEDS) {
     try {
       const release = await fetchFeed(platform, feed, now);
-      // A parts mod declares nothing at the top level, so presence is judged against every part's entries:
-      // any one of them in the folder is the mod being there. A mod that creates an install is not in the
-      // mods folder at all: what answers for it is the directory it makes.
-      const creates = release.manifest.creates;
-      const created = creates ? platform.paths.join(install.path, creates.directory) : null;
-      const declared = release.manifest.entries ?? partOptions(release.manifest).flatMap((part) => part.entries ?? []);
-      const present =
-        created === null
-          ? await presentInMods(platform, install.path, feed.id, declared)
-          : (await platform.fs.stat(created))?.kind === "dir";
-      // Read only for a base mod, and only where it could answer: a stacking mod's version is the record's.
-      // A created install stamps its own copy, one directory in, which is where this reads it.
-      const baseVersion =
-        release.manifest.type === "base" ? await installedBaseVersion(platform, created ?? install.path) : undefined;
-      // A base mod's components are asked for every install rather than carried over: they are the
-      // installer's own list, ZAX records no selection for them, and the installer's wizard would ask too.
-      //
-      // Only where this host would actually run that installer. The choice exists in the Inno installer and
-      // nowhere else - RPU's build moves the optional dats out of `mods/` for that route alone, and the zip
-      // every other system takes ships all of them - so offering it here would be offering a choice that
-      // changes nothing.
-      const components =
-        release.installer?.route === "windows" ? release.manifest.installer?.windows?.components : undefined;
-      const groups = components ?? offeredParts(release);
-      const carried: CarriedSelection = components
-        ? { selection: [], dropped: [], ask: true }
-        : carryOver(release, record.mods.find((mod) => mod.id === release.manifest.id)?.parts);
-      offers.push({
-        id: release.manifest.id,
-        name: release.manifest.name,
-        version: release.manifest.version,
-        type: release.manifest.type,
-        ...(release.manifest.reason !== undefined ? { reason: release.manifest.reason } : {}),
-        ...(release.manifest.becomes !== undefined ? { becomes: release.manifest.becomes } : {}),
-        ...(creates ? { creates: creates.directory } : {}),
-        ...(release.manifest.inputs ? { asks: release.manifest.inputs } : {}),
-        ...(groups.length > 0 ? { choices: { what: components ? "components" : "parts", groups, ...carried } } : {}),
-        availability: availability(release, {
-          install,
-          record,
-          sfall,
-          present,
-          ...(baseVersion !== undefined ? { baseVersion } : {}),
-        }),
-      });
+      releases.push(release);
+      published.push(publishedFrom(release, componentsOf(release)));
     } catch (error) {
       // Only a base mod earns a row here: that one is the whole installation, so a user who cannot get it
       // needs to know why. A stacking mod that is unreachable or has not adopted the format offers the same
@@ -668,10 +682,56 @@ export async function listAvailableMods(
       failures.push({ repository, id, name, why: error instanceof Error ? error.message : String(error) });
     }
   }
+  return { listing: { published, failures }, releases };
+}
+
+/**
+ * Where one install stands against releases already read. Everything here reads the game folder or the
+ * install's own record, which is why it is asked again for each install and the feeds above are not.
+ */
+export async function readModInstallState(
+  platform: Platform,
+  releases: readonly ModRelease[],
+  install: Install,
+  record: InstallRecord,
+  sfall: string | null,
+): Promise<ModInstallState> {
+  const standing: Record<string, { availability: Availability; carried?: CarriedSelection }> = {};
+  for (const release of releases) {
+    // A parts mod declares nothing at the top level, so presence is judged against every part's entries:
+    // any one of them in the folder is the mod being there. A mod that creates an install is not in the
+    // mods folder at all: what answers for it is the directory it makes.
+    const creates = release.manifest.creates;
+    const created = creates ? platform.paths.join(install.path, creates.directory) : null;
+    const declared = release.manifest.entries ?? partOptions(release.manifest).flatMap((part) => part.entries ?? []);
+    const present =
+      created === null
+        ? await presentInMods(platform, install.path, release.manifest.id, declared)
+        : (await platform.fs.stat(created))?.kind === "dir";
+    // Read only for a base mod, and only where it could answer: a stacking mod's version is the record's.
+    // A created install stamps its own copy, one directory in, which is where this reads it.
+    const baseVersion =
+      release.manifest.type === "base" ? await installedBaseVersion(platform, created ?? install.path) : undefined;
+    const components = componentsOf(release);
+    const carried: CarriedSelection = components
+      ? { selection: [], dropped: [], ask: true }
+      : carryOver(release, record.mods.find((mod) => mod.id === release.manifest.id)?.parts);
+    standing[release.manifest.id] = {
+      availability: availability(release, {
+        install,
+        record,
+        sfall,
+        present,
+        ...(baseVersion !== undefined ? { baseVersion } : {}),
+      }),
+      carried,
+    };
+  }
 
   // Recorded but followed by no feed: an id retired from the list, or renamed upstream. The row is what keeps
   // Remove reachable - the tab is otherwise feed-driven, and such a mod would be installed yet invisible.
   const followed = new Set(MOD_FEEDS.map((feed) => feed.id));
+  const unfollowed: ModOffer[] = [];
   for (const mod of record.mods) {
     if (followed.has(mod.id)) continue;
     let manifest: ModManifest | null = null;
@@ -681,7 +741,7 @@ export async function listAvailableMods(
       // An unreadable snapshot still names the mod through the record's own fields, and defaulting the type
       // to removable is safe: uninstall re-reads the type itself, so a wrong guess costs a refused click.
     }
-    offers.push({
+    unfollowed.push({
       id: mod.id,
       name: manifest?.name ?? mod.id,
       version: mod.version,
@@ -690,5 +750,26 @@ export async function listAvailableMods(
       availability: mod.complete ? { kind: "unfollowed" } : { kind: "retry", version: mod.version },
     });
   }
-  return { offers, failures };
+  return { standing, unfollowed };
+}
+
+/**
+ * The two halves as one listing. Pure, so the interface can hold the feeds across a change of game and redraw
+ * from a fresh install state alone. A published mod the install state says nothing about is dropped rather
+ * than drawn without one: it means the two were read either side of a refresh that changed what is published,
+ * and a row with no standing has no status line, no button and nothing to do.
+ */
+export function listingFrom(feeds: ModFeedListing, state: ModInstallState): ModListing {
+  const offers: ModOffer[] = [];
+  for (const mod of feeds.published) {
+    const standing = state.standing[mod.id];
+    if (!standing) continue;
+    const { choice, ...rest } = mod;
+    offers.push({
+      ...rest,
+      ...(choice ? { choices: { ...choice, ...(standing.carried ?? { selection: [], dropped: [], ask: true }) } } : {}),
+      availability: standing.availability,
+    });
+  }
+  return { offers: [...offers, ...state.unfollowed], failures: feeds.failures };
 }

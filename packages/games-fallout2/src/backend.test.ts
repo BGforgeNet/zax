@@ -338,6 +338,37 @@ describe("engines across the boundary", () => {
   });
 });
 
+describe("the feeds, against the installs asked about", () => {
+  /** No responses at all, so every feed refuses - what an offline machine does, counted by request. */
+  const offline = () => new MemoryPlatform({ os: "linux", arch: "x64", config: "cfg", cache: "cache" });
+
+  it("reads them once for any number of installs, since a release is published for all of them", async () => {
+    const platform = offline();
+    const backend = createBackend(platform, noShell);
+    await backend.publishedMods();
+    const afterFirst = platform.fetched.length;
+    expect(afterFirst, "the read happened at all").toBeGreaterThan(0);
+
+    await backend.modInstallState(install);
+    await backend.modInstallState({ path: "/games/two", type: "fallout2" });
+    await backend.modInstallState(install);
+
+    // The whole point of the split: where an install stands is read from its folder, not from the network.
+    expect(platform.fetched).toHaveLength(afterFirst);
+  });
+
+  it("asks again when the held answer is a refusal, so a machine that comes back online recovers", async () => {
+    const platform = offline();
+    const backend = createBackend(platform, noShell);
+    const refused = await backend.publishedMods();
+    expect(refused.failures.length, "every base feed refused").toBeGreaterThan(0);
+    const afterFirst = platform.fetched.length;
+
+    await backend.publishedMods();
+    expect(platform.fetched.length, "a refusal is not an answer worth keeping").toBeGreaterThan(afterFirst);
+  });
+});
+
 /** A compile-time check that the list is exactly the interface's keys, not merely a subset of them. */
 const _covers: Record<keyof Backend, true> = Object.fromEntries(BACKEND_METHODS.map((name) => [name, true])) as Record<
   keyof Backend,

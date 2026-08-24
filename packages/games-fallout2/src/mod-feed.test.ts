@@ -5,7 +5,9 @@ import {
   availability,
   MOD_FEEDS,
   fetchFeed,
-  listAvailableMods,
+  listingFrom,
+  readModFeeds,
+  readModInstallState,
   offeredParts,
   presentInMods,
   type ModContext,
@@ -13,10 +15,26 @@ import {
 } from "./mod-feed.js";
 import { MOD_GRANTS } from "./mod-grants.js";
 import { parseManifest } from "./manifest.js";
+import type { InstallRecord } from "./records.js";
 
 const REPO = "BGforgeNet/FO2tweaks";
 const FEED = { repository: REPO, id: "fo2tweaks" };
 const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
+
+/**
+ * Both halves put together, which is what the backend does with them and so what these cases are about. Kept
+ * here rather than shipped: nothing in the application needs the pair read back to back, since holding the
+ * published half across a change of game is the point of their being apart.
+ */
+const wholeListing = async (
+  platform: MemoryPlatform,
+  install: Install,
+  record: InstallRecord,
+  sfall: string | null,
+) => {
+  const { listing, releases } = await readModFeeds(platform);
+  return listingFrom(listing, await readModInstallState(platform, releases, install, record, sfall));
+};
 
 const manifestText = (id: string, version: string, rest = "") =>
   `spec: 1\nid: ${id}\nname: ${id}\nversion: "${version}"\ngame: fallout2\narchive: ${id}.zip\n${rest}`;
@@ -294,7 +312,7 @@ describe("availability", () => {
   });
 });
 
-describe("listAvailableMods", () => {
+describe("the two halves of a listing, composed the way the backend composes them", () => {
   const install: Install = { path: "/games/fallout2", type: "fallout2" };
 
   it("lists a recorded mod no feed follows, so Remove stays reachable after an id is retired", async () => {
@@ -321,7 +339,7 @@ describe("listAvailableMods", () => {
         },
       ],
     };
-    const listing = await listAvailableMods(platform, install, record, null);
+    const listing = await wholeListing(platform, install, record, null);
     const offer = listing.offers.find((one) => one.id === "oldmod");
     expect(offer).toMatchObject({ name: "Old Mod", version: "3", type: "pluggable" });
     expect(offer?.availability).toEqual({ kind: "unfollowed" });
@@ -348,7 +366,7 @@ describe("listAvailableMods", () => {
         },
       ],
     };
-    const listing = await listAvailableMods(platform, install, record, null);
+    const listing = await wholeListing(platform, install, record, null);
     expect(listing.offers.find((one) => one.id === "oldmod")?.availability).toEqual({
       kind: "retry",
       version: "3",
@@ -572,7 +590,7 @@ parts:
       ],
     };
     // The renderer never reads a manifest, so the choice has to reach it through the offer or not at all.
-    const listing = await listAvailableMods(platform, install, record, null);
+    const listing = await wholeListing(platform, install, record, null);
     const offer = listing.offers.find((one) => one.id === "fo2tweaks");
     expect(offer?.choices?.groups.map((group) => group.label)).toEqual(["Head", "Voice"]);
     // Carried over rather than merely reported: this is what an upgrade would install without asking.
@@ -1052,7 +1070,7 @@ describe("fetchFeed with a manifest ZAX carries", () => {
   });
 });
 
-describe("listAvailableMods over the vendored rows", () => {
+describe("a listing over the vendored rows", () => {
   const install: Install = { path: "/games/fallout2", type: "fallout2" };
   const listing = (repository: string) => `https://api.github.com/repos/${repository}/releases?per_page=100`;
   const bgforge = (mod: string, tag: string) => ({
@@ -1082,7 +1100,7 @@ describe("listAvailableMods over the vendored rows", () => {
         ["https://raw.githubusercontent.com/rotators/Fo1in2/v1.16.3771/f2mod.yml"]: 404,
       },
     });
-    const found = await listAvailableMods(platform, install, { path: install.path, mods: [] }, null);
+    const found = await wholeListing(platform, install, { path: install.path, mods: [] }, null);
     expect(found.offers.map((offer) => [offer.id, offer.version, offer.availability.kind])).toEqual([
       ["rpu", "2.4.34", "install"],
       ["upu", "34", "install"],

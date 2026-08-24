@@ -49,12 +49,17 @@ export {
   MOD_FEEDS,
   availability,
   fetchFeed,
-  listAvailableMods,
+  listingFrom,
   presentInMods,
+  readModFeeds,
+  readModInstallState,
   type ModContext,
+  type ModFeedListing,
+  type ModInstallState,
   type ModListing,
   type ModOffer,
   type ModRelease,
+  type PublishedMod,
 } from "./mod-feed.js";
 export { baseVersionOf, installedBaseVersion, type BaseVersion } from "./base-version.js";
 export { applyBaseInstall, planBaseInstall, type BaseInstallOutcome, type BaseInstallPlan } from "./mod-base.js";

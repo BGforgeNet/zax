@@ -34,7 +34,15 @@ import type { OperatingSystem, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
 import { mayWrite, parseManifest, type DroppedSetting, type ModSetting } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
-import { MOD_FEEDS, fetchFeed, listAvailableMods, type ModListing } from "./mod-feed.js";
+import {
+  MOD_FEEDS,
+  fetchFeed,
+  readModFeeds,
+  readModInstallState,
+  type ModFeedListing,
+  type ModInstallState,
+  type ModRelease,
+} from "./mod-feed.js";
 import { applyBaseInstall, planBaseInstall, type BaseInstallOutcome, type BaseInstallPlan } from "./mod-base.js";
 import {
   applyCreateInstall,
@@ -141,8 +149,17 @@ export interface Backend {
   /** sfall's mod load order, and what sits in the folder it orders. */
   loadMods(install: Install): Promise<ModsSnapshot>;
   saveMods(request: ModsSaveRequest): Promise<SaveOutcome>;
-  /** Every known mod against this install: what it is, and what can be done with it here. */
-  availableMods(install: Install): Promise<ModListing>;
+  /**
+   * What every followed feed has published. The same answer for every install, so it is read once and held:
+   * `refresh` is what the Mods tab's own control passes to ask the feeds again rather than be told what they
+   * said before.
+   */
+  publishedMods(refresh?: boolean): Promise<ModFeedListing>;
+  /**
+   * Where one install stands against those mods - what is deployed in the folder, and what its record says.
+   * This is the half a change of game invalidates; `listingFrom` puts the two back together.
+   */
+  modInstallState(install: Install): Promise<ModInstallState>;
   /**
    * Downloads and verifies a mod's newest release, answering the resolved plan the confirmation shows.
    * `choices` names what was picked before installing - a release's parts, or a base installer's components -
@@ -247,6 +264,31 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         : packageDirectory(platform);
 
   /**
+   * What the feeds published, read once and kept. A repository publishes one release whichever game folder is
+   * selected, so re-reading it per install would spend the same requests - and, inside the feed cache's
+   * window, the same parse of the same files - to arrive at the answer already held.
+   *
+   * Held as the promise rather than its result, so two reads starting at once make one request between them
+   * and the second waits on the first. Assigned before it is awaited, which is what makes that true.
+   */
+  let feeds: Promise<{ listing: ModFeedListing; releases: readonly ModRelease[] }> | null = null;
+  const feedsHeld = () => (feeds ??= readModFeeds(platform));
+
+  /**
+   * The same, for the two callers that are asking after the feeds themselves rather than needing a release
+   * from them: startup and the Refresh control. `again` is Refresh, and a held answer carrying a refusal is
+   * read again regardless - the machine that was offline when ZAX started may not be a minute later.
+   *
+   * That retry belongs here and not in `feedsHeld`, or an offline machine would attempt every feed again on
+   * every change of game, which is the cost the two halves exist to avoid.
+   */
+  const feedsAsked = async (again: boolean) => {
+    if (!again && (await feedsHeld()).listing.failures.length === 0) return feedsHeld();
+    feeds = readModFeeds(platform);
+    return feeds;
+  };
+
+  /**
    * The release a mod flow works on - never data the renderer supplied. An unfinished transaction answers
    * with the release it opened on, so a retry finishes the version it started: the copies it set aside are
    * that version's, and a feed that published a newer one meanwhile would otherwise leave a recovery
@@ -259,7 +301,11 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     if (open) return { release: releaseOf(open), selection: open.selection ?? [] };
     const feed = MOD_FEEDS.find((entry) => entry.id === modId);
     if (!feed) throw new Error(`No known feed carries "${modId}".`);
-    return { release: await fetchFeed(platform, feed), selection: chosen ?? [] };
+    // The release the listing was drawn from, so what gets installed is the version the button offered. Going
+    // back to the feed here would let a release published since open the plan the user never saw, and the
+    // confirmation compares the two - so the flow would refuse itself rather than install anything.
+    const held = (await feedsHeld()).releases.find((one) => one.manifest.id === modId);
+    return { release: held ?? (await fetchFeed(platform, feed)), selection: chosen ?? [] };
   };
 
   /**
@@ -319,10 +365,11 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     loadMods: (install) => readMods(platform, install),
     saveMods: (request) => saveMods(platform, request),
 
-    availableMods: async (install) => {
+    publishedMods: async (refresh = false) => (await feedsAsked(refresh)).listing,
+    modInstallState: async (install) => {
       const record = await reconcileRecord(platform, await loadRecord(platform, install.path));
       const sfall = await installedSfallVersion(platform, install);
-      return listAvailableMods(platform, install, record, sfall);
+      return readModInstallState(platform, (await feedsHeld()).releases, install, record, sfall);
     },
     planMod: async (install, modId, choices, answers) => {
       const { release, selection } = await releaseForMod(install, modId, choices);

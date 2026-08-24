@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { GAME_TYPES, type GameType } from "@zax/core";
   import { type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
@@ -8,11 +7,8 @@
 
   const KIND_LABEL = { dat: "dat", folder: "folder", file: "file", missing: "missing" } as const;
 
-  // Once per showing, not per failure: a failed read leaves a listing with its failures named, so this does
-  // not retry in a loop - the Refresh control is the deliberate way to ask again.
-  onMount(() => {
-    if (store.install && store.modListing === null) void store.loadModOffers();
-  });
+  // No read on showing: the store asks the feeds whenever the selected install changes, so opening this tab
+  // finds either an answer or one on its way. Refresh is the deliberate way to ask again.
 
   /** The one line under an offer's name that says where things stand. */
   function statusOf(offer: ModOffer): string {
@@ -170,13 +166,14 @@
     <div class="scroll">
       {#if store.modsTab === "installation"}
         <div class="feed-tools">
-          <button class="link" disabled={store.busy !== null} onclick={() => void store.loadModOffers()}>
+          <!-- The one control that asks the feeds again: everything else is told what they said before. -->
+          <button class="link" disabled={store.busy !== null} onclick={() => void store.loadModOffers(true)}>
             Refresh
           </button>
         </div>
 
         {#if store.modListing === null}
-          <p class="empty">{store.busy ? "Reading the mod feeds..." : "The feeds have not been read yet."}</p>
+          <p class="empty">{store.readingOffers ? "Reading the mod feeds..." : "The feeds have not been read yet."}</p>
         {:else}
           {#each store.modListing.offers as offer (offer.id)}
             <div class="offer">
