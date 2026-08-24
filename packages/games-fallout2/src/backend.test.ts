@@ -262,7 +262,7 @@ describe("engines across the boundary", () => {
     const platform = enginePlatform();
     const backend = createBackend(platform, { chooseFolder: async () => null });
     const listed = await backend.availableEngines(install);
-    expect(listed).toHaveLength(1);
+    expect(listed.map((one) => one.id)).toEqual(["fallout2-ce", "fission"]);
     expect(listed[0]!.id).toBe("fallout2-ce");
     expect(listed[0]!.build?.asset).toBe("fallout2-ce-linux-x64.tar.gz");
     expect(listed[0]!.installed).toBeNull();

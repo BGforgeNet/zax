@@ -73,7 +73,7 @@ import {
   type EngineRemoval,
 } from "./engine-install.js";
 import { cachedEngine, latestEngine, type EngineRelease } from "./engine-release.js";
-import { ENGINES, buildFor, engineById } from "./engines.js";
+import { ENGINES, buildFor, engineById, type ReleaseModel } from "./engines.js";
 import { loadRecord, reconcileRecord, type InstalledEngine } from "./records.js";
 import { readTransaction, releaseOf } from "./mod-transaction.js";
 import { readMods, saveMods, type ModsSaveRequest, type ModsSnapshot } from "./mods.js";
@@ -129,6 +129,8 @@ export interface EngineListing {
   name: string;
   short: string;
   page: string;
+  /** How the project publishes, which decides whether a build is named to the user by tag or by date. */
+  releases: ReleaseModel;
   /** What would be installed here, or null with `why` saying there is nothing. */
   build: { asset: string; program: string } | null;
   why?: string;
@@ -464,6 +466,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
             name: engine.name,
             short: engine.short,
             page: engine.page,
+            releases: engine.releases,
             build: build === null ? null : { asset: build.asset, program: build.program },
             ...(build === null ? { why: `${engine.name} publishes no build for this machine.` } : {}),
             installed: installed.find((one) => one.id === engine.id) ?? null,

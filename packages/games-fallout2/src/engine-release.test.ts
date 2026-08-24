@@ -4,6 +4,7 @@ import { engineById } from "./engines.js";
 import { cachedEngine, enginePackage, engineOutdated, latestEngine } from "./engine-release.js";
 
 const CE = engineById("fallout2-ce");
+const FISSION = engineById("fission");
 const FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=1";
 const TAG = "https://api.github.com/repos/fallout2-ce/fallout2-ce/git/ref/tags/continious";
 const COMMIT = "5f737d8fff969c90ddc86b0235afbce044c79b2d";
@@ -103,6 +104,17 @@ describe("whether what is installed is behind", () => {
         commit: null,
       }),
     ).toBe(false);
+  });
+
+  it("compares tags for a project that names versions, prefix and all", () => {
+    const at = (release: string) => ({ release, published: "2026-08-22T04:55:11Z", asset: null, commit: null });
+    const held = (release: string) => ({ ...installed, release });
+    expect(engineOutdated(FISSION, held("beta-0.9.6.3"), at("beta-0.9.6.4"))).toBe(true);
+    expect(engineOutdated(FISSION, held("beta-0.9.6.4"), at("beta-0.9.6.4"))).toBe(false);
+    expect(engineOutdated(FISSION, held("beta-0.9.6.4"), at("beta-0.9.6.3"))).toBe(false);
+    // The case a whole-string comparison gets backwards: 0.9.10 sorts before 0.9.9 as text.
+    expect(engineOutdated(FISSION, held("beta-0.9.9"), at("beta-0.9.10"))).toBe(true);
+    expect(engineOutdated(FISSION, held("beta-0.9.10"), at("beta-0.9.9"))).toBe(false);
   });
 
   it("says nothing rather than guessing when a recorded instant will not parse", () => {

@@ -1,15 +1,22 @@
 <script lang="ts">
+  import type { EngineListing } from "@zax/fallout2";
   import { isPreview } from "./host.js";
   import { ENGINE_ICON } from "./icons.js";
   import { store } from "./store.svelte.js";
 
   const OUTSIDE = "The browser preview has no machine to reach - this needs the desktop build";
 
-  /** The publication date is the version for a project that publishes none, so it is what is shown. */
   const day = (instant: string) => {
     const at = Date.parse(instant);
     return Number.isNaN(at) ? instant : new Date(at).toLocaleDateString();
   };
+
+  /**
+   * What names a build to the user: the tag where the project publishes versions, and the publication date
+   * where it republishes one tag and the date is the only thing that separates two builds.
+   */
+  const mark = (engine: EngineListing, build: { release: string; published: string }) =>
+    engine.releases === "tagged" ? build.release : day(build.published);
 
   /**
    * A rolling project republishes one tag, so the date and this are the only things that tell two builds
@@ -48,7 +55,7 @@
           <p class="line">
             Installed
             {#if engine.installed}
-              <strong>{day(engine.installed.published)}</strong>
+              <strong>{mark(engine, engine.installed)}</strong>
               {#if engine.installed.commit}<code class="sha">{sha(engine.installed.commit)}</code>{/if}
               {#if !engine.installed.complete}<span class="problem">- that install did not finish</span>{/if}
             {:else}
@@ -58,7 +65,7 @@
           <p class="line">
             Latest
             {#if latest}
-              <strong>{day(latest.published)}</strong>
+              <strong>{mark(engine, latest)}</strong>
               {#if latest.commit}<code class="sha">{sha(latest.commit)}</code>{/if}
             {:else}
               <span class="unknown">not checked</span>

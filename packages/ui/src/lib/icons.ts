@@ -6,6 +6,7 @@ import fallout2ce from "../assets/fallout2ce.png";
 import fallout2rpu from "../assets/fallout2rpu.png";
 import fallout2upu from "../assets/fallout2upu.png";
 import ettu from "../assets/ettu.png";
+import fission from "../assets/fission.png";
 import fo1in2 from "../assets/fo1in2.png";
 
 /*
@@ -38,7 +39,11 @@ export const MOD_ICON: Record<string, string> = {
   fo2tweaks: bgforge,
 };
 
-/** By engine id. The project's own mark, from the organisation that publishes it. */
+/**
+ * By engine id, each project's own mark. CE's is the organisation avatar it publishes under; Fission has no
+ * organisation account, so its own application icon stands in.
+ */
 export const ENGINE_ICON: Record<string, string> = {
   "fallout2-ce": fallout2ce,
+  fission,
 };

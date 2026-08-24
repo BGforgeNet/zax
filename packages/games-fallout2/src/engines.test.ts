@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ENGINES, buildFor, engineById } from "./engines.js";
 
 const CE = engineById("fallout2-ce");
+const FISSION = engineById("fission");
 
 describe("the engine catalog", () => {
   it("names one build per machine, with no machine claimed twice", () => {
@@ -46,6 +47,16 @@ describe("choosing a build", () => {
     expect(buildFor(CE, "macos", "x64")?.asset).toBe("Fallout.II.Community.Edition.dmg");
     expect(buildFor(CE, "macos", "arm64")?.asset).toBe("Fallout.II.Community.Edition.dmg");
     expect(buildFor(CE, "macos", "other")?.asset).toBe("Fallout.II.Community.Edition.dmg");
+  });
+
+  it("picks a build from the second project's flat archives", () => {
+    expect(buildFor(FISSION, "windows", "x64")?.asset).toBe("fallout-fission-windows-x64.zip");
+    expect(buildFor(FISSION, "linux", "x64")?.program).toBe("fallout-fission-linux-x64");
+    expect(buildFor(FISSION, "linux", "arm64")?.program).toBe("fallout-fission-linux-arm64");
+  });
+
+  it("answers null on macOS for the project whose disk image ZAX will not unpack", () => {
+    expect(buildFor(FISSION, "macos", "arm64")).toBeNull();
   });
 
   it("answers null where there is no build this machine can run", () => {

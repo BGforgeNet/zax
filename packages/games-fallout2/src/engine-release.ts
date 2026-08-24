@@ -113,7 +113,9 @@ export async function latestEngine(platform: Platform, engineId: string): Promis
  */
 export function engineOutdated(engine: EngineDefinition, installed: InstalledEngine, latest: EngineRelease): boolean {
   if (engine.releases === "tagged") {
-    const strip = (tag: string) => tag.replace(/^v\.?/i, "");
+    // Every leading non-digit, not just `v`: a tag can carry a word ("beta-0.9.6.4"), and a tag that keeps one
+    // falls back to comparing whole strings, which puts 0.9.10 before 0.9.9.
+    const strip = (tag: string) => tag.replace(/^\D+/, "");
     return compareVersions(strip(installed.release), strip(latest.release)) < 0;
   }
   const had = Date.parse(installed.published);

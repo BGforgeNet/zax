@@ -10,8 +10,7 @@ import type { Architecture, OperatingSystem } from "@zax/platform";
 
 /**
  * How a project publishes. `rolling` republishes one release in place and carries no version number, so its
- * publication time is its version; `tagged` names versions that can be compared. The field exists because the
- * update rule needs it, not as a knob - rolling is the only value in use.
+ * publication time is its version; `tagged` names versions that can be compared.
  */
 export type ReleaseModel = "rolling" | "tagged";
 
@@ -45,13 +44,10 @@ export interface EngineDefinition {
   builds: readonly EngineBuild[];
 }
 
-/**
- * `EXAMPLE_fallout2.cfg` ships in every one of these archives and appears in no member list: deploying it
- * would replace the user's settings with an example, which is the one outcome an engine install must not
- * produce.
- */
 export const ENGINES: readonly EngineDefinition[] = [
   {
+    // `EXAMPLE_fallout2.cfg` ships in this project's archives and appears in no member list: deploying it
+    // would replace the user's settings with an example, which an engine install must not produce.
     id: "fallout2-ce",
     name: "Fallout II Community Edition",
     short: "CE",
@@ -102,6 +98,55 @@ export const ENGINES: readonly EngineDefinition[] = [
           },
         ],
         program: "Fallout II Community Edition.app/Contents/MacOS/fallout2-ce",
+      },
+    ],
+  },
+  {
+    /*
+      No macOS build, though the project publishes one: its disk image carries the `/Applications` alias every
+      drag-to-install image has, and `preflightArchive` refuses an archive holding a symbolic link before it is
+      opened. Widening that guard for one engine changes what every downloaded archive is allowed to do.
+    */
+    id: "fission",
+    name: "Fallout Fission",
+    short: "Fission",
+    repo: "cambragol/fission-ce",
+    page: "https://github.com/cambragol/fission-ce",
+    // Named versions, unlike CE's one republished tag, so what is installed is compared by tag rather than date.
+    releases: "tagged",
+    // The 32-bit and armhf builds this project also publishes have no `Architecture` to match, and the shell
+    // ZAX itself ships in has no build for such a host either. Every archive here is flat, with no wrapper
+    // directory to name in a member.
+    builds: [
+      {
+        os: "windows",
+        arch: "x64",
+        asset: "fallout-fission-windows-x64.zip",
+        members: [
+          { from: "fallout-fission-x64.exe", to: "fallout-fission-x64.exe" },
+          { from: "fission.dat", to: "fission.dat" },
+        ],
+        program: "fallout-fission-x64.exe",
+      },
+      {
+        os: "linux",
+        arch: "x64",
+        asset: "fallout-fission-linux-x64.zip",
+        members: [
+          { from: "fallout-fission-linux-x64", to: "fallout-fission-linux-x64" },
+          { from: "fission.dat", to: "fission.dat" },
+        ],
+        program: "fallout-fission-linux-x64",
+      },
+      {
+        os: "linux",
+        arch: "arm64",
+        asset: "fallout-fission-linux-arm64.zip",
+        members: [
+          { from: "fallout-fission-linux-arm64", to: "fallout-fission-linux-arm64" },
+          { from: "fission.dat", to: "fission.dat" },
+        ],
+        program: "fallout-fission-linux-arm64",
       },
     ],
   },
