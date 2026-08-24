@@ -22,14 +22,19 @@ describe("planning a launch", () => {
   });
 
   it("passes the install's own prefix and debug setting", () => {
-    const wine = { prefix: "/home/t/.wine-fallout", debug: "-all" };
+    const wine = { prefix: "/home/t/.wine-fallout", debug: "warn+all" };
     expect(planLaunch("linux", { ...INSTALL, wine }, "4.5").env).toMatchObject({
       WINEPREFIX: "/home/t/.wine-fallout",
-      WINEDEBUG: "-all",
+      WINEDEBUG: "warn+all",
     });
   });
 
-  it("leaves out a Wine setting the install does not have, rather than setting it empty", () => {
+  it("silences Wine's own logging when the install names no channels", () => {
+    expect(planLaunch("linux", INSTALL, "4.5").env["WINEDEBUG"]).toBe("-all");
+    expect(planLaunch("linux", { ...INSTALL, wine: { prefix: "/p" } }, "4.5").env["WINEDEBUG"]).toBe("-all");
+  });
+
+  it("leaves out a prefix the install does not have, rather than setting it empty", () => {
     expect(planLaunch("linux", INSTALL, "4.5").env).not.toHaveProperty("WINEPREFIX");
   });
 

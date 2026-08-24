@@ -93,7 +93,10 @@ describe("the operations", () => {
       {
         program: "wine",
         args: ["fallout2.exe"],
-        options: { cwd: "/games/one", env: { WINEPREFIX: "/p", WINEDLLOVERRIDES: "ddraw.dll=n,b" } },
+        options: {
+          cwd: "/games/one",
+          env: { WINEPREFIX: "/p", WINEDEBUG: "-all", WINEDLLOVERRIDES: "ddraw.dll=n,b" },
+        },
       },
     ]);
   });

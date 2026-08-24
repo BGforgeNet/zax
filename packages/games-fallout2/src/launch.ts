@@ -13,6 +13,12 @@ export const EXECUTABLE = "fallout2.exe";
 /** The sfall release from which Wine needs the DLL loaded as builtin as well as native. */
 const NATIVE_AND_BUILTIN_FROM = "4.1.2";
 
+/**
+ * What Wine logs when the install names no channels of its own. Wine's default leaves `err` and `fixme` on, which
+ * is a stream of stub notices from a game that runs fine rather than anything diagnostic.
+ */
+const DEFAULT_DEBUG = "-all";
+
 export interface LaunchPlan {
   program: string;
   args: readonly string[];
@@ -58,7 +64,7 @@ export function planLaunch(
     cwd: install.path,
     env: {
       ...(install.wine?.prefix ? { WINEPREFIX: install.wine.prefix } : {}),
-      ...(install.wine?.debug ? { WINEDEBUG: install.wine.debug } : {}),
+      WINEDEBUG: install.wine?.debug || DEFAULT_DEBUG,
       ...overrides,
     },
   };
