@@ -12,9 +12,9 @@ import type { Platform } from "@zax/platform";
 import { MemoryPlatform } from "@zax/platform/memory";
 import { createBackend, saveRecord, wrapMethods, type Backend, type OperationProgress } from "@zax/fallout2";
 
-import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
-import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
-import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
+import fallout2cfg from "../../../../fixtures/f2up/fallout2.cfg?raw";
+import f2resini from "../../../../fixtures/f2up/f2_res.ini?raw";
+import ddrawini from "../../../../fixtures/f2up/ddraw.ini?raw";
 // FO2tweaks as it publishes itself: the manifest its repository carries and the ini its release ships, both
 // verbatim. A sample written here would drift from the format the mod actually uses, and this surface only
 // means anything if it is the real one.
@@ -38,7 +38,7 @@ declare global {
 export type HostKind = "desktop" | "preview";
 
 /** The install the preview edits, named for what it is rather than as a plausible home directory. */
-export const PREVIEW_INSTALL = "fixtures/vanilla-f2up";
+export const PREVIEW_INSTALL = "fixtures/f2up";
 
 export const PREVIEW_REASON = "The browser preview has no machine to reach - this needs the desktop build.";
 

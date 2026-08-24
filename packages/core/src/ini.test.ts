@@ -33,7 +33,7 @@ describe("round-trip", () => {
 
   it("returns real config files unchanged, byte for byte", () => {
     for (const name of ["fallout2.cfg", "f2_res.ini", "ddraw.ini"]) {
-      const bytes = new Uint8Array(readFileSync(`fixtures/vanilla-f2up/${name}`));
+      const bytes = new Uint8Array(readFileSync(`fixtures/f2up/${name}`));
       const out = IniDocument.parseBytes(bytes).toBytes();
       expect(Buffer.from(out).equals(Buffer.from(bytes))).toBe(true);
     }
@@ -114,7 +114,7 @@ describe("set", () => {
   });
 
   it("appends cleanly to a real file that ends without a newline", () => {
-    const doc = IniDocument.parseBytes(new Uint8Array(readFileSync("fixtures/vanilla-f2up/ddraw.ini")));
+    const doc = IniDocument.parseBytes(new Uint8Array(readFileSync("fixtures/f2up/ddraw.ini")));
     doc.set("Misc", "CombatPanelAnimDelay", "4");
     const text = doc.toString();
     expect(text).not.toContain("DisablePipboyAlarm=0CombatPanelAnimDelay");
@@ -162,7 +162,7 @@ describe("inline comments", () => {
   });
 
   it("round-trips a real file carrying inline comments", () => {
-    const bytes = new Uint8Array(readFileSync("fixtures/vanilla-f2up/f2_res.ini"));
+    const bytes = new Uint8Array(readFileSync("fixtures/f2up/f2_res.ini"));
     const doc = IniDocument.parseBytes(bytes);
     expect(doc.get("MAPS", "SCROLL_DIST_X")).toBe("HALF_SCRN");
     expect(Buffer.from(doc.toBytes()).equals(Buffer.from(bytes))).toBe(true);

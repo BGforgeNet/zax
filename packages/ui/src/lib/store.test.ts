@@ -10,9 +10,9 @@ import {
   type ModFeedListing,
   type ModInstallState,
 } from "@zax/fallout2";
-import fallout2cfg from "../../../../fixtures/vanilla-f2up/fallout2.cfg?raw";
-import f2resini from "../../../../fixtures/vanilla-f2up/f2_res.ini?raw";
-import ddrawini from "../../../../fixtures/vanilla-f2up/ddraw.ini?raw";
+import fallout2cfg from "../../../../fixtures/f2up/fallout2.cfg?raw";
+import f2resini from "../../../../fixtures/f2up/f2_res.ini?raw";
+import ddrawini from "../../../../fixtures/f2up/ddraw.ini?raw";
 
 /**
  * The store reads its state and the selected install's config files from the platform, and the tests below

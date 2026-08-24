@@ -136,7 +136,7 @@ describe("catalog", () => {
 
 describe("catalog against real config files", () => {
   const docs = new Map(
-    CONFIG_FILES.map((f) => [f, IniDocument.parseBytes(new Uint8Array(readFileSync(`fixtures/vanilla-f2up/${f}`)))]),
+    CONFIG_FILES.map((f) => [f, IniDocument.parseBytes(new Uint8Array(readFileSync(`fixtures/f2up/${f}`)))]),
   );
 
   const present = (s: SettingDef) => docs.get(s.file as never)?.get(s.section, s.key) !== undefined;
@@ -170,7 +170,7 @@ describe("catalog against real config files", () => {
   });
 
   it("creates a section that the installed component version predates", () => {
-    const doc = IniDocument.parseBytes(new Uint8Array(readFileSync("fixtures/vanilla-f2up/ddraw.ini")));
+    const doc = IniDocument.parseBytes(new Uint8Array(readFileSync("fixtures/f2up/ddraw.ini")));
     expect(doc.get("Debugging", "DebugMode")).toBeUndefined();
     doc.set("Debugging", "DebugMode", "debug.log");
     expect(doc.get("Debugging", "DebugMode")).toBe("debug.log");
@@ -281,7 +281,7 @@ describe("managed values", () => {
     // ZAX writes the copy in the game folder. Pinning it off is what keeps the two looking at one file.
     const uac = SETTINGS.find((s) => s.key === "UAC_AWARE");
     expect(uac?.managed?.value).toBe("0");
-    const doc = IniDocument.parseBytes(new Uint8Array(readFileSync("fixtures/vanilla-f2up/f2_res.ini")));
+    const doc = IniDocument.parseBytes(new Uint8Array(readFileSync("fixtures/f2up/f2_res.ini")));
     expect(doc.get("MAIN", "UAC_AWARE")).toBe("1");
   });
 });
