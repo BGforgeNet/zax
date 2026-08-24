@@ -2,10 +2,9 @@
  * Rasterises the icon source into the two PNGs the application ships: the interface's favicon, which the
  * desktop shell also hands the window, and the 1024px one electron-builder turns into a `.ico` and a `.icns`.
  *
- * Through a browser rather than a converter because the SVG uses a filter and a pattern, and the small
- * converters render neither - this is also the renderer the interface itself draws the mark with, so what
- * ships and what is on screen cannot diverge. Point `CHROME` at a binary, or leave it and one is looked for
- * on `PATH`.
+ * Through a browser rather than a converter because it is the renderer the interface itself draws the mark
+ * with, so what ships and what is on screen cannot diverge. Point `CHROME` at a binary, or leave it and one
+ * is looked for on `PATH`.
  */
 
 import { execFileSync } from "node:child_process";
