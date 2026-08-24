@@ -3,9 +3,28 @@
   import { type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
   import SettingRow from "./SettingRow.svelte";
+  import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
 
   const KIND_LABEL = { dat: "dat", folder: "folder", file: "file", missing: "missing" } as const;
+
+  const PREVIEW_FEEDS = "The browser preview cannot reach the mod feeds - this needs the desktop build";
+
+  /**
+   * The version the choice dialog is sitting on. Set where the list arrives rather than by an effect watching
+   * for it: the newest is a starting point, and an effect would fight the user's own pick.
+   */
+  let wantedVersion = $state("");
+
+  async function openVersions(offer: ModOffer): Promise<void> {
+    await store.chooseModVersion(offer);
+    wantedVersion = store.modVersionPick?.versions[0] ?? "";
+  }
+
+  function closeVersions(): void {
+    store.dismissModVersion();
+    wantedVersion = "";
+  }
 
   // No read on showing: the store asks the feeds whenever the selected install changes, so opening this tab
   // finds either an answer or one on its way. Refresh is the deliberate way to ask again.
@@ -176,7 +195,7 @@
           <p class="empty">{store.readingOffers ? "Reading the mod feeds..." : "The feeds have not been read yet."}</p>
         {:else}
           {#each store.modListing.offers as offer (offer.id)}
-            <div class="offer">
+            <div class="offer" class:refused={offer.availability.kind === "blocked"}>
               <div class="about">
                 <span class="mod-name">{offer.name}</span>
                 <span class="version">{offer.version}</span>
@@ -204,6 +223,18 @@
                 {#if installLabel(offer) !== null}
                   <button class="primary" disabled={store.busy !== null} onclick={() => void store.prepareMod(offer)}>
                     {installButtonLabel(offer)}
+                  </button>
+                {/if}
+                <!-- Beside the button that names one version rather than replacing it: the head of the line is
+                     what most installs want, and picking another is the deliberate act. Disabled rather than
+                     hidden where the list cannot be read, as the sfall panel's buttons are. -->
+                {#if installLabel(offer) !== null}
+                  <button
+                    disabled={isPreview || store.busy !== null}
+                    title={isPreview ? PREVIEW_FEEDS : null}
+                    onclick={() => void openVersions(offer)}
+                  >
+                    {store.busy === `Reading the ${offer.name} versions` ? "Reading..." : "Other version"}
                   </button>
                 {/if}
                 {#if offer.availability.kind === "retry"}
@@ -366,6 +397,43 @@
 
 <!-- Asked before anything is downloaded, and only when the choice cannot be carried over from the record:
      a first install, or a release that took away what was chosen. The plan dialog follows it as always. -->
+<!--
+  Older releases of the same line, for an install that wants one that is not the newest. Nothing older than
+  what is installed is in the list: the answer comes from the backend, where the line that orders these
+  versions is known, and a base mod's installer has no way back down anyway.
+-->
+<Dialog open={store.modVersionPick !== null} title="Install another version" dismiss={closeVersions}>
+  {#if store.modVersionPick}
+    {@const pick = store.modVersionPick}
+    <select class="pick" aria-label="Version" bind:value={wantedVersion} disabled={pick.versions.length === 0}>
+      {#each pick.versions as version (version)}
+        <option value={version}>{version}{version === pick.offer.version ? " (newest)" : ""}</option>
+      {:else}
+        <option value="">{pick.read ? "Nothing else to install" : "Reading the list..."}</option>
+      {/each}
+    </select>
+    <p class="plan-lead">
+      {pick.offer.name} is installed from the release you pick here, the same way the button beside the row installs the newest
+      one.
+    </p>
+  {/if}
+  {#snippet footer()}
+    <button onclick={closeVersions}>Cancel</button>
+    <button
+      class="primary"
+      disabled={wantedVersion === "" || store.busy !== null}
+      onclick={() => {
+        const held = store.modVersionPick;
+        const version = wantedVersion;
+        closeVersions();
+        if (held) void store.prepareMod(held.offer, undefined, undefined, version);
+      }}
+    >
+      Install {wantedVersion}
+    </button>
+  {/snippet}
+</Dialog>
+
 <Dialog open={store.modParts !== null} title="Choose what to install" dismiss={() => store.dismissModParts()}>
   {#if store.modParts?.offer.choices}
     {@const chosen = store.modParts.chosen}
@@ -802,6 +870,15 @@
 
   .mod-name {
     font-weight: 600;
+  }
+
+  /*
+    A row nothing can be done with reads as one tone throughout. The name is all this sets: the version, the
+    badge and the status beneath are already the faint tone, so dimming the name is what makes the row uniform,
+    and fading the whole thing further would put the sentence explaining the refusal under 4.5:1.
+  */
+  .refused .mod-name {
+    color: var(--text-dim);
   }
 
   .version {

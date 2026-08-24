@@ -25,6 +25,7 @@ export const BACKEND_METHODS = [
   "modInstallState",
   "planMod",
   "installMod",
+  "modVersions",
   "restoreMod",
   "removeMod",
   "modSettings",

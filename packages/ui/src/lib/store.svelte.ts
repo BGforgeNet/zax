@@ -262,15 +262,25 @@ class Store {
    * A resolved install plan awaiting the user's word, with the offer it belongs to. Two shapes: a stacking
    * mod's names every file, and a base mod's names the release and the space, the installer owning the rest.
    */
-  modPlan = $state<{ offer: ModOffer; plan: ModInstallPlan | BaseInstallPlan | CreateInstallPlan } | null>(null);
+  modPlan = $state<{
+    offer: ModOffer;
+    plan: ModInstallPlan | BaseInstallPlan | CreateInstallPlan;
+    /** The version this plan is for, which is the offer's unless the user picked another. */
+    version: string;
+  } | null>(null);
   /** The chooser while it is open: the offer whose choice is being made, and what is ticked in it. */
-  modParts = $state<{ offer: ModOffer; chosen: readonly string[] } | null>(null);
+  modParts = $state<{ offer: ModOffer; chosen: readonly string[]; version?: string } | null>(null);
   /**
    * The folders a mod has to be pointed at before it can be planned, while that question is open. Its own
    * dialog rather than the chooser's: what is being asked for is a path on this machine, not a choice
    * between things the release publishes.
    */
-  modInputs = $state<{ offer: ModOffer; chosen: readonly string[]; answers: Record<string, string> } | null>(null);
+  modInputs = $state<{
+    offer: ModOffer;
+    chosen: readonly string[];
+    answers: Record<string, string>;
+    version?: string;
+  } | null>(null);
   /** The installed mods' settings schemas, rendered with the same per-kind controls the catalog gets. */
   modSettings = $state<readonly ModSettingsGroup[]>([]);
   /** Which of the Mods view's tabs is showing. */
@@ -872,6 +882,7 @@ class Store {
     offer: ModOffer,
     chosen?: readonly string[],
     answers?: Readonly<Record<string, string>>,
+    version?: string,
   ): Promise<void> {
     const install = this.install;
     if (!install) return;
@@ -881,25 +892,60 @@ class Store {
       return;
     }
     if (chosen === undefined && offer.choices?.ask) {
-      this.modParts = { offer, chosen: offer.choices.selection };
+      this.modParts = { offer, chosen: offer.choices.selection, ...(version !== undefined ? { version } : {}) };
       return;
     }
     const parts = chosen ?? offer.choices?.selection;
     // After the choice rather than before it: what a release publishes is its own question, and the folders
     // on this machine are asked for once that is settled.
     if (answers === undefined && offer.asks?.length) {
-      this.modInputs = { offer, chosen: parts ?? [], answers: {} };
+      this.modInputs = { offer, chosen: parts ?? [], answers: {}, ...(version !== undefined ? { version } : {}) };
       return;
     }
+    const wanted = version ?? offer.version;
     await this.run(
-      `Preparing ${offer.name} ${offer.version}`,
+      `Preparing ${offer.name} ${wanted}`,
       async () => {
-        const plan = await backend.planMod(install, offer.id, parts, answers);
-        this.modPlan = { offer, plan };
+        const plan = await backend.planMod(install, offer.id, parts, answers, version);
+        this.modPlan = { offer, plan, version: wanted };
         return null;
       },
       { id: offer.id, action: "prepare" },
     );
+  }
+
+  /**
+   * The versions a row could install instead of the one its button names, once the list has arrived. Held for
+   * one row at a time, which is all the dialog shows.
+   */
+  modVersionPick = $state<{ offer: ModOffer; versions: readonly string[]; read: boolean } | null>(null);
+
+  /**
+   * Opens that choice. What the install already carries goes with the request, so the answer is the versions
+   * it could move to: a base mod is not put back to an older release, which its installer cannot undo.
+   */
+  async chooseModVersion(offer: ModOffer): Promise<void> {
+    const state = offer.availability;
+    const held =
+      state.kind === "upgrade" || state.kind === "downgrade" || state.kind === "convert" ? state.from : undefined;
+    this.modVersionPick = { offer, versions: [], read: false };
+    await this.run(`Reading the ${offer.name} versions`, async () => {
+      try {
+        const versions = await backend.modVersions(offer.id, held);
+        // The dialog may have been dismissed, or another row's opened, while the list was on its way.
+        if (this.modVersionPick?.offer.id === offer.id) this.modVersionPick = { offer, versions, read: true };
+      } catch (error) {
+        // Closed rather than left saying "reading": the notice `run` raises carries the reason, and a dialog
+        // still claiming to be loading a list that will never arrive is the one state worse than no dialog.
+        if (this.modVersionPick?.offer.id === offer.id) this.modVersionPick = null;
+        throw error;
+      }
+      return null;
+    });
+  }
+
+  dismissModVersion(): void {
+    this.modVersionPick = null;
   }
 
   /** Opens the shell's folder picker for one of a mod's questions, and keeps what comes back. */
@@ -918,7 +964,7 @@ class Store {
   async confirmModInputs(): Promise<void> {
     const held = this.modInputs;
     this.modInputs = null;
-    if (held) await this.prepareMod(held.offer, held.chosen, held.answers);
+    if (held) await this.prepareMod(held.offer, held.chosen, held.answers, held.version);
   }
 
   dismissModInputs(): void {
@@ -949,14 +995,14 @@ class Store {
       if (kept.length === chosen.length) break;
       chosen = kept;
     }
-    this.modParts = { offer: held.offer, chosen };
+    this.modParts = { offer: held.offer, chosen, ...(held.version !== undefined ? { version: held.version } : {}) };
   }
 
   /** The chosen parts go on to the plan, which is the confirmation proper. */
   async confirmModParts(): Promise<void> {
     const held = this.modParts;
     this.modParts = null;
-    if (held) await this.prepareMod(held.offer, held.chosen);
+    if (held) await this.prepareMod(held.offer, held.chosen, undefined, held.version);
   }
 
   dismissModParts(): void {
@@ -970,7 +1016,7 @@ class Store {
     this.modPlan = null;
     if (!held || !install) return;
     await this.run(
-      `Installing ${held.offer.name} ${held.offer.version}`,
+      `Installing ${held.offer.name} ${held.version}`,
       async () => {
         // The plan's own fingerprint, so what runs is what was on screen: the install re-plans, and one
         // that now resolves differently comes back as a refusal to look again rather than as a surprise.
@@ -983,7 +1029,14 @@ class Store {
               ? held.plan.parts
               : undefined;
         const answers = held.plan.kind === "creates" ? held.plan.inputs : undefined;
-        const outcome = await backend.installMod(install, held.offer.id, held.plan.fingerprint, chosen, answers);
+        const outcome = await backend.installMod(
+          install,
+          held.offer.id,
+          held.plan.fingerprint,
+          chosen,
+          answers,
+          held.version === held.offer.version ? undefined : held.version,
+        );
         // A mod that created an install is a second game to manage. Registered through the same path the Add
         // button takes, so what it is comes from reading the directory rather than from what the manifest
         // claimed it would make - and a refusal there is reported rather than swallowed. Not through

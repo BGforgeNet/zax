@@ -18,7 +18,7 @@ const componentIds = (groups: readonly { options: readonly { id: string }[] }[] 
 describe("the vendored manifests", () => {
   it("names each release's own assets, which carry the version for both BGforge mods", () => {
     // The names v2.4.34 and v34 really publish: `rpu_v2.4.34.exe` and `upu_v34.exe`.
-    const rpu = parsed("rpu", "2.4.34");
+    const rpu = parsed("rpu24", "2.4.34");
     expect(rpu.installer?.windows?.asset).toBe("rpu_v2.4.34.exe");
     expect(rpu.installer?.other).toEqual({ asset: "rpu_v2.4.34.zip", run: "rpu-install.sh" });
 
@@ -28,8 +28,8 @@ describe("the vendored manifests", () => {
   });
 
   it("describes each mod as the base mod it is", () => {
-    expect(parsed("rpu", "2.4.34")).toMatchObject({
-      name: "Restoration Project Updated",
+    expect(parsed("rpu24", "2.4.34")).toMatchObject({
+      name: "Restoration Project Updated 2.4",
       version: "2.4.34",
       type: "base",
       becomes: "fallout2rpu",
@@ -40,7 +40,7 @@ describe("the vendored manifests", () => {
   });
 
   it("carries upstream's own component tree, backslashes and all", () => {
-    const rpu = parsed("rpu", "2.4.34");
+    const rpu = parsed("rpu24", "2.4.34");
     const ids = componentIds(rpu.installer?.windows?.components);
     // Inno spells a child inside its parent with a backslash, and the id is that spelling verbatim - a
     // double-quoted YAML scalar would refuse the document rather than carry it.
@@ -63,7 +63,7 @@ describe("the vendored manifests", () => {
 
   it("offers the ten languages both installers ship, at most one of them", () => {
     for (const [id, version] of [
-      ["rpu", "2.4.34"],
+      ["rpu24", "2.4.34"],
       ["upu", "34"],
     ] as const) {
       const language = parsed(id, version).installer?.windows?.components?.[1];
@@ -71,6 +71,19 @@ describe("the vendored manifests", () => {
       expect(language?.pick).toBe("one");
       expect(language?.options).toHaveLength(10);
     }
+  });
+
+  it("carries one document per release line, alike but for which mod each says it is", () => {
+    // The two ship in lockstep from one installer: a difference between them would be a difference upstream
+    // does not have, and the id is the whole of what tells a 2.3 release from a 2.4 one.
+    const older = parsed("rpu23", "2.3.34");
+    const newer = parsed("rpu24", "2.4.34");
+    expect(older.name).toBe("Restoration Project Updated 2.3");
+    expect(older.becomes).toBe(newer.becomes);
+    expect(componentIds(older.installer?.windows?.components)).toEqual(
+      componentIds(newer.installer?.windows?.components),
+    );
+    expect(older.installer?.windows?.asset).toBe("rpu_v2.3.34.exe");
   });
 
   it("gives UPU the tree it has rather than RPU's", () => {
@@ -101,7 +114,7 @@ describe("the vendored manifests", () => {
   it("parses every document it carries, under the id its entry follows", () => {
     // Named rather than counted: the loops below assert nothing at all on an empty list, and this is the one
     // place that says which documents are supposed to be here.
-    expect(VENDORED_MANIFESTS.map((entry) => entry.id)).toEqual(["rpu", "upu", "fo1in2"]);
+    expect(VENDORED_MANIFESTS.map((entry) => entry.id)).toEqual(["rpu23", "rpu24", "upu", "fo1in2"]);
     for (const entry of VENDORED_MANIFESTS) {
       const manifest = parseManifest(encoder.encode(entry.text("1.2.3")), { version: "1.2.3" });
       expect(manifest.id).toBe(entry.id);

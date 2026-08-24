@@ -37,6 +37,9 @@ import { grantsFor } from "./mod-grants.js";
 import {
   MOD_FEEDS,
   fetchFeed,
+  compareInLine,
+  fetchFeedAt,
+  listModVersions,
   readModFeeds,
   readModInstallState,
   type ModFeedListing,
@@ -171,6 +174,7 @@ export interface Backend {
     modId: string,
     choices?: readonly string[],
     answers?: Readonly<Record<string, string>>,
+    version?: string,
   ): Promise<ModInstallPlan | BaseInstallPlan | CreateInstallPlan>;
   /** Installs the plan whose fingerprint this is; one that no longer resolves the same is refused. */
   installMod(
@@ -179,7 +183,15 @@ export interface Backend {
     fingerprint: string,
     choices?: readonly string[],
     answers?: Readonly<Record<string, string>>,
+    version?: string,
   ): Promise<ModInstallOutcome | BaseInstallOutcome | CreateInstallOutcome>;
+  /**
+   * The versions this mod's feed publishes, newest first, for a row that offers a choice rather than only the
+   * release at the head of its line. Read from the cached listing, so asking costs nothing the feed has not
+   * already paid for. `above` is what the install already carries, and the answer excludes it and everything
+   * below: the comparison belongs here, where the release line that defines it is known.
+   */
+  modVersions(modId: string, above?: string): Promise<readonly string[]>;
   /** Unwinds an install that never finished; the working directory holds everything it puts back. */
   restoreMod(install: Install, modId: string): Promise<void>;
   removeMod(install: Install, modId: string): Promise<ModRemoval>;
@@ -294,16 +306,18 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
    * that version's, and a feed that published a newer one meanwhile would otherwise leave a recovery
    * describing files that are no longer the ones on disk.
    */
-  const releaseForMod = async (install: Install, modId: string, chosen?: readonly string[]) => {
+  const releaseForMod = async (install: Install, modId: string, chosen?: readonly string[], version?: string) => {
     const open = await readTransaction(platform, install, modId);
     // An unfinished attempt decides its own selection too, and for the same reason: the copies waiting
     // beside it are those parts', and a second answer to the dialog would land on the first attempt's work.
     if (open) return { release: releaseOf(open), selection: open.selection ?? [] };
     const feed = MOD_FEEDS.find((entry) => entry.id === modId);
     if (!feed) throw new Error(`No known feed carries "${modId}".`);
-    // The release the listing was drawn from, so what gets installed is the version the button offered. Going
-    // back to the feed here would let a release published since open the plan the user never saw, and the
-    // confirmation compares the two - so the flow would refuse itself rather than install anything.
+    // A version the user picked is fetched by name; otherwise the release the listing was drawn from, so what
+    // gets installed is the version the button offered. Going back to the feed for the newest here would let a
+    // release published since open the plan the user never saw, and the confirmation compares the two - so the
+    // flow would refuse itself rather than install anything.
+    if (version !== undefined) return { release: await fetchFeedAt(platform, feed, version), selection: chosen ?? [] };
     const held = (await feedsHeld()).releases.find((one) => one.manifest.id === modId);
     return { release: held ?? (await fetchFeed(platform, feed)), selection: chosen ?? [] };
   };
@@ -371,8 +385,8 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       const sfall = await installedSfallVersion(platform, install);
       return readModInstallState(platform, (await feedsHeld()).releases, install, record, sfall);
     },
-    planMod: async (install, modId, choices, answers) => {
-      const { release, selection } = await releaseForMod(install, modId, choices);
+    planMod: async (install, modId, choices, answers, version) => {
+      const { release, selection } = await releaseForMod(install, modId, choices, version);
       const progress = reporting();
       if (release.manifest.creates) {
         return planCreateInstall(platform, install, release, answers ?? {}, await extractionTool(progress), progress);
@@ -381,8 +395,8 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         ? planBaseInstall(platform, install, release, selection, progress)
         : planModInstall(platform, install, release, selection, progress);
     },
-    installMod: async (install, modId, fingerprint, choices, answers) => {
-      const { release, selection } = await releaseForMod(install, modId, choices);
+    installMod: async (install, modId, fingerprint, choices, answers, version) => {
+      const { release, selection } = await releaseForMod(install, modId, choices, version);
       const progress = reporting();
       // Re-planned rather than trusting a plan the renderer held: the directory may have moved on since the
       // confirmation, and the plan is cheap against the already-verified archive. What runs is still what
@@ -405,6 +419,13 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       const plan = await planModInstall(platform, install, release, selection, progress);
       if (plan.fingerprint !== fingerprint) throw stale();
       return applyModInstall(platform, install, release, plan, progress, new Date());
+    },
+    modVersions: async (modId, above) => {
+      const feed = MOD_FEEDS.find((entry) => entry.id === modId);
+      if (!feed) throw new Error(`No known feed carries "${modId}".`);
+      const versions = await listModVersions(platform, feed);
+      if (above === undefined) return versions;
+      return versions.filter((version) => compareInLine(feed.line, version, above) > 0);
     },
     restoreMod: (install, modId) => restoreModInstall(platform, install, modId, new Date()),
     removeMod: (install, modId) => uninstallMod(platform, install, modId, new Date()),

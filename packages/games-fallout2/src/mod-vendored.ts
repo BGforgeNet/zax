@@ -13,7 +13,8 @@
  * already found nothing at is not asked again, so the switch is a new release rather than a new commit.
  *
  * The ids are minted here from upstream's own naming (`#define basename "rpu"`, the `Fo1in2` repository), which
- * is what an author adopting the format would most likely pick anyway. If one picks differently, their feed row
+ * is what an author adopting the format would most likely pick anyway - with the release line appended where a
+ * repository publishes two, since one id per line is what makes them two mods rather than one with a branch. If one picks differently, their feed row
  * stops matching and the mod reads as unfollowed until a ZAX release corrects the row - the whole cost, because
  * these three name no setting and put nothing in `mods/` (see `mod-grants.ts`). A fallback id on the row, and a
  * record migration, were both considered and are not built: they buy a seamless handover for a case that costs
@@ -111,9 +112,11 @@ const QOL = `          - id: qol
             help: Turns on a set of sfall options - the action point bar, damage and karma readouts, party
               member details and more.`;
 
-const rpu = (version: string): string => `spec: 1
-id: rpu
-name: Restoration Project Updated
+const rpu =
+  (id: string, name: string) =>
+  (version: string): string => `spec: 1
+id: ${id}
+name: ${name}
 game: fallout2
 type: base
 becomes: fallout2rpu
@@ -204,7 +207,10 @@ extract-dat:
 `;
 
 export const VENDORED_MANIFESTS: readonly VendoredManifest[] = [
-  { id: "rpu", text: rpu },
+  // One document per release line, differing in nothing but which mod it says it is: the two ship in lockstep
+  // from one repository and one installer, and only the tag they are built from tells them apart.
+  { id: "rpu23", text: rpu("rpu23", "Restoration Project Updated 2.3") },
+  { id: "rpu24", text: rpu("rpu24", "Restoration Project Updated 2.4") },
   { id: "upu", text: upu },
   { id: "fo1in2", text: fo1in2 },
 ];

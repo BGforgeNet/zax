@@ -5,12 +5,16 @@ import {
   availability,
   MOD_FEEDS,
   fetchFeed,
+  fetchFeedAt,
+  listModVersions,
   listingFrom,
   readModFeeds,
   readModInstallState,
   offeredParts,
   presentInMods,
+  type FeedSource,
   type ModContext,
+  type ModLine,
   type ModRelease,
 } from "./mod-feed.js";
 import { MOD_GRANTS } from "./mod-grants.js";
@@ -709,12 +713,15 @@ becomes: fallout2rpu
 installer:
   other: { asset: rpu.zip, run: rpu-install.sh }
 `;
-  const found = (): ModRelease => ({
+  const found = (line?: ModLine): ModRelease => ({
     manifest: parseManifest(new TextEncoder().encode(BASE)),
     manifestText: BASE,
     manifestFromAsset: true,
     installer: { route: "other", asset: { name: "rpu.zip", url: "https://example.test/rpu.zip" } },
+    ...(line ? { line } : {}),
   });
+  const NEWER: ModLine = { prefix: "2.4." };
+  const OLDER: ModLine = { prefix: "2.3.", counter: true };
   const context = (over: Partial<ModContext>): ModContext => ({
     install,
     record: { path: install.path, mods: [] },
@@ -724,33 +731,51 @@ installer:
   });
 
   it("reads the version it stamped, and offers the release against it", () => {
-    expect(availability(found(), context({ baseVersion: { version: "2.4.33", line: "2.4" } }))).toEqual({
+    expect(availability(found(NEWER), context({ baseVersion: { version: "2.4.33" } }))).toEqual({
       kind: "upgrade",
       from: "2.4.33",
     });
-    expect(availability(found(), context({ baseVersion: { version: "2.4.34", line: "2.4" } }))).toEqual({
+    expect(availability(found(NEWER), context({ baseVersion: { version: "2.4.34" } }))).toEqual({
       kind: "installed",
     });
-    expect(availability(found(), context({ baseVersion: { version: "2.4.35", line: "2.4" } }))).toEqual({
+    expect(availability(found(NEWER), context({ baseVersion: { version: "2.4.35" } }))).toEqual({
       kind: "downgrade",
       from: "2.4.35",
     });
   });
 
-  it("does not offer the other line as an upgrade - the two never cross", () => {
-    // A 2.3 install meeting a 2.4 release: not its next version, and switching is the user's explicit pick.
-    expect(availability(found(), context({ baseVersion: { version: "2.3.34", line: "2.3" } }))).toEqual({
-      kind: "install-over",
+  it("refuses the other line the way it refuses any other base mod - one to an installation", () => {
+    // A 2.3 install meeting the 2.4 row: 2.4 is a different mod, and this installation already carries one.
+    const state = availability(found(NEWER), context({ baseVersion: { version: "2.3.34" } }));
+    expect(state).toMatchObject({ kind: "blocked" });
+    expect((state as { why: string }).why).toMatch(/installs on Fallout 2 /);
+  });
+
+  it("upgrades a pre-split install within the line its history belongs to", () => {
+    // `2.3.3u30` is patch 30 of RP 2.3.3, so its next release is 2.3.32 - the counter running on, not a
+    // version numbered below `2.3.3`.
+    const RPU23 = BASE.replace('version: "2.4.34"', 'version: "2.3.34"');
+    const release: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(RPU23)),
+      manifestText: RPU23,
+      manifestFromAsset: true,
+      installer: { route: "other", asset: { name: "rpu.zip", url: "https://example.test/rpu.zip" } },
+      line: OLDER,
+    };
+    expect(availability(release, context({ baseVersion: { version: "2.3.3u30" } }))).toEqual({
+      kind: "upgrade",
+      from: "2.3.3u30",
     });
   });
 
-  it("offers a pre-split install the choice rather than a line it was never on", () => {
-    expect(availability(found(), context({ baseVersion: { version: "2.3.3u30" } }))).toEqual({
-      kind: "install-over",
-    });
+  it("leaves an install that states nothing to the line its history belongs to", () => {
+    // Neither row can read a version, but only one of them could have written the installation: 2.4 has
+    // stamped its own number since the day it existed.
+    expect(availability(found(OLDER), context({ baseVersion: null }))).toEqual({ kind: "install-over" });
+    expect(availability(found(NEWER), context({ baseVersion: null }))).toMatchObject({ kind: "blocked" });
   });
 
-  it("falls back to installing over where the install says nothing about its version", () => {
+  it("falls back to installing over where a mod publishes one line and says nothing", () => {
     expect(availability(found(), context({ baseVersion: null }))).toEqual({ kind: "install-over" });
   });
 });
@@ -866,14 +891,14 @@ extract-dat:
   });
 
   it("answers from the created install's own stamp, which is what a hand-installed one has", () => {
-    expect(availability(release, where({ baseVersion: { version: "1.16.3771", line: "1.16" } }))).toEqual({
+    expect(availability(release, where({ baseVersion: { version: "1.16.3771" } }))).toEqual({
       kind: "installed",
     });
-    expect(availability(release, where({ baseVersion: { version: "1.15.3735", line: "1.15" } }))).toEqual({
+    expect(availability(release, where({ baseVersion: { version: "1.15.3735" } }))).toEqual({
       kind: "upgrade",
       from: "1.15.3735",
     });
-    expect(availability(release, where({ baseVersion: { version: "1.17.3800", line: "1.17" } }))).toEqual({
+    expect(availability(release, where({ baseVersion: { version: "1.17.3800" } }))).toEqual({
       kind: "downgrade",
       from: "1.17.3800",
     });
@@ -953,7 +978,8 @@ creates:
 
 describe("fetchFeed with a manifest ZAX carries", () => {
   const RPU_REPO = "BGforgeNet/Fallout2_Restoration_Project";
-  const RPU_FEED = { repository: RPU_REPO, id: "rpu" };
+  const RPU_FEED: FeedSource = { repository: RPU_REPO, id: "rpu24", line: { prefix: "2.4." } };
+  const RPU23_FEED: FeedSource = { repository: RPU_REPO, id: "rpu23", line: { prefix: "2.3.", counter: true } };
   const RPU_RELEASES = `https://api.github.com/repos/${RPU_REPO}/releases?per_page=100`;
   const rpuAtTag = (tag: string) => `https://raw.githubusercontent.com/${RPU_REPO}/${tag}/f2mod.yml`;
 
@@ -972,7 +998,11 @@ describe("fetchFeed with a manifest ZAX carries", () => {
       responses: { [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34")]), [rpuAtTag("v2.4.34")]: 404 },
     });
     const found = await fetchFeed(platform, RPU_FEED);
-    expect(found.manifest).toMatchObject({ id: "rpu", name: "Restoration Project Updated", version: "2.4.34" });
+    expect(found.manifest).toMatchObject({
+      id: "rpu24",
+      name: "Restoration Project Updated 2.4",
+      version: "2.4.34",
+    });
     // Not from an asset, so the payload is never expected to carry a copy of it.
     expect(found.manifestFromAsset).toBe(false);
     // This host is not Windows, so the route resolved is the script one, and it names the release's own zip.
@@ -986,7 +1016,7 @@ describe("fetchFeed with a manifest ZAX carries", () => {
     const platform = feedPlatform({
       responses: {
         [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34")]),
-        [rpuAtTag("v2.4.34")]: "spec: 1\nid: rpu\nname: RPU as its author describes it\ngame: fallout2\n",
+        [rpuAtTag("v2.4.34")]: "spec: 1\nid: rpu24\nname: RPU as its author describes it\ngame: fallout2\n",
       },
     });
     const found = await fetchFeed(platform, RPU_FEED);
@@ -1012,7 +1042,7 @@ describe("fetchFeed with a manifest ZAX carries", () => {
       responses: {
         [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34", [asset])]),
         "https://example.test/v2.4.34/f2mod.yml":
-          "spec: 1\nid: rpu\nname: RPU as its author describes it\ngame: fallout2\narchive: rpu.zip\n",
+          "spec: 1\nid: rpu24\nname: RPU as its author describes it\ngame: fallout2\narchive: rpu.zip\n",
       },
     });
     const found = await fetchFeed(platform, RPU_FEED);
@@ -1052,6 +1082,35 @@ describe("fetchFeed with a manifest ZAX carries", () => {
     expect(platform.fetched).toEqual([RPU_RELEASES, rpuAtTag("v2.4.34")]);
   });
 
+  it("orders a line by its counter, which ran on through RPU's change of scheme", async () => {
+    // `v30` was the last of the single counter and `v2.3.32` the next release after it. Compared piece by
+    // piece the old spelling would win for good - 30 reads as a major version above 2 - and the row would
+    // offer a release from before the lines existed.
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.3.32"), rpuRelease("v30"), rpuRelease("v29")]),
+        [rpuAtTag("v2.3.32")]: 404,
+      },
+    });
+    const found = await fetchFeed(platform, RPU23_FEED);
+    expect(found.manifest.version).toBe("2.3.32");
+    expect(platform.fetched).toEqual([RPU_RELEASES, rpuAtTag("v2.3.32")]);
+  });
+
+  it("leaves the other line's releases to the other row", async () => {
+    // The two interleave in one release list, newest first, and 2.4.34 is the newest of all - but it is not
+    // this row's, and taking it would be the cross-line upgrade the whole split exists to prevent.
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34"), rpuRelease("v2.3.34"), rpuRelease("v2.4.33")]),
+        [rpuAtTag("v2.3.34")]: 404,
+      },
+    });
+    const found = await fetchFeed(platform, RPU23_FEED);
+    expect(found.manifest).toMatchObject({ id: "rpu23", version: "2.3.34" });
+    expect(platform.fetched).toEqual([RPU_RELEASES, rpuAtTag("v2.3.34")]);
+  });
+
   it("still asks about a release that publishes its own manifest, whatever its tag names", async () => {
     // The listing already carries the asset's name, so honouring an author's own document costs nothing -
     // and its version is the document's to state, which no tag can rule out in advance.
@@ -1061,12 +1120,62 @@ describe("fetchFeed with a manifest ZAX carries", () => {
         [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34"), rpuRelease("v2.3.34", [asset])]),
         [rpuAtTag("v2.4.34")]: 404,
         "https://example.test/old/f2mod.yml":
-          'spec: 1\nid: rpu\nname: RPU as its author describes it\nversion: "9.9"\ngame: fallout2\n',
+          'spec: 1\nid: rpu24\nname: RPU as its author describes it\nversion: "2.4.99"\ngame: fallout2\n',
       },
     });
     const found = await fetchFeed(platform, RPU_FEED);
-    expect(found.manifest).toMatchObject({ name: "RPU as its author describes it", version: "9.9" });
+    expect(found.manifest).toMatchObject({ name: "RPU as its author describes it", version: "2.4.99" });
     expect(found.manifestFromAsset).toBe(true);
+  });
+
+  it("lists a line's versions newest first, and only that line's", async () => {
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([
+          rpuRelease("v2.4.34"),
+          rpuRelease("v2.3.34"),
+          rpuRelease("v2.3.32"),
+          rpuRelease("v30"),
+          rpuRelease("latest"),
+        ]),
+      },
+    });
+    // The counter orders them, so v30 sits below 2.3.32 rather than above every release the split produced.
+    expect(await listModVersions(platform, RPU23_FEED)).toEqual(["2.3.34", "2.3.32", "30"]);
+    expect(await listModVersions(platform, RPU_FEED)).toEqual(["2.4.34"]);
+  });
+
+  it("fetches a version the user named rather than the one at the head of the line", async () => {
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.3.34"), rpuRelease("v30")]),
+        [rpuAtTag("v30")]: 404,
+      },
+    });
+    const found = await fetchFeedAt(platform, RPU23_FEED, "30");
+    expect(found.manifest).toMatchObject({ id: "rpu23", version: "30" });
+    // The document ZAX carries names the release's own asset, whichever release it is asked about.
+    expect(found.installer?.asset.name).toBe("rpu_v30.zip");
+  });
+
+  it("says so rather than falling back when the version named is published nowhere", async () => {
+    const platform = feedPlatform({ responses: { [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.3.34")]) } });
+    await expect(fetchFeedAt(platform, RPU23_FEED, "2.3.99")).rejects.toThrow('publishes "rpu23" 2.3.99');
+  });
+
+  it("passes over a document whose own version falls outside the line", async () => {
+    // The tag filter cannot judge a release that states its own version, so the document is read and then
+    // measured against the line the same way - otherwise any number at all could win a row it never belonged to.
+    const asset = { name: "f2mod.yml", browser_download_url: "https://example.test/odd/f2mod.yml" };
+    const platform = feedPlatform({
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34"), rpuRelease("v2.3.34", [asset])]),
+        [rpuAtTag("v2.4.34")]: 404,
+        "https://example.test/odd/f2mod.yml":
+          'spec: 1\nid: rpu24\nname: RPU as its author describes it\nversion: "9.9"\ngame: fallout2\n',
+      },
+    });
+    expect((await fetchFeed(platform, RPU_FEED)).manifest.version).toBe("2.4.34");
   });
 });
 
@@ -1081,11 +1190,14 @@ describe("a listing over the vendored rows", () => {
     ],
   });
 
-  it("offers all three base mods on a vanilla install, each as the install it would make", async () => {
+  it("offers every base mod on a vanilla install, each as the install it would make", async () => {
     const platform = new MemoryPlatform({
       files: { [`${install.path}/fallout2.exe`]: "" },
       responses: {
-        [listing("BGforgeNet/Fallout2_Restoration_Project")]: JSON.stringify([bgforge("rpu", "v2.4.34")]),
+        [listing("BGforgeNet/Fallout2_Restoration_Project")]: JSON.stringify([
+          bgforge("rpu", "v2.4.34"),
+          bgforge("rpu", "v2.3.34"),
+        ]),
         [listing("BGforgeNet/Fallout2_Unofficial_Patch")]: JSON.stringify([bgforge("upu", "v34")]),
         [listing("rotators/Fo1in2")]: JSON.stringify([
           {
@@ -1096,19 +1208,23 @@ describe("a listing over the vendored rows", () => {
         [listing("BGforgeNet/FO2tweaks")]: JSON.stringify([]),
         // None of the three has committed a manifest, which is the answer ZAX's own copy stands in for.
         ["https://raw.githubusercontent.com/BGforgeNet/Fallout2_Restoration_Project/v2.4.34/f2mod.yml"]: 404,
+        ["https://raw.githubusercontent.com/BGforgeNet/Fallout2_Restoration_Project/v2.3.34/f2mod.yml"]: 404,
         ["https://raw.githubusercontent.com/BGforgeNet/Fallout2_Unofficial_Patch/v34/f2mod.yml"]: 404,
         ["https://raw.githubusercontent.com/rotators/Fo1in2/v1.16.3771/f2mod.yml"]: 404,
       },
     });
     const found = await wholeListing(platform, install, { path: install.path, mods: [] }, null);
+    // RPU's two lines are two rows over one repository: each takes its own line's newest release, and on a
+    // vanilla install both are equally installable, which is the choice the split exists to put to the user.
     expect(found.offers.map((offer) => [offer.id, offer.version, offer.availability.kind])).toEqual([
-      ["rpu", "2.4.34", "install"],
+      ["rpu23", "2.3.34", "install"],
+      ["rpu24", "2.4.34", "install"],
       ["upu", "34", "install"],
       ["fo1in2", "1.16.3771", "install"],
     ]);
     // The one that creates an install says so, and it is the only one that asks the user for anything.
-    expect(found.offers.map((offer) => offer.creates)).toEqual([undefined, undefined, "Fallout1in2"]);
-    expect(found.offers[2]?.asks?.map((ask) => ask.id)).toEqual(["fallout1"]);
+    expect(found.offers.map((offer) => offer.creates)).toEqual([undefined, undefined, undefined, "Fallout1in2"]);
+    expect(found.offers[3]?.asks?.map((ask) => ask.id)).toEqual(["fallout1"]);
     // The mod nobody has adopted the format for is still followed and still fails, but it is a stacking mod:
     // a row saying a repository has not adopted the format is nothing the user can act on, so none is shown.
     expect(found.failures).toEqual([]);

@@ -964,6 +964,51 @@ describe("a mod that must be pointed at another game", () => {
  * here are what the store does with what came back - and reaching them for real needs the network, an
  * installer to run and, for the second, a copy of Fallout 1.
  */
+describe("installing a version other than the newest", () => {
+  const offer = {
+    id: "rpu23",
+    name: "Restoration Project Updated 2.3",
+    version: "2.3.34",
+    type: "base" as const,
+    availability: { kind: "upgrade" as const, from: "2.3.32" },
+  };
+
+  afterEach(() => vi.restoreAllMocks());
+
+  test("asks only for what the install could move to, not for every release ever published", async () => {
+    const versions = vi.spyOn(hostBackend, "modVersions").mockResolvedValue(["2.3.34", "2.3.33"]);
+    await store.chooseModVersion(offer);
+    // What is installed goes with the request: the backend owns the comparison, which is the only place the
+    // release line ordering these versions is known.
+    expect(versions).toHaveBeenCalledWith("rpu23", "2.3.32");
+    expect(store.modVersionPick).toEqual({ offer, versions: ["2.3.34", "2.3.33"], read: true });
+  });
+
+  test("plans the version picked rather than the one the row names", async () => {
+    const plan = vi
+      .spyOn(hostBackend, "planMod")
+      .mockResolvedValue({ kind: "base", version: "2.3.33", fingerprint: "f" } as never);
+    await store.prepareMod(offer, undefined, undefined, "2.3.33");
+    expect(plan).toHaveBeenCalledWith(expect.anything(), "rpu23", undefined, undefined, "2.3.33");
+    expect(store.modPlan?.version).toBe("2.3.33");
+  });
+
+  test("closes the dialog rather than sitting on a list that will never arrive", async () => {
+    vi.spyOn(hostBackend, "modVersions").mockRejectedValue(new Error("the machine cannot be reached"));
+    await store.chooseModVersion(offer);
+    expect(store.modVersionPick, "a dialog still reading is worse than none").toBeNull();
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.notice?.text).toContain("the machine cannot be reached");
+  });
+
+  test("drops the choice when the dialog is dismissed", async () => {
+    vi.spyOn(hostBackend, "modVersions").mockResolvedValue(["2.3.34"]);
+    await store.chooseModVersion(offer);
+    store.dismissModVersion();
+    expect(store.modVersionPick).toBeNull();
+  });
+});
+
 describe("what an installed base mod does to the list of games", () => {
   const settled = { standing: {}, unfollowed: [] };
 
@@ -988,6 +1033,7 @@ describe("what an installed base mod does to the list of games", () => {
     expect(store.installs.find((one) => one.path === PREVIEW_INSTALL)?.type).toBe("fallout2up");
 
     store.modPlan = {
+      version: "2.4.34",
       offer: {
         id: "rpu",
         name: "Restoration Project Updated",
@@ -1025,6 +1071,7 @@ describe("what an installed base mod does to the list of games", () => {
     answering({ version: "1.16.3771", created, extracted: 8602, conflicts: [] }, "fo1in2");
 
     store.modPlan = {
+      version: "1.16.3771",
       offer: {
         id: "fo1in2",
         name: "Fallout et tu",

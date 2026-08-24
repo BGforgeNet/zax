@@ -51,17 +51,73 @@ export interface ModFeed {
    * worth saying so, and a stacking mod whose repository has simply not adopted the format is not.
    */
   base: boolean;
+  /**
+   * Which of the repository's releases this entry follows, where one repository publishes more than one line.
+   * RPU is the only case and needs declaring because its releases cannot say: it ran a single counter to `v30`
+   * and split into `2.3.32` and `2.4.32` at 32, publishing no manifest of its own for either.
+   */
+  line?: ModLine;
+}
+
+/**
+ * One of a repository's parallel release lines. `prefix` is what its versions start with, and `counter` marks
+ * the line that the pre-split history belongs to - RPU's bare `v30` and everything below it is 2.3's past, and
+ * an install that stamps no version at all is that line's to repair rather than the newer line's to take over.
+ */
+export interface ModLine {
+  prefix: string;
+  counter?: true;
+}
+
+/** Whether a version belongs to a line: its own numbering, or the counter the line inherited. */
+export const heldByLine = (line: ModLine, version: string): boolean =>
+  version.startsWith(line.prefix) || (line.counter === true && /^\d+$/.test(version));
+
+/**
+ * The number a version ends on - 30 for `v30`, 34 for `2.3.34`, 30 for the `2.3.3u30` an install of that era
+ * stamps. RPU's counter ran through all three spellings, so it is what orders a line whatever scheme wrote it.
+ */
+const counterOf = (version: string): number => {
+  const match = /(\d+)$/.exec(version);
+  return match?.[1] === undefined ? Number.NaN : Number(match[1]);
+};
+
+/**
+ * How two of one row's versions compare. A line orders by its counter, because the schemes either side of
+ * RPU's split are not comparable component by component: `30` would read as a major version above `2.4.34`.
+ */
+export function compareInLine(line: ModLine | undefined, a: string, b: string): number {
+  if (line === undefined) return compareVersions(a, b);
+  const left = counterOf(a);
+  const right = counterOf(b);
+  if (Number.isNaN(left) || Number.isNaN(right)) return compareVersions(a, b);
+  return left - right;
 }
 
 /**
  * What reading a repository takes: the releases to list and the id to follow through them. The rest of a row
  * describes the mod where no manifest arrives, which is the listing's business rather than the fetch's.
  */
-export type FeedSource = Pick<ModFeed, "repository" | "id">;
+export type FeedSource = Pick<ModFeed, "repository" | "id" | "line">;
 
 /** Base mods first: what an install is comes before what is stacked on it, and that is the order it is read in. */
 export const MOD_FEEDS: readonly ModFeed[] = [
-  { repository: "BGforgeNet/Fallout2_Restoration_Project", id: "rpu", name: "RPU", base: true },
+  // Two entries over one repository, which is what parallel release lines are: a 2.3 install upgrades within
+  // 2.3 and never crosses, so 2.4 is a different mod rather than a branch of this one.
+  {
+    repository: "BGforgeNet/Fallout2_Restoration_Project",
+    id: "rpu23",
+    name: "RPU 2.3",
+    base: true,
+    line: { prefix: "2.3.", counter: true },
+  },
+  {
+    repository: "BGforgeNet/Fallout2_Restoration_Project",
+    id: "rpu24",
+    name: "RPU 2.4",
+    base: true,
+    line: { prefix: "2.4." },
+  },
   { repository: "BGforgeNet/Fallout2_Unofficial_Patch", id: "upu", name: "UPU", base: true },
   { repository: "rotators/Fo1in2", id: "fo1in2", name: "ET TU", base: true },
   { repository: "BGforgeNet/FO2tweaks", id: "fo2tweaks", name: "FO2tweaks", base: false },
@@ -91,6 +147,11 @@ export interface ModRelease {
    * install so eligibility can say "not for this system" without downloading anything.
    */
   installer?: { route: "windows" | "other"; asset: ReleaseAsset };
+  /**
+   * The release line this came from, carried because versions of one line compare on their own counter and an
+   * install stamping another line's version is another mod rather than an older copy of this one.
+   */
+  line?: ModLine;
 }
 
 /**
@@ -300,13 +361,28 @@ function installerFor(
  * This is what keeps a first listing from costing one 404 per release across a repository's whole history.
  */
 function worthAsking(feed: FeedSource, releases: readonly FeedRelease[]): readonly FeedRelease[] {
-  if (vendoredManifestFor(feed.id) === undefined) return releases;
+  // A line's releases are the only ones this entry follows, whatever else the repository publishes - and the
+  // filter comes first, so the highest below is the highest of this line rather than of both.
+  const line = feed.line;
+  const mine =
+    line === undefined
+      ? releases
+      : releases.filter((release) => {
+          // A release stating its own id says which line it belongs to better than its tag does, and the id
+          // check below is what then keeps it or drops it. Only the tag-read releases are filtered here.
+          if (release.assets.some((asset) => asset.name === MANIFEST_NAME)) return true;
+          const tagged = versionFromTag(release.tag);
+          return tagged !== undefined && heldByLine(line, tagged);
+        });
+  if (vendoredManifestFor(feed.id) === undefined) return mine;
   let highest: string | undefined;
-  for (const release of releases) {
+  for (const release of mine) {
     const tagged = versionFromTag(release.tag);
-    if (tagged !== undefined && (highest === undefined || compareVersions(tagged, highest) > 0)) highest = tagged;
+    if (tagged !== undefined && (highest === undefined || compareInLine(feed.line, tagged, highest) > 0)) {
+      highest = tagged;
+    }
   }
-  return releases.filter(
+  return mine.filter(
     (release) =>
       release.assets.some((asset) => asset.name === MANIFEST_NAME) ||
       // Guarded rather than compared straight: with no version-shaped tag anywhere, `highest` is undefined and
@@ -315,52 +391,122 @@ function worthAsking(feed: FeedSource, releases: readonly FeedRelease[]): readon
   );
 }
 
+/**
+ * What a walk over a repository's releases learned besides the release it picked: whether any manifest was
+ * reachable at all, and the first one that would not parse. Both go into the message when nothing wins, where
+ * "this needs a newer ZAX" is truer than "nothing found".
+ */
+interface FeedNotes {
+  sawManifest: boolean;
+  firstRefusal: Error | null;
+}
+
+/**
+ * One release read as this feed's mod, or null where it is not one - another id, another line, or no manifest
+ * at all. Shared by the walk that picks the current release and by the fetch of a version the user named, so
+ * an older release is assembled exactly as the newest one is.
+ */
+async function releaseFrom(
+  platform: Platform,
+  feed: FeedSource,
+  release: FeedRelease,
+  notes: FeedNotes,
+): Promise<ModRelease | null> {
+  const tagged = versionFromTag(release.tag);
+  const found = await fetchManifestText(platform, feed, release, tagged);
+  if (found === null) return null;
+  notes.sawManifest = true;
+  const inferred = soleArchive(release.assets);
+  let manifest: ModManifest;
+  try {
+    manifest = parseManifest(new TextEncoder().encode(found.text), {
+      ...(tagged !== undefined ? { version: tagged } : {}),
+      ...(inferred !== undefined ? { archive: inferred.name } : {}),
+    });
+  } catch (error) {
+    notes.firstRefusal ??= error instanceof Error ? error : new Error(String(error));
+    return null;
+  }
+  if (manifest.id !== feed.id) return null;
+  // A line is a stretch of the numbering, so a document is this row's only if its version falls in it - the
+  // tag filter cannot answer for a release whose own document states the version.
+  if (feed.line && !heldByLine(feed.line, manifest.version)) return null;
+  const archive = manifest.archive ? release.assets.find((asset) => asset.name === manifest.archive) : undefined;
+  const parts: Record<string, ReleaseAsset> = {};
+  for (const part of partOptions(manifest)) {
+    const asset = release.assets.find((entry) => entry.name === part.archive);
+    if (asset) parts[part.id] = asset;
+  }
+  const installer = installerFor(platform, manifest, release.assets);
+  return {
+    manifest,
+    manifestText: found.text,
+    manifestFromAsset: found.fromAsset,
+    ...(feed.line ? { line: feed.line } : {}),
+    ...(archive ? { archive } : {}),
+    ...(manifest.parts ? { parts } : {}),
+    ...(installer ? { installer } : {}),
+  };
+}
+
+/**
+ * Every version this row's releases name, newest first. Read from the listing already cached for the current
+ * release, so putting a choice in front of the user costs no request of its own. These are what the tags say:
+ * a release stating its own version in a document it publishes could name another, which the fetch then finds.
+ */
+export async function listModVersions(
+  platform: Platform,
+  feed: FeedSource,
+  now: Date = new Date(),
+): Promise<readonly string[]> {
+  const seen = new Set<string>();
+  for (const release of await fetchReleases(platform, feed.repository, now)) {
+    const tagged = versionFromTag(release.tag);
+    if (tagged === undefined) continue;
+    if (feed.line && !heldByLine(feed.line, tagged)) continue;
+    seen.add(tagged);
+  }
+  return [...seen].sort((a, b) => compareInLine(feed.line, b, a));
+}
+
+/**
+ * The release naming one particular version, for installing something other than the newest. The whole listing
+ * is searched rather than the shortlist `worthAsking` keeps: that one exists to avoid asking about releases
+ * which cannot win, and a version the user named has already won.
+ */
+export async function fetchFeedAt(
+  platform: Platform,
+  feed: FeedSource,
+  version: string,
+  now: Date = new Date(),
+): Promise<ModRelease> {
+  const notes: FeedNotes = { sawManifest: false, firstRefusal: null };
+  for (const release of await fetchReleases(platform, feed.repository, now)) {
+    if (versionFromTag(release.tag) !== version) continue;
+    const built = await releaseFrom(platform, feed, release, notes);
+    if (built !== null) return built;
+  }
+  if (notes.firstRefusal) throw notes.firstRefusal;
+  throw new Error(`No release of ${feed.repository} publishes "${feed.id}" ${version}.`);
+}
+
 export async function fetchFeed(platform: Platform, feed: FeedSource, now: Date = new Date()): Promise<ModRelease> {
   const releases = worthAsking(feed, await fetchReleases(platform, feed.repository, now));
-  let firstRefusal: Error | null = null;
-  let sawManifest = false;
+  const notes: FeedNotes = { sawManifest: false, firstRefusal: null };
   let best: ModRelease | null = null;
 
   for (const release of releases) {
-    const tagged = versionFromTag(release.tag);
-    const found = await fetchManifestText(platform, feed, release, tagged);
-    if (found === null) continue;
-    sawManifest = true;
-    const inferred = soleArchive(release.assets);
-    let manifest: ModManifest;
-    try {
-      manifest = parseManifest(new TextEncoder().encode(found.text), {
-        ...(tagged !== undefined ? { version: tagged } : {}),
-        ...(inferred !== undefined ? { archive: inferred.name } : {}),
-      });
-    } catch (error) {
-      firstRefusal ??= error instanceof Error ? error : new Error(String(error));
-      continue;
-    }
-    if (manifest.id !== feed.id) continue;
+    const built = await releaseFrom(platform, feed, release, notes);
+    if (built === null) continue;
     // Strictly higher, so a version published twice keeps its newest release's assets.
-    if (best !== null && compareVersions(manifest.version, best.manifest.version) <= 0) continue;
-    const archive = manifest.archive ? release.assets.find((asset) => asset.name === manifest.archive) : undefined;
-    const parts: Record<string, ReleaseAsset> = {};
-    for (const part of partOptions(manifest)) {
-      const asset = release.assets.find((entry) => entry.name === part.archive);
-      if (asset) parts[part.id] = asset;
-    }
-    const installer = installerFor(platform, manifest, release.assets);
-    best = {
-      manifest,
-      manifestText: found.text,
-      manifestFromAsset: found.fromAsset,
-      ...(archive ? { archive } : {}),
-      ...(manifest.parts ? { parts } : {}),
-      ...(installer ? { installer } : {}),
-    };
+    if (best !== null && compareInLine(feed.line, built.manifest.version, best.manifest.version) <= 0) continue;
+    best = built;
   }
 
   if (best !== null) return best;
-  if (firstRefusal) throw firstRefusal;
+  if (notes.firstRefusal) throw notes.firstRefusal;
   throw new Error(
-    sawManifest
+    notes.sawManifest
       ? `No release of ${feed.repository} carries a manifest for "${feed.id}".`
       : `No release of ${feed.repository} ships a ZAX manifest yet.`,
   );
@@ -403,11 +549,12 @@ export interface ModContext {
   baseVersion?: BaseVersion | null;
 }
 
-/** Which sequence of releases a version belongs to - `2.4.34` is the 2.4 line, which never crosses to 2.3. */
-const lineOf = (version: string): string | undefined => {
-  const pieces = version.split(".");
-  return pieces.length >= 3 ? pieces.slice(0, 2).join(".") : undefined;
-};
+/**
+ * Whether a lined base mod is this installation's to offer: its own line's stamp, or - for the line the
+ * pre-split history belongs to - an installation stating no version at all, which no later line ever wrote.
+ */
+const offeredOnLine = (line: ModLine, held: BaseVersion | null | undefined): boolean =>
+  held ? heldByLine(line, held.version) : line.counter === true;
 
 export function availability(release: ModRelease, context: ModContext): Availability {
   const { manifest } = release;
@@ -497,16 +644,15 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   if (manifest.type === "base") {
     if (context.install.type !== manifest.becomes) return blockedByType(manifest, context) ?? { kind: "install" };
     const held = context.baseVersion;
-    // What the install stamped into `ddraw.ini` stands in for the record it has not got - but only within
-    // its own line. RPU's 2.3 and 2.4 ship in lockstep and never upgrade across, so a 2.4 release meeting a
-    // 2.3 install is not that install's next version; it is the other line, and picking it is the user's.
-    // Both sides agreeing about lines, undefined included: UPU's versions have no line at all and compare
-    // straight, while a pre-split RPU install has none and the release has one - which is the whole point of
-    // the pre-split trap. That install belongs to no line, so its first update is the same choice a fresh
-    // install makes, and ZAX puts it to the user rather than picking a line for them.
-    const sameLine = held?.line === lineOf(manifest.version);
-    if (held && sameLine) {
-      const newness = compareVersions(manifest.version, held.version);
+    // What the install stamped into `ddraw.ini` stands in for the record it has not got. Where the mod is
+    // published in parallel lines that stamp also says WHICH of them is here, and only one base mod fits an
+    // installation: another line's version is that other mod already installed, refused in the same sentence
+    // as any other base mod meeting an installation it does not install on.
+    if (release.line && !offeredOnLine(release.line, held)) {
+      return blockedByType(manifest, context) ?? { kind: "install-over" };
+    }
+    if (held) {
+      const newness = compareInLine(release.line, manifest.version, held.version);
       if (newness === 0) return { kind: "installed" };
       return newness > 0 ? { kind: "upgrade", from: held.version } : { kind: "downgrade", from: held.version };
     }

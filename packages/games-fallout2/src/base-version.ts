@@ -20,14 +20,12 @@
 import { IniDocument } from "@zax/core";
 import type { Platform } from "@zax/platform";
 
-/** What an install says about itself: the release it carries, and the line that release belongs to. */
+/**
+ * What an install says about itself: the release it carries. Which line that release belongs to is the feed
+ * list's to declare rather than this parser's - a version says its own numbering and nothing about branches.
+ */
 export interface BaseVersion {
   version: string;
-  /**
-   * Which sequence of releases this one follows - `2.3` and `2.4` ship in lockstep and never upgrade across.
-   * Absent for a pre-split install, which belongs to no line: its first update is where the user picks one.
-   */
-  line?: string;
 }
 
 /** The post-split shape: `2.4.34`, a line and a patch. */
@@ -60,8 +58,7 @@ export function baseVersionOf(text: string): BaseVersion | null {
   // version compared against a release is the number rather than the way that release wrote it.
   const version = last.replace(/^v/i, "");
   if (PRE_SPLIT.test(version)) return { version };
-  const split = LINE_AND_PATCH.exec(version);
-  return split?.[1] ? { version, line: split[1] } : null;
+  return LINE_AND_PATCH.test(version) ? { version } : null;
 }
 
 /**

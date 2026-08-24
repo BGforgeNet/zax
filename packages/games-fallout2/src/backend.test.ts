@@ -373,6 +373,43 @@ describe("the feeds, against the installs asked about", () => {
   });
 });
 
+describe("the versions a row can be moved to", () => {
+  const RPU_RELEASES = "https://api.github.com/repos/BGforgeNet/Fallout2_Restoration_Project/releases?per_page=100";
+  const release = (tag: string) => ({
+    tag_name: tag,
+    assets: [{ name: `rpu_${tag}.zip`, browser_download_url: `https://example.test/${tag}.zip` }],
+  });
+  const published = () =>
+    new MemoryPlatform({
+      os: "linux",
+      arch: "x64",
+      config: "cfg",
+      cache: "cache",
+      responses: {
+        [RPU_RELEASES]: JSON.stringify([release("v2.3.34"), release("v2.3.33"), release("v2.3.32"), release("v30")]),
+      },
+    });
+
+  it("offers the line's releases, newest first", async () => {
+    const backend = createBackend(published(), noShell);
+    expect(await backend.modVersions("rpu23")).toEqual(["2.3.34", "2.3.33", "2.3.32", "30"]);
+  });
+
+  it("leaves out everything the install already has or has passed", async () => {
+    // A base mod's installer has no way back down, so a version below the installed one is not a choice to
+    // put on screen - and the counter is what decides that, with `30` below `2.3.32` rather than above it.
+    const backend = createBackend(published(), noShell);
+    expect(await backend.modVersions("rpu23", "2.3.33")).toEqual(["2.3.34"]);
+    expect(await backend.modVersions("rpu23", "30")).toEqual(["2.3.34", "2.3.33", "2.3.32"]);
+    expect(await backend.modVersions("rpu23", "2.3.34")).toEqual([]);
+  });
+
+  it("refuses a mod no feed follows rather than answering with nothing", async () => {
+    const backend = createBackend(published(), noShell);
+    await expect(backend.modVersions("not-a-mod")).rejects.toThrow('No known feed carries "not-a-mod"');
+  });
+});
+
 /** A compile-time check that the list is exactly the interface's keys, not merely a subset of them. */
 const _covers: Record<keyof Backend, true> = Object.fromEntries(BACKEND_METHODS.map((name) => [name, true])) as Record<
   keyof Backend,
