@@ -4,6 +4,7 @@
   import Dialog from "./Dialog.svelte";
   import SettingRow from "./SettingRow.svelte";
   import { isPreview } from "./host.js";
+  import { MOD_ICON } from "./icons.js";
   import { store } from "./store.svelte.js";
 
   const KIND_LABEL = { dat: "dat", folder: "folder", file: "file", missing: "missing" } as const;
@@ -195,7 +196,14 @@
           <p class="empty">{store.readingOffers ? "Reading the mod feeds..." : "The feeds have not been read yet."}</p>
         {:else}
           {#each store.modListing.offers as offer (offer.id)}
+            <!-- Decoration beside a name that already says which mod it is, so it carries no alt text. -->
+            {@const icon = MOD_ICON[offer.id]}
             <div class="offer" class:refused={offer.availability.kind === "blocked"}>
+              {#if icon}
+                <img class="mod-icon" src={icon} alt="" width="64" height="34" />
+              {:else}
+                <span class="mod-icon"></span>
+              {/if}
               <div class="about">
                 <span class="mod-name">{offer.name}</span>
                 <span class="version">{offer.version}</span>
@@ -251,7 +259,13 @@
             </div>
           {/each}
           {#each store.modListing.failures as failure (failure.id)}
+            {@const icon = MOD_ICON[failure.id]}
             <div class="offer">
+              {#if icon}
+                <img class="mod-icon" src={icon} alt="" width="64" height="34" />
+              {:else}
+                <span class="mod-icon"></span>
+              {/if}
               <div class="about">
                 <span class="mod-name">{failure.name}</span>
                 <p class="status">{failure.why}</p>
@@ -857,7 +871,12 @@
 
   .offer {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    /*
+      The icon keeps its column even where a feed has none, so the names of two rows still line up rather than
+      stepping in and out with whichever mods happen to ship art. Wide enough for the one project whose mark is
+      a banner rather than a disc, since a track sized to the discs renders that one as an unreadable strip.
+    */
+    grid-template-columns: 64px minmax(0, 1fr) auto;
     align-items: center;
     column-gap: 12px;
     padding: 9px var(--gutter);
@@ -866,6 +885,22 @@
 
   .about {
     min-width: 0;
+  }
+
+  /*
+    One box, two shapes: contain letterboxes rather than stretching or cropping, so a disc fills the height at
+    its own aspect and the banner fills the width at its.
+  */
+  .mod-icon {
+    width: 64px;
+    height: 34px;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+
+  /* Dimmed with the rest of a refused row - a full-strength icon reads as the one live thing in it. */
+  .refused .mod-icon {
+    opacity: 0.45;
   }
 
   .mod-name {

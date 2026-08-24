@@ -1,26 +1,8 @@
 <script lang="ts">
-  import { GAME_TYPES, displayName, type GameType } from "@zax/core";
+  import { GAME_TYPES, displayName } from "@zax/core";
   import { isPreview, PREVIEW_REASON } from "./host.js";
+  import { GAME_ICON } from "./icons.js";
   import { store } from "./store.svelte.js";
-  import fallout2 from "../assets/fallout2.png";
-  import fallout2rpu from "../assets/fallout2rpu.png";
-  import fallout2upu from "../assets/fallout2upu.png";
-  import fo1in2icon from "../assets/fo1in2.png";
-
-  /*
-    The previous interface's own icons, carried over from its `zax/icons/`: one disc per game, with a coloured
-    letter over it for the mod. It had none for killap's two patches, which each share the icon of the fork that
-    descends from it. Fallout et tu is the one entry whose disc is a different game rather than the same one
-    modded, so it carries Fallout 1's own art, and its letter is the engine it runs on.
-  */
-  const ICON: Record<GameType, string> = {
-    fallout2,
-    fallout2up: fallout2upu,
-    fallout2rp: fallout2rpu,
-    fallout2upu,
-    fallout2rpu,
-    fo1in2: fo1in2icon,
-  };
 
   const current = $derived(store.install);
 
@@ -60,7 +42,7 @@
             rename(install.path);
           }}
         >
-          <img class="icon" src={ICON[install.type]} alt={type.label} width="32" height="32" />
+          <img class="icon" src={GAME_ICON[install.type]} alt={type.label} width="32" height="32" />
           <span class="text">
             <span class="top">
               <!-- The path below is what tells two installs of one type apart; the name says what the game is. -->
