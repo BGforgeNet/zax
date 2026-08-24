@@ -95,7 +95,8 @@ describe("the operations", () => {
         args: ["fallout2.exe"],
         options: {
           cwd: "/games/one",
-          env: { WINEPREFIX: "/p", WINEDEBUG: "-all", WINEDLLOVERRIDES: "ddraw.dll=n,b" },
+          env: { WINEPREFIX: "/p", WINEDLLOVERRIDES: "ddraw.dll=n,b" },
+          log: "/games/one/wine.log",
         },
       },
     ]);

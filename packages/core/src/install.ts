@@ -62,6 +62,21 @@ export interface Install {
   wine?: WineConfig;
 }
 
+/**
+ * What a new install starts WINEDEBUG at. Wine's default leaves `err` and `fixme` on, which is a stub notice
+ * for every unimplemented call rather than anything diagnostic; clearing the field is what asks for them.
+ */
+export const DEFAULT_WINE_DEBUG = "-all";
+
+/**
+ * An install as it joins the list, whether the user pointed at it or a scan turned it up, so both routes start
+ * it the same way. The Wine default is stored on Windows too: it costs one line nothing reads there, and it is
+ * already right if the folder is later opened from a machine that does use Wine.
+ */
+export function newInstall(path: string, type: GameType): Install {
+  return { path, type, wine: { debug: DEFAULT_WINE_DEBUG } };
+}
+
 /** What to call an install: the user's name for it, or the one its type carries. */
 export function displayName(install: Install): string {
   return install.alias ?? GAME_TYPES[install.type].name;

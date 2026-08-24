@@ -32,7 +32,8 @@ mods as well as settings.
   selected. Switching games only re-checks that game's folder. A machine that cannot reach any of it is left as
   it was: the versions read as unchecked, and the buttons still ask.
 - **Bug reports in one archive.** Configs, the game's logs, listings of the folder and of `mods/`, the load
-  order, ZAX's own log, and any savegames you choose.
+  order, ZAX's own log, what Wine printed where the game runs under it, and any savegames you choose. Wine is
+  kept quiet for normal play and says its piece again once you turn full debugging on.
 - **Runs from anywhere.** Windows, Linux and macOS builds, none of them installers. A `data` directory beside
   the executable makes a copy portable, settings and all.
 - **Try it without a game.** Opened in a browser, the interface edits a bundled fixture; anything that would

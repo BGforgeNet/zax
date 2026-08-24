@@ -2,11 +2,13 @@ export { IniDocument } from "./ini.js";
 export { isApplied, pendingTargets, type Action, type ActionGroup } from "./action.js";
 export { validate } from "./validate.js";
 export {
+  DEFAULT_WINE_DEBUG,
   GAME_TYPES,
   SCAN_LOCATIONS,
   addInstall,
   detectGameType,
   displayName,
+  newInstall,
   removeInstall,
   setAlias,
   withWine,

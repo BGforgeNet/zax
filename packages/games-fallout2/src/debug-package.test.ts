@@ -53,6 +53,14 @@ describe("creating the package", () => {
     expect(contents).toEqual(["ddraw.dll", "debug.log", "f2_res.ini", "fallout2.cfg", "game.txt", "sfall-log.txt"]);
   });
 
+  it("takes Wine's log where there is one, and misses nothing where there is not", async () => {
+    // Present only after the game has been started under Wine with its logging left on, which is exactly the
+    // report worth having: what Wine says about a crash before the game reaches its own log.
+    const withLog = await packaged(installed({ "/games/one/wine.log": "err:module:import_dll" }));
+    expect(withLog).toContain("wine.log");
+    expect(await packaged(installed())).not.toContain("wine.log");
+  });
+
   it("writes the archive under the debug directory, named for when it was made", async () => {
     const platform = installed();
     expect((await createDebugPackage(platform, INSTALL, [], AT)).path).toBe(ARCHIVE);

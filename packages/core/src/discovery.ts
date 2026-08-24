@@ -25,6 +25,7 @@ import {
   EPIC_REGISTRY_KEY,
   UNSEARCHABLE_DIRECTORIES,
   detectGameType,
+  newInstall,
   type GameType,
   type Install,
 } from "./install.js";
@@ -365,7 +366,7 @@ export async function scanForInstalls(
       seen.add(key);
       const type = await identifyInstall(platform, candidate.path);
       if (type === null) continue;
-      found.push({ path: candidate.path, type });
+      found.push(newInstall(candidate.path, type));
       credited.push(`${candidate.path} (${candidate.source}, ${type})`);
     }
   };

@@ -22,19 +22,14 @@ describe("planning a launch", () => {
   });
 
   it("passes the install's own prefix and debug setting", () => {
-    const wine = { prefix: "/home/t/.wine-fallout", debug: "warn+all" };
+    const wine = { prefix: "/home/t/.wine-fallout", debug: "-all" };
     expect(planLaunch("linux", { ...INSTALL, wine }, "4.5").env).toMatchObject({
       WINEPREFIX: "/home/t/.wine-fallout",
-      WINEDEBUG: "warn+all",
+      WINEDEBUG: "-all",
     });
   });
 
-  it("silences Wine's own logging when the install names no channels", () => {
-    expect(planLaunch("linux", INSTALL, "4.5").env["WINEDEBUG"]).toBe("-all");
-    expect(planLaunch("linux", { ...INSTALL, wine: { prefix: "/p" } }, "4.5").env["WINEDEBUG"]).toBe("-all");
-  });
-
-  it("leaves out a prefix the install does not have, rather than setting it empty", () => {
+  it("leaves out a Wine setting the install does not have, rather than setting it empty", () => {
     expect(planLaunch("linux", INSTALL, "4.5").env).not.toHaveProperty("WINEPREFIX");
   });
 
@@ -46,6 +41,17 @@ describe("planning a launch", () => {
 
   it("sets no override at all when the install has no sfall to load", () => {
     expect(planLaunch("linux", INSTALL, null).env).not.toHaveProperty("WINEDLLOVERRIDES");
+  });
+
+  it("keeps what Wine prints beside the game's own log", () => {
+    // Nothing else catches it: the game is launched detached from a windowed application, so a crash Wine
+    // explains on stderr would otherwise be written to a console the desktop build does not have.
+    expect(planLaunch("linux", INSTALL, "4.5").log).toBe("/games/one/wine.log");
+  });
+
+  it("asks for no log where nothing runs under Wine", () => {
+    expect(planLaunch("windows", INSTALL, "4.5").log).toBeUndefined();
+    expect(planLaunch("linux", INSTALL, "4.5", "fallout2-ce").log).toBeUndefined();
   });
 });
 

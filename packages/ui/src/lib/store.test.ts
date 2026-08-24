@@ -27,6 +27,7 @@ const bytes = (text: string) => {
   return out;
 };
 
+const ADDED_INSTALL = "preview/added";
 const ORDER_FILE = `${PREVIEW_INSTALL}/mods/mods_order.txt`;
 const MOD_INI = `${PREVIEW_INSTALL}/mods/fo2tweaks.ini`;
 /** Captured on the first run, before any test has written to it, so the seed is not repeated here to drift. */
@@ -92,6 +93,35 @@ describe("installs", () => {
     await store.setWine("/games/b", { debug: "-all" });
     expect(store.installs.find((g) => g.path === "/games/a")?.wine).toEqual({ prefix: "/home/u/.wine-a" });
     expect(store.installs.find((g) => g.path === "/games/b")?.wine).toEqual({ debug: "-all" });
+  });
+
+  test("an install added by pointing at it starts with Wine silenced", async () => {
+    await previewPlatform.fs.write(`${ADDED_INSTALL}/fallout2.exe`, new Uint8Array([0x4d, 0x5a]));
+    await store.addInstall(ADDED_INSTALL);
+    expect(store.installs.find((g) => g.path === ADDED_INSTALL)?.wine).toEqual({ debug: "-all" });
+  });
+});
+
+describe("the debugging actions and Wine", () => {
+  const enable = () => store.actionById("debug.enable")!;
+  const disable = () => store.actionById("debug.disable")!;
+
+  test("enabling debugging clears WINEDEBUG, and turning it off silences Wine again", async () => {
+    await store.setWine(PREVIEW_INSTALL, { debug: "-all" });
+    expect(store.actionApplied(enable()), "silenced Wine leaves the action still to do").toBe(false);
+
+    store.applyAction(enable());
+    await vi.waitFor(() => expect(store.install?.wine?.debug).toBeUndefined());
+    expect(store.actionWineDebug).toBe("");
+
+    store.applyAction(disable());
+    await vi.waitFor(() => expect(store.install?.wine?.debug).toBe("-all"));
+  });
+
+  test("leaves a prefix the user set alone while changing the logging", async () => {
+    await store.setWine(PREVIEW_INSTALL, { prefix: "/home/u/.wine-f2", debug: "-all" });
+    store.applyAction(enable());
+    await vi.waitFor(() => expect(store.install?.wine).toEqual({ prefix: "/home/u/.wine-f2" }));
   });
 });
 

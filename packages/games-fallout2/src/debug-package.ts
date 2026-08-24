@@ -7,13 +7,14 @@
 import { debugDirectory, listFilesRecursively, logFile, stamp, temporaryDirectory } from "@zax/core";
 import type { Install } from "@zax/core";
 import type { ArchiveEntry, Platform } from "@zax/platform";
+import { WINE_LOG } from "./launch.js";
 import { MODS_ORDER_FILE } from "./mods.js";
 
 /** Fallout 2 installers disagree about the case of this directory, and both spellings occur in the wild. */
 const SAVE_DIRECTORIES = ["data/SAVEGAME", "data/savegame"];
 
 /** Files from the game folder worth having, beyond every `.ini` and `.cfg`. */
-const WANTED = ["ddraw.dll", "debug.log", "sfall-log.txt"];
+export const WANTED: readonly string[] = ["ddraw.dll", "debug.log", "sfall-log.txt", WINE_LOG];
 
 const interesting = (name: string) => {
   const lower = name.toLowerCase();

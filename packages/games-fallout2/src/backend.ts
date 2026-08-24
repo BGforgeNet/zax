@@ -478,7 +478,11 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         program = build.program;
       }
       const plan = planLaunch(platform.os, install, sfallVersion, program);
-      await platform.process.launch(plan.program, plan.args, { cwd: plan.cwd, env: plan.env });
+      await platform.process.launch(plan.program, plan.args, {
+        cwd: plan.cwd,
+        env: plan.env,
+        ...(plan.log !== undefined ? { log: plan.log } : {}),
+      });
     },
 
     open: async (target) => {

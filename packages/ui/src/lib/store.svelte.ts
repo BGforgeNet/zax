@@ -5,6 +5,7 @@ import {
   describeValueTest,
   isApplied,
   matchesValueTest,
+  newInstall,
   removeInstall,
   searchText,
   setAlias,
@@ -566,10 +567,25 @@ class Store {
     }
     this.overrides = next;
     this.scheduleAutosave();
+    // The install's record is written straight away where the config targets wait for a save: it lives in ZAX's
+    // own state file, which has no pending layer for an edit to sit in.
+    const install = this.install;
+    if (action.wine && install && this.wineAvailable) {
+      void this.setWine(install.path, { ...install.wine, debug: action.wine.debug });
+    }
   }
 
   actionApplied(action: Action): boolean {
-    return isApplied(action, (id) => this.valueOf(id));
+    return isApplied(action, (id) => this.valueOf(id), this.actionWineDebug);
+  }
+
+  /**
+   * What an action's Wine half is compared against: the selected install's value, or null on Windows, where the
+   * field is hidden and an action must not sit unapplied over something the user cannot reach.
+   */
+  get actionWineDebug(): string | null {
+    if (!this.wineAvailable) return null;
+    return this.install?.wine?.debug ?? "";
   }
 
   baselineOf(id: string): string | undefined {
@@ -1266,7 +1282,7 @@ class Store {
     if (trimmed === "") return null;
     const type = await backend.identifyInstall(trimmed);
     if (type === null) return { kind: "problem", text: `${trimmed} does not hold a Fallout 2 install.` };
-    const result = addInstall(this.installs, { path: trimmed, type });
+    const result = addInstall(this.installs, newInstall(trimmed, type));
     if (!result.ok) return { kind: "problem", text: result.reason };
     this.installs = result.installs;
     await this.persist();

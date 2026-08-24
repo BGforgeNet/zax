@@ -123,6 +123,30 @@ describe("node processes", () => {
     expect(utf8.decode(await platform.fs.read(marker))).toBe("wine-prefix");
   });
 
+  it("sends both streams to the log it was given, replacing what was there", async () => {
+    const log = at("wine.log");
+    await platform.fs.write(log, new TextEncoder().encode("from an older run"));
+    await platform.process.launch("sh", ["-c", 'printf "out"; printf "err" >&2'], { log });
+    for (let attempt = 0; attempt < 50; attempt++) {
+      if (utf8.decode(await platform.fs.read(log)) === "outerr") break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(utf8.decode(await platform.fs.read(log))).toBe("outerr");
+  });
+
+  it("starts the program anyway when its log cannot be opened", async () => {
+    // A game folder ZAX cannot write to is still a game the user asked to start.
+    const marker = at("ran-without-a-log.txt");
+    await platform.process.launch("sh", ["-c", 'printf "ran" > "$ZAX_OUT"'], {
+      env: { ZAX_OUT: marker },
+      log: at("no/such/directory/wine.log"),
+    });
+    for (let attempt = 0; attempt < 50 && !(await platform.fs.stat(marker)); attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(utf8.decode(await platform.fs.read(marker))).toBe("ran");
+  });
+
   it("reports a program that could not be started", async () => {
     await expect(platform.process.launch("zax-no-such-program", [])).rejects.toThrow();
   });

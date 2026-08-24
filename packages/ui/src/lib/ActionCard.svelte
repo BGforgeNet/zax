@@ -5,7 +5,7 @@
   let { action }: { action: Action } = $props();
 
   const applied = $derived(store.actionApplied(action));
-  const pending = $derived(pendingTargets(action, (id) => store.valueOf(id)));
+  const pending = $derived(pendingTargets(action, (id) => store.valueOf(id), store.actionWineDebug));
 </script>
 
 <article class:applied>

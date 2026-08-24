@@ -71,7 +71,9 @@ describe("where a scan starts", () => {
 describe("scanning the known locations", () => {
   it("finds an install at a known location under the home directory", async () => {
     const platform = new MemoryPlatform({ home: "/home/t", files: install("/home/t/GOG Games/Fallout 2", "upu.dat") });
-    expect(await scan(platform)).toEqual([{ path: "/home/t/GOG Games/Fallout 2", type: "fallout2upu" }]);
+    expect(await scan(platform)).toEqual([
+      { path: "/home/t/GOG Games/Fallout 2", type: "fallout2upu", wine: { debug: "-all" } },
+    ]);
   });
 
   it("finds an install inside the Wine prefix, which is where a Windows build lives", async () => {
@@ -226,7 +228,9 @@ describe("asking the registry where GOG put things", () => {
       registry: { [GOG_REGISTRY_KEYS[0]!]: { path: "E:/Somewhere Odd/Fallout 2" } },
       files: install("E:/Somewhere Odd/Fallout 2", "rpu.dat"),
     });
-    expect(await scan(platform)).toEqual([{ path: "E:/Somewhere Odd/Fallout 2", type: "fallout2rpu" }]);
+    expect(await scan(platform)).toEqual([
+      { path: "E:/Somewhere Odd/Fallout 2", type: "fallout2rpu", wine: { debug: "-all" } },
+    ]);
   });
 
   it("tries the second product id, since which one an install registers under varies", async () => {
@@ -263,8 +267,8 @@ describe("looking inside an install, which is where Fallout et tu goes", () => {
       files: { ...install("C:/GOG Games/Fallout 2"), ...fo1in2("C:/GOG Games/Fallout 2/Fallout1in2") },
     });
     expect(await scan(platform)).toEqual([
-      { path: "C:/GOG Games/Fallout 2", type: "fallout2" },
-      { path: "C:/GOG Games/Fallout 2/Fallout1in2", type: "fo1in2" },
+      { path: "C:/GOG Games/Fallout 2", type: "fallout2", wine: { debug: "-all" } },
+      { path: "C:/GOG Games/Fallout 2/Fallout1in2", type: "fo1in2", wine: { debug: "-all" } },
     ]);
   });
 
@@ -275,7 +279,9 @@ describe("looking inside an install, which is where Fallout et tu goes", () => {
       files: { ...install("/home/t/Games/Fallout 2"), ...fo1in2("/home/t/Games/Fallout 2/Fallout1in2") },
     });
     const known = [{ path: "/home/t/Games/Fallout 2", type: "fallout2" as const }];
-    expect(await scan(platform, known)).toEqual([{ path: "/home/t/Games/Fallout 2/Fallout1in2", type: "fo1in2" }]);
+    expect(await scan(platform, known)).toEqual([
+      { path: "/home/t/Games/Fallout 2/Fallout1in2", type: "fo1in2", wine: { debug: "-all" } },
+    ]);
   });
 
   it("matches the folder whatever its casing, and reports the spelling on disk", async () => {

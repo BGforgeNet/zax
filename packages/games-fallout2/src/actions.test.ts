@@ -59,6 +59,13 @@ describe("actions reference real settings", () => {
     const disable = ACTIONS.find((a) => a.id === "debug.disable")!;
     expect(Object.keys(enable.targets).sort()).toEqual(Object.keys(disable.targets).sort());
   });
+
+  it("takes WINEDEBUG the opposite way in each direction", () => {
+    // Turning every sfall log on leaves Wine silenced unless this half runs, and a report gathered that way is
+    // missing the part that explains a crash happening before the game starts.
+    expect(ACTIONS.find((a) => a.id === "debug.enable")?.wine).toEqual({ debug: "" });
+    expect(ACTIONS.find((a) => a.id === "debug.disable")?.wine).toEqual({ debug: "-all" });
+  });
 });
 
 describe("applied detection", () => {
@@ -82,6 +89,28 @@ describe("applied detection", () => {
 
   it("treats an unset value as not applied", () => {
     expect(isApplied(action, () => undefined)).toBe(false);
+  });
+});
+
+describe("the Wine half of an action", () => {
+  const action = ACTIONS.find((a) => a.id === "debug.enable")!;
+  const matching = (id: string) => action.targets[id];
+
+  it("holds the action back while WINEDEBUG still differs", () => {
+    expect(isApplied(action, matching, "-all")).toBe(false);
+    expect(isApplied(action, matching, "")).toBe(true);
+  });
+
+  it("counts as one more change the action will make", () => {
+    const pending = pendingTargets(action, matching, "-all");
+    expect(pending.map((p) => p.id)).toEqual(["WINEDEBUG"]);
+    expect(pending[0]?.from).toBe("-all");
+  });
+
+  it("is left out entirely on a machine with no Wine", () => {
+    // Otherwise every Windows install would show the action as unapplied over a field that is not on screen.
+    expect(isApplied(action, matching, null)).toBe(true);
+    expect(pendingTargets(action, matching, null)).toEqual([]);
   });
 });
 

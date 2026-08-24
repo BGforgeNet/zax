@@ -4,7 +4,7 @@
 
 import { execFile, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream, statSync } from "node:fs";
+import { closeSync, createReadStream, openSync, statSync } from "node:fs";
 import {
   appendFile,
   chmod,
@@ -248,19 +248,34 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
 
     process: {
       launch: async (program, args, options?: LaunchOptions) => {
-        // Detached with its handles closed: the game outlives this process, and a manager that holds the game's
-        // stdout open would keep it alive after the user quits ZAX.
-        const child = spawn(program, [...args], {
-          detached: true,
-          stdio: "ignore",
-          ...(options?.cwd !== undefined ? { cwd: options.cwd } : {}),
-          ...(options?.env ? { env: { ...process.env, ...options.env } } : {}),
-        });
-        await new Promise<void>((resolve, reject) => {
-          child.once("spawn", resolve);
-          child.once("error", reject);
-        });
-        child.unref();
+        // A folder ZAX cannot write to is not a reason to refuse to start the game, so a log that will not open
+        // is dropped rather than raised - the launch is what the user asked for.
+        let log: number | null = null;
+        if (options?.log !== undefined) {
+          try {
+            log = openSync(options.log, "w");
+          } catch {
+            log = null;
+          }
+        }
+        try {
+          // Detached with its handles closed: the game outlives this process, and a manager that holds the
+          // game's stdout open would keep it alive after the user quits ZAX. A log file is the exception - the
+          // child holds its own copy of the descriptor, so closing this one here leaves the child writing.
+          const child = spawn(program, [...args], {
+            detached: true,
+            stdio: log === null ? "ignore" : ["ignore", log, log],
+            ...(options?.cwd !== undefined ? { cwd: options.cwd } : {}),
+            ...(options?.env ? { env: { ...process.env, ...options.env } } : {}),
+          });
+          await new Promise<void>((resolve, reject) => {
+            child.once("spawn", resolve);
+            child.once("error", reject);
+          });
+          child.unref();
+        } finally {
+          if (log !== null) closeSync(log);
+        }
       },
       run: async (program, args, options?: LaunchOptions) => {
         // Attached rather than detached, with its output captured: the caller is waiting for this one, and

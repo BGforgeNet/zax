@@ -70,14 +70,14 @@
           <input
             type="text"
             value={current.wine?.debug ?? ""}
-            placeholder="-all"
+            placeholder="unset"
             aria-label="WINEDEBUG"
             onchange={(e) =>
               void store.setWine(current.path, { prefix: current.wine?.prefix ?? "", debug: e.currentTarget.value })}
           />
         </div>
         <div class="notes">
-          <span class="help">Wine's own logging channels. Left empty they are silenced with <code>-all</code>.</span>
+          <span class="help">Wine's own logging channels, such as <code>-all</code> to silence them.</span>
         </div>
       </div>
     </div>

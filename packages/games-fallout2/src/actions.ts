@@ -1,3 +1,4 @@
+import { DEFAULT_WINE_DEBUG } from "@zax/core";
 import type { Action } from "@zax/core";
 
 /**
@@ -15,8 +16,11 @@ export const ACTIONS: readonly Action[] = [
     group: "report",
     label: "Enable full debugging",
     description:
-      "Turns on every engine and script log and writes them to debug.log. Do this before reproducing a bug you want to report.",
+      "Turns on every engine and script log and writes them to debug.log, and lets Wine report as well. Do this before reproducing a bug you want to report.",
     appliedLabel: "Debugging is on",
+    // Wine says nothing while WINEDEBUG silences it, so a report made with debugging on would be missing the
+    // half that explains a crash before the game ever starts.
+    wine: { debug: "" },
     targets: {
       "sfall.Debugging.DebugMode": "2",
       "sfall.Debugging.Init": "1",
@@ -38,6 +42,7 @@ export const ACTIONS: readonly Action[] = [
     label: "Turn debugging off",
     description: "Restores quiet operation. Logging costs performance, so leave it off for normal play.",
     appliedLabel: "Debugging is off",
+    wine: { debug: DEFAULT_WINE_DEBUG },
     targets: {
       "sfall.Debugging.DebugMode": "0",
       "sfall.Debugging.Init": "0",

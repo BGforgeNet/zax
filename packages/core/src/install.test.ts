@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { addInstall, detectGameType, displayName, removeInstall, setAlias, withWine, type Install } from "./install.js";
+import {
+  addInstall,
+  detectGameType,
+  displayName,
+  newInstall,
+  removeInstall,
+  setAlias,
+  withWine,
+  type Install,
+} from "./install.js";
 
 const at = (path: string): Install => ({ path, type: "fallout2" });
 
@@ -134,5 +143,19 @@ describe("wine settings", () => {
 
     const empty = withWine(cleared, "/games/a", { prefix: "", debug: "" });
     expect(empty[0]?.wine, "an install nobody configured carries no wine key at all").toBeUndefined();
+  });
+
+  it("starts a new install silent, so a launch does not inherit Wine's own chatter", () => {
+    expect(newInstall("/games/a", "fallout2")).toEqual({
+      path: "/games/a",
+      type: "fallout2",
+      wine: { debug: "-all" },
+    });
+  });
+
+  it("lets that default be cleared like any other value", () => {
+    // The field means what it says: empty passes no WINEDEBUG, which is how the debugging action asks for it.
+    const cleared = withWine([newInstall("/games/a", "fallout2")], "/games/a", { debug: "" });
+    expect(cleared[0]?.wine).toBeUndefined();
   });
 });

@@ -92,6 +92,12 @@ export interface LaunchOptions {
   cwd?: string;
   /** Added to the inherited environment rather than replacing it, so a Wine prefix does not cost the user PATH. */
   env?: Readonly<Record<string, string>>;
+  /**
+   * A file to send both output streams to, replacing what is there. Only `launch` honours it: a program ZAX
+   * waits for answers with its output, while one that outlives ZAX would otherwise write to a console the
+   * desktop build does not have.
+   */
+  log?: string;
 }
 
 /** What a program that ran to completion left behind. */

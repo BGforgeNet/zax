@@ -10,14 +10,14 @@ import type { OperatingSystem } from "@zax/platform";
 
 export const EXECUTABLE = "fallout2.exe";
 
+/**
+ * Where Wine's own output is kept. Beside the game's `debug.log` because that is where a user looks for one,
+ * and it is per install for the same reason the config files are.
+ */
+export const WINE_LOG = "wine.log";
+
 /** The sfall release from which Wine needs the DLL loaded as builtin as well as native. */
 const NATIVE_AND_BUILTIN_FROM = "4.1.2";
-
-/**
- * What Wine logs when the install names no channels of its own. Wine's default leaves `err` and `fixme` on, which
- * is a stream of stub notices from a game that runs fine rather than anything diagnostic.
- */
-const DEFAULT_DEBUG = "-all";
 
 export interface LaunchPlan {
   program: string;
@@ -25,6 +25,8 @@ export interface LaunchPlan {
   cwd: string;
   /** Added to the inherited environment. Empty on Windows, where the game is started directly. */
   env: Readonly<Record<string, string>>;
+  /** Where to send what the program prints, for the Wine route, whose output has nowhere else to go. */
+  log?: string;
 }
 
 /**
@@ -62,9 +64,11 @@ export function planLaunch(
     program: "wine",
     args: [EXECUTABLE],
     cwd: install.path,
+    // Always joined with "/": this branch is every machine except Windows.
+    log: `${install.path}/${WINE_LOG}`,
     env: {
       ...(install.wine?.prefix ? { WINEPREFIX: install.wine.prefix } : {}),
-      WINEDEBUG: install.wine?.debug || DEFAULT_DEBUG,
+      ...(install.wine?.debug ? { WINEDEBUG: install.wine.debug } : {}),
       ...overrides,
     },
   };
