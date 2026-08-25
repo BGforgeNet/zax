@@ -28,10 +28,68 @@ interface EntryParts {
 }
 
 const SECTION_RE = /^(\s*)\[([^\]]*)\](\s*)$/;
-// The value stops at an inline comment: a ";" or "#" preceded by whitespace. Requiring the whitespace keeps a
-// separator inside a value (a path, a list) from being mistaken for one.
-const ENTRY_RE = /^(\s*)([^=\s][^=]*?)(\s*=\s*)(.*?)(\s+[;#].*?)?(\s*)$/;
 const COMMENT_RE = /^\s*[;#]/;
+
+// Whitespace as the regular-expression engine defines it, asked one character at a time. This file works in
+// latin1, where 0xa0 is a non-breaking space, so a hand-written set would have to keep pace with that
+// definition for the round-trip to stay byte-exact.
+const SPACE_RE = /\s/;
+const isSpace = (ch: string | undefined) => ch !== undefined && SPACE_RE.test(ch);
+
+/**
+ * Splits an entry line into its value and the pieces that surround it, or `undefined` when it is not an entry.
+ *
+ * Hand-parsed rather than matched by one expression: the natural expression needs a lazy key group in front of
+ * the separator, and a backtracking engine walks a line that holds no "=" and ends in whitespace in quadratic
+ * time - four times the length cost sixteen times the work, 60ms at 16k characters. Config files come from the
+ * user and from mod archives, so their line lengths are not ours to bound.
+ */
+function parseEntry(body: string): { value: string; parts: Omit<EntryParts, "eol"> } | undefined {
+  const eq = body.indexOf("=");
+  if (eq < 0) return undefined;
+
+  let keyStart = 0;
+  while (keyStart < eq && isSpace(body[keyStart])) keyStart++;
+  let keyEnd = eq;
+  while (keyEnd > keyStart && isSpace(body[keyEnd - 1])) keyEnd--;
+  // Nothing but whitespace in front of the "=" names no key, so the line is not an entry.
+  if (keyEnd === keyStart) return undefined;
+
+  // The separator carries the whitespace on both sides of the "=", so writing a value disturbs neither.
+  let valueStart = eq + 1;
+  while (isSpace(body[valueStart])) valueStart++;
+
+  let trailingStart = body.length;
+  while (trailingStart > valueStart && isSpace(body[trailingStart - 1])) trailingStart--;
+
+  // The value stops at an inline comment: the first run of whitespace that a ";" or "#" follows. Requiring the
+  // whitespace keeps a separator inside a value (a path, a list) from being mistaken for one.
+  let commentStart = trailingStart;
+  for (let i = valueStart; i < trailingStart;) {
+    if (!isSpace(body[i])) {
+      i++;
+      continue;
+    }
+    let after = i;
+    while (isSpace(body[after])) after++;
+    if (body[after] === ";" || body[after] === "#") {
+      commentStart = i;
+      break;
+    }
+    i = after;
+  }
+
+  return {
+    value: body.slice(valueStart, commentStart),
+    parts: {
+      indent: body.slice(0, keyStart),
+      key: body.slice(keyStart, keyEnd),
+      separator: body.slice(keyEnd, valueStart),
+      comment: body.slice(commentStart, trailingStart),
+      trailing: body.slice(trailingStart),
+    },
+  };
+}
 
 const fold = (s: string) => s.toLowerCase();
 
@@ -67,17 +125,10 @@ export class IniDocument {
         nodes.push({ kind: "section", name: section, raw });
         continue;
       }
-      const ent = ENTRY_RE.exec(body);
-      if (ent) {
-        const [, indent = "", key = "", separator = "=", value = "", comment = "", trailing = ""] = ent;
-        nodes.push({
-          kind: "entry",
-          section,
-          key,
-          value,
-          raw,
-          parts: { indent, key, separator, comment, trailing, eol },
-        });
+      const parsed = parseEntry(body);
+      if (parsed) {
+        const { value, parts } = parsed;
+        nodes.push({ kind: "entry", section, key: parts.key, value, raw, parts: { ...parts, eol } });
         continue;
       }
       nodes.push({ kind: "unknown", raw });

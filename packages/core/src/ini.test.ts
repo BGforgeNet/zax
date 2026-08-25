@@ -168,3 +168,17 @@ describe("inline comments", () => {
     expect(Buffer.from(doc.toBytes()).equals(Buffer.from(bytes))).toBe(true);
   });
 });
+
+describe("long lines", () => {
+  // A line with no separator that ends in whitespace is the shape that made the old entry expression backtrack
+  // quadratically: 16k characters took 60ms and each doubling cost four times as much, so a config file out of
+  // a mod archive could stall the parser. The bound is far above the linear cost and far below the old one.
+  it("parses a line with no separator in time proportional to its length", () => {
+    const line = `${"a".repeat(400_000)}${" ".repeat(400_000)}\n`;
+    const started = performance.now();
+    const doc = IniDocument.parse(line);
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(doc.toString()).toBe(line);
+    expect(doc.sections()).toEqual([]);
+  });
+});
