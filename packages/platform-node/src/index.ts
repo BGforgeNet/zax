@@ -73,9 +73,15 @@ function architecture(arch: NodeJS.Architecture): Architecture {
   return "other";
 }
 
-/** The desktop's own way of handing a path to whatever handles it - the file manager, the default editor. */
+/**
+ * The desktop's own way of handing a path to whatever handles it - the file manager, the default editor.
+ *
+ * Windows goes to `explorer` rather than through `cmd /c start`: the latter hands the target to two more
+ * parsers, cmd's and start's, each with its own metacharacters, and the target can be a URL that arrived over
+ * the network. `explorer` takes it as one argument and opens it with whatever handles it, same as start did.
+ */
 function openCommand(os: NodeJS.Platform): { program: string; args: readonly string[] } {
-  if (os === "win32") return { program: "cmd", args: ["/c", "start", ""] };
+  if (os === "win32") return { program: "explorer.exe", args: [] };
   if (os === "darwin") return { program: "open", args: [] };
   return { program: "xdg-open", args: [] };
 }

@@ -36,5 +36,21 @@ export async function latestZax(platform: Platform): Promise<ZaxRelease> {
   const windows = platform.os === "windows";
   const match = named.find((asset) => asset.name.toLowerCase().endsWith(".exe") === windows);
   const page = typeof body.html_url === "string" ? body.html_url : LATEST_RELEASE;
-  return { version, url: match?.browser_download_url ?? page };
+  return { version, url: httpsOnly(match?.browser_download_url) ?? httpsOnly(page) ?? LATEST_RELEASE };
+}
+
+/**
+ * The address if it is one this may be opened with, and undefined otherwise.
+ *
+ * Checked here rather than where it is opened: this is where the feed's bytes become a value, and the thing
+ * that receives it is the system's own opener, which will do whatever the scheme says - `file:` reaches the
+ * disk, and the shells that handle the rest are not ours.
+ */
+function httpsOnly(address: string | undefined): string | undefined {
+  if (address === undefined) return undefined;
+  try {
+    return new URL(address).protocol === "https:" ? address : undefined;
+  } catch {
+    return undefined;
+  }
 }
