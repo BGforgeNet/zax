@@ -1,6 +1,6 @@
 <script lang="ts">
   /*
-    What a first run looks like. Without this the settings pane renders all 166 controls against nothing - every
+    What a first run looks like. Without this the settings pane renders all 227 controls against nothing - every
     row reading "not in your config" and every control editable, with no file behind any of them. The previous
     interface hid both top-level tabs entirely until a game was on the list; this says why instead.
   */
