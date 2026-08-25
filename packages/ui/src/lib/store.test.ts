@@ -1,56 +1,27 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ownTarget } from "@zax/core";
-import { ENGINE_CONFIG_FILES, ENGINES, SETTINGS } from "@zax/fallout2";
-import { PREVIEW_INSTALL, backend as hostBackend, previewPlatform } from "./host.js";
-import { store, unwrapArguments } from "./store.svelte.js";
 import {
   BACKEND_METHODS,
+  ENGINES,
+  SETTINGS,
   loadRecord,
   saveRecord,
   type Backend,
   type ModFeedListing,
   type ModInstallState,
 } from "@zax/fallout2";
+import { PREVIEW_INSTALL, backend as hostBackend, previewPlatform } from "./host.js";
+import { MOD_INI, ORDER_FILE, bytes, reseedPreview } from "./preview-fixture.js";
+import { store, unwrapArguments } from "./store.svelte.js";
 import fallout2cfg from "../../../../fixtures/f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/f2up/f2_res.ini?raw";
 import ddrawini from "../../../../fixtures/f2up/ddraw.ini?raw";
 
-/**
- * The store reads its state and the selected install's config files from the platform, and the tests below
- * write to both, so each starts from the seeded state file rather than from whatever the last test left.
- *
- * Without this the gate and conflict tests run against an empty baseline, where every value reads as absent -
- * and they pass, because "absent" is also what a closed gate looks like.
- */
-const bytes = (text: string) => {
-  const out = new Uint8Array(text.length);
-  for (let i = 0; i < text.length; i++) out[i] = text.charCodeAt(i) & 0xff;
-  return out;
-};
-
 const ADDED_INSTALL = "preview/added";
-const ORDER_FILE = `${PREVIEW_INSTALL}/mods/mods_order.txt`;
-const MOD_INI = `${PREVIEW_INSTALL}/mods/fo2tweaks.ini`;
-/** Captured on the first run, before any test has written to it, so the seed is not repeated here to drift. */
-let seededOrder: Uint8Array | null = null;
-let seededModIni: Uint8Array | null = null;
 
-beforeEach(async () => {
-  const seeded = `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`;
-  await previewPlatform.fs.write("preview/config/zax.yml", new TextEncoder().encode(seeded));
-  // The config files too: a test that saves rewrites them, and the next test would inherit that.
-  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(fallout2cfg));
-  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/f2_res.ini`, bytes(f2resini));
-  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddrawini));
-  // And an engine's own config goes, so a test that writes one does not leave the next install looking like
-  // one an engine has already run in. Reseeding fallout2.cfg clears fallout2-ce's mark with it.
-  for (const name of ENGINE_CONFIG_FILES) await previewPlatform.fs.remove(`${PREVIEW_INSTALL}/${name}`);
-  seededOrder ??= await previewPlatform.fs.read(ORDER_FILE);
-  await previewPlatform.fs.write(ORDER_FILE, seededOrder);
-  seededModIni ??= await previewPlatform.fs.read(MOD_INI);
-  await previewPlatform.fs.write(MOD_INI, seededModIni);
-  await store.start();
-});
+// Shared with the component tests rather than kept here: both suites drive the same singleton over the same
+// in-memory disk, and a second copy of the seed is a second thing to keep in step with the fixture.
+beforeEach(reseedPreview);
 
 test("starts on the seeded install with its config files read", () => {
   expect(store.installs.map((one) => one.path)).toEqual([PREVIEW_INSTALL]);

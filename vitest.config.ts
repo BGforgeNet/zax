@@ -15,9 +15,12 @@ export default defineConfig({
       reporter: ["text", "lcovonly"],
       // Named rather than left to default: without it the ratio is taken over whatever the run happened to
       // load, so adding a dependency moves the number without anything about this code changing.
-      include: ["packages/*/src/**/*.ts"],
+      include: ["packages/*/src/**/*.ts", "packages/*/src/**/*.svelte"],
       exclude: [
         "**/*.test.ts",
+        // The component tests' own setup - the preview disk reseeded and a component mounted against it. Test
+        // support rather than shipped code, and counting it would report on the harness, not the interface.
+        "packages/ui/src/lib/preview-fixture.ts",
         // Generated data tables. They are one long literal each, counted as executed the moment they are
         // imported, and eleven hundred such lines swamp the ratio for the code that has branches in it.
         "packages/games-fallout2/src/catalog.ts",
