@@ -18,6 +18,7 @@ const dist = join(here, "dist");
 // `electron` is provided by the runtime. `7z-wasm` loads its own `.wasm` from beside its module, which a
 // bundle would move away from it - so it stays a real import resolved from node_modules. Everything else,
 // workspace sources included, is bundled: the workspace packages are TypeScript that Node cannot load.
+/** @type {import("esbuild").BuildOptions} */
 const common = {
   bundle: true,
   platform: "node",
@@ -69,16 +70,18 @@ await build({
   format: "cjs",
 });
 
-await new Promise((resolve, reject) => {
-  const child = spawn(
-    "pnpm",
-    ["--filter", "@zax/ui", "exec", "vite", "build", "--outDir", join(dist, "renderer"), "--emptyOutDir"],
-    // On Windows pnpm is a `.cmd`, which `spawn` cannot execute without a shell - it looks for an extensionless
-    // file and fails with ENOENT. The arguments here are fixed, so a shell adds no injection surface.
-    { stdio: "inherit", cwd: join(here, "../.."), shell: process.platform === "win32" },
-  );
-  child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`The interface build exited with ${code}`))));
-  child.on("error", reject);
-});
+await /** @type {Promise<void>} */ (
+  new Promise((resolve, reject) => {
+    const child = spawn(
+      "pnpm",
+      ["--filter", "@zax/ui", "exec", "vite", "build", "--outDir", join(dist, "renderer"), "--emptyOutDir"],
+      // On Windows pnpm is a `.cmd`, which `spawn` cannot execute without a shell - it looks for an extensionless
+      // file and fails with ENOENT. The arguments here are fixed, so a shell adds no injection surface.
+      { stdio: "inherit", cwd: join(here, "../.."), shell: process.platform === "win32" },
+    );
+    child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`The interface build exited with ${code}`))));
+    child.on("error", reject);
+  })
+);
 
 console.log(`built into ${dist}`);

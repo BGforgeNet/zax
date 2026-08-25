@@ -87,7 +87,10 @@ child.on("error", (error) => {
   announce();
 });
 
-/** Resolves once `target` checks have reported, and rejects if the watcher dies or the wait runs out. */
+/**
+ * Resolves once `target` checks have reported, and rejects if the watcher dies or the wait runs out.
+ * @returns {Promise<void>}
+ */
 function waitForChecks(target, ms, what) {
   return new Promise((resolve, reject) => {
     const settle = () => {

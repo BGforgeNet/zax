@@ -45,12 +45,14 @@ for (const [mod, file] of Object.entries(MODULES)) {
 
     const call = CALL.exec(line);
     const direct = DIRECT.exec(line);
-    if (tab && (call || direct)) {
-      const [section, key] = call ? [call[2], call[3]] : [direct[2], direct[3]];
+    // Both patterns put the section and the key in the same two groups, so one branch reads either.
+    const matched = call ?? direct;
+    if (tab && matched) {
+      const [section, key] = [matched[2], matched[3]];
       out.push({
         file,
         tab,
-        frame: frames.length ? frames[frames.length - 1].name : null,
+        frame: frames.at(-1)?.name ?? null,
         section,
         key,
         widget: call ? call[1] : "custom",
@@ -65,7 +67,8 @@ for (const [mod, file] of Object.entries(MODULES)) {
     }
 
     depth += (line.match(/[([]/g) ?? []).length - (line.match(/[)\]]/g) ?? []).length;
-    while (frames.length && depth <= frames[frames.length - 1].depth) frames.pop();
+    // `at(-1)` on an empty stack answers undefined, which the fallback turns into a depth nothing reaches.
+    while (depth <= (frames.at(-1)?.depth ?? -Infinity)) frames.pop();
   }
 }
 

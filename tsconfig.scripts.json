@@ -1,0 +1,16 @@
+{
+  // The build, generator and verification scripts. Their own config rather than the root's include list: they
+  // are Node ESM resolved the way Node resolves it, where the packages are bundled, and they are checked as
+  // JavaScript, which the root config would then have to allow everywhere.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowJs": true,
+    "checkJs": true,
+    "noImplicitAny": false,
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*.mjs", "packages/app/build.mjs"]
+}

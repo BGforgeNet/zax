@@ -35,17 +35,24 @@ ZAX_DEV_SERVER=http://localhost:5173 pnpm --filter @zax/app start
 ## Checks
 
 ```bash
-pnpm check           # tsc over the TypeScript packages, then svelte-check over the interface
+pnpm check           # tsc over the TypeScript packages and over the build and generator scripts, then
+                     # svelte-check over the interface
 pnpm lint            # eslint, then prettier --check
 pnpm test            # the whole suite
 pnpm test:coverage   # the same, measured against a floor
 ```
 
+The scripts are checked as JavaScript through `tsconfig.scripts.json`, which turns off `noImplicitAny` and
+leaves the rest of the strict set on: the errors worth having there are wrong arguments and unguarded
+absences, and annotating every parameter of a generator that reads YAML would buy little for the work.
+
 The coverage floor sits below what the suite reaches and only ever rises; it is there to make an untested
 path visible, not to be aimed at. CI runs the measured variant, so the floor gates a change rather than
-slowing every local run. The three process entry points are excluded - each constructs the window, the bridge
-or the root component and holds no decision of its own, the decisions having been extracted into modules that
-are covered.
+slowing every local run. Components are measured alongside the TypeScript: the interface is where the wording
+a user reads is decided, and leaving `.svelte` out of the ratio would have said nothing about it. The three
+process entry points are excluded - each constructs the window, the bridge or the root component and holds no
+decision of its own, the decisions having been extracted into modules that are covered - as are the two
+generated data tables, which are one long literal each, and the component tests' own harness.
 
 CI runs all three on every push, installing with `--ignore-scripts`, then builds the distributables on Linux,
 Windows and macOS.

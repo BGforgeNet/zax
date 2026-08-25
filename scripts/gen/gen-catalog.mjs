@@ -265,6 +265,7 @@ const CONFLICTS = {
   which is not something the file and section can be read off: fallout2-ce writes `f2_res_dat` into the game's
   own [system] and `gapless_music` into its [sound], beside vanilla keys that are nobody's engine.
 */
+/** @type {ReadonlyArray<[string, Record<string, string>]>} */
 const BINDINGS = [
   // sfall's ddraw.ini against fallout2-ce's own [ui] section, and Fallout Fission's [enhancements].
   ["ddraw.ini|Misc|AutoQuickSave", { "fallout2-ce": "fallout2.cfg|ui|auto_quick_save" }],
@@ -558,6 +559,12 @@ const nominated = (d) => `${d.targets[0].file}|${d.targets[0].section}|${d.targe
   is derived from what this catalog holds, so its addresses have to be known before `defFor` reads the link
   table - which is why this is two passes rather than one.
 */
+/**
+ * Every setting to emit. Two shapes: one read out of a format file, carrying the parsed item, and one read
+ * out of an engine's own source, carrying where it came from. Both are shaped by YAML and by the extractors,
+ * so the three fields those produce are annotated loosely rather than described twice.
+ * @type {Array<{file: string, section: string, key: string, item?: any, engine?: string, read?: any, entry?: any}>}
+ */
 const sources = [];
 for (const file of FILES) {
   const doc = YAML.parse(fs.readFileSync(`scripts/gen/formats/${file}.yml`, "utf8"));

@@ -9,7 +9,7 @@
     "build": "pnpm --filter @zax/ui build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "check": "tsc -p tsconfig.json && pnpm --filter @zax/ui exec svelte-check --tsconfig ./tsconfig.json",
+    "check": "tsc -p tsconfig.json && tsc -p tsconfig.scripts.json && pnpm --filter @zax/ui exec svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "check-manifest": "jiti scripts/check-manifest.mjs",

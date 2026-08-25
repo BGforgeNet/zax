@@ -194,6 +194,7 @@ export const ENGINE_TABLES = { "fallout2-ce": COMMUNITY_EDITION, fission: FISSIO
  * every side holds the same values. Same rule as the catalog's own bindings, and named here rather than
  * derived because the two names differ - the derivation only finds a key spelled identically on both sides.
  */
+/** @type {ReadonlyArray<[string, Record<string, string>]>} */
 export const ENGINE_BINDINGS = [
   ["fallout2.cfg|qol|auto_open_doors", { fission: "fission.cfg|enhancements|AutoOpenDoors" }],
   ["fallout2.cfg|sound|gapless_music", { fission: "fission.cfg|enhancements|GaplessMusic" }],

@@ -26,10 +26,9 @@ if (!id || !checkout) {
 const read = (relative) => fs.readFileSync(path.join(checkout, relative), "utf8");
 
 /** The commit the reading came from. A pin is only worth having if it names something exact. */
-function commitOf() {
+const commitOf = () =>
   // Bounded: a checkout that is not a git repository must fail here rather than pin nothing.
-  return execFileSync("git", ["-C", checkout, "rev-parse", "HEAD"], { encoding: "utf8", timeout: 30_000 }).trim();
-}
+  execFileSync("git", ["-C", checkout, "rev-parse", "HEAD"], { encoding: "utf8", timeout: 30_000 }).trim();
 
 /**
  * Field types, per struct, out of the settings header. The struct a section reads into is what says whether a
@@ -67,7 +66,7 @@ function memberStructs(header) {
   const out = new Map();
   const block = /^struct Settings \{$([\s\S]*?)^\};$/m.exec(header);
   if (block === null) throw new Error("the settings header declares no Settings struct");
-  for (const line of block[1].split("\n")) {
+  for (const line of (block[1] ?? "").split("\n")) {
     const member = /^\s+(\w+)\s+(\w+);/.exec(line);
     if (member) out.set(member[2], member[1]);
   }
@@ -129,8 +128,8 @@ function readCommunityEdition() {
     // The engine clamps on load, so these are the values it will actually keep. Two of them are stated as
     // enum members rather than numbers; those are carried across as written, for the generator to resolve
     // against the enum, rather than dropped into a setting that looks unbounded.
-    const bounds = processed ? /^clamp\((.+),\s*(.+)\)$/.exec(processed[2]) : null;
-    const numeric = bounds !== null && /^-?[\d.]+$/.test(bounds[1]) && /^-?[\d.]+$/.test(bounds[2]);
+    const bounds = processed ? /^clamp\((.+),\s*(.+)\)$/.exec(processed[2] ?? "") : null;
+    const numeric = bounds !== null && /^-?[\d.]+$/.test(bounds[1] ?? "") && /^-?[\d.]+$/.test(bounds[2] ?? "");
     out.push({
       section,
       key,
@@ -199,7 +198,7 @@ function readFission() {
     if (section === undefined || key === undefined) throw new Error(`${call[1]}/${call[2]}: no such constant`);
     const type = types.get(members.get(call[3]) ?? "")?.get(call[4]);
     if (type === undefined) throw new Error(`${section}.${key}: no field "${call[4]}" in the settings header`);
-    out.push({ section, key, kind: call[4].endsWith("_path") ? "path" : kindOf(type) });
+    out.push({ section, key, kind: (call[4] ?? "").endsWith("_path") ? "path" : kindOf(type) });
   }
   return out;
 }
