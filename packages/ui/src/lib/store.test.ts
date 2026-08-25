@@ -1377,6 +1377,78 @@ describe("a row drawn under an engine's tab", () => {
     expect(store.targetFor(def)).toMatchObject({ file: "ddraw.ini", key: "ExpandBarter" });
   });
 
+  test("names every other address the value reaches, on the components this install has", async () => {
+    // Fission is installed and has run, fallout2-ce is not installed at all. So the mark names Fission's
+    // address and says nothing about CE's - a link to software that is not here would appear on nearly every
+    // vanilla row and distinguish nothing, which is the whole point of showing a mark.
+    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([
+      {
+        id: "fission",
+        name: "Fallout Fission",
+        short: "Fission",
+        page: "",
+        releases: "tagged",
+        build: null,
+        installed: {
+          id: "fission",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: [],
+        },
+        cached: false,
+      },
+    ] as never);
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
+    await store.start();
+
+    expect(store.linkedTo(def, "ddraw.ini")).toEqual([
+      { at: expect.objectContaining({ file: "fission.cfg", key: "EnhancedBarter" }), live: true },
+    ]);
+    // Read from the other side, the row's own address is the one left out.
+    expect(store.linkedTo(def, "fission").map((one) => one.at.file)).toEqual(["ddraw.ini"]);
+    // A setting only one component has is not linked to anything, so its row carries no chain at all.
+    expect(
+      store.linkedTo(
+        SETTINGS.find((one) => one.id === "sfall.Misc.SingleCore")!,
+        "ddraw.ini",
+      ),
+    ).toEqual([]);
+  });
+
+  test("names an installed engine's address before that engine has written its settings, and marks it", async () => {
+    // The link is real and about to matter, so it is named - but flagged, because a save does not reach it
+    // yet and "also writes X" of a file ZAX is deliberately leaving alone is a lie in the other direction.
+    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([
+      {
+        id: "fission",
+        name: "Fallout Fission",
+        short: "Fission",
+        page: "",
+        releases: "tagged",
+        build: null,
+        installed: {
+          id: "fission",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: [],
+        },
+        cached: false,
+      },
+    ] as never);
+    await store.start();
+    expect(store.linkedTo(def, "ddraw.ini")).toEqual([
+      { at: expect.objectContaining({ file: "fission.cfg" }), live: false },
+    ]);
+  });
+
+  test("marks nothing on an install carrying no alternative engine", async () => {
+    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([] as never);
+    await store.start();
+    expect(store.linkedTo(def, "ddraw.ini")).toEqual([]);
+  });
+
   test("carries the gate of that address alone", async () => {
     // Fission refuses every enhancement while its strict-vanilla switch is on. That says nothing about the
     // same setting's sfall half, which is the case a gate on the setting rather than the target would get

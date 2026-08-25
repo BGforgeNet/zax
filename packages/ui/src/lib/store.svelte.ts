@@ -718,6 +718,26 @@ class Store {
    * component, and only the one the tab belongs to is the address that tab is about. Falls back to the
    * setting's own where the group holds no target for it, which is what a search result gets.
    */
+  /**
+   * What else a row's value is written to: every address of the setting but the one this row shows, each
+   * with whether an edit reaches it now.
+   *
+   * Only addresses of components this install actually has. An engine nobody installed still has a target in
+   * the catalog, and marking every vanilla row as shared with software that is not here would say nothing
+   * about this install - the mark is worth having precisely because it distinguishes. An engine that IS
+   * installed but has not written its settings is named and flagged instead of dropped: that link is real
+   * and about to matter, and saying "also writes X" of a file ZAX is deliberately leaving alone would be a
+   * lie in the other direction.
+   */
+  linkedTo(def: SettingDef, group?: string): ReadonlyArray<{ at: SettingTarget; live: boolean }> {
+    if (def.targets.length < 2) return [];
+    const here = this.targetFor(def, group);
+    const live = liveTargets(def, this.contents);
+    const present = (at: SettingTarget) =>
+      at.engine === undefined || this.engines.some((one) => one.id === at.engine && one.installed !== null);
+    return def.targets.filter((t) => t !== here && present(t)).map((at) => ({ at, live: live.includes(at) }));
+  }
+
   targetFor(def: SettingDef, group?: string): SettingTarget {
     if (group === undefined) return ownTarget(def);
     return def.targets.find((t) => (t.engine ?? t.file) === group) ?? ownTarget(def);

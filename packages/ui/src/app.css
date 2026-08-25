@@ -266,12 +266,28 @@ button {
 }
 
 .list .row .label {
-  /* Set by an enclosing group; ungrouped rows inherit nothing and sit flush. */
-  padding-left: var(--row-indent, 0);
+  /*
+    Set by an enclosing group; ungrouped rows inherit nothing and sit flush. The extra 18px is the marker's
+    gutter, reserved on every row so the labels all start at one x whether or not the row carries one.
+  */
+  padding-left: calc(var(--row-indent, 0px) + 18px);
+  position: relative;
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+/*
+  Out of the flex flow rather than a first item in it: this row wraps its items, and a wrapping container
+  wraps before it shrinks, so a marker sharing the line pushed any label too long to sit beside it onto a
+  flex line of its own and stranded the marker above it.
+*/
+.list .row .label .mark {
+  position: absolute;
+  left: var(--row-indent, 0px);
+  top: 3px;
+  line-height: 0;
 }
 
 /* Not emphasised: the group titles above carry the hierarchy, and bolding every row flattened it again. */

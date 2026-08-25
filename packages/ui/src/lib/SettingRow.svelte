@@ -78,6 +78,15 @@
   const managed = $derived(def.managed);
   const inert = $derived(gate !== null && !gate.active);
   const origin = $derived(`${address.file} [${address.section}] ${address.key}`);
+  // What the same value is written to elsewhere. Named in full - file, section and key - because that is what
+  // makes the claim checkable against the file itself, which is the point of showing it at all.
+  const linked = $derived(store.linkedTo(def, group));
+  const linkNote = $derived.by(() => {
+    if (linked.length === 0) return "";
+    const say = (one: { at: { file: string; section: string; key: string }; live: boolean }) =>
+      `${one.at.file} [${one.at.section}] ${one.at.key}${one.live ? "" : " (not until that engine has run)"}`;
+    return `The same value is written to ${linked.map(say).join(", ")}`;
+  });
 
   // The component this setting belongs to is not installed, or an engine installed here has not yet written
   // its settings. Editing would write a config file for it, which is not a thing to do on the user's behalf,
@@ -88,6 +97,26 @@
 <div class="row" class:modified class:inert class:nested>
   <div class="label">
     <!-- The tab already names the file, so only the hover still spells out which key this writes. -->
+    <!--
+      A chain rather than a word: the row's own labels are the setting's, and a second one competing with them
+      would read as part of the name. The tooltip is its accessible name too, since nothing else on the row
+      says the value goes anywhere but here.
+
+      Leading, in a slot every row reserves, rather than after the label: the label column is nearly full at
+      its longest, so a trailing marker lands alone on a second line under exactly the rows whose names are
+      hardest to read. Leading it cannot orphan, the reserved width keeps every label starting at one x, and
+      the shared rows become scannable down the column instead of something to hunt for.
+    -->
+    <span class="mark" aria-hidden={linkNote ? undefined : "true"}>
+      {#if linkNote}
+        <span class="linked" role="img" aria-label={linkNote} title={linkNote}>
+          <svg viewBox="0 0 12 12" focusable="false">
+            <path d="M5 7a2 2 0 0 0 3 0l2-2a2 2 0 0 0-3-3l-.6.6" />
+            <path d="M7 5a2 2 0 0 0-3 0L2 7a2 2 0 0 0 3 3l.6-.6" />
+          </svg>
+        </span>
+      {/if}
+    </span>
     <span class="name" title={origin}>{def.label}</span>
     {#if where && onGo}
       <button class="badge go" title="Go to {where}" onclick={onGo}>{where}</button>
@@ -144,6 +173,19 @@
 </div>
 
 <style>
+  /* Faint: it qualifies the label rather than competing with it, and every linked row carries one. */
+  .linked svg {
+    width: 11px;
+    height: 11px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--text-faint);
+    vertical-align: -1px;
+  }
+
   /* Carries no appearance of its own: it is here to disable, not to draw a box. */
   .controls {
     border: 0;
