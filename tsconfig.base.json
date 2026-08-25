@@ -3,7 +3,10 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM"],
+    // The libraries both runtimes actually have, rather than the oldest that compiles: the main process is the
+    // Node 24 Electron 43 embeds and the renderer is its Chromium, and each carries every ES2024 method. Left at
+    // ES2022 the checker rejects `toSorted` and `Object.groupBy` on code that would run.
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,

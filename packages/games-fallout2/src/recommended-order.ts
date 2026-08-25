@@ -120,7 +120,7 @@ export function rankOf(name: string, order: readonly string[]): number | null {
 export function recommendedOrder(mods: readonly Mod[], order: readonly string[]): readonly Mod[] {
   const ranked = mods.map((mod, at) => ({ mod, at, rank: rankOf(mod.name, order) }));
   const known = ranked.filter((item): item is { mod: Mod; at: number; rank: number } => item.rank !== null);
-  const sorted = [...known].sort((a, b) => a.rank - b.rank);
+  const sorted = known.toSorted((a, b) => a.rank - b.rank);
   const out = [...mods];
   known.forEach((item, i) => (out[item.at] = sorted[i]!.mod));
   return out;

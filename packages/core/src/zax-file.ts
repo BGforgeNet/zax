@@ -74,8 +74,8 @@ export function parseZaxFile(text: string): ZaxFile {
  * configured does not accumulate two empty keys every time anything else is saved.
  */
 export function formatZaxFile(state: ZaxFile): string {
-  const games = [...state.installs]
-    .sort((a, b) => a.path.localeCompare(b.path))
+  const games = state.installs
+    .toSorted((a, b) => a.path.localeCompare(b.path))
     .map((install) => ({
       path: install.path,
       ...(install.alias ? { alias: install.alias } : {}),
