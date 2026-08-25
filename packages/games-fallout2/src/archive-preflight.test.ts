@@ -3,13 +3,16 @@ import type { ArchiveEntryInfo } from "@zax/platform";
 import { describe, expect, it } from "vitest";
 import { preflightArchive } from "./archive-preflight.js";
 
-const listing = (...entries: readonly ArchiveEntryInfo[]) =>
+const listing = (entries: readonly ArchiveEntryInfo[]) =>
   new MemoryPlatform({ os: "linux", arch: "x64", config: "cfg", cache: "cache", listings: { payload: entries } });
 
 const file = (name: string, size = 1): ArchiveEntryInfo => ({ name, size, kind: "file" });
 
-const judge = (...entries: readonly ArchiveEntryInfo[]) =>
-  preflightArchive(listing(...entries), "payload", "a mod release");
+/** Takes the list rather than spreading it: the ceiling cases run to tens of thousands, past the call stack. */
+const judgeAll = (entries: readonly ArchiveEntryInfo[]) =>
+  preflightArchive(listing(entries), "payload", "a mod release");
+
+const judge = (...entries: readonly ArchiveEntryInfo[]) => judgeAll(entries);
 
 describe("preflightArchive", () => {
   it("returns the directory it read, so the caller plans from the same listing", async () => {
@@ -64,9 +67,16 @@ describe("preflightArchive", () => {
     await expect(judge(entry)).resolves.toEqual([entry]);
   });
 
+  it("allows an archive the size of the largest release published", async () => {
+    // Fallout et tu ships Fallout 1's asset tree unpacked: 10,985 entries at v1.16.3771, and it was refused
+    // outright while the ceiling sat at 10,000 - which its v1.10 release had already passed.
+    const entries = Array.from({ length: 10_985 }, (_, i) => file(`Fallout1in2/data/${i}.frm`));
+    await expect(judgeAll(entries)).resolves.toHaveLength(10_985);
+  });
+
   it("refuses more entries than any release declares", async () => {
-    const entries = Array.from({ length: 10_001 }, (_, i) => file(`mods/${i}.dat`));
-    await expect(judge(...entries)).rejects.toThrow("a mod release declares 10001 entries - refused.");
+    const entries = Array.from({ length: 65_537 }, (_, i) => file(`mods/${i}.dat`));
+    await expect(judgeAll(entries)).rejects.toThrow("a mod release declares 65537 entries - refused.");
   });
 
   it("refuses a declaration that would fill the disk", async () => {

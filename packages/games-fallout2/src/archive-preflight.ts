@@ -10,8 +10,12 @@
 
 import type { ArchiveEntryInfo, Platform } from "@zax/platform";
 
-/** Ceilings, calibrated against the real corpus with headroom - RPU's gigabyte is the outlier. */
-const MAX_ENTRIES = 10_000;
+/**
+ * Ceilings, measured against the published corpus. Everything ZAX installs declares under 100 entries and a
+ * gigabyte except Fallout et tu, which ships Fallout 1's asset tree unpacked rather than in a `.dat`: 10,985
+ * entries at v1.16.3771, up from 9,591 at v1.8, which is why this ceiling sits so far above the rest.
+ */
+const MAX_ENTRIES = 65_536;
 const MAX_PATH_DEPTH = 16;
 const MAX_TOTAL_BYTES = 8 * 1024 ** 3;
 
