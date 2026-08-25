@@ -1371,6 +1371,37 @@ describe("engines", () => {
     expect(listing).toHaveBeenCalledWith(expect.objectContaining({ path: "/games/other" }));
     expect(store.engines).toEqual([]);
   });
+
+  test("holds a cached engine in the listing while the install switched to is being read", async () => {
+    // Run is drawn unconditionally and each Run in X from this listing, so emptying it for the length of the
+    // reads took the engine's button away and put it back on every switch, over a fact that had not moved.
+    const ce = ENGINES.find((one) => one.id === "fallout2-ce")!;
+    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([
+      {
+        id: ce.id,
+        name: ce.name,
+        short: ce.short,
+        page: ce.page,
+        releases: ce.releases,
+        build: { asset: "a.zip", program: "a.exe" },
+        installed: null,
+        cached: true,
+      },
+    ] as never);
+    store.installs = [...store.installs, { path: "/games/other", type: "fallout2" }];
+    await store.selectInstall("/games/other");
+
+    const during: string[][] = [];
+    const read = hostBackend.loadConfigFiles;
+    vi.spyOn(hostBackend, "loadConfigFiles").mockImplementation((path) => {
+      during.push(store.engines.map((one) => one.id));
+      return read(path);
+    });
+    await store.selectInstall(PREVIEW_INSTALL);
+
+    // Read partway through the switch rather than after it: the two ends were never the problem.
+    expect(during).toEqual([["fallout2-ce"]]);
+  });
 });
 
 describe("a setting both engines changed", () => {

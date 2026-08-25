@@ -407,7 +407,10 @@ class Store {
   sfallLatest = $state<SfallRelease | null>(null);
   /** Every engine ZAX knows, against the selected install. Read with the install: it costs no network. */
   engines = $state<readonly EngineListing[]>([]);
-  /** What each engine has published, by id. Asked for at startup, and by the Check button after that. */
+  /**
+   * What each engine has published, by id: asked for at startup, and by the Check button after that. One
+   * release is published whichever folder is selected, so switching install leaves it alone.
+   */
   engineLatest = $state<Record<string, EngineRelease>>({});
   /** The hi-res patch's version, or null when the install does not have it. There is no latest to compare. */
   hiresInstalled = $state<string | null>(null);
@@ -547,10 +550,10 @@ class Store {
     // Before the reads below, which are awaited and so can render between them: another game's disagreements
     // would mark rows of this one, and "nothing is split" is the reading that mismarks nothing.
     this.split = {};
-    // The listing goes because it carries what is deployed here. A check does not: what the project has
-    // published is the same answer whichever game folder is selected, and throwing it away asked the network
-    // again for a result already on screen - the same rule `sfallLatest` follows one field up.
-    this.engines = [];
+    // Only what is deployed here goes. The rest of the listing is the catalog's and the machine's and holds
+    // whichever folder is selected, and emptying it took every Run in X button off the bar until the reads
+    // below finished - a cached engine's button flickering on each switch, over a fact that had not moved.
+    this.engines = this.engines.map((one) => ({ ...one, installed: null }));
     // Another install's standing would be wrong here. What the feeds published is left alone: one release is
     // published for every game, which is why the two are read apart in the first place.
     if (switched) {
