@@ -126,6 +126,17 @@ describe("what an offer's status says", () => {
     expect(status({ kind: "install-over" })).toContain("installed by hand");
   });
 
+  /* A nightly stamps the commit it was built from, and is usually built from after the last release. Read as
+     "a version it does not state", the row said the install was unidentifiable and offered the older release
+     as an ordinary install-over - which reads as an upgrade and is not one. */
+  test("a nightly build names the commit, and warns the offer may be behind it", () => {
+    const text = status({ kind: "nightly", commit: "fc706658" });
+    expect(text).toContain("nightly build");
+    expect(text).toContain("fc706658");
+    expect(text).toContain("may be older than what is here");
+    expect(text, "the wording that sent the user looking for a fault").not.toContain("does not state");
+  });
+
   test("an install that never finished says so", () => {
     expect(status({ kind: "retry", version: "14.8" })).toContain("never finished");
   });

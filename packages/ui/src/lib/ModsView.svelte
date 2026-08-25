@@ -48,6 +48,11 @@
         return offer.becomes
           ? `This installation is already ${gameName(offer.becomes)}, at a version it does not state. Installing lays this release over it.`
           : "In the mods folder without a record - installed by hand, or before ZAX kept one.";
+      case "nightly":
+        // Not "a version it does not state": it states one, and it is a commit. Saying which, and that the
+        // offer may be behind it, is the difference between a message that reads as a fault and one the user
+        // can act on - a nightly is usually built from after the last release.
+        return `Installed: a nightly build, from commit ${state.commit}. It names no release, so ${offer.version} may be older than what is here.`;
       case "installed":
         return "Installed and current.";
       case "upgrade":

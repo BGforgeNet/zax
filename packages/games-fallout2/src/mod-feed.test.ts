@@ -731,14 +731,14 @@ installer:
   });
 
   it("reads the version it stamped, and offers the release against it", () => {
-    expect(availability(found(NEWER), context({ baseVersion: { version: "2.4.33" } }))).toEqual({
+    expect(availability(found(NEWER), context({ baseVersion: { kind: "release", version: "2.4.33" } }))).toEqual({
       kind: "upgrade",
       from: "2.4.33",
     });
-    expect(availability(found(NEWER), context({ baseVersion: { version: "2.4.34" } }))).toEqual({
+    expect(availability(found(NEWER), context({ baseVersion: { kind: "release", version: "2.4.34" } }))).toEqual({
       kind: "installed",
     });
-    expect(availability(found(NEWER), context({ baseVersion: { version: "2.4.35" } }))).toEqual({
+    expect(availability(found(NEWER), context({ baseVersion: { kind: "release", version: "2.4.35" } }))).toEqual({
       kind: "downgrade",
       from: "2.4.35",
     });
@@ -746,7 +746,7 @@ installer:
 
   it("refuses the other line the way it refuses any other base mod - one to an installation", () => {
     // A 2.3 install meeting the 2.4 row: 2.4 is a different mod, and this installation already carries one.
-    const state = availability(found(NEWER), context({ baseVersion: { version: "2.3.34" } }));
+    const state = availability(found(NEWER), context({ baseVersion: { kind: "release", version: "2.3.34" } }));
     expect(state).toMatchObject({ kind: "blocked" });
     expect((state as { why: string }).why).toMatch(/installs on Fallout 2 /);
   });
@@ -762,7 +762,7 @@ installer:
       installer: { route: "other", asset: { name: "rpu.zip", url: "https://example.test/rpu.zip" } },
       line: OLDER,
     };
-    expect(availability(release, context({ baseVersion: { version: "2.3.3u30" } }))).toEqual({
+    expect(availability(release, context({ baseVersion: { kind: "release", version: "2.3.3u30" } }))).toEqual({
       kind: "upgrade",
       from: "2.3.3u30",
     });
@@ -806,9 +806,39 @@ installer:
       record: { path: install.path, mods: [] },
       sfall: null,
       present: false,
-      baseVersion: { version: "34" },
+      baseVersion: { kind: "release", version: "34" },
     });
     expect(state).toEqual({ kind: "upgrade", from: "34" });
+  });
+
+  it("reports a nightly as one rather than as an install stating no version", () => {
+    // A build from between releases: it stamps the commit, and 34 may well be behind it. Read as "no version"
+    // the row offered 34 as an ordinary install-over, which is a silent downgrade of a newer build.
+    const manifestText = `spec: 1
+id: fo2tweaks
+name: Unofficial Patch, updated
+version: "35"
+game: fallout2
+type: base
+becomes: fallout2upu
+installer:
+  other: { asset: upu.zip, run: upu-install.sh }
+`;
+    const at: Install = { path: "/games/fallout2", type: "fallout2upu" };
+    const nightlyRelease: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(manifestText)),
+      manifestText,
+      manifestFromAsset: true,
+      installer: { route: "other", asset: { name: "upu.zip", url: "https://example.test/upu.zip" } },
+    };
+    const state = availability(nightlyRelease, {
+      install: at,
+      record: { path: at.path, mods: [] },
+      sfall: null,
+      present: false,
+      baseVersion: { kind: "nightly", commit: "fc706658" },
+    });
+    expect(state).toEqual({ kind: "nightly", commit: "fc706658" });
   });
 });
 
@@ -891,14 +921,14 @@ extract-dat:
   });
 
   it("answers from the created install's own stamp, which is what a hand-installed one has", () => {
-    expect(availability(release, where({ baseVersion: { version: "1.16.3771" } }))).toEqual({
+    expect(availability(release, where({ baseVersion: { kind: "release", version: "1.16.3771" } }))).toEqual({
       kind: "installed",
     });
-    expect(availability(release, where({ baseVersion: { version: "1.15.3735" } }))).toEqual({
+    expect(availability(release, where({ baseVersion: { kind: "release", version: "1.15.3735" } }))).toEqual({
       kind: "upgrade",
       from: "1.15.3735",
     });
-    expect(availability(release, where({ baseVersion: { version: "1.17.3800" } }))).toEqual({
+    expect(availability(release, where({ baseVersion: { kind: "release", version: "1.17.3800" } }))).toEqual({
       kind: "downgrade",
       from: "1.17.3800",
     });

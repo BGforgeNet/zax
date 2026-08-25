@@ -517,6 +517,8 @@ export type Availability =
   | { kind: "install" }
   /** Present without a record - hand-installed - so the offer is the latest release laid over it. */
   | { kind: "install-over" }
+  /** A build from between releases, named by the commit it was built from - see `base-version.ts`. */
+  | { kind: "nightly"; commit: string }
   | { kind: "installed" }
   | { kind: "upgrade"; from: string }
   /**
@@ -554,7 +556,7 @@ export interface ModContext {
  * pre-split history belongs to - an installation stating no version at all, which no later line ever wrote.
  */
 const offeredOnLine = (line: ModLine, held: BaseVersion | null | undefined): boolean =>
-  held ? heldByLine(line, held.version) : line.counter === true;
+  held?.kind === "release" ? heldByLine(line, held.version) : line.counter === true;
 
 export function availability(release: ModRelease, context: ModContext): Availability {
   const { manifest } = release;
@@ -587,7 +589,7 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   // A mod that creates an install answers from the created directory's own stamp, and it answers here -
   // before the offers below - so an install already at this version reads as installed even on a host where
   // a later step could not run.
-  if (manifest.creates && context.baseVersion) {
+  if (manifest.creates && context.baseVersion?.kind === "release") {
     const newness = compareVersions(manifest.version, context.baseVersion.version);
     // Straight version comparison, with no line to cross: lines are a property of RPU's release lines, and a
     // mod that creates an install publishes one sequence.
@@ -630,6 +632,7 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   // A created install's own version, where one is there and this release is newer than it. The earlier arm
   // answered the other two directions; this is the upgrade an install ZAX never performed can still take.
   if (manifest.creates) {
+    if (context.baseVersion?.kind === "nightly") return { kind: "nightly", commit: context.baseVersion.commit };
     if (context.baseVersion) return { kind: "upgrade", from: context.baseVersion.version };
     // A directory that is there and says nothing about itself: the release goes over it, which is what
     // unpacking a payload over an existing folder does anyway.
@@ -644,6 +647,10 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   if (manifest.type === "base") {
     if (context.install.type !== manifest.becomes) return blockedByType(manifest, context) ?? { kind: "install" };
     const held = context.baseVersion;
+    // A nightly stamps the commit it was built from where a release stamps its number, so nothing here can
+    // order it against what the feed offers - and a build from after the last release is the common case.
+    // Reported as what it is rather than as an install with no version, which is what it was read as.
+    if (held?.kind === "nightly") return { kind: "nightly", commit: held.commit };
     // What the install stamped into `ddraw.ini` stands in for the record it has not got. Where the mod is
     // published in parallel lines that stamp also says WHICH of them is here, and only one base mod fits an
     // installation: another line's version is that other mod already installed, refused in the same sentence
