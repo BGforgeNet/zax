@@ -121,6 +121,29 @@
 
         <!-- The shell hands a web link to the browser rather than following it, so this needs no operation. -->
         <span class="powered">
+          <!--
+            Where to report a bug and where to ask about one, then who made it. The mark is the only name the
+            GitHub link has, so it carries the label a tooltip would otherwise merely repeat; the forum has no
+            mark of its own and is a word.
+          -->
+          <a
+            class="mark"
+            href="https://github.com/BGforgeNet/zax"
+            target="_blank"
+            rel="noreferrer"
+            title="Source on GitHub"
+            aria-label="Source on GitHub"
+          >
+            <!-- The GitHub mark, from Primer's octicons (MIT). -->
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"
+              ><path
+                d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"
+              /></svg
+            >
+          </a>
+          <span class="sep" aria-hidden="true">|</span>
+          <a href="https://forums.bgforge.net/viewtopic.php?t=365" target="_blank" rel="noreferrer">Forum</a>
+          <span class="sep" aria-hidden="true">|</span>
           Powered by <a href="https://bgforge.net/" target="_blank" rel="noreferrer">BGforge</a>
           <img class="logo" src={bgforgeLogo} alt="" width="18" height="18" />
         </span>
@@ -265,6 +288,32 @@
 
   .powered a:hover {
     color: var(--accent);
+  }
+
+  /* Decoration, and hidden from the reading order: a rule between links is not a word anyone needs read out. */
+  .powered .sep {
+    color: var(--border-strong);
+  }
+
+  /* The mark stands for the link, so it takes the underline off and the row's own ink instead. */
+  .powered a.mark {
+    display: flex;
+    text-decoration: none;
+  }
+
+  /*
+    One rule for both marks so they cannot drift apart: the BGforge logo is an image sized by its width and
+    height attributes, which stay for the layout they reserve while it loads, and the GitHub mark is inline
+    SVG with no intrinsic size at all.
+  */
+  .powered .logo,
+  .powered a.mark svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .powered a.mark svg {
+    fill: currentColor;
   }
 
   .working {
