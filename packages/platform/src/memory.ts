@@ -91,8 +91,10 @@ export interface MemoryOptions {
   /** Registry values, by key and then by value name. Both are matched case-insensitively, as Windows does. */
   registry?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /**
-   * What `process.run` answers, by program. A program with no entry rejects, as a host answers one that is
-   * not installed - so a test reaches the installer path only by saying what the installer does.
+   * What `process.run` answers, by program, or by program and subcommand where a tool answers its own
+   * subcommands differently - `"/cache/dat3 l"` before `"/cache/dat3"`. A program with no entry rejects, as a
+   * host answers one that is not installed - so a test reaches the installer path only by saying what the
+   * installer does.
    */
   runs?: Readonly<Record<string, RunOutcome>>;
   /**
@@ -224,7 +226,7 @@ export class MemoryPlatform implements Platform {
       },
       run: async (program, args, launchOptions) => {
         this.ran.push({ program, args, ...(launchOptions ? { options: launchOptions } : {}) });
-        const canned = options.runs?.[program];
+        const canned = options.runs?.[`${program} ${args[0] ?? ""}`.trim()] ?? options.runs?.[program];
         if (canned === undefined) throw new Error(`No such program: ${program}`);
         return canned;
       },
@@ -235,7 +237,7 @@ export class MemoryPlatform implements Platform {
       // took is the host's business, and a test that stated what the tool says should not have to know.
       runWasm: async (module, args) => {
         this.ran.push({ program: module, args, wasm: true });
-        const canned = options.runs?.[module];
+        const canned = options.runs?.[`${module} ${args[0] ?? ""}`.trim()] ?? options.runs?.[module];
         if (canned === undefined) throw new Error(`No such program: ${module}`);
         return canned;
       },

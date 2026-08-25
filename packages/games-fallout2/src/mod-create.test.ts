@@ -164,8 +164,14 @@ describe("performing an install that creates another", () => {
     const args = platform.ran.map((one) => one.args);
     expect(args[0]?.slice(0, 2)).toEqual(["l", `${FO1}/MASTER.DAT`]);
     const extraction = args.find((one) => one[0] === "x");
-    expect(extraction?.slice(0, 4)).toEqual(["x", `${FO1}/MASTER.DAT`, "-o", `${GAME}/Fallout1in2/data`]);
-    expect(extraction?.[4]).toContain("undat_files.txt");
+    expect(extraction?.slice(0, 5)).toEqual([
+      "x",
+      `${FO1}/MASTER.DAT`,
+      "--ignore-missing",
+      "-o",
+      `${GAME}/Fallout1in2/data`,
+    ]);
+    expect(extraction?.[5]).toContain("undat_files.txt");
   });
 
   it("records the install against the host, complete, without changing what the host is", async () => {
@@ -176,17 +182,38 @@ describe("performing an install that creates another", () => {
     ]);
   });
 
-  it("refuses before the payload lands when the archive does not hold what the list names", async () => {
+  /** What the tool prints when the archive is missing the named paths. */
+  const notFound = (...names: string[]) =>
+    `Files not found:\n${names.map((name) => `  ${name}`).join("\n")}\nError: Some requested files were not found`;
+
+  it("refuses before the payload lands when the archive holds hardly any of what the list names", async () => {
     // The gate runs against the copy taken out of the payload, so a wrong Fallout 1 folder costs nothing:
     // the unpack has not happened yet.
     const platform = createPlatform();
     const found = await release();
     const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
     const missing = createPlatform({
-      runs: { [TOOL_PATH]: { code: 1, output: "Files not found:\n  ART/SCENERY/CSTALAG2.FRM" } },
+      runs: { [TOOL_PATH]: { code: 1, output: notFound(...Array.from({ length: 200 }, (_, i) => `ART/A${i}.FRM`)) } },
     });
-    await expect(applyCreateInstall(missing, install, found, plan, TOOL)).rejects.toThrow(/CSTALAG2\.FRM/);
+    await expect(applyCreateInstall(missing, install, found, plan, TOOL)).rejects.toThrow(/holds hardly any/);
     expect(await missing.fs.stat(`${GAME}/Fallout1in2/Fallout2.exe`)).toBeNull();
+  });
+
+  it("installs an archive an edition apart, reporting the paths it went without", async () => {
+    // Fallout et tu v1.16.3771 asks for two files whose 8.3 collision suffix differs between Fallout 1
+    // editions. Upstream's own extractor skips a name it cannot find, so refusing over them blocked an
+    // install that works; the count reported has to lose them too, or it names files that never landed.
+    const platform = createPlatform();
+    const found = await release();
+    const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
+    const apart = createPlatform({
+      // Only the listing reports the gap; the extraction is given --ignore-missing and takes the rest.
+      runs: { [`${TOOL_PATH} l`]: { code: 1, output: notFound("SOUND/SPEECH/LIEUT/LI3ACF~5.TXT") } },
+    });
+    const outcome = await applyCreateInstall(apart, install, found, plan, TOOL);
+    expect(outcome.skipped).toEqual(["SOUND/SPEECH/LIEUT/LI3ACF~5.TXT"]);
+    expect(outcome.extracted).toBe(1);
+    expect(await apart.fs.stat(`${GAME}/Fallout1in2/Fallout2.exe`)).not.toBeNull();
   });
 
   it("leaves the record incomplete when the extraction fails, so a relaunch says so", async () => {

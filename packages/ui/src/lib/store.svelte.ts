@@ -1284,7 +1284,16 @@ class Store {
             ? ` ${outcome.conflicts.length} setting(s) you had changed were kept over the release's new defaults.`
             : "";
         const beside = "created" in outcome ? ` ${outcome.created} is now on the list of installations.` : "";
-        return { kind: "done", text: `${held.offer.name} ${outcome.version} installed.${conflicts}${beside}` };
+        // Named rather than counted: which files an edition of the archive turned out not to hold is what
+        // decides whether the gap matters, and a bare number sends the user looking for a list nothing keeps.
+        const skipped =
+          "skipped" in outcome && outcome.skipped.length > 0
+            ? ` Your archive does not hold ${outcome.skipped.join(", ")}, so ${outcome.skipped.length === 1 ? "it was" : "they were"} skipped.`
+            : "";
+        return {
+          kind: "done",
+          text: `${held.offer.name} ${outcome.version} installed.${conflicts}${beside}${skipped}`,
+        };
       },
       { id: held.offer.id, action: "install" },
     );

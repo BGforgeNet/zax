@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryPlatform } from "@zax/platform/memory";
 import {
   DAT_TOOL_VERSION,
-  assertDatHolds,
+  missingFromDat,
   datReadError,
   datToolFor,
   ensureDatTool,
@@ -108,23 +108,46 @@ describe("running the archive tool", () => {
     expect(bad).toContain("DAT size mismatch");
   });
 
-  it("refuses when the archive does not hold everything the list names", async () => {
-    // The gate that matters: it runs before the payload lands, where extraction's own version of this answer
-    // comes after the game folder has already been written to.
-    const platform = ran({ code: 1, output: "Files not found:\n  ART/SCENERY/NOTHERE.FRM\nError: not found" });
-    await expect(assertDatHolds(platform, TOOL, DAT, LIST)).rejects.toThrow(/NOTHERE\.FRM/);
+  /** What the tool prints when the archive is missing some of what the list named. */
+  const notFound = (...names: string[]) =>
+    `       Size      Packed  Comp  Name\n\nFiles not found:\n${names
+      .map((name) => `  ${name}`)
+      .join("\n")}\nError: Some requested files were not found`;
+
+  it("takes an archive an edition apart, naming what it turned out not to hold", async () => {
+    // Fallout et tu v1.16.3771 asks for two files whose 8.3 collision suffix differs between Fallout 1
+    // editions. Refusing over them blocked an install upstream's own extractor completes.
+    const platform = ran({
+      code: 1,
+      output: notFound("SOUND/SPEECH/LIEUT/LI3ACD~5.TXT", "SOUND/SPEECH/LIEUT/LI3ACF~5.TXT"),
+    });
+    await expect(missingFromDat(platform, TOOL, DAT, LIST)).resolves.toEqual([
+      "SOUND/SPEECH/LIEUT/LI3ACD~5.TXT",
+      "SOUND/SPEECH/LIEUT/LI3ACF~5.TXT",
+    ]);
     expect(platform.ran[0]?.args).toEqual(["l", DAT, `@${LIST}`]);
+  });
+
+  it("refuses the archive that holds hardly any of it, which is a user who pointed at the wrong one", async () => {
+    const platform = ran({ code: 1, output: notFound(...Array.from({ length: 101 }, (_, i) => `ART/A${i}.FRM`)) });
+    await expect(missingFromDat(platform, TOOL, DAT, LIST)).rejects.toThrow(/holds hardly any/);
+  });
+
+  it("refuses an output it cannot read rather than passing an archive nothing checked", async () => {
+    // The tool is pinned, so a shape with no block to read is a tool ZAX no longer understands.
+    const platform = ran({ code: 1, output: "Error: something else entirely" });
+    await expect(missingFromDat(platform, TOOL, DAT, LIST)).rejects.toThrow(/holds hardly any/);
   });
 
   it("takes an archive that holds every path the list names", async () => {
     const platform = ran({ code: 0, output: "8602 files" });
-    await expect(assertDatHolds(platform, TOOL, DAT, LIST)).resolves.toBeUndefined();
+    await expect(missingFromDat(platform, TOOL, DAT, LIST)).resolves.toEqual([]);
   });
 
   it("extracts the listed paths into the directory it is given", async () => {
     const platform = ran({ code: 0, output: "Extracting 8602 files..." });
     await extractFromDat(platform, TOOL, DAT, LIST, INTO);
-    expect(platform.ran[0]?.args).toEqual(["x", DAT, "-o", INTO, `@${LIST}`]);
+    expect(platform.ran[0]?.args).toEqual(["x", DAT, "--ignore-missing", "-o", INTO, `@${LIST}`]);
   });
 
   it("reports a failed extraction with what the tool said", async () => {
@@ -137,6 +160,6 @@ describe("running the archive tool", () => {
     const platform = ran({ code: 0, output: "Extracting 8602 files..." }, module);
     await extractFromDat(platform, module, DAT, LIST, INTO);
     expect(platform.ran[0]).toMatchObject({ program: module.path, wasm: true });
-    expect(platform.ran[0]?.args).toEqual(["x", DAT, "-o", INTO, `@${LIST}`]);
+    expect(platform.ran[0]?.args).toEqual(["x", DAT, "--ignore-missing", "-o", INTO, `@${LIST}`]);
   });
 });

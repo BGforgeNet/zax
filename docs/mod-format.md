@@ -224,8 +224,12 @@ carries an entry outside it is refused.
 Each entry of `inputs` is a folder ZAX asks the user for, checked by the file it `holds`. `extract-dat` unpacks
 one input's archive into the created install: `from` names the input, `list` is the response file the payload
 ships - one path per line, as the archive spells them - and `into` is where they land. Both paths are read
-inside the created directory. The extraction is all-or-nothing: every path the list names must be in the
-archive, so a folder that is not the game the mod asked for is refused rather than half-unpacked.
+inside the created directory.
+
+A list is written against one edition of the archive and run against whichever the user owns, so a path the
+user's copy does not hold is skipped and named in the result rather than failing the extraction. An archive
+holding hardly any of what the list names is a folder that is not the game the mod asked for, and is refused
+before anything is downloaded or written.
 
 ### Refusal rules
 

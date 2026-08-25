@@ -14,7 +14,7 @@ import type { ReleaseAsset } from "./mod-feed.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 
 /** The pinned release. Raising it is a ZAX change: new digests, and the invocation re-checked against them. */
-export const DAT_TOOL_VERSION = "0.9.1";
+export const DAT_TOOL_VERSION = "0.10.1";
 
 const RELEASE = `https://github.com/BGforgeNet/dat3/releases/download/v${DAT_TOOL_VERSION}`;
 
@@ -45,22 +45,22 @@ const BUILDS: Readonly<Partial<Record<`${OperatingSystem}-${Architecture}`, Rele
   "linux-x64": {
     name: "dat3",
     url: `${RELEASE}/dat3`,
-    digest: "sha256:808527196fedd111fdc1f685ee80aa39419b2083b50a762c05efc547263ecec5",
+    digest: "sha256:1d4654d8f4ebf4dd2baa14a1d17a13c055ba7c2999395209f62ad6d507ac890f",
   },
   "linux-arm64": {
     name: "dat3-arm64",
     url: `${RELEASE}/dat3-arm64`,
-    digest: "sha256:7a65ee101f0c7906447c880e90c770d909475fd7371742e8c81b2bc66082610f",
+    digest: "sha256:51df57b672e58393908a22020f3fb25e042178359eedfd31d6ef1f2e51e40fba",
   },
   "windows-x64": {
     name: "dat3.exe",
     url: `${RELEASE}/dat3.exe`,
-    digest: "sha256:c9070e59a78cf2c0e32563b0ff9c0582bfa26062d4bf2cbe90d87875511e4ea9",
+    digest: "sha256:0bbcfbb5e2b99ff24822b138e71e6af683bb4d11862a2e2feed0b084c3d1444c",
   },
   "windows-arm64": {
     name: "dat3.exe",
     url: `${RELEASE}/dat3.exe`,
-    digest: "sha256:c9070e59a78cf2c0e32563b0ff9c0582bfa26062d4bf2cbe90d87875511e4ea9",
+    digest: "sha256:0bbcfbb5e2b99ff24822b138e71e6af683bb4d11862a2e2feed0b084c3d1444c",
   },
 };
 
@@ -72,7 +72,7 @@ const BUILDS: Readonly<Partial<Record<`${OperatingSystem}-${Architecture}`, Rele
 const PORTABLE_BUILD: ReleaseAsset = {
   name: "dat3.wasm",
   url: `${RELEASE}/dat3.wasm`,
-  digest: "sha256:acf013e39ea9efa4a72004ad9c214fe460c14aa10fb04c6476b1a8ed55af18f7",
+  digest: "sha256:9d618a402c5150ff31644c9cd608fc4f2bdcd6d552d3bcbb54eda3a143aedd0e",
 };
 
 /** How this machine runs the tool. Always an answer: the module covers every pair with no native build. */
@@ -117,22 +117,61 @@ export async function datReadError(platform: Platform, tool: ReadyDatTool, dat: 
 }
 
 /**
- * That the archive holds every path the list names, which is what decides whether it is the archive the mod
- * asked for.
- *
- * Extraction answers the same question from v0.9.0 on, but it answers it too late: it runs after the payload
- * has been unpacked into the game folder and the record written, where this runs before either. A user who
- * pointed at the wrong `master.dat` is told so with nothing yet touched.
+ * How many of the list's paths an archive may be missing and still be the archive the mod asked for. The two
+ * cases are orders of magnitude apart, so the line between them is wide rather than tuned: Fallout et tu
+ * v1.16.3771 names two files whose 8.3 collision suffix differs between Fallout 1 editions - upstream deleted
+ * both a fortnight later - while a user who points at Fallout 2's `master.dat` misses nearly all 8,602.
  */
-export async function assertDatHolds(platform: Platform, tool: ReadyDatTool, dat: string, list: string): Promise<void> {
+const EDITION_DRIFT = 100;
+
+/** The paths the list named that the archive does not hold. Extraction skips these. */
+const notFound = (output: string): readonly string[] => {
+  const lines = output.split("\n");
+  const head = lines.findIndex((line) => line.trim() === "Files not found:");
+  if (head === -1) return [];
+  const missing: string[] = [];
+  for (const line of lines.slice(head + 1)) {
+    // The tool indents each name and closes the block with an unindented `Error:` line.
+    if (!/^\s+\S/.test(line)) break;
+    missing.push(line.trim());
+  }
+  return missing;
+};
+
+/**
+ * The paths the list names that this archive does not hold, refusing the archive that holds hardly any of them.
+ *
+ * Runs before the payload is downloaded, which is the whole point: extraction answers the same question, but
+ * only once an 800 MB unpack has landed in the game folder. Nothing is written when this refuses.
+ *
+ * A few missing paths are not a wrong archive - upstream's own extractor skips a name it cannot find and
+ * reports success - so they are returned for the caller to report rather than thrown over. An output with no
+ * block to read is treated as everything missing: the tool is pinned, so a shape this cannot parse is a tool
+ * ZAX no longer understands, and passing an unread archive is the failure worth avoiding.
+ */
+export async function missingFromDat(
+  platform: Platform,
+  tool: ReadyDatTool,
+  dat: string,
+  list: string,
+): Promise<readonly string[]> {
   const outcome = await runTool(platform, tool, ["l", dat, `@${list}`]);
-  if (outcome.code !== 0)
+  if (outcome.code === 0) return [];
+  const missing = notFound(outcome.output);
+  if (missing.length === 0 || missing.length > EDITION_DRIFT)
     throw new Error(
-      `${dat} is not the archive this mod needs - it does not hold everything the mod asked for. The tool said: ${said(outcome.output)}`,
+      `${dat} is not the archive this mod needs - it holds hardly any of what the mod asked for. The tool said: ${said(outcome.output)}`,
     );
+  return missing;
 }
 
-/** Extracts the listed paths, structure preserved, into a directory. */
+/**
+ * Extracts the listed paths, structure preserved, into a directory.
+ *
+ * `--ignore-missing` because a list is written against one edition of the archive and run against another:
+ * without it a name the user's copy spells differently fails the whole extraction, and nothing lands at all.
+ * `missingFromDat` is what decides whether the misses amount to the wrong archive, before this runs.
+ */
 export async function extractFromDat(
   platform: Platform,
   tool: ReadyDatTool,
@@ -140,7 +179,7 @@ export async function extractFromDat(
   list: string,
   into: string,
 ): Promise<void> {
-  const outcome = await runTool(platform, tool, ["x", dat, "-o", into, `@${list}`]);
+  const outcome = await runTool(platform, tool, ["x", dat, "--ignore-missing", "-o", into, `@${list}`]);
   if (outcome.code !== 0)
     throw new Error(`Unpacking ${dat} stopped with code ${outcome.code ?? "no exit code"}: ${said(outcome.output)}`);
 }

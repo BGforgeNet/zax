@@ -16,7 +16,7 @@ import { backupDirectory, fnv1a, stamp, type GameType, type Install, type MergeC
 import type { ArchiveEntryInfo, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
 import { preflightArchive } from "./archive-preflight.js";
-import { assertDatHolds, datReadError, extractFromDat, type ReadyDatTool } from "./dat-tool.js";
+import { datReadError, extractFromDat, missingFromDat, type ReadyDatTool } from "./dat-tool.js";
 import type { ModCreates, ModInput, ModManifest } from "./manifest.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import type { ModRelease, ReleaseAsset } from "./mod-feed.js";
@@ -56,6 +56,8 @@ export interface CreateInstallOutcome {
   created: string;
   /** How many paths were lifted out of the user's archive. */
   extracted: number;
+  /** Paths the list named that the user's archive does not hold, which the extraction went without. */
+  skipped: readonly string[];
   /** Settings both the user and the release changed; the user's won. Empty on a first install. */
   conflicts: readonly MergeConflict[];
 }
@@ -298,12 +300,14 @@ export async function applyCreateInstall(
     options,
   );
 
-  // Before anything lands: the archive the user pointed at has to hold every path the mod asks for. The
-  // extraction itself cannot answer this - it skips what it cannot find and reports success.
+  // Before anything lands: whether the archive the user pointed at is the one the mod asks for. The
+  // extraction cannot answer that - it is told to skip what it cannot find, which is what lets a copy an
+  // edition apart install at all - so an archive holding hardly any of the list is refused here instead.
   const list = await fetchList(platform, work, archivePath, manifest, creates);
+  let skipped: readonly string[] = [];
   if (source !== null && list !== null) {
     options?.onStep?.(`Checking ${platform.paths.basename(source)}`);
-    await assertDatHolds(platform, tool, source, list.path);
+    skipped = await missingFromDat(platform, tool, source, list.path);
   }
 
   const pending: InstalledMod = {
@@ -335,7 +339,9 @@ export async function applyCreateInstall(
   if (source !== null && list !== null && manifest.extractDat) {
     options?.onStep?.(`Unpacking Fallout 1's files`);
     await extractFromDat(platform, tool, source, list.path, insidePath(platform, created, manifest.extractDat.into));
-    extracted = list.entries;
+    // What the list named less what this archive turned out not to hold: the count is reported to the user,
+    // and one taken from the list alone would say files landed that never existed here.
+    extracted = list.entries - skipped.length;
   }
 
   const { shipped, conflicts } = await mergeUserFiles(
@@ -351,7 +357,7 @@ export async function applyCreateInstall(
     withMod(await loadRecord(platform, install.path), { ...pending, complete: true, shipped }),
   );
   await platform.fs.remove(work);
-  return { version: manifest.version, created, extracted, conflicts };
+  return { version: manifest.version, created, extracted, skipped, conflicts };
 }
 
 function withMod(record: InstallRecord, mod: InstalledMod): InstallRecord {
