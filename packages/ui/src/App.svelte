@@ -39,24 +39,6 @@
 <svelte:window onkeydown={onWindowKey} />
 
 <div class="shell">
-  <!--
-    Outcomes of anything that reached the machine - a save, a refusal, a failed version check - land here
-    rather than beside the button that started them: several of those buttons live in the sidebar, and a
-    message that scrolls away with its panel is a message the user never reads. Above both columns, since
-    either can produce one.
-  -->
-  {#if store.notice}
-    <div
-      class="notice"
-      class:problem={store.notice.kind === "problem"}
-      class:note={store.notice.kind === "note"}
-      role="status"
-    >
-      <span>{store.notice.text}</span>
-      <button class="dismiss" onclick={() => (store.notice = null)}>Dismiss</button>
-    </div>
-  {/if}
-
   <div class="body">
     <Sidebar />
 
@@ -171,6 +153,25 @@
       {/if}
     </div>
   </div>
+
+  <!--
+    Outcomes of anything that reached the machine - a save, a refusal, a failed version check - land here
+    rather than beside the button that started them: several of those buttons live in the sidebar, and a
+    message that scrolls away with its panel is a message the user never reads. Below both columns, since
+    either can produce one, and below rather than above so that one arriving takes its space off the bottom
+    edge instead of pushing every row the user was reading down the window.
+  -->
+  {#if store.notice}
+    <div
+      class="notice"
+      class:problem={store.notice.kind === "problem"}
+      class:note={store.notice.kind === "note"}
+      role="status"
+    >
+      <span>{store.notice.text}</span>
+      <button class="dismiss" onclick={() => (store.notice = null)}>Dismiss</button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -237,7 +238,7 @@
     flex: 0 0 auto;
     padding: 7px var(--gutter);
     background: var(--accent-soft);
-    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
     font-size: 12.5px;
     color: var(--text);
   }
@@ -250,7 +251,7 @@
   /* Something ZAX did unasked: set apart from a completed action without reading as a fault. */
   .notice.note {
     background: color-mix(in srgb, var(--accent) 10%, transparent);
-    border-bottom-color: var(--accent);
+    border-top-color: var(--accent);
   }
 
   .notice span {

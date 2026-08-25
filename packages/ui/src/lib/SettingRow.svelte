@@ -36,7 +36,7 @@
   const modified = $derived(store.isModified(def.id));
   // Where the value came from, when it was not typed here. A row that is marked changed with nothing on
   // screen saying why reads as ZAX having edited the install on its own.
-  const carriedFrom = $derived(store.propagated[def.id]);
+  const carriedFrom = $derived(store.reconciled[def.id]?.from);
   const value = $derived(store.valueOf(def.id));
   const validation = $derived(validate(def, value));
   const sentinel = $derived(sentinelLabel(def, value));
@@ -168,7 +168,7 @@
 
   <!-- At the row's end rather than beside the label: the row's colour already says it changed, this undoes it. -->
   {#if modified}
-    <button class="revert" onclick={() => store.revert(def.id)}>revert</button>
+    <button class="revert" onclick={() => void store.revert(def.id)}>revert</button>
   {/if}
 </div>
 

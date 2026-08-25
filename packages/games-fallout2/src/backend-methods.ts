@@ -20,6 +20,7 @@ export const BACKEND_METHODS = [
   "loadConfigFiles",
   "saveConfigFiles",
   "settingsBase",
+  "acceptSettingsBase",
   "loadMods",
   "saveMods",
   "publishedMods",

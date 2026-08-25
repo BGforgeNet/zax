@@ -28,7 +28,11 @@ describe("settling a linked setting", () => {
     // The user turned it on inside the engine's own preferences screen; the base is what says so.
     const base = { [SFALL]: "0", [CE]: "0", [FISSION]: "0" };
     expect(reconcileSettings(linked, install("0", "1", "0"), base)).toEqual([
-      { id: BARTER, settle: { target: expect.objectContaining({ file: "fallout2.cfg" }), value: "1" } },
+      {
+        id: BARTER,
+        at: expect.arrayContaining([expect.objectContaining({ value: "1" })]),
+        settle: { target: expect.objectContaining({ file: "fallout2.cfg" }), value: "1" },
+      },
     ]);
   });
 
@@ -44,6 +48,45 @@ describe("settling a linked setting", () => {
     const [found] = reconcileSettings(linked, install("0", "1", "1"), base);
     expect(found?.choose).toBeUndefined();
     expect(found?.settle?.value).toBe("1");
+  });
+
+  it("asks nothing about a disagreement every address has a base for, which is one already accepted", () => {
+    // Reverting the carry moved each base to what its address then held. Nothing has moved since, so there
+    // is nothing to do - and doing it anyway is what made the banner come back on every switch of game.
+    const base = { [SFALL]: "0", [CE]: "1", [FISSION]: "0" };
+    const [found] = reconcileSettings(linked, install("0", "1", "0"), base);
+    expect(found?.settle, "nothing to carry").toBeUndefined();
+    expect(found?.choose, "and nothing to ask").toBeUndefined();
+  });
+
+  it("reports that accepted disagreement all the same, since the addresses still differ", () => {
+    // The interface reads this to know an edit to the setting has somewhere to go: the value it shows comes
+    // from one address, and the others still hold something else.
+    const base = { [SFALL]: "0", [CE]: "1", [FISSION]: "0" };
+    expect(reconcileSettings(linked, install("0", "1", "0"), base).map((one) => one.id)).toEqual([BARTER]);
+  });
+
+  it("carries across a later change inside an engine, measured from the accepted base", () => {
+    const base = { [SFALL]: "0", [CE]: "1", [FISSION]: "0" };
+    const [found] = reconcileSettings(linked, install("0", "2", "0"), base);
+    expect(found?.settle).toEqual({ target: expect.objectContaining({ file: "fallout2.cfg" }), value: "2" });
+  });
+
+  it("still prefers the setting's own address where one address has no base at all", () => {
+    // An engine installed after the disagreement was accepted writes its own defaults and has no base. The
+    // rest do, so this is not an accepted disagreement - it is a new engine to carry the known value to.
+    const base = { [SFALL]: "1", [CE]: "1" };
+    const [found] = reconcileSettings(linked, install("1", "1", "0"), base);
+    expect(found?.settle).toEqual({ target: expect.objectContaining({ file: "ddraw.ini" }), value: "1" });
+  });
+
+  it("reports every address weighed, which is what accepting the disagreement records", () => {
+    const [found] = reconcileSettings(linked, install("1", "0", "0"), {});
+    expect(found?.at.map((one) => [one.target.file, one.value])).toEqual([
+      ["ddraw.ini", "1"],
+      ["fallout2.cfg", "0"],
+      ["fission.cfg", "0"],
+    ]);
   });
 
   it("takes the setting's own address the first time, with no base to go on", () => {

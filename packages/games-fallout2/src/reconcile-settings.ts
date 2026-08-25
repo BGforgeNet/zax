@@ -6,6 +6,10 @@
  * base: the value ZAX itself last wrote there, kept in the install's record. Without one the only available
  * rule is to prefer the setting's own address, which is right the first time and wrong afterwards, since it
  * would revert whatever the user had just changed inside the engine.
+ *
+ * A base is also what accepting a disagreement records. Reverting a carry is the user saying these engines
+ * may differ, and nothing on disk changes when they do - so without somewhere to put that answer the next
+ * load reads the same files against the same bases and asks again, forever.
  */
 
 import { IniDocument, type ConfigFileContents, type SettingDef, type SettingTarget } from "@zax/core";
@@ -15,22 +19,33 @@ import { liveTargets } from "./engine-config.js";
 export const addressOf = (at: { file: string; section: string; key: string }): string =>
   `${at.file}|${at.section}|${at.key}`;
 
-/** One address that has moved, and what it now says. */
-export interface MovedTarget {
+/** One address taking part, and what it now says. */
+export interface HeldTarget {
   target: SettingTarget;
   value: string;
 }
 
-/** What one linked setting needs doing about it. Exactly one of the two fields is set. */
+/**
+ * One linked setting whose addresses do not agree, and what needs doing about it. At most one of `settle`
+ * and `choose` is set: neither, where the disagreement has already been accepted and there is nothing left
+ * to do - it is still reported, because a caller has to know these addresses differ whether or not it is
+ * being asked to act on them.
+ */
 export interface Divergence {
   id: string;
+  /**
+   * Every address taking part, as it now reads. What accepting the disagreement records as the new base:
+   * the caller holds no other view of which addresses were weighed, and re-deriving them from the files a
+   * second time is a second answer to the same question.
+   */
+  at: readonly HeldTarget[];
   /**
    * The value that survives and where it came from. It is by definition a value ZAX did not write, so the
    * interface says where it came from rather than propagating it silently.
    */
-  settle?: MovedTarget;
+  settle?: HeldTarget;
   /** Two addresses moved since ZAX wrote, so which value survives is the user's to choose, not ZAX's. */
-  choose?: readonly MovedTarget[];
+  choose?: readonly HeldTarget[];
 }
 
 /**
@@ -59,7 +74,7 @@ export function reconcileSettings(
     if (def.targets.length < 2) continue;
     const stated = liveTargets(def, contents)
       .map((target) => ({ target, value: held(target) }))
-      .filter((one): one is MovedTarget => one.value !== undefined);
+      .filter((one): one is HeldTarget => one.value !== undefined);
     if (stated.length < 2) continue;
     if (new Set(stated.map((one) => one.value)).size === 1) continue;
 
@@ -69,17 +84,25 @@ export function reconcileSettings(
       const base = written[addressOf(one.target)];
       return base !== undefined && one.value !== base;
     });
-    const agreed = new Set(moved.map((one) => one.value));
     if (moved.length === 0) {
-      // No base anywhere, so nothing here says which side is the newer intention. The setting's own address
-      // wins: `ddraw.ini` and `f2_res.ini` hold only what a person put there, while an engine writes a value
-      // for every key it knows the first time it runs.
-      out.push({ id: def.id, settle: stated[0]! });
-    } else if (agreed.size === 1) {
-      out.push({ id: def.id, settle: moved[0]! });
-    } else {
-      out.push({ id: def.id, choose: moved });
+      // Every address holding a base holds exactly what ZAX left there. Where that is all of them, the
+      // disagreement is one ZAX has already been told about and had accepted - reverting the carry is what
+      // records it - so asking again is the loop that acceptance exists to end. Reported all the same: the
+      // addresses still differ, and an edit to this setting still has to reach the ones that lag.
+      if (stated.every((one) => written[addressOf(one.target)] !== undefined)) {
+        out.push({ id: def.id, at: stated });
+        continue;
+      }
+      // Otherwise nothing here says which side is the newer intention. The setting's own address wins:
+      // `ddraw.ini` and `f2_res.ini` hold only what a person put there, while an engine writes a value for
+      // every key it knows the first time it runs.
+      out.push({ id: def.id, at: stated, settle: stated[0]! });
+      continue;
     }
+    const agreed = new Set(moved.map((one) => one.value));
+    out.push(
+      agreed.size === 1 ? { id: def.id, at: stated, settle: moved[0]! } : { id: def.id, at: stated, choose: moved },
+    );
   }
   return out;
 }

@@ -25,15 +25,12 @@ beforeEach(async () => {
 afterEach(unmountAll);
 
 const pose = (values: [string, string]) => {
-  store.settingsChoices = [
-    {
-      id: linked.id,
-      choose: [
-        { target: first, value: values[0] },
-        { target: second, value: values[1] },
-      ],
-    },
-  ] as never;
+  // Both addresses took part and both moved, which is exactly the shape reconciliation hands over here.
+  const moved = [
+    { target: first, value: values[0] },
+    { target: second, value: values[1] },
+  ];
+  store.settingsChoices = [{ id: linked.id, at: moved, choose: moved }];
   return render(LinkedChoices as never, {} as never);
 };
 

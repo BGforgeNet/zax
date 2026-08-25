@@ -1,7 +1,7 @@
 export { SETTINGS } from "./catalog.js";
 export { CONFIG_FILES, ENGINE_CONFIG_FILES } from "./files.js";
 export { hasMintedSettings, liveTargets } from "./engine-config.js";
-export { addressOf, reconcileSettings, type Divergence, type MovedTarget } from "./reconcile-settings.js";
+export { addressOf, reconcileSettings, type Divergence, type HeldTarget } from "./reconcile-settings.js";
 export { ACTIONS, COMMON_RESOLUTIONS } from "./actions.js";
 export { DEBUG_PACKAGE_CONTENTS } from "./trouble.js";
 export { LAYOUT, type LayoutFile, type LayoutNode, type LayoutTab } from "./layout.js";

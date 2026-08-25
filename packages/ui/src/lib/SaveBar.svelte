@@ -39,14 +39,12 @@
       Run in {engine.short}
     </button>
   {/each}
-  {#if store.modifiedCount > 0}
-    <button class="link" onclick={() => store.revertAll()}>Revert all</button>
-  {/if}
-
   <!-- Status rather than an action, so it sits away from the buttons at the far end of their own bar. -->
   <div class="spacer"></div>
   {#if store.modifiedCount > 0}
     <span class="chip">{store.modifiedCount} unsaved</span>
+    <!-- After the count rather than among the buttons: the count is what says there is anything to undo. -->
+    <button class="link" onclick={() => void store.revertAll()}>Revert all</button>
   {:else}
     <span class="chip muted">No changes</span>
   {/if}
@@ -83,7 +81,9 @@
     opacity: 0.55;
   }
 
-  .link {
+  /* Scoped like `.primary` above it, and for the same reason: `.footer button` is the more specific of the
+     two otherwise, and this one would draw as the bordered button it is meant not to be. */
+  .footer .link {
     background: none;
     border: none;
     padding: 0;

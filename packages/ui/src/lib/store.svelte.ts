@@ -50,6 +50,7 @@ import {
   type Divergence,
   type EngineListing,
   type EngineRelease,
+  type HeldTarget,
   type LayoutFile,
   type MachineDescription,
   type Mod,
@@ -218,6 +219,18 @@ export interface Notice {
   text: string;
 }
 
+/** A disagreement this load put in front of the user, and everything undoing the answer needs to know. */
+export interface Reconciled {
+  /**
+   * The file the value was carried from - what the row says, so a change ZAX made unasked names its source.
+   * Absent where the user picked between two that had both moved: they know where their own answer came
+   * from, and a row is not told what it already did.
+   */
+  from?: string;
+  /** Every address the setting was weighed at, as it then read. The base a revert of the answer accepts. */
+  at: readonly HeldTarget[];
+}
+
 /**
  * Edits are held as a sparse override map rather than applied to the parsed documents. That keeps
  * "what did I change" and revert trivial, and it is the shape a saved profile will store.
@@ -340,11 +353,21 @@ class Store {
   private modOperation = $state<{ id: string; action: ModAction } | null>(null);
   notice = $state<Notice | null>(null);
   /**
-   * Settings this load carried across from an engine's own file, and which file each came from. The row says
+   * Settings whose engines this load found disagreeing and which now have an answer - one ZAX carried across
+   * from an engine's own file, or one the user picked. A carry names the file it came from and the row says
    * so: a link cannot be broken, so a difference someone meant to keep is lost by being reconciled, and the
    * only defence is that it is never lost quietly.
+   *
+   * Both kinds sit here because both are answers a revert has to accept rather than merely undo. Rebuilt by
+   * every read, so an entry only ever describes the install now selected.
    */
-  propagated = $state<Record<string, string>>({});
+  reconciled = $state<Record<string, Reconciled>>({});
+  /**
+   * The banner the carry raised, while it is still the one showing. Held by identity rather than by a flag:
+   * reverting the carry has to take its banner down with it, and must not take down a save's report that
+   * landed on top of it in the meantime.
+   */
+  private carryNotice: Notice | null = null;
   /** Linked settings whose engines have each moved since ZAX wrote, so which value survives is the user's. */
   settingsChoices = $state<Divergence[]>([]);
 
@@ -352,10 +375,17 @@ class Store {
    * Answers one of those choices: the value picked becomes a pending edit like any other, so it reaches every
    * address of the setting on the next save and can be reverted before it does. The choice leaves the list
    * once answered, which is what closes the prompt - there is nothing further to decide about that setting.
+   *
+   * The answer joins the carries as something a revert accepts, and by the same reasoning: reverting it says
+   * the engines may differ after all, and without recording that the question is asked again on the next
+   * read. Only once answered - an untouched choice is nothing the user has decided, so a revert leaves it
+   * standing rather than dismissing a question on their behalf.
    */
   chooseLinked(id: string, value: string): void {
+    const answered = this.settingsChoices.find((one) => one.id === id);
     this.set(id, value);
     this.settingsChoices = this.settingsChoices.filter((one) => one.id !== id);
+    if (answered) this.reconciled = { ...this.reconciled, [id]: { at: answered.at } };
   }
 
   /** Whether this row's own control is the one running - a button's cue to change its label. */
@@ -404,6 +434,16 @@ class Store {
    */
   private baseline: Record<string, string | undefined> = $state({});
   private rawBaseline: Record<string, string | undefined> = $state({});
+  /**
+   * Linked settings whose addresses do not all hold the same value, as of the last read.
+   *
+   * `baseline` holds the setting's own address alone, which is the value every control shows - and while the
+   * addresses agree that is a sound stand-in for all of them. While they do not, it is not: an edit matching
+   * the own address still changes the ones that hold something else, so an edit here is a real edit however
+   * it compares to what is on screen. Read off the reconciliation that already worked it out, rather than
+   * asked of the files a second time.
+   */
+  private split: Record<string, true> = $state({});
   discovered = $state<SettingDef[]>([]);
 
   private index(): void {
@@ -503,6 +543,9 @@ class Store {
     this.readFor = install?.path ?? "";
     this.sfallInstalled = null;
     this.hiresInstalled = null;
+    // Before the reads below, which are awaited and so can render between them: another game's disagreements
+    // would mark rows of this one, and "nothing is split" is the reading that mismarks nothing.
+    this.split = {};
     // The listing goes because it carries what is deployed here. A check does not: what the project has
     // published is the same answer whichever game folder is selected, and throwing it away asked the network
     // again for a result already on screen - the same rule `sfallLatest` follows one field up.
@@ -525,6 +568,11 @@ class Store {
       this.modById = new Map();
       this.index();
       this.overrides = {};
+      // With nothing selected there is nothing to reconcile, and a question left standing would be asked
+      // about a game no longer on screen.
+      this.reconciled = {};
+      this.settingsChoices = [];
+      this.split = {};
       this.setMods({ text: undefined, present: [], owners: [] });
       return;
     }
@@ -561,22 +609,60 @@ class Store {
    */
   private async settleLinked(installPath: string): Promise<void> {
     const found = reconcileSettings(SETTINGS, this.contents, await backend.settingsBase(installPath));
-    const carried: Record<string, string> = {};
+    const carried: Record<string, Reconciled> = {};
     const next = { ...this.overrides };
     for (const one of found) {
       if (!one.settle) continue;
       next[one.id] = one.settle.value;
-      carried[one.id] = one.settle.target.file;
+      carried[one.id] = { from: one.settle.target.file, at: one.at };
     }
     this.overrides = next;
-    this.propagated = carried;
+    this.reconciled = carried;
     this.settingsChoices = found.filter((one) => one.choose !== undefined);
+    // Every disagreement, including the ones already accepted - what makes an edit to them count as one.
+    this.split = Object.fromEntries(found.map((one) => [one.id, true as const]));
     const count = Object.keys(carried).length;
+    this.carryNotice = null;
     if (count > 0) {
-      this.notice = {
+      this.carryNotice = this.notice = {
         kind: "note",
         text: `${count === 1 ? "One setting was" : `${count} settings were`} changed outside ZAX and carried across to the other engines. Save to keep them, or revert.`,
       };
+    }
+  }
+
+  /**
+   * Accepts the files as they stand for answers that have just been reverted - a carry ZAX made, or a choice
+   * the user answered. One gate for both: what a revert undoes differs, what it means does not.
+   *
+   * Reverting is the user saying these engines may disagree. Dropping the pending edit is only half of that:
+   * nothing on disk changes, so the next read of this install weighs the same files against the same bases
+   * and reaches the same answer again - which it did on every switch between games. Moving each address's
+   * base to what it now holds is what makes the answer stick, and a later change inside an engine still
+   * reads as a move against it.
+   */
+  private async acceptReconciled(ids: readonly string[]): Promise<void> {
+    const install = this.install;
+    const dropped = ids.filter((id) => this.reconciled[id] !== undefined);
+    if (!install || dropped.length === 0) return;
+    const at = dropped.flatMap((id) => this.reconciled[id]!.at);
+    try {
+      await backend.acceptSettingsBase(install.path, at);
+    } catch (error) {
+      // The edit is dropped either way, but a base that did not move means the next read of this install
+      // reaches the same answer again - which reads as the revert never having worked. The rows keep saying
+      // where their value came from, since that is still true.
+      const reason = error instanceof Error ? error.message : String(error);
+      this.notice = { kind: "problem", text: `The revert could not be recorded: ${reason}` };
+      return;
+    }
+    this.reconciled = Object.fromEntries(Object.entries(this.reconciled).filter(([id]) => !dropped.includes(id)));
+    // Only while it is still the banner the carry raised, and only once no carry is left for it to describe -
+    // an answered choice sits in the same map but was never one of the settings that banner counted.
+    const carries = Object.values(this.reconciled).some((one) => one.from !== undefined);
+    if (!carries && this.notice === this.carryNotice) {
+      this.notice = null;
+      this.carryNotice = null;
     }
   }
 
@@ -834,11 +920,14 @@ class Store {
   }
 
   isModified(id: string): boolean {
-    return id in this.overrides && this.overrides[id] !== this.baselineOf(id);
+    if (!(id in this.overrides)) return false;
+    return this.split[id] === true || this.overrides[id] !== this.baselineOf(id);
   }
 
   set(id: string, value: string): void {
-    if (value === this.baselineOf(id)) {
+    // Dropped only where it would write nothing. A setting whose addresses disagree always has something to
+    // write, even when the value matches the one address the control was showing.
+    if (value === this.baselineOf(id) && this.split[id] !== true) {
       const { [id]: _dropped, ...rest } = this.overrides;
       this.overrides = rest;
       return;
@@ -847,16 +936,18 @@ class Store {
     this.scheduleAutosave();
   }
 
-  revert(id: string): void {
+  async revert(id: string): Promise<void> {
     const { [id]: _dropped, ...rest } = this.overrides;
     this.overrides = rest;
+    await this.acceptReconciled([id]);
     this.scheduleAutosave();
   }
 
-  revertAll(): void {
+  async revertAll(): Promise<void> {
     // Pinned values are ZAX policy rather than a user edit, so reverting restores them instead of dropping them.
     this.overrides = this.managedOverrides();
     this.mods = this.modsBaseline;
+    await this.acceptReconciled(Object.keys(this.reconciled));
     this.scheduleAutosave();
   }
 

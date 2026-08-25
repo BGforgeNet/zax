@@ -105,10 +105,14 @@ export interface InstallRecord {
   /** Engines installed here. Optional as `opaque` is: most records have none. */
   engines?: readonly InstalledEngine[];
   /**
-   * The value ZAX last wrote to each address of a setting more than one engine carries, keyed by
+   * The base each address of a setting more than one engine carries is measured from, keyed by
    * `file|section|key`. What reconciliation compares against: an address differing from its base is the side
    * that moved since, so its value is the one to carry to the rest. Losing it degrades to preferring the
    * setting's own address, not to losing the setting.
+   *
+   * Usually the value ZAX last wrote there. It is also what the user accepted by reverting a carry, which is
+   * a value ZAX did not write - the two are one field because reconciliation asks the same question of both:
+   * has this address moved since it was last agreed?
    */
   written?: Readonly<Record<string, string>>;
   /** Entries this version could not read. Carried through every rewrite and touched by nothing else. */

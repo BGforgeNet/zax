@@ -23,6 +23,7 @@ import {
   saveState,
   scanForInstalls,
   type AppState,
+  type ConfigChange,
   type ConfigFileContents,
   type GameType,
   type Install,
@@ -33,7 +34,7 @@ import {
 } from "@zax/core";
 import type { OperatingSystem, Platform } from "@zax/platform";
 import { engineConfigPaths } from "./engine-config.js";
-import { addressOf } from "./reconcile-settings.js";
+import { addressOf, type HeldTarget } from "./reconcile-settings.js";
 import { SETTINGS } from "./catalog.js";
 import { CONFIG_FILES } from "./files.js";
 import { mayWrite, parseManifest, type DroppedSetting, type ModSetting } from "./manifest.js";
@@ -94,8 +95,8 @@ import {
 } from "./sfall.js";
 
 /**
- * Every address a linked setting writes. What `rememberWritten` records a base for: an address no link
- * reaches has nothing to reconcile against, so recording one would grow the record for nothing.
+ * Every address a linked setting writes. What `moveBase` records a base for: an address no link reaches has
+ * nothing to reconcile against, so recording one would grow the record for nothing.
  */
 const LINKED_ADDRESSES = new Set(
   SETTINGS.filter((setting) => setting.targets.length > 1).flatMap((setting) =>
@@ -169,11 +170,19 @@ export interface Backend {
   loadConfigFiles(installPath: string): Promise<ConfigFileContents>;
   saveConfigFiles(request: SaveRequest): Promise<SaveOutcome>;
   /**
-   * What ZAX last wrote to each address of a setting more than one engine carries, keyed by
-   * `file|section|key`. Recorded by `saveConfigFiles` itself, so the two cannot come to disagree about what
-   * was written.
+   * The base each address of a setting more than one engine carries is measured from, keyed by
+   * `file|section|key`. Written by `saveConfigFiles` and by `acceptSettingsBase` below, so nothing outside
+   * this interface can move a base out from under the reconciliation that reads it.
    */
   settingsBase(installPath: string): Promise<Readonly<Record<string, string>>>;
+  /**
+   * Moves those bases to the values named, without touching a file.
+   *
+   * What reverting a carried-across value does. The user has said these engines may disagree, and no file
+   * changes when they do - so unless the bases move with them, the next load reads the same disagreement off
+   * the same files and carries it across again. A later change inside an engine still reads as a move.
+   */
+  acceptSettingsBase(installPath: string, at: readonly HeldTarget[]): Promise<void>;
   /** sfall's mod load order, and what sits in the folder it orders. */
   loadMods(install: Install): Promise<ModsSnapshot>;
   saveMods(request: ModsSaveRequest): Promise<SaveOutcome>;
@@ -381,20 +390,20 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
   };
 
   /**
-   * Records what a save just wrote to the addresses of a setting more than one engine carries, which is what
-   * a later load compares against to tell which side moved. Only those: an address no link reaches has
-   * nothing to reconcile with, and recording every key would put the whole catalog in the record.
+   * Moves the base of each given address to the value named, which is what a later load compares against to
+   * tell which side has moved since. Only addresses a link reaches: one no link reaches has nothing to
+   * reconcile with, and recording every key would put the whole catalog in the record.
    *
-   * Never fails a save that already succeeded. A record written by a newer ZAX is not ours to rewrite, and a
-   * lost base only costs the preference between two values - the files themselves are already correct.
+   * Never fails the operation that asked for it. A record written by a newer ZAX is not ours to rewrite, and
+   * a lost base only costs the preference between two values - the files themselves are already correct.
    */
-  const rememberWritten = async (request: SaveRequest): Promise<void> => {
-    const relevant = request.changes.filter((change) => LINKED_ADDRESSES.has(addressOf(change)));
+  const moveBase = async (installPath: string, at: readonly ConfigChange[]): Promise<void> => {
+    const relevant = at.filter((one) => LINKED_ADDRESSES.has(addressOf(one)));
     if (relevant.length === 0) return;
-    const record = await loadRecord(platform, request.installPath);
+    const record = await loadRecord(platform, installPath);
     if (record.laterFormat !== undefined) return;
     const written = { ...record.written };
-    for (const change of relevant) written[addressOf(change)] = change.value;
+    for (const one of relevant) written[addressOf(one)] = one.value;
     await saveRecord(platform, { ...record, written });
   };
 
@@ -426,10 +435,15 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       // writes where it read. A `master_patches` changed in the same save takes effect on the next load.
       const paths = await engineConfigPaths(platform, request.installPath, request.original["fallout2.cfg"]);
       const outcome = await saveConfigFiles(platform, { ...request, paths });
-      if (outcome.ok) await rememberWritten(request);
+      if (outcome.ok) await moveBase(request.installPath, request.changes);
       return outcome;
     },
     settingsBase: async (installPath) => (await loadRecord(platform, installPath)).written ?? {},
+    acceptSettingsBase: (installPath, at) =>
+      moveBase(
+        installPath,
+        at.map((one) => ({ ...one.target, value: one.value })),
+      ),
     loadMods: (install) => readMods(platform, install),
     saveMods: (request) => saveMods(platform, request),
 

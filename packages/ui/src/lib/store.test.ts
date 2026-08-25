@@ -31,6 +31,9 @@ test("starts on the seeded install with its config files read", () => {
 });
 
 describe("a setting more than one engine carries", () => {
+  // One case forces the record write to fail; without this its spy would outlive it into the rest of these.
+  afterEach(() => vi.restoreAllMocks());
+
   const BARTER = "sfall.Interface.ExpandBarter";
   const read = async (name: string) =>
     new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${PREVIEW_INSTALL}/${name}`));
@@ -82,8 +85,69 @@ describe("a setting more than one engine carries", () => {
 
     expect(store.valueOf(BARTER), "the newer value won").toBe("1");
     expect(store.isModified(BARTER), "left pending rather than written during a load").toBe(true);
-    expect(store.propagated[BARTER], "the row has to be able to say where it came from").toBe("fission.cfg");
+    expect(store.reconciled[BARTER]?.from, "the row has to be able to say where it came from").toBe("fission.cfg");
     expect(store.notice?.kind).toBe("note");
+  });
+
+  test("leaves a reverted carry alone on every later read of the install", async () => {
+    // Reverting used to drop the pending edit and nothing else, so the next read of this install weighed the
+    // same files against the same bases and carried the same value across again - on every switch of game.
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+    await store.start();
+    expect(store.notice?.kind, "the carry was raised to begin with").toBe("note");
+
+    await store.revertAll();
+    expect(store.isModified(BARTER), "the carried edit is gone").toBe(false);
+    expect(store.reconciled[BARTER], "and the row's note about where it came from with it").toBeUndefined();
+    expect(store.notice, "and the banner that asked about it").toBeNull();
+
+    await previewPlatform.fs.write(`${ADDED_INSTALL}/fallout2.exe`, new Uint8Array([0x4d, 0x5a]));
+    await store.addInstall(ADDED_INSTALL);
+    await store.selectInstall(ADDED_INSTALL);
+    // What Dismiss does, so that anything showing afterwards is a banner the read back raised.
+    store.notice = null;
+    await store.selectInstall(PREVIEW_INSTALL);
+
+    expect(store.notice, "the disagreement was accepted, so there is nothing left to raise").toBeNull();
+    expect(store.isModified(BARTER)).toBe(false);
+    expect(await read("fission.cfg"), "and no file was written to settle it").toContain("EnhancedBarter=1");
+    expect(await read("ddraw.ini")).toContain("ExpandBarter=0");
+  });
+
+  test("says so when the revert could not be recorded, rather than looking settled until the next read", async () => {
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+    await store.start();
+    vi.spyOn(hostBackend, "acceptSettingsBase").mockRejectedValue(new Error("the record is read-only"));
+
+    await store.revertAll();
+
+    expect(store.notice).toEqual({
+      kind: "problem",
+      text: "The revert could not be recorded: the record is read-only",
+    });
+    // Still true of the file, and the next read will carry it across again - so the row goes on saying it.
+    expect(store.reconciled[BARTER]?.from).toBe("fission.cfg");
+  });
+
+  test("carries a further change inside an engine across, measured from the accepted base", async () => {
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+    await store.start();
+    await store.revertAll();
+
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=2\n"));
+    await store.start();
+
+    expect(store.valueOf(BARTER), "accepting one disagreement is not agreeing to the next").toBe("2");
+    expect(store.reconciled[BARTER]?.from).toBe("fission.cfg");
   });
 
   test("asks rather than choosing when two engines have both moved", async () => {
@@ -94,8 +158,87 @@ describe("a setting more than one engine carries", () => {
     await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(`${ddrawini}\n[Interface]\nExpandBarter=2\n`));
     await store.start();
 
-    expect(store.propagated[BARTER], "no value was picked on the user's behalf").toBeUndefined();
+    expect(store.reconciled[BARTER], "no value was picked on the user's behalf").toBeUndefined();
     expect(store.settingsChoices.map((one) => one.id)).toContain(BARTER);
+  });
+
+  /** An install where both engines moved off what ZAX wrote, which is what raises the question. */
+  const withBothMoved = async () => {
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(`${ddrawini}\n[Interface]\nExpandBarter=2\n`));
+    await store.start();
+  };
+
+  test("stops asking once an answered choice has been reverted", async () => {
+    // The carry's defect in the other affordance: answering left a pending edit and nothing else, so a revert
+    // of that edit put the same question back on the next read of the install.
+    await withBothMoved();
+    store.chooseLinked(BARTER, "1");
+    expect(store.isModified(BARTER)).toBe(true);
+
+    await store.revertAll();
+    await store.start();
+
+    expect(
+      store.settingsChoices.map((one) => one.id),
+      "the question was answered and the answer undone",
+    ).toEqual([]);
+    expect(store.notice, "and nothing was carried across in its place either").toBeNull();
+  });
+
+  test("leaves an unanswered question standing through a revert", async () => {
+    // A revert undoes what the user did. They have not answered this one, so there is nothing of theirs to
+    // undo - and dismissing it here would decide on their behalf which of two values is lost.
+    await withBothMoved();
+    store.set("game.preferences.running", "1");
+
+    await store.revertAll();
+
+    expect(store.settingsChoices.map((one) => one.id)).toContain(BARTER);
+  });
+
+  test("answering with the value the setting's own address already holds still reaches the other engine", async () => {
+    // The value shown comes from ddraw.ini alone. Picking it looks like picking what is already there, and
+    // used to be dropped as no edit at all - leaving Save disabled and the question to be asked again.
+    await withBothMoved();
+    expect(store.valueOf(BARTER), "what the control was showing").toBe("2");
+
+    store.chooseLinked(BARTER, "2");
+    expect(store.isModified(BARTER), "fission.cfg still holds something else, so there is an edit").toBe(true);
+    expect(store.modifiedCount).toBe(1);
+    await store.save();
+
+    expect(await read("fission.cfg"), "the engine that lagged was brought into line").toContain("EnhancedBarter=2");
+    expect(await read("ddraw.ini")).toContain("ExpandBarter=2");
+    expect(store.settingsChoices, "and the question is settled for good").toEqual([]);
+  });
+
+  test("marks a carried row modified even where the address that moved is the one on screen", async () => {
+    // ddraw.ini is the setting's own address, so the carried value equals what the control shows. The row
+    // was left unmarked and without its revert button while telling the user to save or revert.
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(`${ddrawini}\n[Interface]\nExpandBarter=1\n`));
+    await store.start();
+
+    expect(store.reconciled[BARTER]?.from, "ddraw.ini is the one that moved").toBe("ddraw.ini");
+    expect(store.valueOf(BARTER), "which is also the value the control shows").toBe("1");
+    expect(store.isModified(BARTER), "so the row has to be marked, and offer its revert").toBe(true);
+  });
+
+  test("asks again when an engine moves once more after an answer was reverted", async () => {
+    await withBothMoved();
+    store.chooseLinked(BARTER, "1");
+    await store.revertAll();
+
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=3\n"));
+    await store.start();
+
+    expect(store.valueOf(BARTER), "one address moved off its accepted base, so it is carried").toBe("3");
   });
 
   test("writes the same set from a one-click fix as from the row", async () => {
@@ -297,8 +440,8 @@ describe("search", () => {
 describe("gates", () => {
   const def = (id: string) => SETTINGS.find((s) => s.id === id)!;
 
-  test("a gate on a key binding opens only once a key is actually bound", () => {
-    store.revertAll();
+  test("a gate on a key binding opens only once a key is actually bound", async () => {
+    await store.revertAll();
     // The fixture never writes the binding, so the gate starts closed on an absent value rather than on a
     // listed one - the case a values-list gate could not express at all.
     expect(store.gateOf(def("sfall.Input.FastMoveFromContainer"))?.active).toBe(false);
@@ -308,24 +451,24 @@ describe("gates", () => {
 
     store.set("sfall.Input.ItemFastMoveKey", "0");
     expect(store.gateOf(def("sfall.Input.FastMoveFromContainer"))?.active).toBe(false);
-    store.revertAll();
+    await store.revertAll();
   });
 
-  test("the merged resolution keys carry the gate the pair control has to render", () => {
-    store.revertAll();
+  test("the merged resolution keys carry the gate the pair control has to render", async () => {
+    await store.revertAll();
     // The pair renders one control over two keys, so it reads the gate off a member rather than off itself.
     expect(store.gateOf(def("sfall.Graphics.GraphicsWidth"))?.active).toBe(false);
     store.set("sfall.Graphics.Mode", "4");
     expect(store.gateOf(def("sfall.Graphics.GraphicsWidth"))?.active).toBe(true);
-    store.revertAll();
+    await store.revertAll();
   });
 });
 
 describe("conflicts", () => {
   const fix = () => SETTINGS.find((s) => s.id === "hires.OTHER_SETTINGS.CPU_USAGE_FIX")!;
 
-  test("stays quiet until both settings are in the states that clash", () => {
-    store.revertAll();
+  test("stays quiet until both settings are in the states that clash", async () => {
+    await store.revertAll();
     // The fixture ships both off: CPU_USAGE_FIX=0 and ProcessorIdle=-1.
     expect(store.conflictOf(fix())).toBeNull();
 
@@ -338,11 +481,11 @@ describe("conflicts", () => {
     // Backing either side out clears it again.
     store.set("sfall.Misc.ProcessorIdle", "-1");
     expect(store.conflictOf(fix())).toBeNull();
-    store.revertAll();
+    await store.revertAll();
   });
 
-  test("warns on both halves, not only the one carrying the declaration", () => {
-    store.revertAll();
+  test("warns on both halves, not only the one carrying the declaration", async () => {
+    await store.revertAll();
     const idle = SETTINGS.find((s) => s.id === "sfall.Misc.ProcessorIdle")!;
     expect(idle.conflictsWith, "the declaration sits on the other half").toBeUndefined();
 
@@ -350,7 +493,7 @@ describe("conflicts", () => {
     store.set("sfall.Misc.ProcessorIdle", "0");
     // Someone who reaches this setting first would otherwise flip it with no warning at all.
     expect(store.conflictOf(idle)?.other.id).toBe("hires.OTHER_SETTINGS.CPU_USAGE_FIX");
-    store.revertAll();
+    await store.revertAll();
     expect(store.conflictOf(idle)).toBeNull();
   });
 });
@@ -563,10 +706,10 @@ describe("mods", () => {
     expect(store.modsChanged, "and this one is kept, so the user can decide").toBe(true);
   });
 
-  test("reverting restores the order as it was read", () => {
+  test("reverting restores the order as it was read", async () => {
     store.toggleMod("hero_appearance");
     store.moveMod("hero_appearance", -1);
-    store.revertAll();
+    await store.revertAll();
     expect(shown()).toEqual([
       "+weapon_sounds.dat",
       "-extra_music.dat",
@@ -691,7 +834,7 @@ describe("a value ZAX pins", () => {
 describe("the unsaved marks", () => {
   const MUSIC = "game.sound.music";
 
-  test("the settings mark appears on an edit and clears on revert, in step with the file tab's dot", () => {
+  test("the settings mark appears on an edit and clears on revert, in step with the file tab's dot", async () => {
     expect(store.settingsChanged, "a fresh install carries ZAX's pinned values and no edit").toBe(false);
 
     store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
@@ -699,17 +842,17 @@ describe("the unsaved marks", () => {
     expect(store.settingsChanged).toBe(true);
     expect(store.modifiedInGroup("fallout2.cfg"), "and the tab under it is marked too").toBe(1);
 
-    store.revert(MUSIC);
+    await store.revert(MUSIC);
     expect(store.settingsChanged).toBe(false);
   });
 
-  test("neither mark answers for the other's view", () => {
+  test("neither mark answers for the other's view", async () => {
     store.moveMod("hero_appearance", -1);
     expect(store.modsChanged).toBe(true);
     expect(store.settingsChanged, "a mod that moved is not a settings edit").toBe(false);
 
     store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
-    store.revertAll();
+    await store.revertAll();
     expect(store.settingsChanged).toBe(false);
     expect(store.modsChanged).toBe(false);
   });
@@ -907,7 +1050,7 @@ describe("mod flows and unsaved edits", () => {
     expect(store.notice?.kind).toBe("problem");
     expect(store.notice?.text).toContain("unsaved");
     expect(store.modPlan, "no plan was prepared").toBeNull();
-    store.revert("fo2tweaks.main.autodoors");
+    await store.revert("fo2tweaks.main.autodoors");
   });
 
   test("restore refuses over unsaved edits too - it rewrites the same files the other flows do", async () => {
@@ -922,7 +1065,7 @@ describe("mod flows and unsaved edits", () => {
     await store.restoreMod(offer);
     expect(store.notice?.kind).toBe("problem");
     expect(store.notice?.text).toContain("unsaved");
-    store.revert("fo2tweaks.main.autodoors");
+    await store.revert("fo2tweaks.main.autodoors");
   });
 });
 
