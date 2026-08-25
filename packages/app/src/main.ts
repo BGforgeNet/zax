@@ -6,7 +6,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { appendLog } from "@zax/core";
+import { appendLog, type LogLevel } from "@zax/core";
 import { createBackend, type Backend } from "@zax/fallout2";
 import { nodePlatform } from "@zax/platform-node";
 import { CHANNEL, PROGRESS_CHANNEL } from "./channel.js";
@@ -22,19 +22,21 @@ const DEV_SERVER = process.env["ZAX_DEV_SERVER"];
 // thing a bug report from a poor connection cannot reconstruct from the interface. It can be handed `logLine`
 // before the line below because a function declaration is hoisted, and `platform` is only read when one is
 // written rather than when the sink is passed.
-const platform = nodePlatform({ log: (line) => void logLine(line) });
+const platform = nodePlatform({ log: (level, line) => void logLine(level, line) });
 
 /** One line per event, in the file the interface's "open log" button points at. */
-function logLine(text: string): Promise<void> {
-  return appendLog(platform, text, new Date());
+function logLine(level: LogLevel, text: string): Promise<void> {
+  return appendLog(platform, level, text, new Date());
 }
 
 // A crash with no window leaves nothing to read; these lines are the only trace a bug report can carry.
-process.on("uncaughtException", (error) => void logLine(`uncaught: ${describeError(error)}`));
-process.on("unhandledRejection", (reason) => void logLine(`unhandled rejection: ${describeError(reason)}`));
+process.on("uncaughtException", (error) => void logLine("error", `uncaught: ${describeError(error)}`));
+process.on("unhandledRejection", (reason) => void logLine("error", `unhandled rejection: ${describeError(reason)}`));
 
 function register(backend: Backend): void {
-  const dispatch = createDispatch(backend, (line) => void logLine(line));
+  // Every line this sink is handed is an operation that failed; the renderer's notice carries the message and
+  // the log carries the stack.
+  const dispatch = createDispatch(backend, (line) => void logLine("error", line));
   ipcMain.handle(CHANNEL, (_event, method: string, args: unknown[]) => dispatch(method, args));
 }
 
@@ -105,7 +107,7 @@ function createWindow(): BrowserWindow {
   // The interface is local; anything else belongs to the browser, not to a window with a preload attached.
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isWebUrl(url)) void shell.openExternal(url);
-    else void logLine(`refused to open ${url}`);
+    else void logLine("warn", `refused to open ${url}`);
     return { action: "deny" };
   });
 
@@ -115,7 +117,7 @@ function createWindow(): BrowserWindow {
     if (isOwnContent(url, DEV_SERVER)) return;
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
-    else void logLine(`refused to navigate to ${url}`);
+    else void logLine("warn", `refused to navigate to ${url}`);
   });
 
   if (DEV_SERVER) void window.loadURL(DEV_SERVER);

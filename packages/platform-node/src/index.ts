@@ -45,7 +45,7 @@ import { registryValue } from "./registry.js";
  * report cannot reconstruct from the interface, so the shell passes a sink for it here.
  */
 export interface PlatformOptions {
-  log?: (line: string) => void;
+  log?: (level: "info" | "warn", line: string) => void;
 }
 
 const APP_NAME = "zax";
@@ -180,7 +180,13 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
   const noteDownload = (note: AttemptNote): void => {
     const size = note.total === null ? `${note.received} bytes` : `${note.received}/${note.total} bytes`;
     const resumed = note.resumedFrom > 0 ? `, resumed from ${note.resumedFrom}` : "";
-    options.log?.(`download ${note.outcome}: ${note.url} attempt ${note.attempt}, ${size} in ${note.ms}ms${resumed}`);
+    // An attempt that did not finish is a warning even though the download as a whole may still succeed: it is
+    // the line a report from a poor connection is read for, and it should not sit among the ordinary ones.
+    const level = note.outcome === "ok" ? "info" : "warn";
+    options.log?.(
+      level,
+      `download ${note.outcome}: ${note.url} attempt ${note.attempt}, ${size} in ${note.ms}ms${resumed}`,
+    );
   };
 
   return {

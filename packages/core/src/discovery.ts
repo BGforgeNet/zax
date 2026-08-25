@@ -376,9 +376,12 @@ export async function scanForInstalls(
   const nested = await fromInstalls(scan, [...known.map((one) => one.path), ...found.map((one) => one.path)]);
   await consider(nested);
 
-  for (const note of scan.notes) await appendLog(platform, `scan: ${note}`, now);
+  // A note is something the scan could not do - an unreadable root, a candidate it had to skip - so it is a
+  // warning; the count that follows is the ordinary record of a scan having run.
+  for (const note of scan.notes) await appendLog(platform, "warn", `scan: ${note}`, now);
   await appendLog(
     platform,
+    "info",
     `scan: ${roots.length} roots, ${candidates.length + nested.length} candidates, ${found.length} new${
       credited.length ? `: ${credited.join("; ")}` : ""
     }`,

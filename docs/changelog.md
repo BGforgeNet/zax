@@ -38,6 +38,9 @@ mods as well as settings.
 - **Bug reports in one archive.** Configs, the game's logs, listings of the folder and of `mods/`, the load
   order, ZAX's own log, what Wine printed where the game runs under it, and any savegames you choose. Wine is
   kept quiet for normal play and says its piece again once you turn full debugging on.
+- **ZAX's own log says what each line is** - a scan, a download that had to be retried, something that failed -
+  so the line that explains a problem stands out from the ones around it. It is trimmed to its most recent half
+  once it passes a megabyte, saying in the file where the older lines were, and can be cleared outright.
 - **Runs from anywhere.** Windows, Linux and macOS builds, none of them installers. A `data` directory beside
   the executable makes a copy portable, settings and all.
 - **Try it without a game.** Opened in a browser, the interface edits a bundled fixture; anything that would

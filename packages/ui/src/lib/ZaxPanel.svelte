@@ -1,6 +1,6 @@
 <script lang="ts">
   import { compareVersions } from "@zax/core";
-  import type { OwnDirectory } from "@zax/fallout2";
+  import type { WipeTarget } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
@@ -15,20 +15,39 @@
   const outdated = $derived(store.zaxLatest !== null && compareVersions(VERSION, store.zaxLatest) < 0);
 
   /*
-    Wiping deletes files the user cannot get back from here, and the three buttons sit beside an Open button
-    they otherwise look like. One confirmation for all three: a second copy would be a second wording.
+    Wiping deletes files the user cannot get back from here, and the buttons sit beside an Open button they
+    otherwise look like. One confirmation for all of them: a second copy would be a second wording.
   */
-  const WIPES: Record<OwnDirectory, { title: string; what: string }> = {
+  const WIPES: Record<WipeTarget, { title: string; what: string }> = {
     backup: { title: "Backup directory", what: "Every copy ZAX kept of a config file before it wrote to it." },
     packages: {
       title: "Downloaded packages",
       what: "Downloaded sfall and engine releases. They are fetched again when needed.",
     },
     debug: { title: "Debug archive directory", what: "The archives built for bug reports." },
+    log: {
+      title: "Log file",
+      what: "What ZAX recorded about scans, downloads and failures. A bug report made after this carries none of it.",
+    },
   };
 
-  let confirming = $state<OwnDirectory | null>(null);
+  /*
+    The log is one file and the rest are directories, and every word of the confirmation that is not the
+    entry's own follows from which - the question, what it costs, and the button that does it. Derived from
+    the target rather than written into each entry, where the three directories would carry three copies.
+  */
+  const WORDS = {
+    directory: {
+      ask: "Empty this directory?",
+      cost: "This deletes the files. ZAX cannot put them back.",
+      confirm: "Empty it",
+    },
+    file: { ask: "Clear the log?", cost: "This deletes the file. ZAX cannot put it back.", confirm: "Clear it" },
+  };
+
+  let confirming = $state<WipeTarget | null>(null);
   const pending = $derived(confirming === null ? null : WIPES[confirming]);
+  const words = $derived(confirming === "log" ? WORDS.file : WORDS.directory);
 
   function wipe(): void {
     const which = confirming;
@@ -101,7 +120,10 @@
     <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("log")}>
       View
     </button>
+    <button disabled={store.busy !== null} onclick={() => (confirming = "log")}>Clear</button>
   </div>
+  <!-- Said here rather than only in the file: the ceiling is why an old failure may no longer be in it. -->
+  <p class="note">Trimmed to its most recent half when it passes a megabyte.</p>
 
   <!-- The only one that needs nothing outside the page, so the only one that works. -->
   <h2 class="section">Theme</h2>
@@ -127,15 +149,15 @@
   <p class="note">The Save button is disabled; previous copies still go to the backup directory.</p>
 </div>
 
-<Dialog open={confirming !== null} title="Empty this directory?" dismiss={() => (confirming = null)}>
+<Dialog open={confirming !== null} title={words.ask} dismiss={() => (confirming = null)}>
   {#if pending}
     <p class="ask"><strong>{pending.title}</strong></p>
     <p class="ask">{pending.what}</p>
-    <p class="ask">This deletes the files. ZAX cannot put them back.</p>
+    <p class="ask">{words.cost}</p>
   {/if}
   {#snippet footer()}
     <button onclick={() => (confirming = null)}>Cancel</button>
-    <button class="danger" onclick={wipe}>Empty it</button>
+    <button class="danger" onclick={wipe}>{words.confirm}</button>
   {/snippet}
 </Dialog>
 

@@ -95,4 +95,5 @@ export {
   type OperationProgress,
   type OpenTarget,
   type OwnDirectory,
+  type WipeTarget,
 } from "./backend.js";

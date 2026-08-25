@@ -65,7 +65,7 @@ import {
   type ModsSnapshot,
   type OpenTarget,
   type OperationProgress,
-  type OwnDirectory,
+  type WipeTarget,
   type Place,
   type SfallRelease,
 } from "@zax/fallout2";
@@ -143,7 +143,7 @@ const SEARCHABLE: ReadonlyArray<{ def: SettingDef; place: Place; where: string; 
 );
 
 /**
- * Every key the config files actually contain. The catalog curates 166 of them; sfall's ddraw.ini alone holds
+ * Every key the config files actually contain. The catalog curates 227 of them; sfall's ddraw.ini alone holds
  * 115 keys, most undocumented by the catalog but documented by its own inline comments, which become the help
  * text for free.
  */
@@ -399,7 +399,7 @@ class Store {
 
   /**
    * The values on disk, and every key the files actually hold. Computed when an install is read rather than
-   * derived from `contents`: this is three file parses and a pass over 166 settings, and a derivation would
+   * derived from `contents`: this is three file parses and a pass over 227 settings, and a derivation would
    * repeat it on every access from a plain function call.
    */
   private baseline: Record<string, string | undefined> = $state({});
@@ -1736,10 +1736,10 @@ class Store {
     });
   }
 
-  async wipe(which: OwnDirectory): Promise<void> {
-    await this.run("Emptying the directory", async () => {
+  async wipe(which: WipeTarget): Promise<void> {
+    await this.run(which === "log" ? "Clearing the log" : "Emptying the directory", async () => {
       await backend.wipe(which);
-      return { kind: "done", text: `Emptied the ${which} directory.` };
+      return { kind: "done", text: which === "log" ? "Cleared the log." : `Emptied the ${which} directory.` };
     });
   }
 }

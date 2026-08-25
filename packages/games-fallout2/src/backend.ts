@@ -115,6 +115,9 @@ export interface MachineDescription {
 /** One of ZAX's own directories, named rather than passed as a path so a renderer cannot ask for another. */
 export type OwnDirectory = "backup" | "debug" | "packages";
 
+/** Something of ZAX's own the user can empty. The log is a file rather than a directory, hence its own arm. */
+export type WipeTarget = OwnDirectory | "log";
+
 /** Somewhere the desktop's own handler is asked to open. Named for the same reason. */
 export type OpenTarget = OwnDirectory | "log" | "download";
 
@@ -244,7 +247,7 @@ export interface Backend {
   /** `engineId` names an installed alternative engine, or null for the game's own executable. */
   launch(install: Install, sfallVersion: string | null, engineId: string | null): Promise<void>;
   open(target: OpenTarget): Promise<void>;
-  wipe(which: OwnDirectory): Promise<void>;
+  wipe(which: WipeTarget): Promise<void>;
 }
 
 /**
@@ -570,8 +573,10 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       return platform.process.open(own(target));
     },
 
-    // Recreated straight away, so the path the interface shows stays valid.
+    // Recreated straight away, so the path the interface shows stays valid. The log needs no recreating:
+    // the next line written makes it, which is what `appendLog` does when the file is not there at all.
     wipe: async (which) => {
+      if (which === "log") return platform.fs.remove(logFile(platform));
       await platform.fs.remove(own(which));
       await platform.fs.mkdir(own(which));
     },
