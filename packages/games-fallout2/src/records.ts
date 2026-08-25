@@ -104,6 +104,13 @@ export interface InstallRecord {
   mods: readonly InstalledMod[];
   /** Engines installed here. Optional as `opaque` is: most records have none. */
   engines?: readonly InstalledEngine[];
+  /**
+   * The value ZAX last wrote to each address of a setting more than one engine carries, keyed by
+   * `file|section|key`. What reconciliation compares against: an address differing from its base is the side
+   * that moved since, so its value is the one to carry to the rest. Losing it degrades to preferring the
+   * setting's own address, not to losing the setting.
+   */
+  written?: Readonly<Record<string, string>>;
   /** Entries this version could not read. Carried through every rewrite and touched by nothing else. */
   opaque?: readonly OpaqueMod[];
   /** The format the file states, when that is later than this version writes - what makes it read-only. */
@@ -235,6 +242,21 @@ function readMod(entry: unknown): InstalledMod | null {
 }
 
 /** One recorded engine, or null when the entry is not one this version can read. */
+/**
+ * The recorded bases, as text pairs. A malformed entry is dropped rather than refusing the whole record: a
+ * lost base costs a preference between two values, where a refused record costs the knowledge of what is
+ * installed.
+ */
+function readWritten(entry: unknown): Record<string, string> {
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return {};
+  const out: Record<string, string> = {};
+  for (const [address, value] of Object.entries(entry as Record<string, unknown>)) {
+    const held = asText(value);
+    if (held !== undefined && address.split("|").length === 3) out[address] = held;
+  }
+  return out;
+}
+
 function readEngine(entry: unknown): InstalledEngine | null {
   if (entry === null || typeof entry !== "object") return null;
   const fields = entry as Record<string, unknown>;
@@ -299,10 +321,12 @@ export async function loadRecord(platform: Platform, installPath: string): Promi
   const engines = (Array.isArray(fields["engines"]) ? fields["engines"] : [])
     .map(readEngine)
     .filter((one): one is InstalledEngine => one !== null);
+  const written = readWritten(fields["written"]);
   return {
     path,
     mods,
     ...(engines.length > 0 ? { engines } : {}),
+    ...(Object.keys(written).length > 0 ? { written } : {}),
     ...(opaque.length > 0 ? { opaque } : {}),
     ...(laterFormat !== undefined ? { laterFormat } : {}),
   };
@@ -313,7 +337,15 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
   if (record.laterFormat !== undefined) throw new Error(laterFormatMessage(record.laterFormat));
   const path = normalizePath(record.path);
   const at = recordPath(platform, path);
-  if (record.mods.length === 0 && !record.opaque?.length && !record.engines?.length) return platform.fs.remove(at);
+  const written = { ...record.written };
+  if (
+    record.mods.length === 0 &&
+    !record.opaque?.length &&
+    !record.engines?.length &&
+    Object.keys(written).length === 0
+  ) {
+    return platform.fs.remove(at);
+  }
   const body = stringify(
     {
       record: RECORD_FORMAT,
@@ -348,6 +380,7 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
             })),
           }
         : {}),
+      ...(Object.keys(written).length > 0 ? { written } : {}),
     },
     // Unwrapped for the same reason zax.yml is: folded long scalars are lossless but unreadable to hand-edit.
     { lineWidth: 0 },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MemoryPlatform } from "@zax/platform/memory";
-import { loadRecord, modName, reconcileRecord, saveRecord, type InstalledMod } from "./records.js";
+import { installKey, loadRecord, modName, reconcileRecord, saveRecord, type InstalledMod } from "./records.js";
 
 const GAME = "/games/fallout2";
 
@@ -29,6 +29,35 @@ describe("installed records", () => {
   it("answers empty for an install that has none - a first install and a lost record read the same", async () => {
     const platform = new MemoryPlatform();
     expect(await loadRecord(platform, GAME)).toEqual({ path: GAME, mods: [] });
+  });
+
+  it("round-trips the bases a linked setting's addresses were last written with", async () => {
+    const platform = new MemoryPlatform();
+    const written = { "ddraw.ini|Interface|ExpandBarter": "1", "fallout2.cfg|ui|expand_barter_window": "1" };
+    await saveRecord(platform, { path: GAME, mods: [], written });
+    expect((await loadRecord(platform, GAME)).written).toEqual(written);
+  });
+
+  it("keeps a record that holds nothing but bases, which is an install ZAX has only configured", async () => {
+    // The "an empty record is no record" rule deletes the file; a base is content, so it must count.
+    const platform = new MemoryPlatform();
+    await saveRecord(platform, { path: GAME, mods: [], written: { "ddraw.ini|Misc|DamageFormula": "5" } });
+    expect((await loadRecord(platform, GAME)).written).toEqual({ "ddraw.ini|Misc|DamageFormula": "5" });
+  });
+
+  it("drops a malformed base rather than refusing the record it sits in", async () => {
+    // A lost base costs the preference between two values; a refused record costs knowing what is installed.
+    const platform = new MemoryPlatform();
+    await saveRecord(platform, { path: GAME, mods: [mod()], written: { "a|b|c": "keep" } });
+    const at = platform.paths.join(platform.paths.config, "installed-mods", `${installKey(GAME)}.yml`);
+    const body = new TextDecoder().decode(await platform.fs.read(at));
+    // A key that is not an address, and a value that is not text - both written by something that is not this.
+    await platform.fs.write(at, new TextEncoder().encode(body.replace("written:", "written:\n  loose: 1\n  x|y: z")));
+
+    const loaded = await loadRecord(platform, GAME);
+
+    expect(loaded.written).toEqual({ "a|b|c": "keep" });
+    expect(loaded.mods, "the rest of the record survived it").toHaveLength(1);
   });
 
   it("round-trips a record, latin1 state text included", async () => {

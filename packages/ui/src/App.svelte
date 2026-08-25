@@ -46,7 +46,12 @@
     either can produce one.
   -->
   {#if store.notice}
-    <div class="notice" class:problem={store.notice.kind === "problem"} role="status">
+    <div
+      class="notice"
+      class:problem={store.notice.kind === "problem"}
+      class:note={store.notice.kind === "note"}
+      role="status"
+    >
       <span>{store.notice.text}</span>
       <button class="dismiss" onclick={() => (store.notice = null)}>Dismiss</button>
     </div>
@@ -217,6 +222,12 @@
   .notice.problem {
     background: color-mix(in srgb, var(--invalid) 14%, transparent);
     color: var(--invalid);
+  }
+
+  /* Something ZAX did unasked: set apart from a completed action without reading as a fault. */
+  .notice.note {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    border-bottom-color: var(--accent);
   }
 
   .notice span {

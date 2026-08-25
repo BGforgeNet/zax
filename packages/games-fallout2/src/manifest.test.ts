@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ownTarget } from "@zax/core";
 import { MANIFEST_BYTE_CAP, MANIFEST_SPEC, mayWrite, parseManifest, type ModManifest } from "./manifest.js";
 
 const bytes = (text: string) => new TextEncoder().encode(text);
@@ -86,11 +87,11 @@ settings:
     // YAML reads bare 1 as a number; the file's literal is the string.
     expect(enabled?.kind).toEqual({ type: "bool", onValue: "1", offValue: "0" });
     expect(enabled?.default).toBe("1");
-    expect(enabled?.file).toBe("mods/ecco/combat.ini");
+    expect(enabled?.targets).toEqual([{ file: "mods/ecco/combat.ini", section: "main", key: "enabled" }]);
     expect(level?.kind).toEqual({ type: "int", min: 0, max: 10, sentinels: { "0": "Off" } });
     // A gate may name a sibling entry or a catalog id; both resolve.
-    expect(level?.gatedBy).toEqual({ id: "ecco.main.enabled", is: ["1"] });
-    expect(mode?.gatedBy).toEqual({ id: "hires.MAIN.WINDOWED", isNot: ["0"] });
+    expect(level && ownTarget(level).gatedBy).toEqual({ id: "ecco.main.enabled", is: ["1"] });
+    expect(mode && ownTarget(mode).gatedBy).toEqual({ id: "hires.MAIN.WINDOWED", isNot: ["0"] });
   });
 
   it("derives the id and the default file from the address", () => {
@@ -102,9 +103,8 @@ settings:
     const [setting] = manifest.settings;
     // The id is the mod's id plus the address, verbatim - the same rule the catalog's generator applies.
     expect(setting?.id).toBe("fo2tweaks.run_speed.dude_speed");
-    expect(setting?.file).toBe("mods/fo2tweaks.ini");
-    expect(setting?.section).toBe("run_speed");
-    expect(setting?.key).toBe("dude_speed");
+    // A mod setting writes one address; linking across engines is the catalog's business, not a manifest's.
+    expect(setting?.targets).toEqual([{ file: "mods/fo2tweaks.ini", section: "run_speed", key: "dude_speed" }]);
     // Omitted on/off are the ini convention's 1/0.
     expect(setting?.kind).toEqual({ type: "bool", onValue: "1", offValue: "0" });
   });

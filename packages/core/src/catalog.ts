@@ -1,8 +1,8 @@
 /**
  * A setting's typed definition. One object drives parsing, validation, rendering, search and diffing.
  *
- * `id` is deliberately independent of file/section/key: saved profiles and presets store ids, so an upstream
- * rename of a config key does not invalidate user data.
+ * `id` is deliberately independent of the addresses it writes: saved profiles and presets store ids, so an
+ * upstream rename of a config key does not invalidate user data.
  */
 
 export interface ChoiceOption {
@@ -68,19 +68,40 @@ export function describeValueTest(def: SettingDef, test: ValueTest): string {
   return `anything but ${test.isNot.map(name).join(" or ")}`;
 }
 
-export interface SettingDef {
-  id: string;
+/**
+ * One address a setting's value lives at. Most settings have a single target; a setting that more than one
+ * engine carries under its own name has one per engine, so that the several names stay one row.
+ */
+export interface SettingTarget {
   file: string;
   section: string;
   key: string;
+  /**
+   * The engine whose settings this address belongs to, absent where it is the game's own, sfall's or the
+   * high-resolution patch's. Not something the file and section imply: fallout2-ce writes keys of its own
+   * into the game's `[system]` and `[sound]`, beside vanilla keys that belong to no engine.
+   */
+  engine?: string;
+  /**
+   * This target only takes effect while another setting passes the test. Editing it otherwise changes the file
+   * but not the game, so the interface says so rather than letting the change look effective. Per target
+   * rather than per setting: a prerequisite can hold on one engine and not on the next, and a shared gate
+   * would either over-restrict the others or write a value that silently does nothing.
+   */
+  gatedBy?: { id: string } & ValueTest;
+}
+
+export interface SettingDef {
+  id: string;
+  /**
+   * Every address this one value is written to, the nominated one first - that is the address the id was
+   * minted from, so it stays the id's source even where its file is absent. Typed as a non-empty list so
+   * that the nominated target is reachable without an assertion.
+   */
+  targets: readonly [SettingTarget, ...SettingTarget[]];
   kind: SettingKind;
   label: string;
   help?: string;
-  /**
-   * This setting only takes effect while another one passes the test. Editing it otherwise changes the file but
-   * not the game, so the interface says so rather than letting the change look effective.
-   */
-  gatedBy?: { id: string } & ValueTest;
   /**
    * A pairing the engine handles badly, warned about only while both settings are in the states named. Unlike a
    * gate, each setting still works alone, so neither is disabled.
@@ -91,6 +112,11 @@ export interface SettingDef {
    * choice is visible instead of looking like the setting simply went missing.
    */
   managed?: { value: string; reason: string };
+}
+
+/** A setting's own address: the target its id was minted from, which every setting has exactly one of. */
+export function ownTarget(def: SettingDef): SettingTarget {
+  return def.targets[0];
 }
 
 /** Raw config value -> percentage, for scale kinds. */
@@ -282,7 +308,8 @@ export function displayValue(def: SettingDef, raw: string | undefined): string {
  * of settings actually about resolution. `file` already covers searching by origin.
  */
 export function searchText(def: SettingDef): string {
-  const fields = [def.label, def.key, def.section, def.file, def.help ?? ""];
+  const addresses = def.targets.flatMap((t) => [t.key, t.section, t.file]);
+  const fields = [def.label, ...addresses, def.help ?? ""];
   if (def.kind.type === "choice") fields.push(...def.kind.options.map((o) => o.label));
   return fields.join(" ").toLowerCase();
 }

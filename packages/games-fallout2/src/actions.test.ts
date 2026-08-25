@@ -121,8 +121,9 @@ describe("curated surface", () => {
     const h = byId.get("hires.MAIN.SCR_HEIGHT");
     expect(w).toBeDefined();
     expect(h).toBeDefined();
-    // One control writes both keys at once, so they have to belong to the same file.
-    expect(w!.file).toBe(h!.file);
+    // One control writes both keys at once, so they have to reach the same files - the linked engine target
+    // included, or a preset would set the width on both sides and the height on one.
+    expect(w!.targets.map((t) => t.file)).toEqual(h!.targets.map((t) => t.file));
     for (const r of COMMON_RESOLUTIONS) {
       expect(validate(w!, String(r.width)).ok, `width ${r.width}`).toBe(true);
       expect(validate(h!, String(r.height)).ok, `height ${r.height}`).toBe(true);

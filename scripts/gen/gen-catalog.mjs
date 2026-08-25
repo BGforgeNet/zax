@@ -1,10 +1,17 @@
 /**
  * Converts the previous implementation's format definitions into the typed catalog.
  * Run from the repo root: node scripts/gen/gen-catalog.mjs
+ *
+ * Also the source `gen-layout.mjs` reads the settings from, through the `SETTING_DEFS` export below: it places
+ * an engine's rows by the addresses each setting holds, and reading those back out of the emitted TypeScript
+ * meant a regex over generated source, which silently returned the wrong answer for a target whose optional
+ * fields happened to be ordered differently.
  */
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { idFor } from "./ids.mjs";
+import { ENGINE_BINDINGS, ENGINE_TABLES, STRICT_VANILLA, STRICT_VANILLA_GATES } from "./engine-settings.mjs";
 // yaml is @zax/core's dependency; the repo root carries none of its own, so resolve it through that package.
 const YAML = createRequire(new URL("../../packages/core/", import.meta.url))("yaml");
 
@@ -243,6 +250,98 @@ const CONFLICTS = {
   },
 };
 
+/*
+  Settings more than one engine carries under a different name, joined into a single entry with one target
+  apiece so that one write reaches all of them. Linked only where every side holds the same values: a
+  conversion nobody can make honest is worse than two rows, and the eleven pairs that fail that test stay
+  separate settings.
+
+  Each pairing is read off the artifact that asserts it - fallout2-ce's own f2_res.ini and ddraw.ini migration
+  tables for the rows it migrates, and each project's registered key list for the rest - rather than inferred
+  from names resembling each other.
+
+  The first address is the nominated one: the id is minted from it, so a setting that already exists keeps the
+  id it has and nothing storing ids has to migrate. Each of the rest is listed under the engine it belongs to,
+  which is not something the file and section can be read off: fallout2-ce writes `f2_res_dat` into the game's
+  own [system] and `gapless_music` into its [sound], beside vanilla keys that are nobody's engine.
+*/
+const BINDINGS = [
+  // sfall's ddraw.ini against fallout2-ce's own [ui] section, and Fallout Fission's [enhancements].
+  ["ddraw.ini|Misc|AutoQuickSave", { "fallout2-ce": "fallout2.cfg|ui|auto_quick_save" }],
+  [
+    "ddraw.ini|Misc|DisplayBonusDamage",
+    { "fallout2-ce": "fallout2.cfg|ui|display_bonus_damage", fission: "fission.cfg|enhancements|DisplayBonusDamage" },
+  ],
+  [
+    "ddraw.ini|Misc|DisplayKarmaChanges",
+    { "fallout2-ce": "fallout2.cfg|ui|display_karma_changes", fission: "fission.cfg|enhancements|DisplayKarmaChanges" },
+  ],
+  [
+    "ddraw.ini|Misc|NumbersInDialogue",
+    { "fallout2-ce": "fallout2.cfg|ui|numbers_in_dialogue", fission: "fission.cfg|enhancements|NumbersInDialogue" },
+  ],
+  [
+    "ddraw.ini|Misc|SkipOpeningMovies",
+    { "fallout2-ce": "fallout2.cfg|ui|skip_opening_movies", fission: "fission.cfg|enhancements|SkipOpeningMovies" },
+  ],
+  [
+    "ddraw.ini|Interface|ExpandBarter",
+    { "fallout2-ce": "fallout2.cfg|ui|expand_barter_window", fission: "fission.cfg|enhancements|EnhancedBarter" },
+  ],
+  ["ddraw.ini|Interface|ActionPointsBar", { "fallout2-ce": "fallout2.cfg|ui|extend_ap_bar" }],
+
+  // The hi-res patch's f2_res.ini, where fallout2-ce's migration table states the equivalence itself.
+  ["f2_res.ini|MAIN|SCR_WIDTH", { "fallout2-ce": "fallout2.cfg|screen|resolution_x" }],
+  ["f2_res.ini|MAIN|SCR_HEIGHT", { "fallout2-ce": "fallout2.cfg|screen|resolution_y" }],
+  ["f2_res.ini|MAIN|f2_res_dat", { "fallout2-ce": "fallout2.cfg|system|f2_res_dat" }],
+  ["f2_res.ini|IFACE|IFACE_BAR_MODE", { "fallout2-ce": "fallout2.cfg|ui|iface_bar_mode" }],
+  ["f2_res.ini|IFACE|IFACE_BAR_WIDTH", { "fallout2-ce": "fallout2.cfg|ui|iface_bar_width" }],
+  ["f2_res.ini|IFACE|IFACE_BAR_SIDE_ART", { "fallout2-ce": "fallout2.cfg|ui|iface_bar_side_art" }],
+  ["f2_res.ini|IFACE|IFACE_BAR_SIDES_ORI", { "fallout2-ce": "fallout2.cfg|ui|iface_bar_sides_ori" }],
+  ["f2_res.ini|MAPS|IGNORE_PLAYER_SCROLL_LIMITS", { "fallout2-ce": "fallout2.cfg|ui|ignore_scroll_limit" }],
+  ["f2_res.ini|MAPS|IGNORE_MAP_EDGES", { "fallout2-ce": "fallout2.cfg|ui|ignore_map_edges" }],
+  ["f2_res.ini|STATIC_SCREENS|SPLASH_SCRN_SIZE", { "fallout2-ce": "fallout2.cfg|ui|splash_screen_size" }],
+
+  // The six sfall keys fallout2-ce folds into its content config rather than into fallout2.cfg.
+  ["ddraw.ini|Misc|DamageFormula", { "fallout2-ce": "game#patch.cfg|combat|damage_formula" }],
+  ["ddraw.ini|Misc|InventoryApCost", { "fallout2-ce": "game#patch.cfg|combat|inventory_ap_cost" }],
+  [
+    "ddraw.ini|Misc|QuickPocketsApCostReduction",
+    { "fallout2-ce": "game#patch.cfg|combat|quick_pockets_ap_cost_reduction" },
+  ],
+  [
+    "ddraw.ini|Misc|ExplosionsEmitLight",
+    { "fallout2-ce": "game#patch.cfg|explosions|emit_light", fission: "fission.cfg|enhancements|ExplosionsEmitLight" },
+  ],
+  ["ddraw.ini|Interface|WorldMapTravelMarkers", { "fallout2-ce": "game#patch.cfg|worldmap|trail_markers" }],
+  ["ddraw.ini|Interface|WorldMapTerrainInfo", { "fallout2-ce": "game#patch.cfg|worldmap|terrain_info" }],
+  [
+    "ddraw.ini|Misc|RemoveCriticalTimelimits",
+    {
+      "fallout2-ce": "game#patch.cfg|combat|remove_critical_time_limits",
+      fission: "fission.cfg|enhancements|RemoveCriticalTimelimits",
+    },
+  ],
+
+  // Fission renamed one vanilla key rather than dropping it, which makes it a link to the Game tab.
+  ["fallout2.cfg|preferences|player_speedup", { fission: "fission.cfg|preferences|player_speed" }],
+];
+
+// Every address a binding sends a value to, so an address cannot be both a target of one setting and a
+// setting of its own - two rows editing one key, disagreeing whenever the link propagates.
+const LINKED = new Map();
+const TARGETED = new Set();
+for (const [nominated, byEngine] of BINDINGS) {
+  if (LINKED.has(nominated)) throw new Error(`BINDINGS: ${nominated} is bound twice`);
+  const rest = Object.entries(byEngine);
+  if (!rest.length) throw new Error(`BINDINGS: ${nominated} binds nothing`);
+  LINKED.set(nominated, rest);
+  for (const at of [nominated, ...rest.map(([, address]) => address)]) {
+    if (TARGETED.has(at)) throw new Error(`BINDINGS: ${at} is a target of two bindings`);
+    TARGETED.add(at);
+  }
+}
+
 // Values ZAX pins. The previous implementation forced UAC_AWARE off on every load; leaving it on makes the
 // high-resolution patch search for its ini elsewhere, so a user who turns it on gets confusing results.
 const MANAGED = {
@@ -378,28 +477,93 @@ const titleCase = (key) =>
 const layout = JSON.parse(fs.readFileSync("scripts/gen/layout.json", "utf8"));
 const orderOf = new Map(layout.map((r, i) => [`${r.file}|${r.section}|${r.key}`, i]));
 
+/**
+ * Fission's enhancements are inert while its own `StrictVanilla` switch is on, whatever each is set to. The
+ * gate rides on the Fission target so a linked setting's other halves keep working, which is the case gates
+ * are kept per target for.
+ */
+const STRICT_GATED = new Set(STRICT_VANILLA_GATES.map((key) => `fission.cfg|enhancements|${key}`));
+const STRICT_VANILLA_ID = idFor("fission.cfg", STRICT_VANILLA.section, STRICT_VANILLA.key);
+
+const targetAt = (at, engine) => {
+  const [file, section, key] = at.split("|");
+  return {
+    file,
+    section,
+    key,
+    ...(engine === undefined ? {} : { engine }),
+    // The gate rides on the target rather than the setting: a prerequisite can hold for one engine and not
+    // the next, and there is no such thing as a gate that applies to an address in a file that has none.
+    ...(GATED_BY[at] ? { gatedBy: { id: idFor(...GATED_BY[at][0].split("|")), ...GATED_BY[at][1] } } : {}),
+    ...(STRICT_GATED.has(at) ? { gatedBy: { id: STRICT_VANILLA_ID, is: ["0"] } } : {}),
+  };
+};
+
 function defFor(file, section, key, item) {
   const at = `${file}|${section}|${key}`;
   return {
     id: idFor(file, section, key),
-    file,
-    section,
-    key,
+    targets: [targetAt(at), ...(LINKED.get(at) ?? []).map(([engine, address]) => targetAt(address, engine))],
     kind: kindFor(item, key),
     label: LABEL[at] ?? stripUnit((item && item.name) || titleCase(key)),
     ...helpFor(at, item),
     ...(MANAGED[at] ? { managed: MANAGED[at] } : {}),
-    ...(GATED_BY[at] ? { gatedBy: { id: idFor(...GATED_BY[at][0].split("|")), ...GATED_BY[at][1] } } : {}),
     ...(CONFLICTS[at] ? { conflictsWith: { ...CONFLICTS[at], id: idFor(...CONFLICTS[at].id.split("|")) } } : {}),
   };
 }
 
-const defs = [];
+/** A source's catalog kind, whichever of the two shapes it came from. */
+const kindOfSource = (source) =>
+  source.engine === undefined ? kindFor(source.item, source.key) : engineKind(source.read, source.entry);
+
+/**
+ * What an engine key becomes. The storage kind and any clamp come from the engine's own source; option
+ * labels, a unit, sentinels and a floor the source states nowhere come from the table beside it.
+ */
+function engineKind(read, entry) {
+  if (entry.options) return { type: "choice", options: entry.options.map((o) => ({ ...o, value: String(o.value) })) };
+  if (read.kind === "bool") return { type: "bool", onValue: "1", offValue: "0" };
+  if (read.kind === "text" || read.kind === "path") return { type: "text", ...(entry.path ? { path: true } : {}) };
+  const min = entry.min ?? read.min;
+  const max = entry.max ?? read.max;
+  return {
+    type: read.kind === "real" ? "float" : "int",
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
+    ...(entry.unit ? { unit: entry.unit } : {}),
+    ...(entry.sentinels ? { sentinels: Object.fromEntries(Object.entries(entry.sentinels)) } : {}),
+  };
+}
+
+/** An engine's own setting: its own address first, then whatever a binding adds to it. */
+function engineDefFor(source) {
+  const at = `${source.file}|${source.section}|${source.key}`;
+  return {
+    id: idFor(source.file, source.section, source.key),
+    targets: [
+      { ...targetAt(at), engine: source.engine },
+      ...(LINKED.get(at) ?? []).map(([engine, address]) => targetAt(address, engine)),
+    ],
+    kind: engineKind(source.read, source.entry),
+    label: source.entry.label,
+    ...(source.entry.help ? { help: source.entry.help } : {}),
+  };
+}
+
+/** A setting's own address - the one its id was minted from, and the one the tables are keyed by. */
+const nominated = (d) => `${d.targets[0].file}|${d.targets[0].section}|${d.targets[0].key}`;
+
+/*
+  Every setting the two source kinds describe, gathered before any definition is built. A link derived below
+  is derived from what this catalog holds, so its addresses have to be known before `defFor` reads the link
+  table - which is why this is two passes rather than one.
+*/
+const sources = [];
 for (const file of FILES) {
   const doc = YAML.parse(fs.readFileSync(`scripts/gen/formats/${file}.yml`, "utf8"));
   for (const section of Object.keys(doc)) {
     if (section === "zax" || doc[section] == null) continue;
-    for (const key of Object.keys(doc[section])) defs.push(defFor(file, section, key, doc[section][key]));
+    for (const key of Object.keys(doc[section])) sources.push({ file, section, key, item: doc[section][key] });
   }
 }
 
@@ -412,17 +576,129 @@ for (const file of Object.keys(added)) {
   if (!FILES.includes(file)) throw new Error(`added.yml: "${file}" is not a config file ZAX edits`);
   for (const section of Object.keys(added[file] ?? {})) {
     for (const key of Object.keys(added[file][section])) {
-      const def = defFor(file, section, key, added[file][section][key]);
       // Placed after everything the previous layout ordered, since none of these appear in it.
       addedOrder.set(`${file}|${section}|${key}`, addedOrder.size);
-      defs.push(def);
+      sources.push({ file, section, key, item: added[file][section][key] });
     }
   }
 }
 
+/** Which file each engine keeps its own settings in. fallout2-ce writes into the game's own. */
+const ENGINE_FILES = { "fallout2-ce": "fallout2.cfg", fission: "fission.cfg" };
+
+const addressesIn = (file) =>
+  new Set(sources.filter((one) => one.file === file).map((one) => `${one.section}|${one.key}`));
+
+/**
+ * An engine's own keys - the ones no other component already describes at the same address. Read from the
+ * extraction, named by the hand table beside it, and refused outright where the table says nothing: a key
+ * nobody has looked at reads exactly like one deliberately left out.
+ */
+function addEngineSettings(engineId) {
+  const file = ENGINE_FILES[engineId];
+  const table = ENGINE_TABLES[engineId];
+  const held = addressesIn(file);
+  const doc = JSON.parse(fs.readFileSync(`scripts/gen/engines/${engineId}.json`, "utf8"));
+  let added = 0;
+  for (const one of doc.keys) {
+    const at = `${file}|${one.section}|${one.key}`;
+    if (held.has(`${one.section}|${one.key}`) || TARGETED.has(at)) continue;
+    const named = `${one.section}.${one.key}`;
+    if (!(named in table)) throw new Error(`${engineId}: nothing says what to do with ${named}`);
+    if (table[named] === null) continue; // deliberately not offered, with the reason beside the entry
+    addedOrder.set(at, addedOrder.size);
+    sources.push({ file, section: one.section, key: one.key, engine: engineId, read: one, entry: table[named] });
+    added += 1;
+  }
+  return added;
+}
+
+/*
+  Fallout Fission keeps the whole vanilla configuration in `fission.cfg` rather than reading the game's own
+  file, so every vanilla key it honours is a second address for a setting another tab already carries. Those
+  links are derived rather than listed: both sides are the same section and the same key, and fifty-odd rows
+  restating that would be a copy of the engine's own key list, drifting the moment it changed.
+
+  Derived only where the value space fits the field each side stores into, which is what the extraction
+  records: a key the engine reads into a switch cannot take a setting whose values are not 0 and 1. A key
+  that does not fit is named on the console and stays a row of Fission's own rather than being dropped.
+*/
+const fission = JSON.parse(fs.readFileSync("scripts/gen/engines/fission.json", "utf8"));
+
+/** Whether every value a setting can hold is a number, which is what a numeric field will keep. */
+const numericValues = (kind) => {
+  const numeric = (v) => /^-?\d+(\.\d+)?$/.test(v);
+  if (kind.type === "int" || kind.type === "float" || kind.type === "scale") return true;
+  if (kind.type === "bool") return numeric(kind.onValue) && numeric(kind.offValue);
+  if (kind.type === "choice") return kind.options.every((o) => numeric(o.value));
+  return false;
+};
+
+/** Whether the setting's values are exactly the two a C++ `bool` round-trips. */
+const switchValues = (kind) => {
+  const both =
+    kind.type === "bool"
+      ? [kind.onValue, kind.offValue]
+      : kind.type === "choice"
+        ? kind.options.map((o) => o.value)
+        : [];
+  return both.length === 2 && both.includes("0") && both.includes("1");
+};
+
+const fits = (kind, field) => {
+  if (field === "text" || field === "path") return true;
+  if (field === "bool") return switchValues(kind);
+  if (field === "number") return numericValues(kind);
+  return kind.type === "float" || numericValues(kind);
+};
+
+function deriveFissionLinks() {
+  const vanilla = addressesIn("fallout2.cfg");
+  const refused = [];
+  let derived = 0;
+  for (const one of fission.keys) {
+    const at = `fallout2.cfg|${one.section}|${one.key}`;
+    const address = `fission.cfg|${one.section}|${one.key}`;
+    if (!vanilla.has(`${one.section}|${one.key}`)) continue;
+    if (TARGETED.has(address)) continue; // already named by hand, which wins over a derivation
+    const source = sources.find((s) => s.file === "fallout2.cfg" && s.section === one.section && s.key === one.key);
+    if (!fits(kindOfSource(source), one.kind)) {
+      refused.push(`${at} -> ${one.kind}`);
+      continue;
+    }
+    LINKED.set(at, [...(LINKED.get(at) ?? []), ["fission", address]]);
+    TARGETED.add(address);
+    derived += 1;
+  }
+  return { derived, refused };
+}
+
+/*
+  Order matters here, and only this one works. The engine bindings name addresses fallout2-ce owns, so they
+  are registered before its keys are read or those keys would become settings of their own and be bound as
+  well. Fission's links are derived after that, against every fallout2.cfg address including the ones
+  fallout2-ce just added - which is what finds `running_burning_guy`, a key both engines have under one name
+  and the game does not have at all. Fission's own keys come last, once every address it shares is spoken for.
+*/
+for (const [nominated, byEngine] of ENGINE_BINDINGS) {
+  const rest = Object.entries(byEngine);
+  LINKED.set(nominated, [...(LINKED.get(nominated) ?? []), ...rest]);
+  for (const [, address] of rest) {
+    if (TARGETED.has(address)) throw new Error(`ENGINE_BINDINGS: ${address} is a target of two bindings`);
+    TARGETED.add(address);
+  }
+}
+const ceKeys = addEngineSettings("fallout2-ce");
+const { derived, refused } = deriveFissionLinks();
+const fissionKeys = addEngineSettings("fission");
+
+const defs = sources.map((one) =>
+  one.engine === undefined ? defFor(one.file, one.section, one.key, one.item) : engineDefFor(one),
+);
+
 // A key in one of the hand-maintained tables that matches no setting sits inert and changes nothing, which is
 // invisible in the output - an upstream rename would silently drop a gate rather than break the build.
-const known = new Set(defs.map((d) => `${d.file}|${d.section}|${d.key}`));
+const known = new Set(defs.map(nominated));
 const check = (table, k, what) => {
   if (!known.has(k)) throw new Error(`${table}: ${what} matches no setting: ${k}`);
 };
@@ -436,11 +712,26 @@ for (const [k, clash] of Object.entries(CONFLICTS)) {
   check("CONFLICTS", k, "key");
   check("CONFLICTS", clash.id, `counterpart for ${k}`);
 }
+// A gate naming an address no setting reaches sits inert, which is invisible in the output.
+const everyAddress = new Set(defs.flatMap((d) => d.targets.map((t) => `${t.file}|${t.section}|${t.key}`)));
+for (const at of STRICT_GATED) {
+  if (!everyAddress.has(at)) throw new Error(`STRICT_VANILLA_GATES: ${at} is not an address anything writes`);
+}
+if (!everyAddress.has(`fission.cfg|${STRICT_VANILLA.section}|${STRICT_VANILLA.key}`)) {
+  throw new Error("STRICT_VANILLA names no setting, so every gate on it would wait on nothing");
+}
+
+for (const [nominatedAt, rest] of LINKED) {
+  check("BINDINGS", nominatedAt, "nominated address");
+  // A bound address described as a setting of its own would give one key two rows, and the two would
+  // disagree the moment the link propagated.
+  for (const [, at] of rest) if (known.has(at)) throw new Error(`BINDINGS: ${at} is both a target and a setting`);
+}
 
 // Emitted in the order the previous interface laid them out, so the file diffs readably against that layout.
 // Nothing reads this order: where a setting appears is the layout's business.
 const rank = (d) => {
-  const at = `${d.file}|${d.section}|${d.key}`;
+  const at = nominated(d);
   return orderOf.has(at) ? orderOf.get(at) : orderOf.size + addedOrder.get(at);
 };
 defs.sort((a, b) => rank(a) - rank(b));
@@ -457,19 +748,28 @@ const body = defs
   )
   .join(",\n");
 
-fs.writeFileSync(
-  "packages/games-fallout2/src/catalog.ts",
-  `// Generated from the previous implementation's format definitions by scripts/gen/gen-catalog.mjs. Do not edit by hand;\n` +
-    `// change the generator's tables and regenerate.\n\n` +
-    `import type { SettingDef } from "@zax/core";\n\n` +
-    `export const SETTINGS: readonly SettingDef[] = [\n${body},\n];\n`,
-);
+/** Every setting the catalog holds, as objects rather than as the text they are written out to. */
+export const SETTING_DEFS = defs;
 
-const counts = {};
-for (const d of defs) counts[d.file] = (counts[d.file] ?? 0) + 1;
-console.log("total:", defs.length);
-console.log(counts);
-console.log("with help:", defs.filter((d) => d.help).length);
-const kinds = {};
-for (const d of defs) kinds[d.kind.type] = (kinds[d.kind.type] ?? 0) + 1;
-console.log(kinds);
+// Importing this module gives a reader the settings; only running it rewrites the catalog.
+if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
+  fs.writeFileSync(
+    "packages/games-fallout2/src/catalog.ts",
+    `// Generated from the previous implementation's format definitions by scripts/gen/gen-catalog.mjs. Do not edit by hand;\n` +
+      `// change the generator's tables and regenerate.\n\n` +
+      `import type { SettingDef } from "@zax/core";\n\n` +
+      `export const SETTINGS: readonly SettingDef[] = [\n${body},\n];\n`,
+  );
+
+  const counts = {};
+  for (const d of defs) for (const t of d.targets) counts[t.file] = (counts[t.file] ?? 0) + 1;
+  console.log("total:", defs.length);
+  console.log(`engine keys: fallout2-ce ${ceKeys}, fission ${fissionKeys}`);
+  console.log(`derived Fission links: ${derived}${refused.length ? `, refused ${refused.length}` : ""}`);
+  for (const one of refused) console.log("  refused:", one);
+  console.log(counts);
+  console.log("with help:", defs.filter((d) => d.help).length);
+  const kinds = {};
+  for (const d of defs) kinds[d.kind.type] = (kinds[d.kind.type] ?? 0) + 1;
+  console.log(kinds);
+}

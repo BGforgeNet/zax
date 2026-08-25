@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { SETTINGS } from "@zax/fallout2";
+import { ownTarget } from "@zax/core";
+import { ENGINE_CONFIG_FILES, ENGINES, SETTINGS } from "@zax/fallout2";
 import { PREVIEW_INSTALL, backend as hostBackend, previewPlatform } from "./host.js";
 import { store, unwrapArguments } from "./store.svelte.js";
 import {
@@ -41,6 +42,9 @@ beforeEach(async () => {
   await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(fallout2cfg));
   await previewPlatform.fs.write(`${PREVIEW_INSTALL}/f2_res.ini`, bytes(f2resini));
   await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddrawini));
+  // And an engine's own config goes, so a test that writes one does not leave the next install looking like
+  // one an engine has already run in. Reseeding fallout2.cfg clears fallout2-ce's mark with it.
+  for (const name of ENGINE_CONFIG_FILES) await previewPlatform.fs.remove(`${PREVIEW_INSTALL}/${name}`);
   seededOrder ??= await previewPlatform.fs.read(ORDER_FILE);
   await previewPlatform.fs.write(ORDER_FILE, seededOrder);
   seededModIni ??= await previewPlatform.fs.read(MOD_INI);
@@ -53,6 +57,112 @@ test("starts on the seeded install with its config files read", () => {
   // Read from the fixture rather than defaulted: everything below distinguishes a value from its absence.
   expect(store.baselineOf("sfall.Misc.ProcessorIdle")).toBe("-1");
   expect(store.baselineOf("hires.OTHER_SETTINGS.CPU_USAGE_FIX")).toBe("0");
+});
+
+describe("a setting more than one engine carries", () => {
+  const BARTER = "sfall.Interface.ExpandBarter";
+  const read = async (name: string) =>
+    new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${PREVIEW_INSTALL}/${name}`));
+
+  /** An install whose engines have each written their own settings, which is what makes their keys writable. */
+  const withEngines = async () => {
+    await previewPlatform.fs.write(
+      `${PREVIEW_INSTALL}/fallout2.cfg`,
+      bytes(`${fallout2cfg}\n[ui]\nextend_ap_bar=0\nexpand_barter_window=0\n`),
+    );
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
+    await store.start();
+  };
+
+  test("writes one edit to every engine that has run, under each of their own names", async () => {
+    await withEngines();
+    store.set(BARTER, "1");
+    await store.save();
+
+    expect(store.notice, "a save that worked has nothing to report").toBeNull();
+    expect(await read("ddraw.ini")).toContain("ExpandBarter=1");
+    expect(await read("fallout2.cfg")).toContain("expand_barter_window=1");
+    expect(await read("fission.cfg")).toContain("EnhancedBarter=1");
+  });
+
+  test("leaves the keys of an engine that has never run alone", async () => {
+    // Writing them early would create the section fallout2-ce's own one-shot import checks for, and the
+    // import would then never run - the user would lose what it was meant to carry across, silently.
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
+    await store.start();
+    store.set(BARTER, "1");
+    await store.save();
+
+    expect(await read("ddraw.ini")).toContain("ExpandBarter=1");
+    expect(await read("fission.cfg")).toContain("EnhancedBarter=1");
+    // The seeded fixture is vanilla, so fallout2-ce has written nothing and neither does ZAX.
+    expect(await read("fallout2.cfg")).not.toContain("expand_barter_window");
+    expect(await read("fallout2.cfg")).not.toContain("[ui]");
+  });
+
+  test("carries a value changed inside an engine across to the rest, and says where it came from", async () => {
+    // What the engine's own preferences screen leaves behind. ZAX wrote 0 everywhere, so the address that no
+    // longer says 0 is the side that moved.
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+    await store.start();
+
+    expect(store.valueOf(BARTER), "the newer value won").toBe("1");
+    expect(store.isModified(BARTER), "left pending rather than written during a load").toBe(true);
+    expect(store.propagated[BARTER], "the row has to be able to say where it came from").toBe("fission.cfg");
+    expect(store.notice?.kind).toBe("note");
+  });
+
+  test("asks rather than choosing when two engines have both moved", async () => {
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(`${ddrawini}\n[Interface]\nExpandBarter=2\n`));
+    await store.start();
+
+    expect(store.propagated[BARTER], "no value was picked on the user's behalf").toBeUndefined();
+    expect(store.settingsChoices.map((one) => one.id)).toContain(BARTER);
+  });
+
+  test("writes the same set from a one-click fix as from the row", async () => {
+    // Both go through the same pending layer, so the action cannot reach a different set of files.
+    await withEngines();
+    store.applyAction({
+      id: "test.barter",
+      group: "fix",
+      label: "Expand the barter window",
+      description: "Four item slots per table instead of three.",
+      appliedLabel: "Already expanded",
+      targets: { [BARTER]: "1" },
+    });
+    await store.save();
+
+    expect(await read("ddraw.ini")).toContain("ExpandBarter=1");
+    expect(await read("fallout2.cfg")).toContain("expand_barter_window=1");
+    expect(await read("fission.cfg")).toContain("EnhancedBarter=1");
+  });
+});
+
+test("recognizes a linked setting under the engine's own key rather than inventing a second row", async () => {
+  // What an install that has run fallout2-ce once looks like: the engine writes its own sections into the
+  // game's config file, and the keys in them are ones the catalog already describes under other names.
+  await previewPlatform.fs.write(
+    `${PREVIEW_INSTALL}/fallout2.cfg`,
+    bytes(`${fallout2cfg}\n[ui]\nexpand_barter_window=1\n`),
+  );
+  // And sfall's own side of the same link, which the bundled 3.3 ddraw.ini predates.
+  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(`${ddrawini}\n[Interface]\nExpandBarter=0\n`));
+  await store.start();
+
+  const ids = store.discovered.map((s) => s.id);
+  expect(ids, "the engine's key read as an unknown one").not.toContain("raw.fallout2.cfg.ui.expand_barter_window");
+  expect(
+    ids.filter((id) => id === "sfall.Interface.ExpandBarter"),
+    "one setting, however many of its addresses the file holds",
+  ).toHaveLength(1);
 });
 
 describe("installs", () => {
@@ -135,9 +245,9 @@ describe("search", () => {
 
     store.query = "sound";
     expect(store.results).not.toBe(first);
-    expect(store.results.every((r) => `${r.def.label} ${r.def.key} ${r.where}`.toLowerCase().includes("sound"))).toBe(
-      true,
-    );
+    expect(
+      store.results.every((r) => `${r.def.label} ${ownTarget(r.def).key} ${r.where}`.toLowerCase().includes("sound")),
+    ).toBe(true);
     store.query = "";
   });
 
@@ -145,7 +255,7 @@ describe("search", () => {
     store.settingsTab = "fallout2.cfg";
     store.query = "worldmap";
     // Every match here lives in ddraw.ini, which is a different tab from the one selected.
-    const files = new Set(store.results.map((r) => r.def.file));
+    const files = new Set(store.results.map((r) => ownTarget(r.def).file));
     expect(store.results.length).toBeGreaterThan(0);
     expect(files).toEqual(new Set(["ddraw.ini"]));
     store.query = "";
@@ -207,8 +317,8 @@ describe("search", () => {
     store.query = "worldmap";
     const first = store.results[0]!;
     store.goTo(first.place);
-    expect(store.settingsTab).toBe(first.place.file);
-    expect(store.fileTab[first.place.file]).toBe(first.place.tab);
+    expect(store.settingsTab).toBe(first.place.group);
+    expect(store.fileTab[first.place.group]).toBe(first.place.tab);
     expect(store.query, "leaving the query would send the user straight back to the results").toBe("");
   });
 });
@@ -616,7 +726,7 @@ describe("the unsaved marks", () => {
     store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
 
     expect(store.settingsChanged).toBe(true);
-    expect(store.modifiedInFile("fallout2.cfg"), "and the tab under it is marked too").toBe(1);
+    expect(store.modifiedInGroup("fallout2.cfg"), "and the tab under it is marked too").toBe(1);
 
     store.revert(MUSIC);
     expect(store.settingsChanged).toBe(false);
@@ -1135,6 +1245,149 @@ describe("engines", () => {
     // What is the folder's - which engine is deployed in it - is read again for the one arrived at.
     expect(listing).toHaveBeenCalledWith(expect.objectContaining({ path: "/games/other" }));
     expect(store.engines).toEqual([]);
+  });
+});
+
+describe("a setting both engines changed", () => {
+  const BARTER = "sfall.Interface.ExpandBarter";
+  const read = async (name: string) =>
+    new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${PREVIEW_INSTALL}/${name}`));
+
+  test("writes nothing until the user says which value survives, then writes that one everywhere", async () => {
+    // Both sides moved off what ZAX wrote, so neither is the newer one. Reconciliation offers the choice
+    // rather than picking, and the pick is an ordinary pending edit - revertible until it is saved.
+    await previewPlatform.fs.write(
+      `${PREVIEW_INSTALL}/fallout2.cfg`,
+      bytes(`${fallout2cfg}\n[ui]\nexpand_barter_window=0\n`),
+    );
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
+    await store.start();
+    store.set(BARTER, "0");
+    await store.save();
+
+    await previewPlatform.fs.write(
+      `${PREVIEW_INSTALL}/fallout2.cfg`,
+      bytes(`${fallout2cfg}\n[ui]\nexpand_barter_window=1\n`),
+    );
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=2\n"));
+    await store.start();
+
+    expect(store.settingsChoices.map((one) => one.id)).toContain(BARTER);
+    expect(store.isModified(BARTER), "nothing is written while the choice stands").toBe(false);
+
+    store.chooseLinked(BARTER, "1");
+    expect(
+      store.settingsChoices.map((one) => one.id),
+      "the prompt closes on the answer",
+    ).not.toContain(BARTER);
+    expect(store.isModified(BARTER), "and leaves an edit that can still be reverted").toBe(true);
+
+    await store.save();
+    expect(await read("ddraw.ini")).toContain("ExpandBarter=1");
+    expect(await read("fallout2.cfg")).toContain("expand_barter_window=1");
+    expect(await read("fission.cfg")).toContain("EnhancedBarter=1");
+  });
+});
+
+describe("the settings tabs an install offers", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const deployed = (id: string) => ({
+    id,
+    release: "continious",
+    published: "2026-08-23T09:37:22Z",
+    complete: true,
+    files: ["fallout2-ce.exe"],
+  });
+
+  /** The listing the Engines tab reads, with the named engines installed here and the rest not. */
+  const listing = (...installed: string[]) =>
+    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue(
+      ENGINES.map((one) => ({
+        id: one.id,
+        name: one.name,
+        short: one.short,
+        page: one.page,
+        releases: one.releases,
+        build: { asset: "a.zip", program: "a.exe" },
+        installed: installed.includes(one.id) ? deployed(one.id) : null,
+        cached: false,
+      })) as never,
+    );
+
+  const idsOffered = () => store.settingsGroups.map((one) => one.group.id);
+
+  test("offers the game's own three and no engine, on an install that has none", async () => {
+    listing();
+    await store.start();
+    expect(idsOffered()).toEqual(["fallout2.cfg", "f2_res.ini", "ddraw.ini"]);
+  });
+
+  test("offers an installed engine's tab once that engine has written its settings", async () => {
+    listing("fission");
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
+    await store.start();
+    expect(idsOffered()).toContain("fission");
+    expect(store.groupRefusal("fission")).toBeNull();
+  });
+
+  test("offers an installed engine that has not written its settings, and refuses its rows", async () => {
+    // Not hidden: the tab is how a user finds out what the engine can do. Not writable either - ZAX would be
+    // choosing the engine's configuration for it, and fallout2-ce's own one-shot import checks for the very
+    // section a premature write would create.
+    listing("fission");
+    await store.start();
+    expect(idsOffered()).toContain("fission");
+    expect(store.groupRefusal("fission")).toContain("Run the game once");
+  });
+
+  test("leaves a tab pointing at an engine the install arrived at does not have", async () => {
+    listing("fission");
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
+    await store.start();
+    store.settingsTab = "fission";
+
+    listing();
+    store.installs = [...store.installs, { path: "/games/other", type: "fallout2" }];
+    await store.selectInstall("/games/other");
+    expect(store.settingsTab, "a selection nothing offers would show neither that tab nor any other").toBe(
+      "fallout2.cfg",
+    );
+  });
+
+  test("keeps a tab that belongs to no layout group across the switch", async () => {
+    listing();
+    await store.start();
+    store.settingsTab = "trouble";
+    store.installs = [...store.installs, { path: "/games/other", type: "fallout2" }];
+    await store.selectInstall("/games/other");
+    expect(store.settingsTab).toBe("trouble");
+  });
+});
+
+describe("a row drawn under an engine's tab", () => {
+  const BARTER = "sfall.Interface.ExpandBarter";
+  const def = SETTINGS.find((one) => one.id === BARTER)!;
+
+  test("edits the address of the component whose tab it is", () => {
+    expect(store.targetFor(def, "ddraw.ini")).toMatchObject({ file: "ddraw.ini", key: "ExpandBarter" });
+    expect(store.targetFor(def, "fallout2-ce")).toMatchObject({ file: "fallout2.cfg", key: "expand_barter_window" });
+    expect(store.targetFor(def, "fission")).toMatchObject({ file: "fission.cfg", key: "EnhancedBarter" });
+    // A search result names no group, and gets the address the setting's own id was minted from.
+    expect(store.targetFor(def)).toMatchObject({ file: "ddraw.ini", key: "ExpandBarter" });
+  });
+
+  test("carries the gate of that address alone", async () => {
+    // Fission refuses every enhancement while its strict-vanilla switch is on. That says nothing about the
+    // same setting's sfall half, which is the case a gate on the setting rather than the target would get
+    // wrong: the sfall row would grey out because a file sfall never reads holds a 1.
+    await previewPlatform.fs.write(
+      `${PREVIEW_INSTALL}/fission.cfg`,
+      bytes("[enhancements]\nStrictVanilla=1\nEnhancedBarter=0\n"),
+    );
+    await store.start();
+    expect(store.gateOf(def, "ddraw.ini"), "sfall's half is gated by nothing").toBeNull();
+    expect(store.gateOf(def, "fission")?.active, "and Fission's half waits on the switch").toBe(false);
   });
 });
 

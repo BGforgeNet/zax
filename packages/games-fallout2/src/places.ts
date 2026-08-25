@@ -5,7 +5,10 @@ import { LAYOUT, type LayoutNode } from "./layout.js";
  * the result has to carry its own address or the user cannot tell two similarly-named settings apart.
  */
 export interface Place {
-  file: string;
+  /** The group of tabs it is shown under: a config file's name, or an engine's id. */
+  group: string;
+  /** The engine whose tabs those are, absent where the group is one of the game's own files. */
+  engine?: string;
   /** The settings tab, by the component's name rather than the filename. */
   label: string;
   tab: string;
@@ -19,11 +22,17 @@ export function placesById(): ReadonlyMap<string, Place> {
   const walk = (items: readonly LayoutNode[], base: Omit<Place, "frames">, frames: readonly string[]) => {
     for (const n of items) {
       if (n.kind === "frame") walk(n.items, base, [...frames, n.title]);
-      else if (n.kind === "setting") out.set(n.id, { ...base, frames });
+      else if (n.kind === "setting" && !out.has(n.id)) out.set(n.id, { ...base, frames });
     }
   };
+  // First place wins, and the game's own groups come first: a linked setting is reachable from the component
+  // it belongs to whether or not the engine that shares it is installed, so that is where search sends you.
+  // Only a setting no other component has - an engine's own key - is located on an engine's tab.
   for (const f of LAYOUT) {
-    for (const t of f.tabs) walk(t.items, { file: f.file, label: f.label, tab: t.title }, []);
+    for (const t of f.tabs) {
+      const base = { group: f.id, label: f.label, tab: t.title };
+      walk(t.items, f.engine === undefined ? base : { ...base, engine: f.engine }, []);
+    }
   }
   return out;
 }

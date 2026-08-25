@@ -82,6 +82,19 @@ ddraw.ini:
       desc: >-
         Moving money to or from the table pre-fills the Move Items window with the amount that balances the
         trade.
+    # Outside the curated sfall subset on its own merits; here because it completes a link to fallout2-ce's
+    # content config and to Fission, both of which carry the same switch.
+    RemoveCriticalTimelimits:
+      name: Remove critical time limits
+      desc: The game otherwise rolls no critical successes or failures in the first few days of game time.
+
+  Interface:
+    # Here for the same reason: fallout2-ce and Fission both carry it, and a link needs both sides described.
+    ExpandBarter:
+      name: Expanded barter window
+      desc: >-
+        Four item slots per table instead of three. Needs high-resolution patch 4.1.8, a resolution of at
+        least 640x528, and BARTER_E.frm and TRADE_E.frm from sfall.dat.
 
   Scripts:
     IniConfigFolder:

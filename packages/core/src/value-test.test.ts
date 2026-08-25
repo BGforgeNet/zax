@@ -4,9 +4,7 @@ import type { SettingDef } from "./catalog.js";
 
 const def = (kind: SettingDef["kind"], label = "Controller"): SettingDef => ({
   id: "x",
-  file: "ddraw.ini",
-  section: "Graphics",
-  key: "Mode",
+  targets: [{ file: "ddraw.ini", section: "Graphics", key: "Mode" }],
   kind,
   label,
 });

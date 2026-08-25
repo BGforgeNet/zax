@@ -42,6 +42,12 @@ export interface EngineDefinition {
   page: string;
   releases: ReleaseModel;
   builds: readonly EngineBuild[];
+  /**
+   * What proves this engine has written its own settings, which it does the first time it runs. An engine
+   * with a config file of its own is answered by the file; fallout2-ce writes into the game's own config
+   * file, which every install already has, so its mark is a section vanilla does not carry.
+   */
+  settingsMark: { file: string; section?: string };
 }
 
 export const ENGINES: readonly EngineDefinition[] = [
@@ -54,6 +60,9 @@ export const ENGINES: readonly EngineDefinition[] = [
     repo: "fallout2-ce/fallout2-ce",
     page: "https://github.com/fallout2-ce/fallout2-ce",
     releases: "rolling",
+    // It writes all of [ui], [qol], [gameplay] and [screen] on its first run, where vanilla carries only
+    // [debug], [preferences], [sound] and [system]; any one of them answers, and [ui] is the largest.
+    settingsMark: { file: "fallout2.cfg", section: "ui" },
     builds: [
       {
         os: "windows",
@@ -114,6 +123,8 @@ export const ENGINES: readonly EngineDefinition[] = [
     page: "https://github.com/cambragol/fission-ce",
     // Named versions, unlike CE's one republished tag, so what is installed is compared by tag rather than date.
     releases: "tagged",
+    // Its own file, which nothing else in an install creates.
+    settingsMark: { file: "fission.cfg" },
     // The 32-bit and armhf builds this project also publishes have no `Architecture` to match, and the shell
     // ZAX itself ships in has no build for such a host either. Every archive here is flat, with no wrapper
     // directory to name in a member.

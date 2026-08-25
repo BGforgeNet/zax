@@ -11,17 +11,43 @@
     where = "",
     onGo,
     control,
-  }: { def: SettingDef; nested?: boolean; where?: string; onGo?: () => void; control?: string } = $props();
+    group,
+  }: {
+    def: SettingDef;
+    nested?: boolean;
+    where?: string;
+    onGo?: () => void;
+    control?: string;
+    /** The group of tabs this row is drawn under, which picks the address of a setting that has several. */
+    group?: string | undefined;
+  } = $props();
 
+  // The address this row edits. A linked setting has more than one, and which of them a row shows follows the
+  // tab it sits on: the same setting is a different key, under a different gate, on each component's tab.
+  const address = $derived(store.targetFor(def, group));
+  // A controller in another file carries its address inline - the one exemption from the same-tab rule.
+  const elsewhere = (other: SettingDef) => {
+    const file = store.targetFor(other, group).file;
+    return file === address.file ? "" : ` (${file})`;
+  };
+
+  // The whole tab is refused: the engine is installed but has not written its settings yet.
+  const refused = $derived(group !== undefined && store.groupRefusal(group) !== null);
   const modified = $derived(store.isModified(def.id));
+  // Where the value came from, when it was not typed here. A row that is marked changed with nothing on
+  // screen saying why reads as ZAX having edited the install on its own.
+  const carriedFrom = $derived(store.propagated[def.id]);
   const value = $derived(store.valueOf(def.id));
   const validation = $derived(validate(def, value));
   const sentinel = $derived(sentinelLabel(def, value));
-  const absent = $derived(store.isAbsent(def.id) && !store.isModified(def.id));
-  const gate = $derived(store.gateOf(def));
+  // Not while the whole tab is refused: nothing there is in the file yet, so the note is true of every row
+  // at once and the banner above them already says it. Repeated down the column it is noise, and it crowds
+  // out the notes that do differ per row.
+  const absent = $derived(store.isAbsent(def.id) && !store.isModified(def.id) && !refused);
+  const gate = $derived(store.gateOf(def, group));
   // Null where the chain cannot be written from here - a pinned value, a missing file, a gate naming no one
   // value. The note then stands alone and the user sets the controller themselves, as they did before.
-  const requirements = $derived(store.requirementsFor(def));
+  const requirements = $derived(store.requirementsFor(def, group));
   // Where the note pins one value, "set it" says enough. Where it names a range - "DX9 fullscreen or DX9
   // windowed or ..." - the link says which of them the click writes, rather than leaving the user to find out.
   /**
@@ -35,10 +61,7 @@
     const links = requirements ?? [{ def: gate.controller, wants: gate.wants }];
     return links
       .map((link, at) =>
-        // A controller in another file carries its address inline - the one exemption from the same-tab rule.
-        nested && at === 0
-          ? `${link.wants} above`
-          : `${link.def.label}${link.def.file !== def.file ? ` (${link.def.file})` : ""} = ${link.wants}`,
+        nested && at === 0 ? `${link.wants} above` : `${link.def.label}${elsewhere(link.def)} = ${link.wants}`,
       )
       .join(", ");
   });
@@ -54,11 +77,12 @@
   const conflict = $derived(store.conflictOf(def));
   const managed = $derived(def.managed);
   const inert = $derived(gate !== null && !gate.active);
-  const origin = $derived(`${def.file} [${def.section}] ${def.key}`);
+  const origin = $derived(`${address.file} [${address.section}] ${address.key}`);
 
-  // The component this setting belongs to is not installed. Editing would write its config file into the game
-  // folder, which is not a thing to do on the user's behalf, so the row reads but does not take input.
-  const unavailable = $derived(store.install !== undefined && !store.hasFile(def.file));
+  // The component this setting belongs to is not installed, or an engine installed here has not yet written
+  // its settings. Editing would write a config file for it, which is not a thing to do on the user's behalf,
+  // so the row reads but does not take input.
+  const unavailable = $derived(store.install !== undefined && (!store.hasFile(address.file) || refused));
 </script>
 
 <div class="row" class:modified class:inert class:nested>
@@ -94,7 +118,7 @@
       <span class="gate">
         needs {needs}
         {#if requirements && fixWord}
-          <button class="fix" onclick={() => store.satisfyGate(def)}>{fixWord}</button>
+          <button class="fix" onclick={() => store.satisfyGate(def, group)}>{fixWord}</button>
         {/if}
       </span>
     {/if}
@@ -105,6 +129,9 @@
       <span class="absent" title="Setting it here adds the key to the file">
         not in your config - the game uses its default
       </span>
+    {/if}
+    {#if carriedFrom}
+      <span class="carried">changed in {carriedFrom} - save to keep it, or revert</span>
     {/if}
     {#if sentinel}<span class="sentinel">{sentinel}</span>{/if}
     {#if !validation.ok}<span class="invalid" role="alert">{validation.reason}</span>{/if}

@@ -9,18 +9,50 @@ function flatten(items: readonly LayoutNode[]): LayoutNode[] {
 const placed = LAYOUT.flatMap((f) => f.tabs.flatMap((t) => flatten(t.items)));
 const settingIds = placed.filter((n) => n.kind === "setting").map((n) => n.id);
 
+/** Which tab of which group each setting has a row on, keyed by group. */
+const rows = new Map<string, Map<string, string>>();
+for (const group of LAYOUT) {
+  const here = new Map<string, string>();
+  for (const t of group.tabs) for (const n of flatten(t.items)) if (n.kind === "setting") here.set(n.id, t.title);
+  rows.set(group.id, here);
+}
+
+/** The group that shows a given address: the engine's, or the one named for the file it sits in. */
+const groupFor = (at: { file: string; engine?: string }): string => at.engine ?? at.file;
+
 describe("layout", () => {
-  it("keeps the four settings tabs the previous interface had, in its order", () => {
-    expect(LAYOUT.map((f) => f.label)).toEqual(["Game", "HiRes", "Sfall"]);
-    expect(LAYOUT.map((f) => f.file)).toEqual(["fallout2.cfg", "f2_res.ini", "ddraw.ini"]);
+  it("keeps the previous interface's three groups in its order, and adds one per engine after them", () => {
+    expect(LAYOUT.map((f) => f.label)).toEqual(["Game", "HiRes", "Sfall", "CE", "Fission"]);
+    expect(LAYOUT.map((f) => f.id)).toEqual(["fallout2.cfg", "f2_res.ini", "ddraw.ini", "fallout2-ce", "fission"]);
+    // A group is a file's or an engine's, never both and never neither: the id means one thing or the other.
+    expect(LAYOUT.map((f) => f.engine)).toEqual([undefined, undefined, undefined, "fallout2-ce", "fission"]);
+    for (const f of LAYOUT) if (f.engine !== undefined) expect(f.engine).toBe(f.id);
   });
 
-  it("places every catalog setting exactly once", () => {
-    // A setting the layout never places is unreachable; one placed twice edits itself from two rows.
-    const seen = new Set(settingIds);
-    expect(seen.size, "a setting is placed more than once").toBe(settingIds.length);
-    const missing = SETTINGS.filter((s) => !seen.has(s.id)).map((s) => s.id);
-    expect(missing, "settings with no place in the interface").toEqual([]);
+  it("gives every address of every setting a row in the group that shows it, and never two on one tab", () => {
+    // A target with no row is a live value the user cannot reach: whichever component is installed, the tab
+    // for it has to offer the setting. A linked setting therefore has a row in each group that reads it -
+    // but never twice on the same tab, which would be one setting editing itself from two rows.
+    for (const group of LAYOUT) {
+      const ids = group.tabs.flatMap((t) => flatten(t.items)).flatMap((n) => (n.kind === "setting" ? [n.id] : []));
+      expect(new Set(ids).size, `a setting is placed twice on ${group.label}`).toBe(ids.length);
+    }
+    const unreachable = SETTINGS.flatMap((s) =>
+      s.targets.filter((t) => !rows.get(groupFor(t))?.has(s.id)).map((t) => `${s.id} -> ${t.file} [${t.section}]`),
+    );
+    expect(unreachable, "addresses with no row anywhere").toEqual([]);
+  });
+
+  it("places a linked setting on each side's own group rather than one of them", () => {
+    // The point of the two-target shape: this is what would silently regress to a single row if a generator
+    // change started placing a setting by its own address alone.
+    const shared = SETTINGS.filter((s) => s.targets.length > 1);
+    expect(shared.length, "no setting is linked, so this proves nothing").toBeGreaterThan(0);
+    for (const s of shared) {
+      const groups = new Set(s.targets.map((t) => groupFor(t)));
+      expect(groups.size, `${s.id} links two addresses in one group`).toBeGreaterThan(1);
+      for (const group of groups) expect(rows.get(group)?.has(s.id), `${s.id} has no row on ${group}`).toBe(true);
+    }
   });
 
   it("places nothing the catalog does not describe", () => {
@@ -28,30 +60,32 @@ describe("layout", () => {
     expect(settingIds.filter((id) => !known.has(id))).toEqual([]);
   });
 
-  it("puts every setting under the file whose tab it appears on", () => {
-    // A setting shown on the Sfall tab but written to fallout2.cfg would save somewhere the user is not looking.
+  it("puts every setting under a group that actually writes it", () => {
+    // A setting shown on the Sfall tab but written to fallout2.cfg would save somewhere the user is not
+    // looking; one on an engine's tab that the engine does not read would do nothing at all.
     const byId = new Map(SETTINGS.map((s) => [s.id, s]));
-    for (const file of LAYOUT) {
-      for (const t of file.tabs) {
+    for (const group of LAYOUT) {
+      for (const t of group.tabs) {
         for (const n of flatten(t.items)) {
           if (n.kind !== "setting") continue;
-          expect(byId.get(n.id)?.file, `${n.id} on the ${file.label} tab`).toBe(file.file);
+          const where = byId.get(n.id)?.targets.map((target) => groupFor(target)) ?? [];
+          expect(where, `${n.id} on the ${group.label} tab`).toContain(group.id);
         }
       }
     }
   });
 
   it("shows a gated setting on the same tab as the control that opens its gate", () => {
-    // Otherwise the setting sits greyed out with the reason on a screen the user cannot see from here.
-    const tabOf = new Map<string, string>();
-    for (const f of LAYOUT) {
-      for (const t of f.tabs) {
-        for (const n of flatten(t.items)) if (n.kind === "setting") tabOf.set(n.id, `${f.label}/${t.title}`);
-      }
-    }
+    // Otherwise the setting sits greyed out with the reason on a screen the user cannot see from here. Per
+    // target, since a gate rides on one address: Fission's strict-vanilla switch greys its own half of a
+    // linked setting and says nothing about the sfall half on another tab.
     for (const s of SETTINGS) {
-      if (!s.gatedBy) continue;
-      expect(tabOf.get(s.gatedBy.id), `${s.id} is gated from another tab`).toBe(tabOf.get(s.id));
+      for (const target of s.targets) {
+        const gate = target.gatedBy;
+        if (!gate) continue;
+        const here = rows.get(groupFor(target));
+        expect(here?.get(gate.id), `${s.id} is gated from another tab of ${groupFor(target)}`).toBe(here?.get(s.id));
+      }
     }
   });
 
@@ -131,14 +165,14 @@ describe("layout", () => {
   });
 
   it("gives every tab and frame a title", () => {
-    for (const file of LAYOUT) {
-      expect(file.tabs.length, `${file.label} has no tabs`).toBeGreaterThan(0);
-      for (const t of file.tabs) expect(t.title.length).toBeGreaterThan(0);
+    for (const group of LAYOUT) {
+      expect(group.tabs.length, `${group.label} has no tabs`).toBeGreaterThan(0);
+      for (const t of group.tabs) expect(t.title.length).toBeGreaterThan(0);
     }
     const titles = (items: readonly LayoutNode[]): string[] =>
       items.flatMap((n) => (n.kind === "frame" ? [n.title, ...titles(n.items)] : []));
-    for (const file of LAYOUT) {
-      for (const t of file.tabs) for (const title of titles(t.items)) expect(title.length).toBeGreaterThan(0);
+    for (const group of LAYOUT) {
+      for (const t of group.tabs) for (const title of titles(t.items)) expect(title.length).toBeGreaterThan(0);
     }
   });
 });

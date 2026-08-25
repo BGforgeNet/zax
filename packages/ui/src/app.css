@@ -339,6 +339,11 @@ button {
   font-style: italic;
 }
 
+/* The accent the notice reporting the whole set uses, so a row and that banner read as one event. */
+.list .row .carried {
+  color: var(--accent);
+}
+
 /*
   Both warn that a value will not behave as read, so they share the amber; red stays for a value that is itself
   invalid. The opening word separates them, since colour alone must not carry the difference.

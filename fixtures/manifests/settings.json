@@ -8,9 +8,13 @@
     "settings": [
       {
         "id": "fo2tweaks.main.autodoors",
-        "file": "mods/fo2tweaks.ini",
-        "section": "main",
-        "key": "autodoors",
+        "targets": [
+          {
+            "file": "mods/fo2tweaks.ini",
+            "section": "main",
+            "key": "autodoors"
+          }
+        ],
         "kind": {
           "type": "bool",
           "onValue": "1",
@@ -22,9 +26,13 @@
       },
       {
         "id": "fo2tweaks.main.style",
-        "file": "mods/fo2tweaks.ini",
-        "section": "main",
-        "key": "style",
+        "targets": [
+          {
+            "file": "mods/fo2tweaks.ini",
+            "section": "main",
+            "key": "style"
+          }
+        ],
         "kind": {
           "type": "choice",
           "options": [
@@ -44,9 +52,19 @@
       },
       {
         "id": "fo2tweaks.run_speed.dude",
-        "file": "mods/fo2tweaks.ini",
-        "section": "run_speed",
-        "key": "dude",
+        "targets": [
+          {
+            "file": "mods/fo2tweaks.ini",
+            "section": "run_speed",
+            "key": "dude",
+            "gatedBy": {
+              "id": "fo2tweaks.main.autodoors",
+              "is": [
+                "1"
+              ]
+            }
+          }
+        ],
         "kind": {
           "type": "int",
           "min": 0,
@@ -57,19 +75,17 @@
           }
         },
         "label": "The Chosen One",
-        "default": "4",
-        "gatedBy": {
-          "id": "fo2tweaks.main.autodoors",
-          "is": [
-            "1"
-          ]
-        }
+        "default": "4"
       },
       {
         "id": "fo2tweaks.run_speed.party",
-        "file": "mods/fo2tweaks.ini",
-        "section": "run_speed",
-        "key": "party",
+        "targets": [
+          {
+            "file": "mods/fo2tweaks.ini",
+            "section": "run_speed",
+            "key": "party"
+          }
+        ],
         "kind": {
           "type": "float",
           "min": 0.5,
@@ -80,9 +96,13 @@
       },
       {
         "id": "fo2tweaks.volume.music",
-        "file": "mods/fo2tweaks.ini",
-        "section": "volume",
-        "key": "music",
+        "targets": [
+          {
+            "file": "mods/fo2tweaks.ini",
+            "section": "volume",
+            "key": "music"
+          }
+        ],
         "kind": {
           "type": "scale",
           "max": 100
@@ -92,9 +112,13 @@
       },
       {
         "id": "fo2tweaks.paths.data",
-        "file": "mods/fo2tweaks-paths.ini",
-        "section": "paths",
-        "key": "data",
+        "targets": [
+          {
+            "file": "mods/fo2tweaks-paths.ini",
+            "section": "paths",
+            "key": "data"
+          }
+        ],
         "kind": {
           "type": "text",
           "path": true
@@ -103,20 +127,24 @@
       },
       {
         "id": "fo2tweaks.keys.toggle",
-        "file": "mods/fo2tweaks.ini",
-        "section": "keys",
-        "key": "toggle",
+        "targets": [
+          {
+            "file": "mods/fo2tweaks.ini",
+            "section": "keys",
+            "key": "toggle",
+            "gatedBy": {
+              "id": "sfall.Misc.DamageFormula",
+              "is": [
+                "0"
+              ]
+            }
+          }
+        ],
         "kind": {
           "type": "key"
         },
         "label": "Toggle key",
-        "default": "42",
-        "gatedBy": {
-          "id": "sfall.Misc.DamageFormula",
-          "is": [
-            "0"
-          ]
-        }
+        "default": "42"
       }
     ],
     "dropped": []

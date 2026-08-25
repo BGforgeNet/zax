@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GAME_TYPES, type GameType } from "@zax/core";
+  import { GAME_TYPES, ownTarget, type GameType } from "@zax/core";
   import { type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
   import SettingRow from "./SettingRow.svelte";
@@ -79,7 +79,10 @@
   /** A schema's sections, in the order the manifest declares them - the author's one lever over layout. */
   function sectionsOf(group: ModSettingsGroup): string[] {
     const seen: string[] = [];
-    for (const def of group.settings) if (!seen.includes(def.section)) seen.push(def.section);
+    for (const def of group.settings) {
+      const section = ownTarget(def).section;
+      if (!seen.includes(section)) seen.push(section);
+    }
     return seen;
   }
 
@@ -383,7 +386,7 @@
               </div>
             {/if}
             <div class="list">
-              {#each group.settings.filter((def) => def.section === activeSection(group)) as def (def.id)}
+              {#each group.settings.filter((def) => ownTarget(def).section === activeSection(group)) as def (def.id)}
                 <SettingRow {def} />
               {/each}
             </div>

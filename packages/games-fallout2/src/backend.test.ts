@@ -80,6 +80,77 @@ describe("the operations", () => {
     });
   });
 
+  it("reads an engine's own config files alongside the game's", async () => {
+    // The content config sits under the directory master_patches names, so its read needs the game's config
+    // file first; both come back under the name settings address them by, not the path they sit at.
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      dirs: ["/games/one/data"],
+      files: {
+        "/games/one/fallout2.exe": "MZ",
+        "/games/one/fallout2.cfg": "[system]\r\nmaster_patches=data\r\n[ui]\r\nextend_ap_bar=1\r\n",
+        "/games/one/fission.cfg": "[enhancements]\r\nMinimap=1\r\n",
+        "/games/one/data/config/game#patch.cfg": "[combat]\r\ndamage_formula=5\r\n",
+      },
+    });
+
+    const held = await createBackend(platform, noShell).loadConfigFiles("/games/one");
+
+    expect(held["fission.cfg"]).toBe("[enhancements]\r\nMinimap=1\r\n");
+    expect(held["game#patch.cfg"]).toBe("[combat]\r\ndamage_formula=5\r\n");
+  });
+
+  it("writes an engine's setting back where that engine reads it", async () => {
+    const game = "[system]\r\nmaster_patches=data\r\n";
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      dirs: ["/games/one/data"],
+      files: { "/games/one/fallout2.exe": "MZ", "/games/one/fallout2.cfg": game },
+    });
+    const backend = createBackend(platform, noShell);
+
+    const outcome = await backend.saveConfigFiles({
+      installPath: "/games/one",
+      original: await backend.loadConfigFiles("/games/one"),
+      changes: [{ file: "game#patch.cfg", section: "worldmap", key: "terrain_info", value: "1" }],
+    });
+
+    expect(outcome.ok).toBe(true);
+    const written = new TextDecoder("latin1").decode(await platform.fs.read("/games/one/data/config/game#patch.cfg"));
+    expect(written).toContain("terrain_info=1");
+  });
+
+  it("records what it wrote to a linked setting, and nothing else", async () => {
+    // The base is what a later load compares against to tell which side moved. Recorded by the save itself,
+    // so the two cannot come to disagree about what was written.
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      files: {
+        "/games/one/fallout2.exe": "MZ",
+        "/games/one/fallout2.cfg": "[sound]\r\nmusic=1\r\n",
+        "/games/one/ddraw.ini": "[Interface]\r\nExpandBarter=0\r\n",
+      },
+    });
+    const backend = createBackend(platform, noShell);
+
+    await backend.saveConfigFiles({
+      installPath: "/games/one",
+      original: await backend.loadConfigFiles("/games/one"),
+      changes: [
+        { file: "ddraw.ini", section: "Interface", key: "ExpandBarter", value: "1" },
+        // No engine carries this one, so nothing can ever disagree with it about the value.
+        { file: "ddraw.ini", section: "Misc", key: "SingleCore", value: "1" },
+      ],
+    });
+
+    // Only the linked one: an address no link reaches has nothing to reconcile against.
+    expect(await backend.settingsBase("/games/one")).toEqual({ "ddraw.ini|Interface|ExpandBarter": "1" });
+  });
+
+  it("answers with no base for an install it has never written to", async () => {
+    expect(await createBackend(ready(), noShell).settingsBase("/games/one")).toEqual({});
+  });
+
   it("reads the state file through to the resolved install", async () => {
     const { state } = await createBackend(ready(), noShell).loadState();
     expect(state.installs).toEqual([{ path: "/games/one", type: "fallout2" }]);

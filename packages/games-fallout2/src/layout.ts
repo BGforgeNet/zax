@@ -18,16 +18,22 @@ export interface LayoutTab {
 }
 
 export interface LayoutFile {
-  /** The config file this tab edits. */
-  file: string;
+  /**
+   * What identifies this group of tabs and keys which of them is open: the config file's name for the game's
+   * own three, the engine's id for an engine's. An engine's tabs are not one file's - fallout2-ce shows both
+   * the keys it reads from the game's config and the ones a linked setting puts in the content patch.
+   */
+  id: string;
   /** What the previous interface called it - the component, not the filename. */
   label: string;
+  /** The engine whose settings these tabs show, absent for the game's own three. */
+  engine?: string;
   tabs: readonly LayoutTab[];
 }
 
 export const LAYOUT: readonly LayoutFile[] = [
  {
-  "file": "fallout2.cfg",
+  "id": "fallout2.cfg",
   "label": "Game",
   "tabs": [
    {
@@ -356,7 +362,7 @@ export const LAYOUT: readonly LayoutFile[] = [
   ]
  },
  {
-  "file": "f2_res.ini",
+  "id": "f2_res.ini",
   "label": "HiRes",
   "tabs": [
    {
@@ -699,7 +705,7 @@ export const LAYOUT: readonly LayoutFile[] = [
   ]
  },
  {
-  "file": "ddraw.ini",
+  "id": "ddraw.ini",
   "label": "Sfall",
   "tabs": [
    {
@@ -807,6 +813,11 @@ export const LAYOUT: readonly LayoutFile[] = [
         "kind": "setting",
         "id": "sfall.Misc.QuickPocketsApCostReduction",
         "control": "spin"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.RemoveCriticalTimelimits",
+        "control": "checkbox"
        }
       ]
      },
@@ -1058,6 +1069,11 @@ export const LAYOUT: readonly LayoutFile[] = [
       "items": [
        {
         "kind": "setting",
+        "id": "sfall.Interface.ExpandBarter",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
         "id": "sfall.Misc.FullItemDescInBarter",
         "control": "checkbox"
        },
@@ -1199,6 +1215,917 @@ export const LAYOUT: readonly LayoutFile[] = [
       "kind": "setting",
       "id": "sfall.Debugging.Fixes",
       "control": "checkbox"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "fallout2-ce",
+  "label": "CE",
+  "engine": "fallout2-ce",
+  "tabs": [
+   {
+    "title": "Screen",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.screen.windowed",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "game.screen.mouse_lock",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.screen.scale",
+      "control": "spin"
+     },
+     {
+      "kind": "frame",
+      "title": "Resolution",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "hires.MAIN.SCR_WIDTH",
+        "control": "spin"
+       },
+       {
+        "kind": "setting",
+        "id": "hires.MAIN.SCR_HEIGHT",
+        "control": "spin"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Interface",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "sfall.Interface.ActionPointsBar",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.main_menu_scale_mode",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.in_game_menu_help",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.perks_progress_bar",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.alternate_ammo_meter",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.movie_aspect_fit",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.edg_support",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.quick_toolbar_visible",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.anim_speed",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.dialog_border",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.enable_high_resolution_stencil",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.inventory_columns",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.loot_weight_indicator",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "game.ui.loot_container_size_indicator_threshold",
+      "control": "spin"
+     },
+     {
+      "kind": "frame",
+      "title": "Misc",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.SkipOpeningMovies",
+        "control": "dropdown"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Dialog",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.NumbersInDialogue",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Inventory",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.DisplayBonusDamage",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Saves",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.AutoQuickSave",
+        "control": "spin"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "PDA",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.DisplayKarmaChanges",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Maps",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "hires.MAPS.IGNORE_MAP_EDGES",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "hires.MAPS.IGNORE_PLAYER_SCROLL_LIMITS",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Scaling",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "hires.STATIC_SCREENS.SPLASH_SCRN_SIZE",
+        "control": "dropdown"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Interface bar",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "hires.IFACE.IFACE_BAR_MODE",
+        "control": "dropdown"
+       },
+       {
+        "kind": "setting",
+        "id": "hires.IFACE.IFACE_BAR_SIDE_ART",
+        "control": "dropdown"
+       },
+       {
+        "kind": "setting",
+        "id": "hires.IFACE.IFACE_BAR_SIDES_ORI",
+        "control": "dropdown"
+       },
+       {
+        "kind": "setting",
+        "id": "hires.IFACE.IFACE_BAR_WIDTH",
+        "control": "spin"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Barter",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Interface.ExpandBarter",
+        "control": "checkbox"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Quality of life",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.qol.use_walk_distance",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.qol.auto_open_doors",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.qol.party_trade_from_menu",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.qol.party_loot_and_barter",
+      "control": "checkbox"
+     }
+    ]
+   },
+   {
+    "title": "Gameplay",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.gameplay.perk_carryover",
+      "control": "dropdown"
+     }
+    ]
+   },
+   {
+    "title": "Combat",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "sfall.Misc.DamageFormula",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "sfall.Misc.InventoryApCost",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "sfall.Misc.QuickPocketsApCostReduction",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "sfall.Misc.RemoveCriticalTimelimits",
+      "control": "checkbox"
+     }
+    ]
+   },
+   {
+    "title": "Explosions",
+    "items": [
+     {
+      "kind": "frame",
+      "title": "Misc",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.ExplosionsEmitLight",
+        "control": "checkbox"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "World map",
+    "items": [
+     {
+      "kind": "frame",
+      "title": "Worldmap",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Interface.WorldMapTravelMarkers",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Interface.WorldMapTerrainInfo",
+        "control": "checkbox"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Preferences",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.preferences.running_burning_guy",
+      "control": "checkbox"
+     }
+    ]
+   },
+   {
+    "title": "Sound",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.sound.gapless_music",
+      "control": "spin"
+     }
+    ]
+   },
+   {
+    "title": "System",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "hires.MAIN.f2_res_dat",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.screenshots_format",
+      "control": "qinput"
+     }
+    ]
+   },
+   {
+    "title": "Debug",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.debug.show_fps",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.debug.window_width",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.debug.window_height",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.debug.console_output_path",
+      "control": "qinput"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "fission",
+  "label": "Fission",
+  "engine": "fission",
+  "tabs": [
+   {
+    "title": "Graphics",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.ui.enable_high_resolution_stencil",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.graphics.fullscreen",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.graphics.stretch_enabled",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.graphics.preserve_aspect",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.graphics.high_quality",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.graphics.widescreen",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.graphics.square_pixels",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.graphics.play_area",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.graphics.widescreen_variant_suffix",
+      "control": "qinput"
+     }
+    ]
+   },
+   {
+    "title": "Enhancements",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.sound.gapless_music",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.qol.auto_open_doors",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.enhancements.StrictVanilla",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.enhancements.AutoQuickSave",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.enhancements.MassHighlight",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.enhancements.GameSpeed",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.enhancements.AutoPush",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.enhancements.Minimap",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.enhancements.InventoryColumns",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.enhancements.NpcArmor",
+      "control": "checkbox"
+     },
+     {
+      "kind": "frame",
+      "title": "Misc",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.SkipOpeningMovies",
+        "control": "dropdown"
+       },
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.ExplosionsEmitLight",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Dialog",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.NumbersInDialogue",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Inventory",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.DisplayBonusDamage",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "PDA",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.DisplayKarmaChanges",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Combat",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Misc.RemoveCriticalTimelimits",
+        "control": "checkbox"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Barter",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "sfall.Interface.ExpandBarter",
+        "control": "checkbox"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Preferences",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.preferences.brightness",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.game_difficulty",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.item_highlight",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.language_filter",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.mouse_sensitivity",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.running",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.subtitles",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.text_base_delay",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.text_line_delay",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.preferences.running_burning_guy",
+      "control": "checkbox"
+     },
+     {
+      "kind": "frame",
+      "title": "Combat",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "game.preferences.combat_difficulty",
+        "control": "dropdown"
+       },
+       {
+        "kind": "setting",
+        "id": "game.preferences.combat_looks",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "game.preferences.combat_messages",
+        "control": "dropdown"
+       },
+       {
+        "kind": "setting",
+        "id": "game.preferences.combat_taunts",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "game.preferences.target_highlight",
+        "control": "dropdown"
+       },
+       {
+        "kind": "setting",
+        "id": "game.preferences.violence_level",
+        "control": "dropdown"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Speed",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "game.preferences.combat_speed",
+        "control": "spin"
+       },
+       {
+        "kind": "setting",
+        "id": "game.preferences.player_speedup",
+        "control": "checkbox"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Sound",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.sound.music",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.sounds",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.speech",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.music_path1",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.music_path2",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.cache_size",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.device",
+      "control": "dropdown"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.dma",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.initialize",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.irq",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.port",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.debug",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.sound.debug_sfxc",
+      "control": "checkbox"
+     },
+     {
+      "kind": "frame",
+      "title": "Sound volume",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "game.sound.master_volume",
+        "control": "spin"
+       },
+       {
+        "kind": "setting",
+        "id": "game.sound.music_volume",
+        "control": "spin"
+       },
+       {
+        "kind": "setting",
+        "id": "game.sound.sndfx_volume",
+        "control": "spin"
+       },
+       {
+        "kind": "setting",
+        "id": "game.sound.speech_volume",
+        "control": "spin"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "System",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "game.system.art_cache_size",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.color_cycling",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.critter_dat",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.critter_patches",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.cycle_speed_factor",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.executable",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.free_space",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.hashing",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.interrupt_walk",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.language",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.master_dat",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.master_patches",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.scroll_lock",
+      "control": "checkbox"
+     },
+     {
+      "kind": "setting",
+      "id": "game.system.splash",
+      "control": "spin"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.system.fission_dat",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.system.fission_patches",
+      "control": "qinput"
+     },
+     {
+      "kind": "setting",
+      "id": "fission.system.master_override",
+      "control": "checkbox"
+     }
+    ]
+   },
+   {
+    "title": "Debug",
+    "items": [
+     {
+      "kind": "setting",
+      "id": "fission.debug.write_offsets",
+      "control": "checkbox"
+     },
+     {
+      "kind": "frame",
+      "title": "Main",
+      "items": [
+       {
+        "kind": "setting",
+        "id": "game.debug.output_map_data_info",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "game.debug.show_load_info",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "game.debug.show_script_messages",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "game.debug.show_tile_num",
+        "control": "checkbox"
+       },
+       {
+        "kind": "setting",
+        "id": "game.debug.mode",
+        "control": "dropdown"
+       }
+      ]
      }
     ]
    }

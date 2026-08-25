@@ -12,7 +12,15 @@
  */
 
 import { parse } from "yaml";
-import { GAME_TYPES, type GameType, type SettingDef, type SettingKind, type ValueTest } from "@zax/core";
+import {
+  GAME_TYPES,
+  ownTarget,
+  type GameType,
+  type SettingDef,
+  type SettingKind,
+  type SettingTarget,
+  type ValueTest,
+} from "@zax/core";
 import { SETTINGS } from "./catalog.js";
 import { grantsFor } from "./mod-grants.js";
 
@@ -504,20 +512,25 @@ function parseSettings(value: unknown, modId: string, granted: readonly string[]
       continue;
     }
 
-    const setting: ModSetting = {
-      id,
+    // A mod setting writes one address: the manifest format names a single file, section and key, and
+    // linking across engines is the catalog's business rather than something a mod declares.
+    const target: SettingTarget = {
       file:
         parts["file"] === undefined
           ? `mods/${modId}.ini`
           : writablePath(parts["file"], `${where}'s file`, modId, granted),
       section,
       key,
+      ...(parts["gated-by"] !== undefined ? { gatedBy: parseGate(parts["gated-by"], `${where}'s gate`) } : {}),
+    };
+    const setting: ModSetting = {
+      id,
+      targets: [target],
       kind,
       label: text(parts["label"], `${where}'s label`, SHORT_TEXT),
       ...(parts["help"] !== undefined ? { help: text(parts["help"], `${where}'s help`, LONG_TEXT) } : {}),
       ...(parts["default"] !== undefined ? { default: literal(parts["default"], `${where}'s default`) } : {}),
     };
-    if (parts["gated-by"] !== undefined) setting.gatedBy = parseGate(parts["gated-by"], `${where}'s gate`);
     out.push(setting);
   }
 
@@ -527,15 +540,19 @@ function parseSettings(value: unknown, modId: string, granted: readonly string[]
   let kept: readonly ModSetting[] = out;
   for (;;) {
     const ids = new Set(kept.map((setting) => setting.id));
-    const shown = (setting: ModSetting) =>
-      !setting.gatedBy || ids.has(setting.gatedBy.id) || CATALOG_IDS.has(setting.gatedBy.id);
+    const shown = (setting: ModSetting) => {
+      const gate = ownTarget(setting).gatedBy;
+      return !gate || ids.has(gate.id) || CATALOG_IDS.has(gate.id);
+    };
     const survivors = kept.filter(shown);
     if (survivors.length === kept.length) break;
-    for (const gone of kept.filter((setting) => !shown(setting)))
+    for (const gone of kept.filter((setting) => !shown(setting))) {
+      const at = ownTarget(gone);
       dropped.push({
-        address: `${gone.section}.${gone.key}`,
-        why: `it waits on "${gone.gatedBy?.id ?? ""}", which this version cannot show`,
+        address: `${at.section}.${at.key}`,
+        why: `it waits on "${at.gatedBy?.id ?? ""}", which this version cannot show`,
       });
+    }
     kept = survivors;
   }
   return { settings: kept, dropped };

@@ -6,6 +6,7 @@ import {
   isApplied,
   matchesValueTest,
   newInstall,
+  ownTarget,
   removeInstall,
   searchText,
   setAlias,
@@ -21,27 +22,35 @@ import {
   type StoredInstall,
   type Theme,
   type ValueTest,
+  type SettingTarget,
   type WineConfig,
 } from "@zax/core";
 import {
   ACTIONS,
   CONFIG_FILES,
+  ENGINES,
+  LAYOUT,
   MODS_ORDER_PATH,
   SETTINGS,
   againstRecommendation,
   describePlace,
   engineById,
   engineOutdated,
+  hasMintedSettings,
   hiddenIds,
   listMods,
   listingFrom,
+  liveTargets,
+  reconcileSettings,
   placesById,
   recommendationFor,
   recommendedOrder,
   wrapMethods,
   type Backend,
+  type Divergence,
   type EngineListing,
   type EngineRelease,
+  type LayoutFile,
   type MachineDescription,
   type Mod,
   type BaseInstallPlan,
@@ -106,7 +115,12 @@ const AUTOSAVE_DELAY = 400;
 const PLACES = placesById();
 const HIDDEN = hiddenIds();
 
-const CURATED = new Map(SETTINGS.map((s) => [`${s.file}|${s.section}|${s.key}`.toLowerCase(), s]));
+// Keyed by every target, not just each setting's own address: a key a linked setting also writes is that
+// setting seen from another file, and indexing only the first address would make `discover` invent a second
+// raw row for it.
+const CURATED = new Map(
+  SETTINGS.flatMap((s) => s.targets.map((t) => [`${t.file}|${t.section}|${t.key}`.toLowerCase(), s] as const)),
+);
 
 // Built once for the same reason as the maps above: the layout tab asks for a definition once per node on
 // every render, and a scan of the catalog per ask multiplies out on exactly the render that draws all of it.
@@ -139,14 +153,15 @@ function discover(documents: Record<string, IniDocument>): SettingDef[] {
     for (const entry of documents[file]?.entries() ?? []) {
       const curated = CURATED.get(`${file}|${entry.section}|${entry.key}`.toLowerCase());
       if (curated) {
-        out.push(curated);
+        // Once per setting, not once per key it was found under: a linked setting is reached from an engine's
+        // own keys as well as from its own, and a second entry would be the same id listed twice. A scan of
+        // what is already there rather than a set beside it - the list runs to a few hundred, once per load.
+        if (!out.some((seen) => seen.id === curated.id)) out.push(curated);
         continue;
       }
       out.push({
         id: `raw.${file}.${entry.section}.${entry.key}`.toLowerCase(),
-        file,
-        section: entry.section,
-        key: entry.key,
+        targets: [{ file, section: entry.section, key: entry.key }],
         kind: /^-?\d+$/.test(entry.value) ? { type: "int" } : { type: "text" },
         label: entry.key,
         ...(entry.comment ? { help: entry.comment } : {}),
@@ -162,8 +177,17 @@ function discover(documents: Record<string, IniDocument>): SettingDef[] {
  */
 export type TroubleTab = "report" | "fixes";
 
-/** Which sub-tab of Settings, by config file - plus Wine, which edits the install rather than a file. */
+/** Which sub-tab of Settings: a group of the layout's, or one of the tabs that belongs to no config file. */
 export type SettingsTab = string;
+
+/** The tabs the layout does not supply, which stay whatever the install holds. */
+const FIXED_SETTINGS_TABS = new Set(["all", "install", "trouble"]);
+
+/** A group of settings tabs to offer, and the reason its rows will not take input, where there is one. */
+export interface SettingsGroup {
+  group: LayoutFile;
+  refusal: string | null;
+}
 
 /**
  * The sidebar's own tab. Separate from `view` because the column stays put while the main pane changes - the
@@ -184,9 +208,13 @@ export type ModsTab = "installation" | "order" | "settings";
 /** Which of a mod row's controls started what is running - one label each, and the button says it. */
 export type ModAction = "prepare" | "install" | "remove" | "restore";
 
-/** Something that happened and the user needs told: a save, a refusal, a failure. */
+/**
+ * Something that happened and the user needs told: a save, a refusal, a failure. `note` is the third case -
+ * ZAX did something the user did not ask for and would want to know about, which is neither a completed
+ * action nor a fault, and reads as neither.
+ */
 export interface Notice {
-  kind: "done" | "problem";
+  kind: "done" | "problem" | "note";
   text: string;
 }
 
@@ -311,6 +339,24 @@ class Store {
    */
   private modOperation = $state<{ id: string; action: ModAction } | null>(null);
   notice = $state<Notice | null>(null);
+  /**
+   * Settings this load carried across from an engine's own file, and which file each came from. The row says
+   * so: a link cannot be broken, so a difference someone meant to keep is lost by being reconciled, and the
+   * only defence is that it is never lost quietly.
+   */
+  propagated = $state<Record<string, string>>({});
+  /** Linked settings whose engines have each moved since ZAX wrote, so which value survives is the user's. */
+  settingsChoices = $state<Divergence[]>([]);
+
+  /**
+   * Answers one of those choices: the value picked becomes a pending edit like any other, so it reaches every
+   * address of the setting on the next save and can be reverted before it does. The choice leaves the list
+   * once answered, which is what closes the prompt - there is nothing further to decide about that setting.
+   */
+  chooseLinked(id: string, value: string): void {
+    this.set(id, value);
+    this.settingsChoices = this.settingsChoices.filter((one) => one.id !== id);
+  }
 
   /** Whether this row's own control is the one running - a button's cue to change its label. */
   modWorking(id: string, action: ModAction): boolean {
@@ -364,9 +410,14 @@ class Store {
     const modDefs = [...this.modById.values()];
     // The mods' ini files parse alongside the engine's; `discover` still walks CONFIG_FILES alone, so the
     // raw every-key view never extends to mod inis - the schema is their whole surface, by design.
-    const files = [...new Set<string>([...CONFIG_FILES, ...modDefs.map((s) => s.file)])];
+    const files = [...new Set<string>([...CONFIG_FILES, ...modDefs.map((s) => ownTarget(s).file)])];
     const documents = Object.fromEntries(files.map((f) => [f, IniDocument.parse(this.contents[f] ?? "")]));
-    const valueOf = (s: SettingDef) => documents[s.file]?.get(s.section, s.key);
+    // Read at the setting's own address. Reconciling a linked setting's targets against each other needs the
+    // engine's own record of what ZAX last wrote, which no file here carries.
+    const valueOf = (s: SettingDef) => {
+      const at = ownTarget(s);
+      return documents[at.file]?.get(at.section, at.key);
+    };
     this.discovered = discover(documents);
     this.baseline = Object.fromEntries([...SETTINGS, ...modDefs].map((s) => [s.id, valueOf(s)]));
     this.rawBaseline = Object.fromEntries(this.discovered.map((s) => [s.id, valueOf(s)]));
@@ -382,7 +433,7 @@ class Store {
     for (const s of SETTINGS) {
       // Not for a file the install does not have: a pending change there would put the config file of an
       // uninstalled component into the game folder on the next save, which is the opposite of pinning a value.
-      if (!this.hasFile(s.file)) continue;
+      if (!this.hasFile(ownTarget(s).file)) continue;
       if (s.managed && this.baselineOf(s.id) !== s.managed.value) out[s.id] = s.managed.value;
     }
     return out;
@@ -483,10 +534,50 @@ class Store {
     this.modById = new Map(this.modSettings.flatMap((group) => group.settings.map((s) => [s.id, s])));
     this.index();
     this.overrides = await this.applyPins(install.path);
+    await this.settleLinked(install.path);
     await this.readMods(install);
     this.sfallInstalled = await backend.installedSfallVersion(install);
     this.hiresInstalled = await backend.installedHiresVersion(install);
     this.engines = await backend.availableEngines(install);
+    // Last, because it reads the listing above: an engine's tab goes when the engine does, and a selection
+    // left pointing at it would show neither that tab nor any other.
+    this.settleSettingsTab();
+  }
+
+  /** Falls back to the game's own first tab when the selected one is no longer offered. */
+  private settleSettingsTab(): void {
+    if (FIXED_SETTINGS_TABS.has(this.settingsTab)) return;
+    if (this.settingsGroups.some((one) => one.group.id === this.settingsTab)) return;
+    this.settingsTab = LAYOUT[0]!.id;
+  }
+
+  /**
+   * Carries a linked setting's newer value across to the engines that have not got it yet.
+   *
+   * Left pending rather than written, whatever `autosave` says: this is a value the user set somewhere else -
+   * inside an engine's own preferences screen, or by hand - so it is put in front of them as an edit they can
+   * undo, not applied to three files during a load they only meant as a load. A setting whose engines have
+   * both moved is not settled at all; which value survives is theirs to pick.
+   */
+  private async settleLinked(installPath: string): Promise<void> {
+    const found = reconcileSettings(SETTINGS, this.contents, await backend.settingsBase(installPath));
+    const carried: Record<string, string> = {};
+    const next = { ...this.overrides };
+    for (const one of found) {
+      if (!one.settle) continue;
+      next[one.id] = one.settle.value;
+      carried[one.id] = one.settle.target.file;
+    }
+    this.overrides = next;
+    this.propagated = carried;
+    this.settingsChoices = found.filter((one) => one.choose !== undefined);
+    const count = Object.keys(carried).length;
+    if (count > 0) {
+      this.notice = {
+        kind: "note",
+        text: `${count === 1 ? "One setting was" : `${count} settings were`} changed outside ZAX and carried across to the other engines. Save to keep them, or revert.`,
+      };
+    }
   }
 
   /** Rereads the mod order alone, which is what a save of it has to do to leave a fresh baseline behind. */
@@ -622,17 +713,34 @@ class Store {
    * Whether a gated setting currently has any effect, and what would make it live. Returns null for settings
    * that are not gated at all.
    */
-  gateOf(def: SettingDef): { active: boolean; controller: SettingDef; wants: string; test: ValueTest } | null {
-    if (!def.gatedBy) return null;
+  /**
+   * The address a row shows, which follows the group of tabs it sits on: a linked setting has one per
+   * component, and only the one the tab belongs to is the address that tab is about. Falls back to the
+   * setting's own where the group holds no target for it, which is what a search result gets.
+   */
+  targetFor(def: SettingDef, group?: string): SettingTarget {
+    if (group === undefined) return ownTarget(def);
+    return def.targets.find((t) => (t.engine ?? t.file) === group) ?? ownTarget(def);
+  }
+
+  gateOf(
+    def: SettingDef,
+    group?: string,
+  ): { active: boolean; controller: SettingDef; wants: string; test: ValueTest } | null {
+    // The gate of the address this row shows, not of the setting: a prerequisite can hold for one engine and
+    // not the next, which is why the gate sits on the target at all. Fission refuses every enhancement while
+    // its strict-vanilla switch is on, and says nothing about the same setting's sfall half.
+    const gate = this.targetFor(def, group).gatedBy;
+    if (!gate) return null;
     // Through `defOf` rather than the catalog alone: a mod setting may gate on a sibling of its own schema,
     // or across files on a catalog id - the manifest validator has already refused anything else.
-    const controller = this.defOf(def.gatedBy.id);
+    const controller = this.defOf(gate.id);
     if (!controller) return null;
     return {
-      active: matchesValueTest(controller, this.valueOf(controller.id), def.gatedBy),
+      active: matchesValueTest(controller, this.valueOf(controller.id), gate),
       controller,
-      wants: describeValueTest(controller, def.gatedBy),
-      test: def.gatedBy,
+      wants: describeValueTest(controller, gate),
+      test: gate,
     };
   }
 
@@ -642,18 +750,20 @@ class Store {
    * value, or a cycle. Each controller's own gate is followed too, since setting one that is itself inert
    * writes a value the game goes on ignoring; the chain is what a one-click fix has to cover.
    */
-  requirementsFor(def: SettingDef): { def: SettingDef; value: string; wants: string }[] | null {
+  requirementsFor(def: SettingDef, group?: string): { def: SettingDef; value: string; wants: string }[] | null {
     const out: { def: SettingDef; value: string; wants: string }[] = [];
     // An array rather than a set: a chain runs to two or three links, and a set here would be a reactive one.
     const seen = [def.id];
     let current = def;
     for (;;) {
-      const gate = this.gateOf(current);
+      // The same group all the way down: the layout holds a gate's controller to the tab the gated row is on,
+      // so every link in a chain is an address of the component whose tab this is.
+      const gate = this.gateOf(current, group);
       if (!gate || gate.active) return out;
       const controller = gate.controller;
       if (seen.includes(controller.id)) return null;
       seen.push(controller.id);
-      if (controller.managed !== undefined || !this.hasFile(controller.file)) return null;
+      if (controller.managed !== undefined || !this.hasFile(this.targetFor(controller, group).file)) return null;
       const value = valueSatisfying(controller, gate.test);
       if (value === undefined) return null;
       out.push({ def: controller, value, wants: gate.wants });
@@ -666,8 +776,8 @@ class Store {
    * typed one. The notice is not decoration: the settings changed can sit in another tab or another file,
    * where nothing on screen would otherwise show that anything happened.
    */
-  satisfyGate(def: SettingDef): void {
-    const needed = this.requirementsFor(def);
+  satisfyGate(def: SettingDef, group?: string): void {
+    const needed = this.requirementsFor(def, group);
     if (!needed || needed.length === 0) return;
     for (const requirement of needed) this.set(requirement.def.id, requirement.value);
     const first = needed[0];
@@ -1184,14 +1294,43 @@ class Store {
 
   /** Jumps to where a result lives and clears the search, so the row keeps its surrounding group. */
   goTo(place: Place): void {
-    this.settingsTab = place.file;
-    this.fileTab = { ...this.fileTab, [place.file]: place.tab };
+    this.settingsTab = place.group;
+    this.fileTab = { ...this.fileTab, [place.group]: place.tab };
     this.query = "";
   }
 
   /** Unsaved edits belonging to one config file, for the dot on its settings tab. */
-  modifiedInFile(file: string): number {
-    return SETTINGS.filter((s) => s.file === file && this.isModified(s.id)).length;
+  /**
+   * The groups of settings tabs to offer, in the layout's order: the game's own three always, and an engine's
+   * only where that engine is installed here. A tab for an engine nobody has is a screen of controls that
+   * write a file the game will never read.
+   *
+   * An installed engine that has not yet written its settings is offered but refused, with the reason. Its
+   * config does not exist until it has run once, and filling one in from the catalog's own defaults would
+   * hand the engine a configuration the user never chose - so the honest answer is to say what to do.
+   */
+  get settingsGroups(): ReadonlyArray<SettingsGroup> {
+    return LAYOUT.flatMap((group): SettingsGroup[] => {
+      if (group.engine === undefined) return [{ group, refusal: null }];
+      const engine = ENGINES.find((one) => one.id === group.engine);
+      const listing = this.engines.find((one) => one.id === group.engine);
+      if (engine === undefined || listing?.installed == null) return [];
+      if (hasMintedSettings(engine, this.contents)) return [{ group, refusal: null }];
+      return [{ group, refusal: `Run the game once with ${engine.short} - it writes these settings itself.` }];
+    });
+  }
+
+  /** Whether a group's rows accept input: the tab is reachable while its settings are not yet writable. */
+  groupRefusal(group: string): string | null {
+    return this.settingsGroups.find((one) => one.group.id === group)?.refusal ?? null;
+  }
+
+  modifiedInGroup(group: string): number {
+    // By the addresses the group shows rather than by the setting's own one: an edit to a setting an engine
+    // shares is unsaved on that engine's tab too, and a dot only over the component that minted the id would
+    // leave the other tab looking clean while its own row is changed.
+    return SETTINGS.filter((s) => s.targets.some((t) => (t.engine ?? t.file) === group) && this.isModified(s.id))
+      .length;
   }
 
   /**
@@ -1359,7 +1498,12 @@ class Store {
     const out: ConfigChange[] = [];
     for (const [id, value] of Object.entries(values)) {
       const def = this.defOf(id) ?? this.discovered.find((s) => s.id === id);
-      if (def) out.push({ file: def.file, section: def.section, key: def.key, value });
+      if (!def) continue;
+      // Every address the setting has that is actually writable here - one edit, one value, however many
+      // names the installed engines keep it under. `liveTargets` is what leaves a dormant engine's alone.
+      for (const at of liveTargets(def, this.contents)) {
+        out.push({ file: at.file, section: at.section, key: at.key, value });
+      }
     }
     return out;
   }

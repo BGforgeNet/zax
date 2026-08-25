@@ -3,9 +3,7 @@ import { searchText, type SettingDef } from "./catalog.js";
 
 const def = (over: Partial<SettingDef>): SettingDef => ({
   id: "x",
-  file: "f2_res.ini",
-  section: "MAIN",
-  key: "SCR_WIDTH",
+  targets: [{ file: "f2_res.ini", section: "MAIN", key: "SCR_WIDTH" }],
   kind: { type: "int" },
   label: "Resolution X",
   ...over,
@@ -38,7 +36,25 @@ describe("searchText", () => {
   it("carries nothing beyond those fields", () => {
     // The group label ("High resolution") stays out of SettingDef and out of this text: including it made
     // every setting of that file match a search for "resolution", burying the few settings actually about it.
-    const unrelated = def({ label: "Grayscale", key: "IS_GRAY_SCALE", section: "EFFECTS" });
+    const unrelated = def({
+      label: "Grayscale",
+      targets: [{ file: "f2_res.ini", section: "EFFECTS", key: "IS_GRAY_SCALE" }],
+    });
     expect(searchText(unrelated)).not.toContain("resolution");
+  });
+
+  it("carries every target's address, so a linked setting is findable by any of its names", () => {
+    // A setting several engines carry under different names is one row; searching for the name the engine
+    // documents has to reach it, or the link makes the setting harder to find rather than easier.
+    const linked = def({
+      label: "Expanded barter window",
+      targets: [
+        { file: "ddraw.ini", section: "Interface", key: "ExpandBarter" },
+        { file: "fission.cfg", section: "enhancements", key: "EnhancedBarter" },
+      ],
+    });
+    expect(searchText(linked)).toContain("expandbarter");
+    expect(searchText(linked)).toContain("enhancedbarter");
+    expect(searchText(linked)).toContain("fission.cfg");
   });
 });

@@ -2,12 +2,14 @@
   import { isPreview, PREVIEW_REASON } from "./host.js";
   import { store } from "./store.svelte.js";
 
-  let { file }: { file: string } = $props();
+  // `reason` is given where the caller already knows why - an engine that has not written its settings yet.
+  // Without one this works it out from the file, which is the case where what is missing IS the file.
+  let { file = "", reason = "" }: { file?: string; reason?: string } = $props();
 
   /*
-    A tab whose config file the install does not have keeps its settings on screen, read-only: the previous
-    interface disabled the whole tab, which said it was unavailable but not why. Editing is what stays off,
-    because saving would write a config file for a component that is not there.
+    A tab whose settings cannot be edited keeps them on screen, read-only: the previous interface disabled the
+    whole tab, which said it was unavailable but not why. Editing is what stays off, because saving would
+    write a config file for a component that is not there, or one an engine has not chosen its own values for.
 
     Only sfall is offered for installation. The hi-res patch is distributed from a forum thread rather than a
     release feed, so there is nothing to install it from.
@@ -28,9 +30,10 @@
 
 <div class="missing" role="status">
   <span>
-    {file === "f2_res.ini"
-      ? hires
-      : (WHAT[file] ?? "This file is not in the game folder, so its settings cannot be edited.")}
+    {reason ||
+      (file === "f2_res.ini"
+        ? hires
+        : (WHAT[file] ?? "This file is not in the game folder, so its settings cannot be edited."))}
   </span>
   {#if file === "ddraw.ini"}
     <button

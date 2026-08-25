@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { LAYOUT, SETTINGS } from "@zax/fallout2";
+  import { ENGINES, LAYOUT, SETTINGS } from "@zax/fallout2";
   import BugReportPanel from "./BugReportPanel.svelte";
   import FixesPanel from "./FixesPanel.svelte";
   import HiresVersion from "./HiresVersion.svelte";
   import LayoutNodes from "./LayoutNodes.svelte";
+  import LinkedChoices from "./LinkedChoices.svelte";
   import SettingRow from "./SettingRow.svelte";
   import InstallPanel from "./InstallPanel.svelte";
-  import MissingFile from "./MissingFile.svelte";
+  import Unavailable from "./Unavailable.svelte";
   import { store } from "./store.svelte.js";
 
   // A fix is one click and a report is a sequence you work through, so they stay apart.
@@ -15,8 +16,15 @@
     { id: "fixes", title: "Fixes" },
   ] as const;
 
-  const file = $derived(LAYOUT.find((f) => f.file === store.settingsTab));
-  const tab = $derived(file ? (store.fileTab[file.file] ?? file.tabs[0]?.title ?? "") : "");
+  const offered = $derived(store.settingsGroups);
+  const here = $derived(offered.find((one) => one.group.id === store.settingsTab));
+  const file = $derived(here?.group);
+  const refusal = $derived(here?.refusal ?? null);
+  const tab = $derived(file ? (store.fileTab[file.id] ?? file.tabs[0]?.title ?? "") : "");
+  // A group's own name in the tooltip: the filename for the game's three, the engine's full name for the rest,
+  // since "fallout2-ce" is the id a person would have to already know.
+  const nameOf = (f: (typeof LAYOUT)[number]) =>
+    f.engine === undefined ? f.id : (ENGINES.find((e) => e.id === f.engine)?.name ?? f.engine);
   const items = $derived(file?.tabs.find((t) => t.title === tab)?.items ?? []);
   // The search box lives on the "all settings" tab; the window still focuses it with Ctrl-F.
   let searchBox = $state<HTMLInputElement | null>(null);
@@ -31,13 +39,13 @@
 <div class="pane">
   <div class="tabbar">
     <div class="tabs" role="tablist">
-      {#each LAYOUT as f (f.file)}
+      {#each offered as { group: f, refusal: why } (f.id)}
         <button
           role="tab"
           class="tab"
-          aria-selected={store.settingsTab === f.file}
-          title={f.file}
-          onclick={() => (store.settingsTab = f.file)}
+          aria-selected={store.settingsTab === f.id}
+          title={why ?? nameOf(f)}
+          onclick={() => (store.settingsTab = f.id)}
         >
           {f.label}
           <!--
@@ -47,9 +55,9 @@
           -->
           <span
             class="dot"
-            class:unsaved={store.modifiedInFile(f.file) > 0}
+            class:unsaved={store.modifiedInGroup(f.id) > 0}
             aria-hidden="true"
-            title={store.modifiedInFile(f.file) > 0 ? `${store.modifiedInFile(f.file)} unsaved` : null}
+            title={store.modifiedInGroup(f.id) > 0 ? `${store.modifiedInGroup(f.id)} unsaved` : null}
           ></span>
         </button>
       {/each}
@@ -93,7 +101,7 @@
           role="tab"
           class="subtab"
           aria-selected={tab === t.title}
-          onclick={() => (store.fileTab = { ...store.fileTab, [file.file]: t.title })}
+          onclick={() => (store.fileTab = { ...store.fileTab, [file.id]: t.title })}
         >
           {t.title}
         </button>
@@ -116,6 +124,11 @@
 
   <main>
     <div class="list">
+      <!-- Above whichever tab of settings is open, rather than on the one the setting happens to live on: the
+           value is about to be lost either way, and an answer is wanted before anything here is saved. -->
+      {#if file || store.settingsTab === "all"}
+        <LinkedChoices />
+      {/if}
       {#if store.settingsTab === "all"}
         <!--
           Every setting in one flat list, whatever tab it normally lives on. Each carries its own address and a
@@ -158,19 +171,22 @@
           {/if}
         {/each}
       {:else if file}
-        <!-- The settings stay on screen when their file is absent; the rows themselves refuse input. -->
-        {#if store.install && !store.hasFile(file.file)}
-          <MissingFile file={file.file} />
+        <!-- The rows stay on screen and refuse input either way, whether what is missing is the config file or
+             the engine's own first run. Hiding them would answer "what can this engine do" with a blank pane. -->
+        {#if refusal}
+          <Unavailable reason={refusal} />
+        {:else if store.install && file.engine === undefined && !store.hasFile(file.id)}
+          <Unavailable file={file.id} />
         {/if}
         <!--
           The hi-res patch's version, which the previous interface never showed and so has no place in the
           generated layout. It goes where sfall's does - the top of the file's first tab - rather than above
           every tab, and only once there is an f2_res.ini to say anything about.
         -->
-        {#if file.file === "f2_res.ini" && tab === file.tabs[0]?.title && store.hasFile(file.file)}
+        {#if file.id === "f2_res.ini" && tab === file.tabs[0]?.title && store.hasFile(file.id)}
           <HiresVersion />
         {/if}
-        <LayoutNodes {items} />
+        <LayoutNodes {items} group={file.id} />
       {:else if store.settingsTab === "trouble"}
         {#if store.troubleTab === "report"}<BugReportPanel />{:else}<FixesPanel />{/if}
       {:else}

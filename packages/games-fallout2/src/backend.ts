@@ -18,6 +18,7 @@ import {
   loadConfigFiles,
   loadState,
   logFile,
+  ownTarget,
   saveConfigFiles,
   saveState,
   scanForInstalls,
@@ -31,6 +32,9 @@ import {
   type ZaxRelease,
 } from "@zax/core";
 import type { OperatingSystem, Platform } from "@zax/platform";
+import { engineConfigPaths } from "./engine-config.js";
+import { addressOf } from "./reconcile-settings.js";
+import { SETTINGS } from "./catalog.js";
 import { CONFIG_FILES } from "./files.js";
 import { mayWrite, parseManifest, type DroppedSetting, type ModSetting } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
@@ -74,7 +78,7 @@ import {
 } from "./engine-install.js";
 import { cachedEngine, latestEngine, type EngineRelease } from "./engine-release.js";
 import { ENGINES, buildFor, engineById, type ReleaseModel } from "./engines.js";
-import { loadRecord, reconcileRecord, type InstalledEngine } from "./records.js";
+import { loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
 import { readTransaction, releaseOf } from "./mod-transaction.js";
 import { readMods, saveMods, type ModsSaveRequest, type ModsSnapshot } from "./mods.js";
 import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
@@ -88,6 +92,16 @@ import {
   type SfallRelease,
   type SfallUpdate,
 } from "./sfall.js";
+
+/**
+ * Every address a linked setting writes. What `rememberWritten` records a base for: an address no link
+ * reaches has nothing to reconcile against, so recording one would grow the record for nothing.
+ */
+const LINKED_ADDRESSES = new Set(
+  SETTINGS.filter((setting) => setting.targets.length > 1).flatMap((setting) =>
+    setting.targets.map((target) => addressOf(target)),
+  ),
+);
 
 /** The application's own directories, and which machine this is. Read once, at startup. */
 export interface MachineDescription {
@@ -151,6 +165,12 @@ export interface Backend {
   saveState(state: AppState): Promise<void>;
   loadConfigFiles(installPath: string): Promise<ConfigFileContents>;
   saveConfigFiles(request: SaveRequest): Promise<SaveOutcome>;
+  /**
+   * What ZAX last wrote to each address of a setting more than one engine carries, keyed by
+   * `file|section|key`. Recorded by `saveConfigFiles` itself, so the two cannot come to disagree about what
+   * was written.
+   */
+  settingsBase(installPath: string): Promise<Readonly<Record<string, string>>>;
   /** sfall's mod load order, and what sits in the folder it orders. */
   loadMods(install: Install): Promise<ModsSnapshot>;
   saveMods(request: ModsSaveRequest): Promise<SaveOutcome>;
@@ -345,7 +365,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         groups.push({
           modId: manifest.id,
           name: manifest.name,
-          files: [...new Set(manifest.settings.map((setting) => setting.file))],
+          files: [...new Set(manifest.settings.map((setting) => ownTarget(setting).file))],
           settings: manifest.settings,
           dropped: manifest.dropped,
         });
@@ -355,6 +375,24 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       }
     }
     return groups;
+  };
+
+  /**
+   * Records what a save just wrote to the addresses of a setting more than one engine carries, which is what
+   * a later load compares against to tell which side moved. Only those: an address no link reaches has
+   * nothing to reconcile with, and recording every key would put the whole catalog in the record.
+   *
+   * Never fails a save that already succeeded. A record written by a newer ZAX is not ours to rewrite, and a
+   * lost base only costs the preference between two values - the files themselves are already correct.
+   */
+  const rememberWritten = async (request: SaveRequest): Promise<void> => {
+    const relevant = request.changes.filter((change) => LINKED_ADDRESSES.has(addressOf(change)));
+    if (relevant.length === 0) return;
+    const record = await loadRecord(platform, request.installPath);
+    if (record.laterFormat !== undefined) return;
+    const written = { ...record.written };
+    for (const change of relevant) written[addressOf(change)] = change.value;
+    await saveRecord(platform, { ...record, written });
   };
 
   return {
@@ -375,9 +413,20 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       // interface's guard-and-backup behaviour is one mechanism, not two.
       const names = new Set<string>(CONFIG_FILES);
       for (const group of await installedModSettings(installPath)) for (const file of group.files) names.add(file);
-      return loadConfigFiles(platform, installPath, [...names]);
+      const held = await loadConfigFiles(platform, installPath, [...names]);
+      // Second, because where the content config sits is a setting inside the file just read.
+      const paths = await engineConfigPaths(platform, installPath, held["fallout2.cfg"]);
+      return { ...held, ...(await loadConfigFiles(platform, installPath, Object.keys(paths), paths)) };
     },
-    saveConfigFiles: (request) => saveConfigFiles(platform, request),
+    saveConfigFiles: async (request) => {
+      // Resolved against the contents the edits were made against, which is what the read used, so a save
+      // writes where it read. A `master_patches` changed in the same save takes effect on the next load.
+      const paths = await engineConfigPaths(platform, request.installPath, request.original["fallout2.cfg"]);
+      const outcome = await saveConfigFiles(platform, { ...request, paths });
+      if (outcome.ok) await rememberWritten(request);
+      return outcome;
+    },
+    settingsBase: async (installPath) => (await loadRecord(platform, installPath)).written ?? {},
     loadMods: (install) => readMods(platform, install),
     saveMods: (request) => saveMods(platform, request),
 
@@ -440,7 +489,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       try {
         for (const setting of parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version })
           .settings) {
-          allowed.add(setting.file);
+          allowed.add(ownTarget(setting).file);
         }
       } catch {
         // An unreadable snapshot narrows what may be opened; it does not widen anything.

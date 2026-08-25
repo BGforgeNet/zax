@@ -25,15 +25,25 @@ export interface ConfigFileContents {
   [file: string]: string | undefined;
 }
 
+/**
+ * Where a file sits inside an install, for the few whose location is not their own name - one of them is kept
+ * in a directory another file's settings name, so it cannot be addressed by its path. A name this does not
+ * mention is its own path.
+ */
+export type ConfigFilePaths = Readonly<Record<string, string>>;
+
+const pathOf = (paths: ConfigFilePaths, name: string) => paths[name] ?? name;
+
 /** Reads the named files from an install. A file that is not there reads as undefined rather than empty. */
 export async function loadConfigFiles(
   platform: Platform,
   installPath: string,
   names: readonly string[],
+  paths: ConfigFilePaths = {},
 ): Promise<ConfigFileContents> {
   const out: ConfigFileContents = {};
   for (const name of names) {
-    const path = platform.paths.join(installPath, name);
+    const path = platform.paths.join(installPath, pathOf(paths, name));
     out[name] = (await platform.fs.stat(path))?.kind === "file" ? latin1(await platform.fs.read(path)) : undefined;
   }
   return out;
@@ -52,6 +62,8 @@ export interface SaveRequest {
   /** The contents the edits were made against, as `loadConfigFiles` returned them. */
   original: ConfigFileContents;
   changes: readonly ConfigChange[];
+  /** The same map `loadConfigFiles` was given, so a save writes where the read read. */
+  paths?: ConfigFilePaths;
 }
 
 /**
@@ -65,14 +77,14 @@ export async function saveConfigFiles(
   request: SaveRequest,
   now: Date = new Date(),
 ): Promise<SaveOutcome> {
-  const { installPath, original, changes } = request;
+  const { installPath, original, changes, paths = {} } = request;
   const files = [...new Set(changes.map((change) => change.file))].sort();
   if (files.length === 0) return { ok: true, files: [], backup: null };
 
   const current: Record<string, string | undefined> = {};
   const changed: string[] = [];
   for (const file of files) {
-    const path = platform.paths.join(installPath, file);
+    const path = platform.paths.join(installPath, pathOf(paths, file));
     const found = (await platform.fs.stat(path))?.kind === "file" ? latin1(await platform.fs.read(path)) : undefined;
     current[file] = found;
     if (found !== original[file]) changed.push(file);
@@ -82,7 +94,9 @@ export async function saveConfigFiles(
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
   for (const file of files) {
     if (current[file] === undefined) continue;
-    await platform.fs.copy(platform.paths.join(installPath, file), platform.paths.join(backup, file));
+    // The backup mirrors the install, so a copy sits where the file it came from does.
+    const at = pathOf(paths, file);
+    await platform.fs.copy(platform.paths.join(installPath, at), platform.paths.join(backup, at));
   }
 
   for (const file of files) {
@@ -90,7 +104,7 @@ export async function saveConfigFiles(
     for (const change of changes) {
       if (change.file === file) document.set(change.section, change.key, change.value);
     }
-    await platform.fs.write(platform.paths.join(installPath, file), document.toBytes());
+    await platform.fs.write(platform.paths.join(installPath, pathOf(paths, file)), document.toBytes());
   }
 
   return { ok: true, files, backup };

@@ -34,6 +34,7 @@ export {
   saveConfigFiles,
   type ConfigChange,
   type ConfigFileContents,
+  type ConfigFilePaths,
   type SaveOutcome,
   type SaveRequest,
 } from "./config-io.js";
@@ -43,6 +44,7 @@ export {
   describeValueTest,
   displayValue,
   matchesValueTest,
+  ownTarget,
   parseScancode,
   searchText,
   sentinelLabel,
@@ -52,5 +54,6 @@ export {
   scaleToPercent,
   type SettingDef,
   type SettingKind,
+  type SettingTarget,
   type ValueTest,
 } from "./catalog.js";
