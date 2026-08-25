@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  INSTALL_MARKER,
   addInstall,
   detectGameType,
   displayName,
@@ -16,6 +17,13 @@ describe("detecting an install", () => {
   it("is not an install without the executable, whatever else is there", () => {
     expect(detectGameType(["readme.txt", "master.dat"], ["rpu.dat"])).toBeNull();
     expect(detectGameType([], [])).toBeNull();
+  });
+
+  it("gates on the marker the interface points its picker at, so the two cannot drift", () => {
+    // The Add game picker opens on INSTALL_MARKER. If this test ever has to change, so does what the user is
+    // asked to find - a folder chosen by finding one file and rejected for lacking another reads as a bug.
+    expect(detectGameType([INSTALL_MARKER], [])).not.toBeNull();
+    expect(detectGameType(["master.dat", "patch000.dat"], [])).toBeNull();
   });
 
   it("names the mod from what sits in mods/", () => {

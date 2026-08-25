@@ -12,6 +12,7 @@ import { nodePlatform } from "@zax/platform-node";
 import { CHANNEL, PROGRESS_CHANNEL } from "./channel.js";
 import { createDispatch, describeError } from "./dispatch.js";
 import { isOwnContent, isWebUrl } from "./navigation.js";
+import { folderPicked, pickerOptions } from "./picker.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -60,14 +61,16 @@ function installMenu(): void {
 }
 
 /**
- * The directory picker, attached to the window so it is modal to it rather than a stray dialog. Returns null on
- * cancel, which is not a failure: the caller simply has nothing to add.
+ * The folder picker, attached to the window so it is modal to it rather than a stray dialog. Returns null on
+ * cancel, which is not a failure: the caller simply has nothing to add. `holding` asks for the folder by way
+ * of a file inside it - see `picker.ts`, which holds both ends of that.
  */
-async function chooseFolder(): Promise<string | null> {
+async function chooseFolder(holding?: string): Promise<string | null> {
   const [parent] = BrowserWindow.getAllWindows();
-  const options = { title: "Select the game folder", properties: ["openDirectory" as const] };
+  const options = pickerOptions(holding);
   const result = await (parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options));
-  return result.canceled ? null : (result.filePaths[0] ?? null);
+  const picked = result.canceled ? null : (result.filePaths[0] ?? null);
+  return picked === null ? null : folderPicked(picked, holding);
 }
 
 function createWindow(): BrowserWindow {

@@ -521,14 +521,9 @@
         {#if input.help}<span class="note">{input.help}</span>{/if}
         <div class="ask-row">
           <!-- Read-only rather than a typed path: the picker is the shell's, and a folder typed by hand is a
-             refusal from the install rather than an answer. The file that decides whether the folder is the
-             right one is the placeholder rather than a line of its own, which the help above already is. -->
-          <input
-            type="text"
-            readonly
-            value={answers[input.id] ?? ""}
-            placeholder="Choose the folder holding {input.holds}"
-          />
+             refusal from the install rather than an answer. The placeholder names the file the picker opens
+             on, since what comes back is the folder around it rather than the file itself. -->
+          <input type="text" readonly value={answers[input.id] ?? ""} placeholder="Find {input.holds}" />
           <button onclick={() => void store.browseForModInput(input.id)}>Browse...</button>
         </div>
       </div>

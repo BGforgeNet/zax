@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { SETTINGS } from "@zax/fallout2";
 import ModsView from "./ModsView.svelte";
+import { backend as hostBackend } from "./host.js";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
 
@@ -549,7 +550,21 @@ describe("the folder-question dialog", () => {
     expect(drawn.text()).toContain("Point FO2tweaks at what it needs");
     expect(drawn.text()).toContain("Fallout 1 folder");
     expect(drawn.text()).toContain("The original game.");
-    expect(drawn.one<HTMLInputElement>(".ask-row input").placeholder).toBe("Choose the folder holding master.dat");
+    expect(drawn.one<HTMLInputElement>(".ask-row input").placeholder).toBe("Find master.dat");
+  });
+
+  test("opens the picker on the file rather than on the folder around it", async () => {
+    // A folder picker shows no files, so the one thing that settles whether this is the right copy of the
+    // other game is the thing the user cannot see. The shell answers with the folder either way.
+    const picker = vi.spyOn(hostBackend, "chooseFolder").mockResolvedValue("/games/fallout");
+    // To the field's own type rather than `never`: the assertion below reads the answer back, and `never`
+    // narrows the field out of existence for the rest of the test.
+    store.modInputs = { offer: offer({ asks }), chosen: [], answers: {} } as typeof store.modInputs;
+
+    await store.browseForModInput("fallout1");
+
+    expect(picker).toHaveBeenCalledWith("master.dat");
+    expect(store.modInputs?.answers["fallout1"]).toBe("/games/fallout");
   });
 
   test("holds Continue until every folder has been answered", () => {

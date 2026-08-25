@@ -226,6 +226,20 @@ describe("the operations", () => {
     const shell = { chooseFolder: async () => "/games/picked" };
     expect(await createBackend(new MemoryPlatform(), shell).chooseFolder()).toBe("/games/picked");
   });
+
+  it("passes on the file the folder has to hold, which is what the shell opens its picker on", async () => {
+    const asked: (string | undefined)[] = [];
+    const shell = {
+      chooseFolder: async (holding?: string) => {
+        asked.push(holding);
+        return "/games/fallout";
+      },
+    };
+    const backend = createBackend(new MemoryPlatform(), shell);
+    expect(await backend.chooseFolder("master.dat")).toBe("/games/fallout");
+    await backend.chooseFolder();
+    expect(asked).toEqual(["master.dat", undefined]);
+  });
 });
 
 describe("installing a mod", () => {

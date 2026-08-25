@@ -4,6 +4,7 @@ export { validate } from "./validate.js";
 export {
   DEFAULT_WINE_DEBUG,
   GAME_TYPES,
+  INSTALL_MARKER,
   SCAN_LOCATIONS,
   addInstall,
   detectGameType,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { ownTarget } from "@zax/core";
+import { INSTALL_MARKER, ownTarget } from "@zax/core";
 import {
   BACKEND_METHODS,
   ENGINES,
@@ -258,6 +258,17 @@ describe("a setting more than one engine carries", () => {
     expect(await read("fallout2.cfg")).toContain("expand_barter_window=1");
     expect(await read("fission.cfg")).toContain("EnhancedBarter=1");
   });
+});
+
+test("opens the Add game picker on the executable that decides whether a folder is an install", async () => {
+  // Same reasoning as the mod questions: a folder picker shows no files, and every install ZAX recognises is
+  // one holding fallout2.exe - so the folder around that file cannot then be refused for lacking it.
+  const picker = vi.spyOn(hostBackend, "chooseFolder").mockResolvedValue(null);
+
+  await store.browseForInstall();
+
+  expect(picker).toHaveBeenCalledWith(INSTALL_MARKER);
+  vi.restoreAllMocks();
 });
 
 test("recognizes a linked setting under the engine's own key rather than inventing a second row", async () => {

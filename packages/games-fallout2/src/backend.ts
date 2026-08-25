@@ -163,8 +163,15 @@ export interface EngineListing {
 
 export interface Backend {
   describe(): Promise<MachineDescription>;
-  /** A directory the user picked, or null if they cancelled. The picker belongs to the shell, not the page. */
-  chooseFolder(): Promise<string | null>;
+  /**
+   * A directory the user picked, or null if they cancelled. The picker belongs to the shell, not the page.
+   *
+   * `holding` names a file that directory must contain, and changes what the user is shown: a picker for that
+   * file rather than for a folder, whose parent is what comes back. A folder picker hides files, so a user
+   * asked for "the folder holding master.dat" has to recognise it by name alone - and the one thing that
+   * would settle it is the file they are not allowed to see.
+   */
+  chooseFolder(holding?: string): Promise<string | null>;
   loadState(): Promise<LoadedState>;
   saveState(state: AppState): Promise<void>;
   loadConfigFiles(installPath: string): Promise<ConfigFileContents>;
@@ -276,7 +283,8 @@ export interface OperationProgress {
  * the machine but of whatever is presenting the interface, and a browser has none.
  */
 export interface Shell {
-  chooseFolder(): Promise<string | null>;
+  /** `holding` asks for the folder by way of a file inside it - see the interface method of the same name. */
+  chooseFolder(holding?: string): Promise<string | null>;
   /**
    * Where progress goes. Optional: a host that has nowhere to show it simply does not pass one, and every
    * operation below still runs.
@@ -408,7 +416,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
   };
 
   return {
-    chooseFolder: () => shell.chooseFolder(),
+    chooseFolder: (holding) => shell.chooseFolder(holding),
 
     describe: async () => ({
       os: platform.os,

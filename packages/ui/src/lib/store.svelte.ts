@@ -1,4 +1,5 @@
 import {
+  INSTALL_MARKER,
   IniDocument,
   addInstall,
   compareVersions,
@@ -1169,11 +1170,17 @@ class Store {
     this.modVersionPick = null;
   }
 
-  /** Opens the shell's folder picker for one of a mod's questions, and keeps what comes back. */
+  /**
+   * Opens the shell's picker for one of a mod's questions, and keeps what comes back.
+   *
+   * Aimed at the file the answer has to hold rather than at the folder: what the user is looking for is a copy
+   * of another game, and `master.dat` is the thing on screen that says they have found it.
+   */
   async browseForModInput(id: string): Promise<void> {
     const held = this.modInputs;
     if (!held) return;
-    const chosen = await backend.chooseFolder();
+    const asked = held.offer.asks?.find((one) => one.id === id);
+    const chosen = await backend.chooseFolder(asked?.holds);
     if (chosen === null) return;
     // Re-read rather than closed over: the picker is a round trip, and the dialog may have moved on.
     const open = this.modInputs;
@@ -1560,9 +1567,15 @@ class Store {
     if (this.modifiedCount > 0 || this.pendingChanges().length > 0) await this.save();
   }
 
-  /** Opens the shell's directory picker and adds what comes back. Cancelling adds nothing and says nothing. */
+  /**
+   * Opens the shell's picker and adds what comes back. Cancelling adds nothing and says nothing.
+   *
+   * Aimed at `fallout2.exe`, which is the one file `detectGameType` requires of every install it recognises:
+   * a folder picker leaves the user guessing which of several similar-looking folders is the game, and the
+   * folder around that file is by construction one this will not then refuse.
+   */
   async browseForInstall(): Promise<void> {
-    const chosen = await backend.chooseFolder();
+    const chosen = await backend.chooseFolder(INSTALL_MARKER);
     if (chosen !== null) await this.addInstall(chosen);
   }
 

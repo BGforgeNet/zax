@@ -83,6 +83,14 @@ export function displayName(install: Install): string {
 }
 
 /**
+ * The one file every install ZAX recognises must have in its root. Named rather than inlined because the
+ * interface points its picker at it: what the user is asked to find has to be the same thing that decides.
+ *
+ * Lowercase, as the comparison below is; a real install may shout it, which is the caller's problem to allow.
+ */
+export const INSTALL_MARKER = "fallout2.exe";
+
+/**
  * The type of install at a directory, or null when it is not a Fallout 2 install at all.
  *
  * Takes listings rather than a path so the rule is testable without a filesystem: deciding what counts as an
@@ -91,7 +99,7 @@ export function displayName(install: Install): string {
  */
 export function detectGameType(rootEntries: readonly string[], modEntries: readonly string[]): GameType | null {
   const root = new Set(rootEntries.map((f) => f.toLowerCase()));
-  if (!root.has("fallout2.exe")) return null;
+  if (!root.has(INSTALL_MARKER)) return null;
 
   const mods = new Set(modEntries.map((f) => f.toLowerCase()));
   // Fallout et tu replaces the game rather than patching it, and ships no marker of its own in the root it
