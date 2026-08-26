@@ -149,7 +149,12 @@
     <input type="checkbox" checked={store.autosave} onchange={(e) => void store.setAutosave(e.currentTarget.checked)} />
     Save every change straight away
   </label>
-  <p class="note">The Save button is disabled; previous copies still go to the backup directory.</p>
+  <!-- A settings save rewrites one line per changed key and takes no copy: backups belong to the paths that
+     replace whole files, which this switch does not touch. -->
+  <p class="note">
+    The Save button is disabled, and the unsaved count goes with it. Installs and removals still copy what they replace
+    to the backup directory.
+  </p>
 </div>
 
 <Dialog open={confirming !== null} title={words.ask} dismiss={() => (confirming = null)}>
