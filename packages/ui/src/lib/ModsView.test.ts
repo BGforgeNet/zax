@@ -265,10 +265,16 @@ describe("what a row offers to do", () => {
     });
   });
 
-  test("shows the install refused, with its reason, where the feed offers something older", () => {
-    expect(refusal({ kind: "downgrade", from: "15.0" })?.title).toBe(
-      "14.8 is older than the installed 15.0, so installing it would put the mod back.",
+  /*
+    A base mod is put in place by its own installer, which has no way back down. A mod that is files in the
+    mods folder is replaced by an older release the same way it is by a newer one, so that one is offered.
+  */
+  test("refuses an older release for a base mod, and offers it for one that is not", () => {
+    expect(refusal({ kind: "downgrade", from: "15.0" }, { type: "base" })?.title).toBe(
+      "14.8 is older than the installed 15.0, and a base mod cannot be put back.",
     );
+    unmountAll();
+    expect(refusal({ kind: "downgrade", from: "15.0" })?.title).toBeNull();
   });
 
   /* Nothing to choose between when the one on offer cannot be installed, so the list is not offered either. */

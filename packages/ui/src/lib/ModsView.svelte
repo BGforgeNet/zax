@@ -80,8 +80,10 @@
   function installRefusal(offer: ModOffer): string | null {
     const state = offer.availability;
     if (state.kind === "installed") return `${offer.version} is what is installed.`;
-    if (state.kind === "downgrade")
-      return `${offer.version} is older than the installed ${state.from}, so installing it would put the mod back.`;
+    // Only a base mod: it is put in place by its own installer, which has no way back down. Anything that is
+    // files in the mods folder takes an older release the same way it takes a newer one.
+    if (state.kind === "downgrade" && offer.type === "base")
+      return `${offer.version} is older than the installed ${state.from}, and a base mod cannot be put back.`;
     return null;
   }
 
