@@ -264,8 +264,9 @@ class Store {
   installs = $state<readonly Install[]>([]);
   selectedInstall = $state<string>("");
   theme = $state<Theme>("system");
-  /** Whether an edit is written as it is made. Off by default: writing to a game folder is opt-in. */
-  autosave = $state(false);
+  /** Whether an edit is written as it is made. On by default: a save rewrites only the keys that changed, and
+   * an edit left waiting on a second click is one the user can walk away from. */
+  autosave = $state(true);
   overrides = $state<Record<string, string>>({});
 
   /** Contents of the selected install's config files, exactly as they were read. */
@@ -616,12 +617,35 @@ class Store {
   /**
    * Carries a linked setting's newer value across to the engines that have not got it yet.
    *
-   * Left pending rather than written, whatever `autosave` says: this is a value the user set somewhere else -
-   * inside an engine's own preferences screen, or by hand - so it is put in front of them as an edit they can
-   * undo, not applied to three files during a load they only meant as a load. A setting whose engines have
-   * both moved is not settled at all; which value survives is theirs to pick.
+   * Left pending rather than written where the user saves for themselves: this is a value they set somewhere
+   * else - inside an engine's own preferences screen, or by hand - so it is put in front of them as an edit
+   * they can undo, not applied to three files during a load they only meant as a load. A setting whose
+   * engines have both moved is not settled at all; which value survives is theirs to pick.
+   *
+   * Under autosave it is written here instead, for the same reason the pending form exists: the user has to
+   * be able to act on it. Autosave disables Save and draws no revert control, so a carry queued there is an
+   * edit nobody can save or undo, under a banner asking for both - and it blocks every mod flow, which
+   * refuses to run over unsaved edits. Written, the banner reports what happened rather than asking.
    */
   private async settleLinked(installPath: string): Promise<void> {
+    const carried = await this.reconcileLinked(installPath);
+    const count = Object.keys(carried).length;
+    this.carryNotice = null;
+    if (count === 0) return;
+    const what = count === 1 ? "One setting was" : `${count} settings were`;
+    const carry = `${what} changed outside ZAX and carried across to the other engines.`;
+    if (this.autosave && (await this.writeCarried(installPath, carried))) {
+      // Read back rather than assumed: the write moved each address's base with it, so this settles nothing
+      // further and leaves the rows describing the install as it now stands.
+      await this.reconcileLinked(installPath);
+      this.carryNotice = this.notice = { kind: "note", text: carry };
+      return;
+    }
+    this.carryNotice = this.notice = { kind: "note", text: `${carry} Save to keep them, or revert.` };
+  }
+
+  /** Weighs each engine's copy against its base, queues what ZAX can settle, and answers what it carried. */
+  private async reconcileLinked(installPath: string): Promise<Record<string, Reconciled>> {
     const found = reconcileSettings(SETTINGS, this.contents, await backend.settingsBase(installPath));
     const carried: Record<string, Reconciled> = {};
     const next = { ...this.overrides };
@@ -635,14 +659,26 @@ class Store {
     this.settingsChoices = found.filter((one) => one.choose !== undefined);
     // Every disagreement, including the ones already accepted - what makes an edit to them count as one.
     this.split = Object.fromEntries(found.map((one) => [one.id, true as const]));
-    const count = Object.keys(carried).length;
-    this.carryNotice = null;
-    if (count > 0) {
-      this.carryNotice = this.notice = {
-        kind: "note",
-        text: `${count === 1 ? "One setting was" : `${count} settings were`} changed outside ZAX and carried across to the other engines. Save to keep them, or revert.`,
-      };
-    }
+    return carried;
+  }
+
+  /**
+   * Writes the values just carried across, answering whether they took. A refusal leaves them queued, which
+   * is the state the banner then describes - the alternative is a load that quietly loses them.
+   */
+  private async writeCarried(installPath: string, carried: Record<string, Reconciled>): Promise<boolean> {
+    const values = Object.fromEntries(Object.entries(this.overrides).filter(([id]) => id in carried));
+    const outcome = await backend.saveConfigFiles({
+      installPath,
+      original: this.contents,
+      changes: this.pendingChanges(values),
+    });
+    if (!outcome.ok) return false;
+    this.contents = await backend.loadConfigFiles(installPath);
+    this.index();
+    // Dropped before the read back, which would otherwise carry them forward as edits of the user's own.
+    this.overrides = Object.fromEntries(Object.entries(this.overrides).filter(([id]) => !(id in carried)));
+    return true;
   }
 
   /**

@@ -23,7 +23,7 @@ export interface AppState {
   autosave: boolean;
 }
 
-export const EMPTY_STATE: AppState = { installs: [], unavailable: [], theme: "system", autosave: false };
+export const EMPTY_STATE: AppState = { installs: [], unavailable: [], theme: "system", autosave: true };
 
 export interface LoadedState {
   state: AppState;

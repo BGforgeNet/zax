@@ -19,14 +19,19 @@ afterEach(() => {
 
 const SETTING = "sfall.Misc.UseFileSystemOverride";
 
+/** Autosave ships on, so a test of the Save button and its count turns it off the way the ZAX panel does. */
+const byHand = () => store.setAutosave(false);
+
 describe("the Save button", () => {
-  test("is off with nothing changed, and says so in the chip beside it", () => {
+  test("is off with nothing changed, and says so in the chip beside it", async () => {
+    await byHand();
     const view = render(SaveBar as never, {} as never);
     expect(view.control("Save").hasAttribute("disabled")).toBe(true);
     expect(view.text()).toContain("No changes");
   });
 
-  test("comes on once a setting is edited, and the chip counts what is unsaved", () => {
+  test("comes on once a setting is edited, and the chip counts what is unsaved", async () => {
+    await byHand();
     store.set(SETTING, store.valueOf(SETTING) === "1" ? "0" : "1");
     const view = render(SaveBar as never, {} as never);
     expect(view.control("Save").hasAttribute("disabled")).toBe(false);
@@ -34,6 +39,7 @@ describe("the Save button", () => {
   });
 
   test("saves through the store rather than writing anything itself", async () => {
+    await byHand();
     const save = vi.spyOn(store, "save").mockResolvedValue(undefined);
     store.set(SETTING, store.valueOf(SETTING) === "1" ? "0" : "1");
     render(SaveBar as never, {} as never)
@@ -43,31 +49,27 @@ describe("the Save button", () => {
   });
 
   /*
-    Disabled rather than hidden under autosave: a button that vanished would move Run under the pointer. The
-    title is what makes the refusal answerable - `ui-design.md` treats a disabled control with no explanation as
-    a defect rather than a state.
+    Disabled rather than hidden under autosave, so the end of the bar does not shift as the setting is turned
+    on and off. The title is what makes the refusal answerable - `ui-design.md` treats a disabled control with
+    no explanation as a defect rather than a state.
   */
-  test("is off under autosave, and the title says why", async () => {
-    await store.setAutosave(true);
+  test("is off under autosave, and the title says why", () => {
     store.set(SETTING, store.valueOf(SETTING) === "1" ? "0" : "1");
     const view = render(SaveBar as never, {} as never);
     const save = view.control("Save");
     expect(save.hasAttribute("disabled")).toBe(true);
     expect(save.getAttribute("title")).toMatch(/autosave/i);
-    await store.setAutosave(false);
   });
 
   /*
     The count and the Revert all are written within the debounce under autosave, so both would appear and
     vanish on every change. One standing chip instead: the flash was the whole of what they reported.
   */
-  test("reports no unsaved count and offers no revert while autosave is on", async () => {
-    await store.setAutosave(true);
+  test("reports no unsaved count and offers no revert while autosave is on", () => {
     store.set(SETTING, store.valueOf(SETTING) === "1" ? "0" : "1");
     const view = render(SaveBar as never, {} as never);
     expect(view.all("button.link").map((one) => (one.textContent ?? "").trim())).not.toContain("Revert all");
     expect(view.all(".chip").map((one) => (one.textContent ?? "").trim())).toEqual(["Saved automatically"]);
-    await store.setAutosave(false);
   });
 });
 
@@ -84,7 +86,8 @@ describe("the Revert all link", () => {
     expect(render(SaveBar as never, {} as never).all("button.link")).toHaveLength(0);
   });
 
-  test("puts every edited setting back, and takes itself away with them", () => {
+  test("puts every edited setting back, and takes itself away with them", async () => {
+    await byHand();
     const before = store.valueOf(SETTING);
     store.set(SETTING, before === "1" ? "0" : "1");
     const view = render(SaveBar as never, {} as never);

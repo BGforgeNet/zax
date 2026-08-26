@@ -20,14 +20,14 @@ export interface StoredInstall {
 export interface ZaxFile {
   installs: readonly StoredInstall[];
   theme: Theme;
-  /** Whether an edit is written as it is made, rather than waiting for the Save button. */
+  /** Whether an edit is written as it is made, rather than waiting for the Save button. On unless turned off. */
   autosave: boolean;
 }
 
 const THEMES: readonly string[] = ["light", "dark", "system"];
 
 /** The empty state, which is also what a first run has. */
-export const EMPTY_ZAX_FILE: ZaxFile = { installs: [], theme: "system", autosave: false };
+export const EMPTY_ZAX_FILE: ZaxFile = { installs: [], theme: "system", autosave: true };
 
 function trimmed(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -64,8 +64,9 @@ export function parseZaxFile(text: string): ZaxFile {
   return {
     installs,
     theme: typeof theme === "string" && THEMES.includes(theme) ? (theme as Theme) : "system",
-    // Anything but a true written by this application means off: the safe reading of a hand-edited file.
-    autosave: record["autosave"] === true,
+    // Only an explicit false turns it off, so a file written before ZAX had the setting - the previous
+    // implementation's, or a hand-edited one - reads as the default rather than as a choice to save by hand.
+    autosave: record["autosave"] !== false,
   };
 }
 

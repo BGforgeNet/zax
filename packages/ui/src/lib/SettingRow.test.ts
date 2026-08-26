@@ -59,7 +59,9 @@ describe("a value that is not in the file", () => {
 });
 
 describe("an edited value", () => {
-  test("marks the row and offers a revert that puts it back", () => {
+  test("marks the row and offers a revert that puts it back", async () => {
+    // The revert control belongs to saving by hand; autosave, which ships on, draws none.
+    await store.setAutosave(false);
     const before = store.valueOf(BOOL);
     store.set(BOOL, before === "1" ? "0" : "1");
     const view = row(BOOL);
@@ -80,14 +82,12 @@ describe("an edited value", () => {
     Under autosave the edit is written within the debounce, so this control would appear and vanish as the
     pointer reached it. The row's colour still marks the change, which is the feedback autosave leaves.
   */
-  test("offers no revert under autosave, though the row still marks the change", async () => {
-    await store.setAutosave(true);
+  test("offers no revert under autosave, though the row still marks the change", () => {
     const before = store.valueOf(BOOL);
     store.set(BOOL, before === "1" ? "0" : "1");
     const view = row(BOOL);
     expect(view.one(".row").classList.contains("modified")).toBe(true);
     expect(view.all("button.revert")).toHaveLength(0);
-    await store.setAutosave(false);
   });
 });
 

@@ -37,13 +37,17 @@ describe("a setting more than one engine carries", () => {
   const read = async (name: string) =>
     new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${PREVIEW_INSTALL}/${name}`));
 
-  /** An install whose engines have each written their own settings, which is what makes their keys writable. */
+  /**
+   * An install whose engines have each written their own settings, which is what makes their keys writable.
+   * Saving by hand, which is the form most of these are about: the two autosave cases turn it back on.
+   */
   const withEngines = async () => {
     await previewPlatform.fs.write(
       `${PREVIEW_INSTALL}/fallout2.cfg`,
       bytes(`${fallout2cfg}\n[ui]\nextend_ap_bar=0\nexpand_barter_window=0\n`),
     );
     await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
+    await store.setAutosave(false);
     await store.start();
   };
 
@@ -86,6 +90,38 @@ describe("a setting more than one engine carries", () => {
     expect(store.isModified(BARTER), "left pending rather than written during a load").toBe(true);
     expect(store.reconciled[BARTER]?.from, "the row has to be able to say where it came from").toBe("fission.cfg");
     expect(store.notice?.kind).toBe("note");
+  });
+
+  test("writes the carry instead of queueing it when autosave is on, since there is no Save to press", async () => {
+    // Autosave disables Save and draws no revert control, so the pending form left the user a banner asking
+    // for both and no way to do either - and every mod flow refused to run while it stood.
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await store.setAutosave(true);
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+    await store.start();
+
+    expect(store.valueOf(BARTER), "the newer value won, as it does either way").toBe("1");
+    expect(store.isModified(BARTER), "and reached the files rather than the Save button").toBe(false);
+    expect(store.modifiedCount, "so the bar has nothing to report as unsaved").toBe(0);
+    expect(await read("ddraw.ini")).toContain("ExpandBarter=1");
+    expect(store.notice?.text, "the banner says what happened rather than asking for a save").toBe(
+      "One setting was changed outside ZAX and carried across to the other engines.",
+    );
+  });
+
+  test("queues the carry after all when autosave cannot write it, rather than losing it", async () => {
+    await withEngines();
+    store.set(BARTER, "0");
+    await store.save();
+    await store.setAutosave(true);
+    await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+    vi.spyOn(hostBackend, "saveConfigFiles").mockResolvedValue({ ok: false, changed: ["ddraw.ini"] });
+    await store.start();
+
+    expect(store.isModified(BARTER), "still pending, which is what the banner then describes").toBe(true);
+    expect(store.notice?.text).toContain("Save to keep them, or revert.");
   });
 
   test("leaves a reverted carry alone on every later read of the install", async () => {
@@ -910,8 +946,8 @@ describe("autosave", () => {
     expect(store.baselineOf(MUSIC), "and nothing reached the file").toBe(before);
   });
 
-  test("stays off unless asked, so no install is written to by opening the application", () => {
-    expect(store.autosave).toBe(false);
+  test("is on unless the user has turned it off, which is what a fresh state file reads as", () => {
+    expect(store.autosave).toBe(true);
   });
 });
 

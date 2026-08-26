@@ -40,6 +40,9 @@ let seededModIni: Uint8Array | null = null;
  * and they pass, because "absent" is also what a closed gate looks like.
  */
 export async function reseedPreview(): Promise<void> {
+  // Any write the last test's edits scheduled goes first: autosave ships on, so a case that edits and ends
+  // inside the debounce would otherwise fire its save part-way through the next one.
+  await store.setAutosave(false);
   // One install, deliberately narrower than the six a fresh preview lists: these cases are about adding,
   // refusing and relabelling, and each of them asserts against the whole list. The other five directories stay
   // on the disk - the state file is what decides which are listed, so they are inert until something adds them.

@@ -39,15 +39,6 @@
   that wrote only half of that would be a different Save wearing the same word.
 -->
 <div class="footer">
-  <!-- Disabled rather than hidden under autosave: a button that vanished would move Run under the pointer. -->
-  <button
-    class="primary"
-    disabled={store.autosave || !store.install || store.modifiedCount === 0 || store.busy !== null}
-    title={store.autosave ? "Autosave is on - every change is written as it is made" : null}
-    onclick={() => void store.save()}
-  >
-    {store.busy === "Saving" ? "Saving..." : "Save"}
-  </button>
   <button
     disabled={!store.install || isPreview || store.busy !== null}
     title={isPreview ? "The browser preview cannot start a program - this needs the desktop build" : null}
@@ -113,7 +104,7 @@
       {/if}
     </div>
   {/each}
-  <!-- Status rather than an action, so it sits away from the buttons at the far end of their own bar. -->
+  <!-- Status rather than an action, so it sits away from the run buttons at the other end of the bar. -->
   <div class="spacer"></div>
   {#if store.autosave}
     <!-- One standing chip rather than a count: every edit is written within the debounce, so a count and a
@@ -126,6 +117,17 @@
   {:else}
     <span class="chip muted">No changes</span>
   {/if}
+  <!-- Last, at the end the eye finishes on: it is the bar's one committing action, and the count beside it is
+     what says whether there is anything to commit. Disabled rather than hidden under autosave, so the bar's
+     end does not shift as the setting is turned on and off. -->
+  <button
+    class="primary"
+    disabled={store.autosave || !store.install || store.modifiedCount === 0 || store.busy !== null}
+    title={store.autosave ? "Autosave is on - every change is written as it is made" : null}
+    onclick={() => void store.save()}
+  >
+    {store.busy === "Saving" ? "Saving..." : "Save"}
+  </button>
 </div>
 
 <style>

@@ -18,25 +18,26 @@ describe("reading zax.yml", () => {
         { path: "/home/t/Games/Fallout 2 RPU" },
       ],
       theme: "dark",
-      autosave: false,
+      autosave: true,
     });
   });
 
   it("treats an empty or absent games list as no installs rather than failing", () => {
-    expect(parseZaxFile("theme: light")).toEqual({ installs: [], theme: "light", autosave: false });
-    expect(parseZaxFile("")).toEqual({ installs: [], theme: "system", autosave: false });
+    expect(parseZaxFile("theme: light")).toEqual({ installs: [], theme: "light", autosave: true });
+    expect(parseZaxFile("")).toEqual({ installs: [], theme: "system", autosave: true });
   });
 
   /*
     A file written before autosave existed has no such key, and one a user hand-edited may have anything in it.
-    Both have to read as off: turning it on by accident writes to a game folder without being asked.
+    Both read as the default: only the false this application writes when the box is cleared turns it off, so
+    the setting is a choice the user made rather than a key their old file happened not to carry.
   */
-  it("reads autosave as off unless the file says true", () => {
-    expect(parseZaxFile("autosave: true").autosave).toBe(true);
+  it("reads autosave as on unless the file says false", () => {
     expect(parseZaxFile("autosave: false").autosave).toBe(false);
-    expect(parseZaxFile("games: []").autosave).toBe(false);
-    expect(parseZaxFile("autosave: yes-please").autosave).toBe(false);
-    expect(parseZaxFile('autosave: "true"').autosave).toBe(false);
+    expect(parseZaxFile("autosave: true").autosave).toBe(true);
+    expect(parseZaxFile("games: []").autosave).toBe(true);
+    expect(parseZaxFile("autosave: no-thanks").autosave).toBe(true);
+    expect(parseZaxFile('autosave: "false"').autosave).toBe(true);
   });
 
   it("round-trips autosave through a write and a read", () => {

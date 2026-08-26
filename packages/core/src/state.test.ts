@@ -14,7 +14,7 @@ describe("loading application state", () => {
   it("starts empty on a machine that has never run it", async () => {
     const { state, problem } = await loadState(new MemoryPlatform({ home: "/home/t" }));
     expect(problem).toBeUndefined();
-    expect(state).toEqual({ installs: [], unavailable: [], theme: "system", autosave: false });
+    expect(state).toEqual({ installs: [], unavailable: [], theme: "system", autosave: true });
   });
 
   it("reads the type from the directory rather than from the file", async () => {
