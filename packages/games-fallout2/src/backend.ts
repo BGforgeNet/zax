@@ -572,7 +572,16 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         // Not in this folder, but on this machine: unpack the copy already cached rather than refusing. The
         // engine is offered here precisely because that copy exists, so the first run is what puts it in
         // place - the same deployment the Engines tab performs, and it records itself the same way.
-        if (!installed) await installCachedEngine(platform, install, engineId, new Date(), reporting());
+        if (!installed) {
+          await installCachedEngine(
+            platform,
+            install,
+            engineId,
+            { published: null, pin: false },
+            new Date(),
+            reporting(),
+          );
+        }
         program = build.program;
       }
       const plan = planLaunch(platform.os, install, sfallVersion, program);

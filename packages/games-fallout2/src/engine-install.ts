@@ -10,7 +10,7 @@ import type { Install } from "@zax/core";
 import type { ArchiveEntryInfo, FileStat, Platform } from "@zax/platform";
 import { preflightArchive } from "./archive-preflight.js";
 import {
-  cachedEngine,
+  cachedEngines,
   enginePackage,
   latestEngine,
   type EngineProgress,
@@ -90,7 +90,7 @@ export async function installEngine(
   }
 
   const archive = await enginePackage(platform, engine, release, release.asset, options);
-  return deployEngine(platform, install, engine, build, release, archive, now, options);
+  return deployEngine(platform, install, engine, build, release, archive, false, now, options);
 }
 
 /**
@@ -102,6 +102,7 @@ export async function installCachedEngine(
   platform: Platform,
   install: Install,
   engineId: string,
+  choice: { published: string | null; pin: boolean },
   now: Date = new Date(),
   options?: EngineProgress,
 ): Promise<EngineInstallOutcome> {
@@ -110,9 +111,10 @@ export async function installCachedEngine(
   if (build === null) {
     throw new Error(`${engine.name} publishes no build ZAX can install for this machine. See ${engine.page}.`);
   }
-  const held = await cachedEngine(platform, engine, build.asset);
-  if (held === null) throw new Error(`ZAX has no copy of ${engine.name} to install from. Check for one first.`);
-  return deployEngine(platform, install, engine, build, held.release, held.archive, now, options);
+  const cached = await cachedEngines(platform, engine, build.asset);
+  const held = choice.published === null ? cached[0] : cached.find((one) => one.release.published === choice.published);
+  if (held === undefined) throw new Error(`ZAX has no copy of ${engine.name} to install from. Check for one first.`);
+  return deployEngine(platform, install, engine, build, held.release, held.archive, choice.pin, now, options);
 }
 
 /**
@@ -127,6 +129,7 @@ async function deployEngine(
   build: EngineBuild,
   release: EngineRelease,
   archive: string,
+  pin: boolean,
   now: Date,
   options?: EngineProgress,
 ): Promise<EngineInstallOutcome> {
@@ -167,6 +170,9 @@ async function deployEngine(
       complete: false,
       files: build.members.map((member) => member.to),
       ...(release.commit !== null ? { commit: release.commit } : {}),
+      // Written here as well as on the finished entry: a crash between the two must not leave the folder
+      // silently following the newest build again when the user had picked this one.
+      ...(pin ? { pinned: true } : {}),
     };
     await saveRecord(platform, { ...record, engines: withEngine(record.engines ?? [], engine.id, entry) });
 

@@ -370,7 +370,13 @@ describe("installing from what the machine already holds", () => {
     const platform = seeded({ "/games/two/fallout2.exe": "" });
     await installEngine(platform, INSTALL, "fallout2-ce", NOW);
 
-    const outcome = await installCachedEngine(offline(platform), SECOND, "fallout2-ce", NOW);
+    const outcome = await installCachedEngine(
+      offline(platform),
+      SECOND,
+      "fallout2-ce",
+      { published: null, pin: false },
+      NOW,
+    );
     expect(outcome.files).toEqual(["fallout2-ce", "ce.dat"]);
     expect(await platform.fs.stat("/games/two/fallout2-ce")).not.toBeNull();
   });
@@ -379,7 +385,7 @@ describe("installing from what the machine already holds", () => {
     const platform = seeded({ "/games/two/fallout2.exe": "" });
     await installEngine(platform, INSTALL, "fallout2-ce", NOW);
 
-    await installCachedEngine(offline(platform), SECOND, "fallout2-ce", NOW);
+    await installCachedEngine(offline(platform), SECOND, "fallout2-ce", { published: null, pin: false }, NOW);
     expect(await installedEngines(platform, SECOND)).toEqual([
       expect.objectContaining({ id: "fallout2-ce", release: "continious", published: "2026-08-23T09:37:22Z" }),
     ]);
@@ -387,8 +393,75 @@ describe("installing from what the machine already holds", () => {
 
   it("says so rather than half-installing when the machine holds no copy", async () => {
     const platform = seeded({ "/games/two/fallout2.exe": "" });
-    await expect(installCachedEngine(offline(platform), SECOND, "fallout2-ce", NOW)).rejects.toThrow(/no copy/i);
+    await expect(
+      installCachedEngine(offline(platform), SECOND, "fallout2-ce", { published: null, pin: false }, NOW),
+    ).rejects.toThrow(/no copy/i);
     expect(await platform.fs.stat("/games/two/fallout2-ce")).toBeNull();
     expect(await installedEngines(platform, SECOND)).toEqual([]);
+  });
+
+  /** A second release in the cache, written as `enginePackage` writes one - the archive plus its note. */
+  const alsoCached = async (platform: MemoryPlatform, published: string) => {
+    const at = `cache/packages/engines/fallout2-ce/${published.replace(/[^0-9]/g, "")}`;
+    await platform.fs.write(`${at}/fallout2-ce-linux-x64.tar.gz`, new TextEncoder().encode("payload"));
+    await platform.fs.write(
+      `${at}/release.json`,
+      new TextEncoder().encode(JSON.stringify({ release: "continious", published, commit: null })),
+    );
+  };
+
+  it("deploys the build asked for rather than the newest cached", async () => {
+    const platform = seeded({ "/games/two/fallout2.exe": "" });
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+    await alsoCached(platform, "2026-06-01T00:00:00Z");
+
+    const outcome = await installCachedEngine(
+      offline(platform),
+      SECOND,
+      "fallout2-ce",
+      { published: "2026-06-01T00:00:00Z", pin: true },
+      NOW,
+    );
+    expect(outcome.published).toBe("2026-06-01T00:00:00Z");
+  });
+
+  // Switching build is now the common path, so the backup a deployment takes is exercised on every switch
+  // rather than only on an install over a copy someone placed by hand.
+  it("sets the build already there aside when a different one goes in", async () => {
+    const platform = seeded({
+      "/games/two/fallout2.exe": "",
+      "/games/two/fallout2-ce": "the build that was here",
+      "/games/two/ce.dat": "its data",
+    });
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+
+    const outcome = await installCachedEngine(
+      offline(platform),
+      SECOND,
+      "fallout2-ce",
+      { published: null, pin: false },
+      NOW,
+    );
+
+    expect(outcome.replaced).toEqual(["fallout2-ce", "ce.dat"]);
+    expect(outcome.backup).not.toBeNull();
+    const kept = await platform.fs.read(`${outcome.backup!}/fallout2-ce`);
+    expect(new TextDecoder().decode(kept)).toBe("the build that was here");
+  });
+
+  it("records the pin, so the next run stays on this build", async () => {
+    const platform = seeded({ "/games/two/fallout2.exe": "" });
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+
+    await installCachedEngine(offline(platform), SECOND, "fallout2-ce", { published: null, pin: true }, NOW);
+    expect((await installedEngines(platform, SECOND))[0]?.pinned).toBe(true);
+  });
+
+  it("leaves the pin off a deployment nobody asked for by name", async () => {
+    const platform = seeded({ "/games/two/fallout2.exe": "" });
+    await installEngine(platform, INSTALL, "fallout2-ce", NOW);
+
+    await installCachedEngine(offline(platform), SECOND, "fallout2-ce", { published: null, pin: false }, NOW);
+    expect((await installedEngines(platform, SECOND))[0]).not.toHaveProperty("pinned");
   });
 });
