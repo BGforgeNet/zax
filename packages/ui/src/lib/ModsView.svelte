@@ -31,7 +31,7 @@
   // finds either an answer or one on its way. Refresh is the deliberate way to ask again.
 
   /** The one line under an offer's name that says where things stand. */
-  function statusOf(offer: ModOffer): string {
+  function statusOf(offer: ModOffer): string | null {
     const state = offer.availability;
     switch (state.kind) {
       case "install":
@@ -56,7 +56,8 @@
       case "installed":
         return "Installed and current.";
       case "upgrade":
-        return `Installed: ${state.from}.`;
+        // The Current and Available cells are this sentence, so it would say the version a third time.
+        return null;
       case "convert":
         return state.was === "pluggable"
           ? `Installed: ${state.from}, which can be removed. ${offer.version} cannot be - installing it gives that up.`
@@ -71,6 +72,54 @@
         return state.why;
     }
   }
+
+  /**
+   * Why the install button is there but refuses, or nothing where it acts. A disabled control with no title is
+   * a defect rather than a state, so every arm here answers.
+   */
+  function installRefusal(offer: ModOffer): string | null {
+    const state = offer.availability;
+    if (state.kind === "installed") return `${offer.version} is what is installed.`;
+    if (state.kind === "downgrade")
+      return `${offer.version} is older than the installed ${state.from}, so installing it would put the mod back.`;
+    return null;
+  }
+
+  /**
+   * The Current column. A word rather than a blank where no release is installed: the column answers on its
+   * own, which is the point of having it, and the line below carries what a word cannot - which commit a
+   * nightly was built from, why a row is refused.
+   */
+  function currentOf(offer: ModOffer): string {
+    const state = offer.availability;
+    switch (state.kind) {
+      case "install":
+        return "not installed";
+      case "install-over":
+        return "unstated";
+      case "nightly":
+        return "nightly";
+      case "installed":
+      case "unfollowed":
+        return offer.version;
+      case "upgrade":
+      case "convert":
+      case "downgrade":
+        return state.from;
+      case "retry":
+        return "incomplete";
+      case "blocked":
+        // The sfall and payload gates answer before the version comparison, so a refused row is frequently an
+        // installed mod - it carries what the record says, and only a refused install type has nothing.
+        return state.from ?? "not installed";
+    }
+  }
+
+  /**
+   * The Available column. `version` on a row the record alone describes is what is on disk rather than an
+   * offer, so it is not one to advertise - see `noFeed`.
+   */
+  const availableOf = (offer: ModOffer): string => (offer.noFeed ? "no feed" : offer.version);
 
   /** Whether the row gets a Remove control: something of it is here, and its type permits removal. */
   function removable(offer: ModOffer): boolean {
@@ -118,10 +167,19 @@
     switch (offer.availability.kind) {
       case "install":
         return `Install ${offer.version}`;
+      // A nightly joins install-over because laying the release over it is the same operation. A commit
+      // cannot be ordered against releases, so the offer may be older - which the status line says, and why
+      // the version list this unlocks is unfiltered: `chooseModVersion` floors on states that name a version.
       case "install-over":
+      case "nightly":
         return `Install ${offer.version} over it`;
       case "upgrade":
         return `Upgrade to ${offer.version}`;
+      // Named though neither can be acted on, so the column keeps its shape down the list and the reason is
+      // on the control rather than only in the prose - `installRefusal` supplies it.
+      case "installed":
+      case "downgrade":
+        return `Install ${offer.version}`;
       case "convert":
         return `Replace with ${offer.version}`;
       case "retry":
@@ -203,83 +261,107 @@
         {#if store.modListing === null}
           <p class="empty">{store.readingOffers ? "Reading the mod feeds..." : "The feeds have not been read yet."}</p>
         {:else}
-          {#each store.modListing.offers as offer (offer.id)}
-            <!-- Decoration beside a name that already says which mod it is, so it carries no alt text. -->
-            {@const icon = MOD_ICON[offer.id]}
-            <div class="offer" class:refused={offer.availability.kind === "blocked"}>
-              {#if icon}
-                <img class="mod-icon" src={icon} alt="" width="64" height="34" />
-              {:else}
-                <span class="mod-icon"></span>
-              {/if}
-              <div class="about">
-                <span class="mod-name">{offer.name}</span>
-                <span class="version">{offer.version}</span>
-                {#if offer.type !== "pluggable"}
-                  <span class="badge">{offer.type}</span>
+          <div class="offers">
+            {#if store.modListing.offers.length > 0}
+              <!-- A heading for the two columns: a bare pair of versions beside a name does not say which is
+               which. Every row states the same tracks, so the heading lines up with them. -->
+              <div class="offer head">
+                <span></span>
+                <span>Mod</span>
+                <span class="cell current">Current</span>
+                <span class="cell offered">Available</span>
+              </div>
+            {/if}
+            {#each store.modListing.offers as offer (offer.id)}
+              <!-- Decoration beside a name that already says which mod it is, so it carries no alt text. -->
+              {@const icon = MOD_ICON[offer.id]}
+              {@const status = statusOf(offer)}
+              <div class="offer" class:refused={offer.availability.kind === "blocked"}>
+                {#if icon}
+                  <img class="mod-icon" src={icon} alt="" width="64" height="34" />
+                {:else}
+                  <span class="mod-icon"></span>
                 {/if}
-                <p class="status" class:warn={offer.availability.kind === "downgrade"}>{statusOf(offer)}</p>
-                {#if offer.type === "base"}
-                  <!-- Said before install as well as after, because it is the thing to know going in. The two
+                <div class="about">
+                  <span class="mod-name">{offer.name}</span>
+                  {#if offer.type !== "pluggable"}
+                    <span class="badge">{offer.type}</span>
+                  {/if}
+                </div>
+                <span class="cell current">{currentOf(offer)}</span>
+                <span class="cell offered">{availableOf(offer)}</span>
+                <div class="notes">
+                  {#if status !== null}
+                    <p class="status" class:warn={offer.availability.kind === "downgrade"}>{status}</p>
+                  {/if}
+                  {#if offer.type === "base"}
+                    <!-- Said before install as well as after, because it is the thing to know going in. The two
                      kinds of base mod need different sentences: one replaces this installation and the other
                      leaves it alone, so the way back differs as much as the install does. -->
-                  <p class="status">
-                    {offer.creates
-                      ? `ZAX will not remove it: what it installs is a whole game in ${offer.creates}, which is a folder to delete by hand.`
-                      : "Cannot be uninstalled: it replaces the installation rather than adding to it."}
-                  </p>
-                {/if}
-                {#if offer.type === "permanent" && offer.reason !== undefined}
-                  <!-- The declared reason stands in for the Remove control the row never gets - and it is
+                    <p class="status">
+                      {offer.creates
+                        ? `ZAX will not remove it: what it installs is a whole game in ${offer.creates}, which is a folder to delete by hand.`
+                        : "Cannot be uninstalled: it replaces the installation rather than adding to it."}
+                    </p>
+                  {/if}
+                  {#if offer.type === "permanent" && offer.reason !== undefined}
+                    <!-- The declared reason stands in for the Remove control the row never gets - and it is
                      said before install too, since permanence is something to know going in. -->
-                  <p class="status">Cannot be uninstalled: {offer.reason}</p>
-                {/if}
-              </div>
-              <div class="offer-actions">
+                    <p class="status">Cannot be uninstalled: {offer.reason}</p>
+                  {/if}
+                </div>
                 {#if installLabel(offer) !== null}
-                  <button class="primary" disabled={store.busy !== null} onclick={() => void store.prepareMod(offer)}>
+                  {@const refusal = installRefusal(offer)}
+                  <button
+                    class="primary"
+                    disabled={refusal !== null || store.busy !== null}
+                    title={refusal}
+                    onclick={() => void store.prepareMod(offer)}
+                  >
                     {installButtonLabel(offer)}
                   </button>
                 {/if}
-                <!-- Beside the button that names one version rather than replacing it: the head of the line is
+                <div class="offer-actions">
+                  <!-- Beside the button that names one version rather than replacing it: the head of the line is
                      what most installs want, and picking another is the deliberate act. Disabled rather than
                      hidden where the list cannot be read, as the sfall panel's buttons are. -->
-                {#if installLabel(offer) !== null}
-                  <button
-                    disabled={isPreview || store.busy !== null}
-                    title={isPreview ? PREVIEW_FEEDS : null}
-                    onclick={() => void openVersions(offer)}
-                  >
-                    {store.busy === `Reading the ${offer.name} versions` ? "Reading..." : "Other version"}
-                  </button>
-                {/if}
-                {#if offer.availability.kind === "retry"}
-                  <button disabled={store.busy !== null} onclick={() => void store.restoreMod(offer)}>
-                    {store.modWorking(offer.id, "restore") ? "Restoring..." : "Restore"}
-                  </button>
-                {/if}
-                {#if removable(offer)}
-                  <button class="danger" disabled={store.busy !== null} onclick={() => void store.removeMod(offer)}>
-                    {store.modWorking(offer.id, "remove") ? "Removing..." : "Remove"}
-                  </button>
-                {/if}
+                  {#if installLabel(offer) !== null && installRefusal(offer) === null}
+                    <button
+                      disabled={isPreview || store.busy !== null}
+                      title={isPreview ? PREVIEW_FEEDS : null}
+                      onclick={() => void openVersions(offer)}
+                    >
+                      {store.busy === `Reading the ${offer.name} versions` ? "Reading..." : "Other version"}
+                    </button>
+                  {/if}
+                  {#if offer.availability.kind === "retry"}
+                    <button disabled={store.busy !== null} onclick={() => void store.restoreMod(offer)}>
+                      {store.modWorking(offer.id, "restore") ? "Restoring..." : "Restore"}
+                    </button>
+                  {/if}
+                  {#if removable(offer)}
+                    <button class="danger" disabled={store.busy !== null} onclick={() => void store.removeMod(offer)}>
+                      {store.modWorking(offer.id, "remove") ? "Removing..." : "Remove"}
+                    </button>
+                  {/if}
+                </div>
               </div>
-            </div>
-          {/each}
-          {#each store.modListing.failures as failure (failure.id)}
-            {@const icon = MOD_ICON[failure.id]}
-            <div class="offer">
-              {#if icon}
-                <img class="mod-icon" src={icon} alt="" width="64" height="34" />
-              {:else}
-                <span class="mod-icon"></span>
-              {/if}
-              <div class="about">
-                <span class="mod-name">{failure.name}</span>
-                <p class="status">{failure.why}</p>
+            {/each}
+            {#each store.modListing.failures as failure (failure.id)}
+              {@const icon = MOD_ICON[failure.id]}
+              <div class="offer failure">
+                {#if icon}
+                  <img class="mod-icon" src={icon} alt="" width="64" height="34" />
+                {:else}
+                  <span class="mod-icon"></span>
+                {/if}
+                <div class="about">
+                  <span class="mod-name">{failure.name}</span>
+                  <p class="status">{failure.why}</p>
+                </div>
               </div>
-            </div>
-          {/each}
+            {/each}
+          </div>
           {#if store.modListing.offers.length === 0 && store.modListing.failures.length === 0}
             <p class="empty">No mod feeds are known for this game yet.</p>
           {/if}
@@ -872,22 +954,75 @@
     letter-spacing: 0.04em;
   }
 
+  /*
+    One grid for the whole list rather than one per row. The actions column is sized by its content, so a row
+    that sizes it alone puts its version columns wherever its own buttons end - the rows subgrid onto these
+    tracks instead, which is what makes the two columns and their heading line up down the list.
+
+    The icon keeps its column even where a feed has none, so the names of two rows still line up rather than
+    stepping in and out with whichever mods happen to ship art. Wide enough for the one project whose mark is
+    a banner rather than a disc, since a track sized to the discs renders that one as an unreadable strip.
+  */
+  .offers {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 7.5rem 7.5rem auto auto;
+    column-gap: 12px;
+    padding: 0 var(--gutter);
+  }
+
+  /* The gutter is the list's: a subgrid's own horizontal padding shifts its tracks off the parent's lines. */
   .offer {
     display: grid;
-    /*
-      The icon keeps its column even where a feed has none, so the names of two rows still line up rather than
-      stepping in and out with whichever mods happen to ship art. Wide enough for the one project whose mark is
-      a banner rather than a disc, since a track sized to the discs renders that one as an unreadable strip.
-    */
-    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    column-gap: 12px;
-    padding: 9px var(--gutter);
+    padding: 9px 0;
     border-bottom: 1px solid var(--border);
   }
 
   .about {
     min-width: 0;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* The two version columns. Monospace, so the numbers line up down a column as well as across a row. */
+  .cell {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    grid-row: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .current {
+    grid-column: 3;
+  }
+
+  .offered {
+    grid-column: 4;
+  }
+
+  /* Under the name and across the columns' room, so a long sentence does not squeeze the name's track. */
+  .notes {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .head {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+  }
+
+  /* A feed that could not answer has nothing to put in the version columns, so its reason takes their room. */
+  .failure .about {
+    grid-column: 2 / -1;
   }
 
   /*
@@ -895,6 +1030,8 @@
     its own aspect and the banner fills the width at its.
   */
   .mod-icon {
+    grid-column: 1;
+    grid-row: 1;
     width: 64px;
     height: 34px;
     object-fit: contain;
@@ -919,13 +1056,6 @@
     color: var(--text-dim);
   }
 
-  .version {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-left: 6px;
-  }
-
   /* One line under the name; the row's height does not change with the state it reports. */
   .status {
     margin: 2px 0 0;
@@ -937,11 +1067,24 @@
     color: var(--invalid);
   }
 
+  /*
+    A track of its own, so every install button is the width of the widest one in the list rather than of its
+    own label - one grid means the track is sized once for all the rows. Stretched into it for the same reason:
+    a button sized to its text would leave the track it was measured for.
+  */
+  .primary {
+    grid-column: 5;
+    grid-row: 1;
+    justify-self: stretch;
+  }
+
   .offer-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     justify-self: end;
+    grid-column: 6;
+    grid-row: 1;
   }
 
   /* The same clothes the save bar's primary and the wipe buttons' danger wear, so the same kind of action

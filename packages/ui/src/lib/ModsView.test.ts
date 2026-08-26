@@ -103,6 +103,13 @@ describe("what an offer's status says", () => {
     return view().all("p.status")[0]?.textContent ?? "";
   };
 
+  /* The heading states the same two classes, so a row's cells are the ones outside it. */
+  const columns = (availability: Record<string, unknown>, over: Record<string, unknown> = {}) => {
+    publish(over, availability);
+    const cell = (name: string) => view().all(`.offer:not(.head) .${name}`)[0]?.textContent?.trim() ?? "";
+    return { current: cell("current"), available: cell("offered") };
+  };
+
   test("a mod that is not installed", () => {
     expect(status({ kind: "install" })).toBe("Not installed.");
   });
@@ -112,7 +119,44 @@ describe("what an offer's status says", () => {
   });
 
   test("a mod a version behind names the version installed", () => {
-    expect(status({ kind: "upgrade", from: "14.7" })).toContain("Installed: 14.7");
+    expect(columns({ kind: "upgrade", from: "14.7" })).toEqual({ current: "14.7", available: "14.8" });
+    // The sentence that used to carry it would now be saying the same version a third time.
+    expect(status({ kind: "upgrade", from: "14.7" })).toBe("");
+  });
+
+  /* A nightly names the commit it was built from, so nothing orders it against a release - which is why the
+     row was inert. Laying the release over it is the only way off one, so the button has to be there. */
+  test("a nightly is installable, and the column says what is there", () => {
+    const nightly = { kind: "nightly", commit: "fc706658" };
+    expect(columns(nightly)).toEqual({ current: "nightly", available: "14.8" });
+    publish({}, nightly);
+    const labels = view()
+      .all("button")
+      .map((button) => (button.textContent ?? "").trim());
+    expect(labels).toContain("Install 14.8 over it");
+  });
+
+  /* `version` on a row the record alone describes is what is on disk, not an offer - printing it under
+     Available would advertise the installed version as an upgrade. */
+  test("a mod no feed follows offers nothing in the available column", () => {
+    onlyInRecord([
+      {
+        id: "old",
+        name: "An older mod",
+        version: "1.0",
+        type: "pluggable",
+        noFeed: true,
+        availability: { kind: "unfollowed" },
+      },
+    ]);
+    const v = view();
+    expect(v.all(".offer:not(.head) .current")[0]?.textContent?.trim()).toBe("1.0");
+    expect(v.all(".offer:not(.head) .offered")[0]?.textContent?.trim()).toBe("no feed");
+  });
+
+  /* The sfall gate answers before the version comparison, so a refused row is frequently an installed mod. */
+  test("a refused row still names what is installed", () => {
+    expect(columns({ kind: "blocked", why: "Needs newer sfall.", from: "14.7" }).current).toBe("14.7");
   });
 
   /* A feed answering with an older release than what is installed is worth distrusting, so the row says so. */
@@ -188,9 +232,18 @@ describe("what an offer's status says", () => {
 describe("what a row offers to do", () => {
   const actions = (availability: Record<string, unknown>, over: Record<string, unknown> = {}) => {
     publish(over, availability);
+    // The install button sits outside the actions box, in a track of its own that equalises its width, so a
+    // row's controls are that button plus whatever the box holds.
     return view()
-      .all(".offer-actions button")
+      .all(".offer .primary, .offer-actions button")
       .map((b) => (b.textContent ?? "").trim());
+  };
+
+  /** The install button's refusal, where it has one: the reason a disabled control owes its reader. */
+  const refusal = (availability: Record<string, unknown>, over: Record<string, unknown> = {}) => {
+    publish(over, availability);
+    const button = view().all(".offer .primary")[0];
+    return button === undefined ? null : { label: button.textContent?.trim(), title: button.getAttribute("title") };
   };
 
   test("names the install by what it will do and to which version", () => {
@@ -201,15 +254,38 @@ describe("what a row offers to do", () => {
     expect(actions({ kind: "install-over" })).toContain("Install 14.8 over it");
   });
 
+  /*
+    Shown refused rather than left out: a row whose button disappears makes the column jump, and the reason
+    belongs on the control the user is reaching for rather than only in the line underneath.
+  */
+  test("shows the install refused, with its reason, for a version already installed", () => {
+    expect(refusal({ kind: "installed" })).toEqual({
+      label: "Install 14.8",
+      title: "14.8 is what is installed.",
+    });
+  });
+
+  test("shows the install refused, with its reason, where the feed offers something older", () => {
+    expect(refusal({ kind: "downgrade", from: "15.0" })?.title).toBe(
+      "14.8 is older than the installed 15.0, so installing it would put the mod back.",
+    );
+  });
+
+  /* Nothing to choose between when the one on offer cannot be installed, so the list is not offered either. */
+  test("offers no version list on a row whose install is refused", () => {
+    expect(actions({ kind: "installed" })).not.toContain("Other version");
+  });
+
   test("offers a retry rather than an install for an attempt that never finished, plus the way back", () => {
     const labels = actions({ kind: "retry", version: "14.8" });
     expect(labels).toContain("Retry");
     expect(labels).toContain("Restore");
   });
 
-  test("offers nothing to install for a mod that is already current", () => {
-    const labels = actions({ kind: "installed" });
-    expect(labels.some((label) => label.startsWith("Install") || label.startsWith("Upgrade"))).toBe(false);
+  /* Refused rather than absent, so the row keeps its shape; the reason it carries is asserted above. */
+  test("offers nothing that can be clicked to install for a mod that is already current", () => {
+    publish({}, { kind: "installed" });
+    expect(view().all(".offer .primary")[0]?.hasAttribute("disabled")).toBe(true);
   });
 
   /*
