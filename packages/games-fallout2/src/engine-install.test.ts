@@ -5,7 +5,7 @@ import { installCachedEngine, installEngine, installedEngines, removeEngine } fr
 import { loadRecord, saveRecord } from "./records.js";
 
 const INSTALL: Install = { path: "/games/one", type: "fallout2" };
-const FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=1";
+const FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=30";
 const URL = "https://example.invalid/linux.tar.gz";
 const NOW = new Date("2026-08-23T10:45:00Z");
 

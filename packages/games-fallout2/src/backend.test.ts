@@ -6,7 +6,7 @@ import type { Backend } from "./backend.js";
 
 const install = { path: "/games/one", type: "fallout2" as const };
 
-const ENGINE_FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=1";
+const ENGINE_FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=30";
 const ENGINE_URL = "https://example.invalid/linux.tar.gz";
 const ENGINE_RELEASE = JSON.stringify([
   {

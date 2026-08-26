@@ -1,13 +1,39 @@
 import { MemoryPlatform } from "@zax/platform/memory";
 import { describe, expect, it } from "vitest";
 import { engineById } from "./engines.js";
-import { cachedEngine, cachedEngines, enginePackage, engineOutdated, latestEngine } from "./engine-release.js";
+import {
+  cachedEngine,
+  cachedEngines,
+  enginePackage,
+  engineOutdated,
+  engineReleases,
+  latestEngine,
+} from "./engine-release.js";
 
 const CE = engineById("fallout2-ce");
 const FISSION = engineById("fission");
-const FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=1";
+const FEED = "https://api.github.com/repos/fallout2-ce/fallout2-ce/releases?per_page=30";
+const FISSION_FEED = "https://api.github.com/repos/cambragol/fission-ce/releases?per_page=30";
 const TAG = "https://api.github.com/repos/fallout2-ce/fallout2-ce/git/ref/tags/continious";
 const COMMIT = "5f737d8fff969c90ddc86b0235afbce044c79b2d";
+
+/** Two tags of a project that names its versions, which is what makes a version list a real choice. */
+const FISSION_RELEASES = JSON.stringify([
+  {
+    tag_name: "beta-0.9.6.7",
+    published_at: "2026-08-26T03:11:37Z",
+    assets: [
+      { name: "fallout-fission-linux-x64.zip", size: 100, browser_download_url: "https://example.invalid/a.zip" },
+    ],
+  },
+  {
+    tag_name: "beta-0.9.6.6",
+    published_at: "2026-08-25T10:15:14Z",
+    assets: [
+      { name: "fallout-fission-linux-x64.zip", size: 100, browser_download_url: "https://example.invalid/b.zip" },
+    ],
+  },
+]);
 
 const RELEASE = JSON.stringify([
   {
@@ -75,6 +101,28 @@ describe("finding the published release", () => {
   it("says so when the feed names no release at all", async () => {
     const platform = new MemoryPlatform({ config: "cfg", cache: "cache", responses: { [FEED]: "[]" } });
     await expect(latestEngine(platform, "fallout2-ce")).rejects.toThrow(/no release/i);
+  });
+
+  it("lists what a tagged project has published, newest first", async () => {
+    const platform = seeded({ responses: { [FISSION_FEED]: FISSION_RELEASES } });
+    const all = await engineReleases(platform, "fission");
+    expect(all.map((one) => one.release)).toEqual(["beta-0.9.6.7", "beta-0.9.6.6"]);
+  });
+
+  /*
+    The rule that keeps a version list to one request. A commit merely absent from the output looks the same
+    whether it was asked for and lost or never asked for, so what is asserted is the request that was not made.
+  */
+  it("asks for no commits on a tagged project, whose tags already identify its builds", async () => {
+    const platform = seeded({ responses: { [FISSION_FEED]: FISSION_RELEASES } });
+    const all = await engineReleases(platform, "fission");
+    expect(all.every((one) => one.commit === null)).toBe(true);
+    expect(platform.fetched.filter((url) => url.includes("/git/ref/tags/"))).toEqual([]);
+  });
+
+  it("asks for the commit on a rolling project, where the tag never changes", async () => {
+    const platform = seeded();
+    expect((await engineReleases(platform, "fallout2-ce"))[0]?.commit).toBe(COMMIT);
   });
 });
 

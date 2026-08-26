@@ -5,7 +5,7 @@
 
 import { compareVersions, packageDirectory } from "@zax/core";
 import type { DownloadOptions, Platform } from "@zax/platform";
-import { buildFor, engineById, type EngineDefinition } from "./engines.js";
+import { buildFor, engineById, type EngineBuild, type EngineDefinition } from "./engines.js";
 import type { InstalledEngine } from "./records.js";
 
 /** One published file: what it is called, where it is, and how big the release says it is. */
@@ -42,8 +42,10 @@ export interface EngineProgress extends DownloadOptions {
 /**
  * The releases list rather than the `latest` endpoint. A project whose only release is a prerelease - which is
  * what a rolling build is - answers 404 there, and the list's first entry is the newest either way.
+ *
+ * Thirty is what a version list can usefully offer; a rolling project answers with its one release regardless.
  */
-const releasesUrl = (repo: string): string => `https://api.github.com/repos/${repo}/releases?per_page=1`;
+const releasesUrl = (repo: string): string => `https://api.github.com/repos/${repo}/releases?per_page=30`;
 
 /** The singular form, which matches one ref exactly - the plural returns every ref the path is a prefix of. */
 const tagUrl = (repo: string, tag: string): string =>
@@ -76,32 +78,51 @@ interface PublishedRelease {
   assets?: unknown;
 }
 
-export async function latestEngine(platform: Platform, engineId: string): Promise<EngineRelease> {
-  const engine = engineById(engineId);
-  const body: unknown = JSON.parse(await platform.net.fetchText(releasesUrl(engine.repo)));
-  const first = (Array.isArray(body) ? body[0] : undefined) as PublishedRelease | undefined;
-  const release = typeof first?.tag_name === "string" ? first.tag_name : "";
-  const published = typeof first?.published_at === "string" ? first.published_at : "";
-  if (release === "" || published === "") throw new Error(`${engine.name} has published no release ZAX can read.`);
-
-  const commit = await tagCommit(platform, engine.repo, release);
-  const build = buildFor(engine, platform.os, platform.arch);
-  if (build === null) return { release, published, commit, asset: null };
-
-  const declared: unknown = first?.assets;
+/** The asset for this machine, or null where the project publishes no build it can run or shipped none. */
+function assetIn(entry: PublishedRelease, build: EngineBuild | null): EngineAsset | null {
+  if (build === null) return null;
+  const declared: unknown = entry.assets;
   const assets = Array.isArray(declared) ? (declared as PublishedAsset[]) : [];
   const wanted = assets.find((asset) => asset.name === build.asset);
-  if (!wanted || typeof wanted.browser_download_url !== "string") return { release, published, commit, asset: null };
+  if (!wanted || typeof wanted.browser_download_url !== "string") return null;
   return {
-    release,
-    published,
-    commit,
-    asset: {
-      name: build.asset,
-      url: wanted.browser_download_url,
-      size: typeof wanted.size === "number" ? wanted.size : 0,
-    },
+    name: build.asset,
+    url: wanted.browser_download_url,
+    size: typeof wanted.size === "number" ? wanted.size : 0,
   };
+}
+
+/**
+ * Every release this machine could install, newest first. Throws where the project has published nothing this
+ * version can read, which is what a single unreadable release already did.
+ *
+ * The commit is resolved only for a rolling project, and costs one request per release. A tagged release is
+ * identified by its tag, so asking would spend a request each to display nothing the tag does not already say.
+ */
+export async function engineReleases(platform: Platform, engineId: string): Promise<readonly EngineRelease[]> {
+  const engine = engineById(engineId);
+  const body: unknown = JSON.parse(await platform.net.fetchText(releasesUrl(engine.repo)));
+  const published = (Array.isArray(body) ? body : []) as PublishedRelease[];
+  const build = buildFor(engine, platform.os, platform.arch);
+
+  const releases: EngineRelease[] = [];
+  for (const entry of published) {
+    const release = typeof entry.tag_name === "string" ? entry.tag_name : "";
+    const at = typeof entry.published_at === "string" ? entry.published_at : "";
+    if (release === "" || at === "") continue;
+    const commit = engine.releases === "rolling" ? await tagCommit(platform, engine.repo, release) : null;
+    releases.push({ release, published: at, commit, asset: assetIn(entry, build) });
+  }
+  if (releases.length === 0) throw new Error(`${engine.name} has published no release ZAX can read.`);
+  return releases;
+}
+
+/** The newest release. What the Check button reads, and what an update is measured against. */
+export async function latestEngine(platform: Platform, engineId: string): Promise<EngineRelease> {
+  const [newest] = await engineReleases(platform, engineId);
+  // Unreachable: the list above throws rather than come back empty. Bound rather than asserted all the same.
+  if (newest === undefined) throw new Error(`${engineById(engineId).name} has published no release ZAX can read.`);
+  return newest;
 }
 
 /**
