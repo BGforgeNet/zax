@@ -1155,13 +1155,21 @@ class Store {
   modVersionPick = $state<{ offer: ModOffer; versions: readonly string[]; read: boolean } | null>(null);
 
   /**
-   * Opens that choice. What the install already carries goes with the request, so the answer is the versions
-   * it could move to: a base mod is not put back to an older release, which its installer cannot undo.
+   * Opens that choice. What the install already carries goes with the request where it is a floor, so the
+   * answer is the versions it could move to.
+   *
+   * Only a base mod has one: its own installer has no way back down, so an older release is not something to
+   * offer. Anything that is files in the mods folder takes an older release the same way it takes a newer one,
+   * and asking with no floor is what puts those in the list. The type that decides is the one on disk, which a
+   * conversion states separately - the offered release's is the type it would become.
    */
   async chooseModVersion(offer: ModOffer): Promise<void> {
     const state = offer.availability;
+    const onDisk = state.kind === "convert" ? state.was : offer.type;
     const held =
-      state.kind === "upgrade" || state.kind === "downgrade" || state.kind === "convert" ? state.from : undefined;
+      onDisk === "base" && (state.kind === "upgrade" || state.kind === "downgrade" || state.kind === "convert")
+        ? state.from
+        : undefined;
     this.modVersionPick = { offer, versions: [], read: false };
     await this.run(`Reading the ${offer.name} versions`, async () => {
       try {

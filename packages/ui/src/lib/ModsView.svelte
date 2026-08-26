@@ -504,9 +504,10 @@
 <!-- Asked before anything is downloaded, and only when the choice cannot be carried over from the record:
      a first install, or a release that took away what was chosen. The plan dialog follows it as always. -->
 <!--
-  Older releases of the same line, for an install that wants one that is not the newest. Nothing older than
-  what is installed is in the list: the answer comes from the backend, where the line that orders these
-  versions is known, and a base mod's installer has no way back down anyway.
+  Other releases of the same line, for an install that wants one that is not the newest. The answer comes from
+  the backend, where the line that orders these versions is known. For a base mod nothing older than what is
+  installed is in the list, its installer having no way back down; for anything else older releases are there,
+  since replacing files in the mods folder goes either way.
 -->
 <Dialog open={store.modVersionPick !== null} title="Install another version" dismiss={closeVersions}>
   {#if store.modVersionPick}

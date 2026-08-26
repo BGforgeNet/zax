@@ -1217,6 +1217,33 @@ describe("installing a version other than the newest", () => {
     expect(store.modVersionPick).toEqual({ offer, versions: ["2.3.34", "2.3.33"], read: true });
   });
 
+  /*
+    The floor is a base mod's alone: its installer cannot go back down. A mod that is files in the mods folder
+    is replaced by an older release the same way it is by a newer one, so its list is asked for unfloored.
+  */
+  test("asks without a floor for a mod that is not a base one, so older releases are offered", async () => {
+    const versions = vi.spyOn(hostBackend, "modVersions").mockResolvedValue(["14.8", "14.7", "14.6"]);
+    await store.chooseModVersion({
+      id: "fo2tweaks",
+      name: "FO2tweaks",
+      version: "14.8",
+      type: "pluggable",
+      availability: { kind: "downgrade", from: "15.0" },
+    });
+    expect(versions).toHaveBeenCalledWith("fo2tweaks", undefined);
+  });
+
+  /* A conversion states what is on disk separately: the offered release's type is the one it would become. */
+  test("floors on the type that is installed, not the one being offered", async () => {
+    const versions = vi.spyOn(hostBackend, "modVersions").mockResolvedValue(["2.3.34"]);
+    await store.chooseModVersion({
+      ...offer,
+      type: "pluggable",
+      availability: { kind: "convert", from: "2.3.32", was: "base" },
+    });
+    expect(versions).toHaveBeenCalledWith("rpu23", "2.3.32");
+  });
+
   test("plans the version picked rather than the one the row names", async () => {
     const plan = vi
       .spyOn(hostBackend, "planMod")
