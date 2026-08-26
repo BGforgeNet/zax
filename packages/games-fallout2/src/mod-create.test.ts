@@ -182,33 +182,19 @@ describe("performing an install that creates another", () => {
     ]);
   });
 
-  /** What the tool prints when the archive is missing the named paths. */
-  const notFound = (...names: string[]) =>
-    `Files not found:\n${names.map((name) => `  ${name}`).join("\n")}\nError: Some requested files were not found`;
-
-  it("refuses before the payload lands when the archive holds hardly any of what the list names", async () => {
-    // The gate runs against the copy taken out of the payload, so a wrong Fallout 1 folder costs nothing:
-    // the unpack has not happened yet.
-    const platform = createPlatform();
-    const found = await release();
-    const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
-    const missing = createPlatform({
-      runs: { [TOOL_PATH]: { code: 1, output: notFound(...Array.from({ length: 200 }, (_, i) => `ART/A${i}.FRM`)) } },
-    });
-    await expect(applyCreateInstall(missing, install, found, plan, TOOL)).rejects.toThrow(/holds hardly any/);
-    expect(await missing.fs.stat(`${GAME}/Fallout1in2/Fallout2.exe`)).toBeNull();
-  });
+  /** What the tool prints when `--ignore-missing` let it extract around the named paths. */
+  const skipping = (...names: string[]) =>
+    `Extracting 2 files...\n\nWarning: files not found:\n${names.map((name) => `  ${name}`).join("\n")}\nDone`;
 
   it("installs an archive an edition apart, reporting the paths it went without", async () => {
-    // Fallout et tu v1.16.3771 asks for two files whose 8.3 collision suffix differs between Fallout 1
-    // editions. Upstream's own extractor skips a name it cannot find, so refusing over them blocked an
-    // install that works; the count reported has to lose them too, or it names files that never landed.
+    // Fallout et tu v1.16.3771 asks for files whose 8.3 collision suffix is assigned in archive order, so
+    // another edition spells them differently - hundreds of them, which is why no count refuses an install
+    // here. The count reported has to lose them, or it names files that never landed.
     const platform = createPlatform();
     const found = await release();
     const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
     const apart = createPlatform({
-      // Only the listing reports the gap; the extraction is given --ignore-missing and takes the rest.
-      runs: { [`${TOOL_PATH} l`]: { code: 1, output: notFound("SOUND/SPEECH/LIEUT/LI3ACF~5.TXT") } },
+      runs: { [`${TOOL_PATH} x`]: { code: 0, output: skipping("SOUND/SPEECH/LIEUT/LI3ACF~5.TXT") } },
     });
     const outcome = await applyCreateInstall(apart, install, found, plan, TOOL);
     expect(outcome.skipped).toEqual(["SOUND/SPEECH/LIEUT/LI3ACF~5.TXT"]);

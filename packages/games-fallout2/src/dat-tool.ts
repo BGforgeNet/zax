@@ -117,21 +117,16 @@ export async function datReadError(platform: Platform, tool: ReadyDatTool, dat: 
 }
 
 /**
- * How many of the list's paths an archive may be missing and still be the archive the mod asked for. The two
- * cases are orders of magnitude apart, so the line between them is wide rather than tuned: Fallout et tu
- * v1.16.3771 names two files whose 8.3 collision suffix differs between Fallout 1 editions - upstream deleted
- * both a fortnight later - while a user who points at Fallout 2's `master.dat` misses nearly all 8,602.
+ * The paths the list named that this archive does not hold, which `--ignore-missing` turns into a warning the
+ * tool prints before extracting the rest. Reported to the user; nothing is refused over them.
  */
-const EDITION_DRIFT = 100;
-
-/** The paths the list named that the archive does not hold. Extraction skips these. */
 const notFound = (output: string): readonly string[] => {
   const lines = output.split("\n");
-  const head = lines.findIndex((line) => line.trim() === "Files not found:");
+  const head = lines.findIndex((line) => line.trim() === "Warning: files not found:");
   if (head === -1) return [];
   const missing: string[] = [];
   for (const line of lines.slice(head + 1)) {
-    // The tool indents each name and closes the block with an unindented `Error:` line.
+    // The tool indents each name; the first unindented line after them is where the block ends.
     if (!/^\s+\S/.test(line)) break;
     missing.push(line.trim());
   }
@@ -139,38 +134,16 @@ const notFound = (output: string): readonly string[] => {
 };
 
 /**
- * The paths the list names that this archive does not hold, refusing the archive that holds hardly any of them.
- *
- * Runs before the payload is downloaded, which is the whole point: extraction answers the same question, but
- * only once an 800 MB unpack has landed in the game folder. Nothing is written when this refuses.
- *
- * A few missing paths are not a wrong archive - upstream's own extractor skips a name it cannot find and
- * reports success - so they are returned for the caller to report rather than thrown over. An output with no
- * block to read is treated as everything missing: the tool is pinned, so a shape this cannot parse is a tool
- * ZAX no longer understands, and passing an unread archive is the failure worth avoiding.
- */
-export async function missingFromDat(
-  platform: Platform,
-  tool: ReadyDatTool,
-  dat: string,
-  list: string,
-): Promise<readonly string[]> {
-  const outcome = await runTool(platform, tool, ["l", dat, `@${list}`]);
-  if (outcome.code === 0) return [];
-  const missing = notFound(outcome.output);
-  if (missing.length === 0 || missing.length > EDITION_DRIFT)
-    throw new Error(
-      `${dat} is not the archive this mod needs - it holds hardly any of what the mod asked for. The tool said: ${said(outcome.output)}`,
-    );
-  return missing;
-}
-
-/**
- * Extracts the listed paths, structure preserved, into a directory.
+ * Extracts the listed paths, structure preserved, into a directory, answering the ones this archive did not
+ * hold - which the caller reports.
  *
  * `--ignore-missing` because a list is written against one edition of the archive and run against another:
  * without it a name the user's copy spells differently fails the whole extraction, and nothing lands at all.
- * `missingFromDat` is what decides whether the misses amount to the wrong archive, before this runs.
+ * It is also why nothing here judges how much is absent. ZAX used to refuse an archive missing more than a
+ * hundred of the list's paths, on the reading that a large gap meant the wrong folder - but the 8.3 collision
+ * suffixes (`LI3ACD~5.TXT`) are assigned in archive order, so a different edition renumbers hundreds of them
+ * at once and no count separates that from a user who pointed at Fallout 2's `master.dat`. `datReadError` is
+ * what still refuses a folder holding no readable archive at all, before anything is downloaded.
  */
 export async function extractFromDat(
   platform: Platform,
@@ -178,8 +151,9 @@ export async function extractFromDat(
   dat: string,
   list: string,
   into: string,
-): Promise<void> {
+): Promise<readonly string[]> {
   const outcome = await runTool(platform, tool, ["x", dat, "--ignore-missing", "-o", into, `@${list}`]);
   if (outcome.code !== 0)
     throw new Error(`Unpacking ${dat} stopped with code ${outcome.code ?? "no exit code"}: ${said(outcome.output)}`);
+  return notFound(outcome.output);
 }

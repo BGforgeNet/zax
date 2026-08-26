@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { MemoryPlatform } from "@zax/platform/memory";
 import {
   DAT_TOOL_VERSION,
-  missingFromDat,
   datReadError,
   datToolFor,
   ensureDatTool,
@@ -108,46 +107,35 @@ describe("running the archive tool", () => {
     expect(bad).toContain("DAT size mismatch");
   });
 
-  /** What the tool prints when the archive is missing some of what the list named. */
-  const notFound = (...names: string[]) =>
-    `       Size      Packed  Comp  Name\n\nFiles not found:\n${names
+  /** What the tool prints when `--ignore-missing` let it extract around paths this archive does not hold. */
+  const skipping = (...names: string[]) =>
+    `Extracting 8602 files...\n\nWarning: files not found:\n${names
       .map((name) => `  ${name}`)
-      .join("\n")}\nError: Some requested files were not found`;
-
-  it("takes an archive an edition apart, naming what it turned out not to hold", async () => {
-    // Fallout et tu v1.16.3771 asks for two files whose 8.3 collision suffix differs between Fallout 1
-    // editions. Refusing over them blocked an install upstream's own extractor completes.
-    const platform = ran({
-      code: 1,
-      output: notFound("SOUND/SPEECH/LIEUT/LI3ACD~5.TXT", "SOUND/SPEECH/LIEUT/LI3ACF~5.TXT"),
-    });
-    await expect(missingFromDat(platform, TOOL, DAT, LIST)).resolves.toEqual([
-      "SOUND/SPEECH/LIEUT/LI3ACD~5.TXT",
-      "SOUND/SPEECH/LIEUT/LI3ACF~5.TXT",
-    ]);
-    expect(platform.ran[0]?.args).toEqual(["l", DAT, `@${LIST}`]);
-  });
-
-  it("refuses the archive that holds hardly any of it, which is a user who pointed at the wrong one", async () => {
-    const platform = ran({ code: 1, output: notFound(...Array.from({ length: 101 }, (_, i) => `ART/A${i}.FRM`)) });
-    await expect(missingFromDat(platform, TOOL, DAT, LIST)).rejects.toThrow(/holds hardly any/);
-  });
-
-  it("refuses an output it cannot read rather than passing an archive nothing checked", async () => {
-    // The tool is pinned, so a shape with no block to read is a tool ZAX no longer understands.
-    const platform = ran({ code: 1, output: "Error: something else entirely" });
-    await expect(missingFromDat(platform, TOOL, DAT, LIST)).rejects.toThrow(/holds hardly any/);
-  });
-
-  it("takes an archive that holds every path the list names", async () => {
-    const platform = ran({ code: 0, output: "8602 files" });
-    await expect(missingFromDat(platform, TOOL, DAT, LIST)).resolves.toEqual([]);
-  });
+      .join("\n")}\nExtracted 8600 files`;
 
   it("extracts the listed paths into the directory it is given", async () => {
     const platform = ran({ code: 0, output: "Extracting 8602 files..." });
-    await extractFromDat(platform, TOOL, DAT, LIST, INTO);
+    await expect(extractFromDat(platform, TOOL, DAT, LIST, INTO)).resolves.toEqual([]);
     expect(platform.ran[0]?.args).toEqual(["x", DAT, "--ignore-missing", "-o", INTO, `@${LIST}`]);
+  });
+
+  it("answers the paths an archive an edition apart turned out not to hold", async () => {
+    // Fallout et tu v1.16.3771 asks for files whose 8.3 collision suffix is assigned in archive order, so
+    // another edition spells them differently. The extraction goes around them and says which they were.
+    const platform = ran({
+      code: 0,
+      output: skipping("SOUND/SPEECH/LIEUT/LI3ACD~5.TXT", "SOUND/SPEECH/LIEUT/LI3ACF~5.TXT"),
+    });
+    await expect(extractFromDat(platform, TOOL, DAT, LIST, INTO)).resolves.toEqual([
+      "SOUND/SPEECH/LIEUT/LI3ACD~5.TXT",
+      "SOUND/SPEECH/LIEUT/LI3ACF~5.TXT",
+    ]);
+  });
+
+  it("reads the block however many names it carries, since an edition apart renumbers hundreds", async () => {
+    const names = Array.from({ length: 200 }, (_, i) => `SOUND/SPEECH/A${i}~1.TXT`);
+    const platform = ran({ code: 0, output: skipping(...names) });
+    await expect(extractFromDat(platform, TOOL, DAT, LIST, INTO)).resolves.toEqual(names);
   });
 
   it("reports a failed extraction with what the tool said", async () => {

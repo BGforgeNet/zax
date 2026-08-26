@@ -1362,10 +1362,8 @@ describe("what an installed base mod does to the list of games", () => {
     expect(store.installs[0]?.type, "which a stub cannot fake - startup reads the folder itself").toBe("fallout2up");
   });
 
-  test("adds a second game when the mod creates one beside this install", async () => {
-    const created = `${PREVIEW_INSTALL}/Fallout1in2`;
-    answering({ version: "1.16.3771", created, extracted: 8602, conflicts: [] }, "fo1in2");
-
+  /** The dialog as it stands when the et tu install is confirmed, which is what the outcome answers. */
+  const holdEtTu = () => {
     store.modPlan = {
       version: "1.16.3771",
       offer: {
@@ -1387,6 +1385,13 @@ describe("what an installed base mod does to the list of games", () => {
         fingerprint: "fo1in2-1.16.3771",
       },
     };
+  };
+
+  test("adds a second game when the mod creates one beside this install", async () => {
+    const created = `${PREVIEW_INSTALL}/Fallout1in2`;
+    answering({ version: "1.16.3771", created, extracted: 8602, conflicts: [] }, "fo1in2");
+
+    holdEtTu();
     await store.confirmModInstall();
 
     expect(store.installs.map((one) => one.path)).toEqual([PREVIEW_INSTALL, created]);
@@ -1398,6 +1403,31 @@ describe("what an installed base mod does to the list of games", () => {
     expect(await stored(), "and it survives a restart").toContain(created);
     // Said in the notice too, since a game appearing in the sidebar unannounced is a surprise.
     expect(store.notice?.text).toContain("is now on the list of installations");
+  });
+
+  test("names the paths the user's own archive did not hold, while a reader can still read them", async () => {
+    const created = `${PREVIEW_INSTALL}/Fallout1in2`;
+    const skipped = ["SOUND/SPEECH/LIEUT/LI3ACD~5.TXT", "SOUND/SPEECH/LIEUT/LI3ACF~5.TXT"];
+    answering({ version: "1.16.3771", created, extracted: 8600, skipped, conflicts: [] }, "fo1in2");
+
+    holdEtTu();
+    await store.confirmModInstall();
+
+    expect(store.notice?.text).toContain(`Your archive does not hold ${skipped.join(", ")}, so they were skipped.`);
+  });
+
+  test("counts them instead once there are more than a banner can carry", async () => {
+    // A Fallout 1 copy an edition apart renumbers its 8.3 collision suffixes, so the extraction can go
+    // around hundreds of paths. Naming every one of them reports nothing and buries the rest of the line.
+    const created = `${PREVIEW_INSTALL}/Fallout1in2`;
+    const skipped = Array.from({ length: 176 }, (_, i) => `SOUND/SPEECH/A${i}~1.TXT`);
+    answering({ version: "1.16.3771", created, extracted: 8426, skipped, conflicts: [] }, "fo1in2");
+
+    holdEtTu();
+    await store.confirmModInstall();
+
+    expect(store.notice?.text).toContain("Your archive does not hold 176 of the files the mod asked for");
+    expect(store.notice?.text, "and not the list itself").not.toContain("SOUND/SPEECH/A0~1.TXT");
   });
 });
 

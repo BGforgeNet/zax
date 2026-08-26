@@ -16,7 +16,7 @@ import { backupDirectory, fnv1a, stamp, type GameType, type Install, type MergeC
 import type { ArchiveEntryInfo, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
 import { preflightArchive } from "./archive-preflight.js";
-import { datReadError, extractFromDat, missingFromDat, type ReadyDatTool } from "./dat-tool.js";
+import { datReadError, extractFromDat, type ReadyDatTool } from "./dat-tool.js";
 import type { ModCreates, ModInput, ModManifest } from "./manifest.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import type { ModRelease, ReleaseAsset } from "./mod-feed.js";
@@ -300,15 +300,7 @@ export async function applyCreateInstall(
     options,
   );
 
-  // Before anything lands: whether the archive the user pointed at is the one the mod asks for. The
-  // extraction cannot answer that - it is told to skip what it cannot find, which is what lets a copy an
-  // edition apart install at all - so an archive holding hardly any of the list is refused here instead.
   const list = await fetchList(platform, work, archivePath, manifest, creates);
-  let skipped: readonly string[] = [];
-  if (source !== null && list !== null) {
-    options?.onStep?.(`Checking ${platform.paths.basename(source)}`);
-    skipped = await missingFromDat(platform, tool, source, list.path);
-  }
 
   const pending: InstalledMod = {
     id: manifest.id,
@@ -336,11 +328,19 @@ export async function applyCreateInstall(
   await platform.archive.extract(archivePath, install.path);
 
   let extracted = 0;
+  let skipped: readonly string[] = [];
   if (source !== null && list !== null && manifest.extractDat) {
     options?.onStep?.(`Unpacking Fallout 1's files`);
-    await extractFromDat(platform, tool, source, list.path, insidePath(platform, created, manifest.extractDat.into));
-    // What the list named less what this archive turned out not to hold: the count is reported to the user,
-    // and one taken from the list alone would say files landed that never existed here.
+    // The extraction is what discovers a path this edition of the archive spells differently: it is told to
+    // skip those and says which they were. The count reported has to lose them too, or it names files that
+    // never landed.
+    skipped = await extractFromDat(
+      platform,
+      tool,
+      source,
+      list.path,
+      insidePath(platform, created, manifest.extractDat.into),
+    );
     extracted = list.entries - skipped.length;
   }
 

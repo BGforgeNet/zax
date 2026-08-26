@@ -115,6 +115,21 @@ async function quietly(work: () => Promise<void>): Promise<void> {
 */
 const AUTOSAVE_DELAY = 400;
 
+/**
+ * What a created install went without, for the line that reports it.
+ *
+ * Named while there are few enough to read: which files an edition of the archive turned out not to hold is
+ * what decides whether the gap matters, and a bare number sends the user looking for a list nothing keeps.
+ * Counted past that, because a copy an edition apart renumbers hundreds of 8.3 names at once and a banner
+ * carrying every one of them reports nothing at all.
+ */
+const NAMED_SKIPS = 10;
+
+const skippedText = (names: readonly string[]): string =>
+  names.length <= NAMED_SKIPS
+    ? `Your archive does not hold ${names.join(", ")}, so ${names.length === 1 ? "it was" : "they were"} skipped.`
+    : `Your archive does not hold ${names.length} of the files the mod asked for, so they were skipped.`;
+
 // Built once: the layout does not change at runtime, and every search result needs a lookup in it.
 const PLACES = placesById();
 const HIDDEN = hiddenIds();
@@ -1337,12 +1352,7 @@ class Store {
             ? ` ${outcome.conflicts.length} setting(s) you had changed were kept over the release's new defaults.`
             : "";
         const beside = "created" in outcome ? ` ${outcome.created} is now on the list of installations.` : "";
-        // Named rather than counted: which files an edition of the archive turned out not to hold is what
-        // decides whether the gap matters, and a bare number sends the user looking for a list nothing keeps.
-        const skipped =
-          "skipped" in outcome && outcome.skipped.length > 0
-            ? ` Your archive does not hold ${outcome.skipped.join(", ")}, so ${outcome.skipped.length === 1 ? "it was" : "they were"} skipped.`
-            : "";
+        const skipped = "skipped" in outcome && outcome.skipped.length > 0 ? ` ${skippedText(outcome.skipped)}` : "";
         return {
           kind: "done",
           text: `${held.offer.name} ${outcome.version} installed.${conflicts}${beside}${skipped}`,

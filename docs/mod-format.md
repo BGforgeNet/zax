@@ -227,9 +227,10 @@ ships - one path per line, as the archive spells them - and `into` is where they
 inside the created directory.
 
 A list is written against one edition of the archive and run against whichever the user owns, so a path the
-user's copy does not hold is skipped and named in the result rather than failing the extraction. An archive
-holding hardly any of what the list names is a folder that is not the game the mod asked for, and is refused
-before anything is downloaded or written.
+user's copy does not hold is skipped and named in the result rather than failing the extraction. How many are
+missing decides nothing: 8.3 collision suffixes are assigned in archive order, so another edition renumbers
+hundreds of them at once. What is checked before anything is downloaded is that the folder holds an archive
+the tool can read at all.
 
 ### Refusal rules
 
