@@ -255,6 +255,14 @@ export async function cachedEngine(
   return (await cachedEngines(platform, engine, assetName))[0] ?? null;
 }
 
+/**
+ * Removes one cached release. Addressed by publication instant, which is what the directory name is derived
+ * from, so this cannot name a directory outside the engine's own cache.
+ */
+export async function forgetEngine(platform: Platform, engine: EngineDefinition, published: string): Promise<void> {
+  await platform.fs.remove(releaseDirectory(platform, engine, published));
+}
+
 /** The note's fields, or null for anything this version cannot read - a truncated file, or an older format. */
 async function readNote(
   platform: Platform,

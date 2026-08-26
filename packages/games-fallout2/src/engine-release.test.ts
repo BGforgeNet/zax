@@ -7,6 +7,7 @@ import {
   enginePackage,
   engineOutdated,
   engineReleases,
+  forgetEngine,
   latestEngine,
 } from "./engine-release.js";
 
@@ -300,6 +301,24 @@ describe("the copy the machine already holds", () => {
     await held(platform, "2026-08-23T09:37:22Z", null);
     const all = await cachedEngines(platform, CE, ASSET);
     expect(all.map((one) => one.release.release)).toEqual(["old"]);
+  });
+
+  it("drops one build and leaves the rest", async () => {
+    const platform = seeded();
+    await held(platform, "2026-07-01T00:00:00Z", note("old", "2026-07-01T00:00:00Z"));
+    await held(platform, "2026-08-23T09:37:22Z", note("new", "2026-08-23T09:37:22Z"));
+
+    await forgetEngine(platform, CE, "2026-07-01T00:00:00Z");
+
+    const all = await cachedEngines(platform, CE, ASSET);
+    expect(all.map((one) => one.release.release)).toEqual(["new"]);
+  });
+
+  it("says nothing about a build the cache does not hold", async () => {
+    const platform = seeded();
+    await held(platform, "2026-08-23T09:37:22Z", note("new", "2026-08-23T09:37:22Z"));
+    await expect(forgetEngine(platform, CE, "2020-01-01T00:00:00Z")).resolves.toBeUndefined();
+    expect(await cachedEngines(platform, CE, ASSET)).toHaveLength(1);
   });
 
   it("writes the note beside an archive cached before this version wrote them", async () => {
