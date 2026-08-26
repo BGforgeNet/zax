@@ -115,7 +115,11 @@
   {/each}
   <!-- Status rather than an action, so it sits away from the buttons at the far end of their own bar. -->
   <div class="spacer"></div>
-  {#if store.modifiedCount > 0}
+  {#if store.autosave}
+    <!-- One standing chip rather than a count: every edit is written within the debounce, so a count and a
+       Revert all would appear and vanish on each change instead of reporting anything. -->
+    <span class="chip muted">Saved automatically</span>
+  {:else if store.modifiedCount > 0}
     <span class="chip">{store.modifiedCount} unsaved</span>
     <!-- After the count rather than among the buttons: the count is what says there is anything to undo. -->
     <button class="link" onclick={() => void store.revertAll()}>Revert all</button>

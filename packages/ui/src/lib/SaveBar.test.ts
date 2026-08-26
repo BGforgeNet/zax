@@ -56,6 +56,19 @@ describe("the Save button", () => {
     expect(save.getAttribute("title")).toMatch(/autosave/i);
     await store.setAutosave(false);
   });
+
+  /*
+    The count and the Revert all are written within the debounce under autosave, so both would appear and
+    vanish on every change. One standing chip instead: the flash was the whole of what they reported.
+  */
+  test("reports no unsaved count and offers no revert while autosave is on", async () => {
+    await store.setAutosave(true);
+    store.set(SETTING, store.valueOf(SETTING) === "1" ? "0" : "1");
+    const view = render(SaveBar as never, {} as never);
+    expect(view.all("button.link").map((one) => (one.textContent ?? "").trim())).not.toContain("Revert all");
+    expect(view.all(".chip").map((one) => (one.textContent ?? "").trim())).toEqual(["Saved automatically"]);
+    await store.setAutosave(false);
+  });
 });
 
 describe("the Run button", () => {

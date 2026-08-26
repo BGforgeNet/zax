@@ -166,8 +166,10 @@
     {#if !validation.ok}<span class="invalid" role="alert">{validation.reason}</span>{/if}
   </div>
 
-  <!-- At the row's end rather than beside the label: the row's colour already says it changed, this undoes it. -->
-  {#if modified}
+  <!-- At the row's end rather than beside the label: the row's colour already says it changed, this undoes it.
+     Not under autosave, where the edit is written within the debounce: a control that appears and vanishes as
+     the pointer reaches it is worse than none, and the row's colour still confirms the change registered. -->
+  {#if modified && !store.autosave}
     <button class="revert" onclick={() => void store.revert(def.id)}>revert</button>
   {/if}
 </div>

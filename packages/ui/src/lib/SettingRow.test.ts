@@ -75,6 +75,20 @@ describe("an edited value", () => {
   test("offers no revert while nothing is changed", () => {
     expect(row(BOOL).all("button.revert")).toHaveLength(0);
   });
+
+  /*
+    Under autosave the edit is written within the debounce, so this control would appear and vanish as the
+    pointer reached it. The row's colour still marks the change, which is the feedback autosave leaves.
+  */
+  test("offers no revert under autosave, though the row still marks the change", async () => {
+    await store.setAutosave(true);
+    const before = store.valueOf(BOOL);
+    store.set(BOOL, before === "1" ? "0" : "1");
+    const view = row(BOOL);
+    expect(view.one(".row").classList.contains("modified")).toBe(true);
+    expect(view.all("button.revert")).toHaveLength(0);
+    await store.setAutosave(false);
+  });
 });
 
 describe("a value ZAX pins", () => {
