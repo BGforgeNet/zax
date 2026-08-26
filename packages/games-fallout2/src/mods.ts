@@ -310,39 +310,29 @@ export async function readMods(platform: Platform, install: Install): Promise<Mo
 }
 
 /**
- * Writes the order back, refusing a file that changed underneath and copying the old one aside first - the
- * same two guarantees a config file save makes, for a file the user is equally likely to hand-edit.
+ * Writes the order back, refusing a file that changed underneath - the guarantee a config file save makes, for
+ * a file the user is equally likely to hand-edit.
  *
- * `now` is passed rather than read so the backup directory a save produces is predictable in a test.
+ * No copy is taken aside, for the reason `saveConfigFiles` takes none. An install calls this too, and keeps
+ * the whole file in its transaction journal instead, which is what `restoreOrder` unwinds from.
  */
-export async function saveMods(
-  platform: Platform,
-  request: ModsSaveRequest,
-  now: Date = new Date(),
-): Promise<SaveOutcome> {
+export async function saveMods(platform: Platform, request: ModsSaveRequest): Promise<SaveOutcome> {
   const path = orderPath(platform, request.installPath);
   const current = (await platform.fs.stat(path))?.kind === "file" ? latin1(await platform.fs.read(path)) : undefined;
   if (current !== request.original) return { ok: false, changed: [MODS_ORDER_PATH] };
 
-  const backup = await copyOrderAside(platform, path, current, now);
   await platform.fs.write(path, latin1Bytes(writeOrder(current, request.mods)));
-  return { ok: true, files: [MODS_ORDER_PATH], backup };
+  return { ok: true, files: [MODS_ORDER_PATH] };
 }
 
 const orderPath = (platform: Platform, installPath: string): string =>
   platform.paths.join(installPath, MODS_DIRECTORY, MODS_ORDER_FILE);
 
-/** The copy every rewrite of this file makes first, or null when there was no file to copy. */
-async function copyOrderAside(
-  platform: Platform,
-  path: string,
-  current: string | undefined,
-  now: Date,
-): Promise<string | null> {
-  if (current === undefined) return null;
+/** Copies aside the file an unwind is about to overwrite. */
+async function copyOrderAside(platform: Platform, path: string, current: string | undefined, now: Date): Promise<void> {
+  if (current === undefined) return;
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
   await platform.fs.copy(path, platform.paths.join(backup, MODS_DIRECTORY, MODS_ORDER_FILE));
-  return backup;
 }
 
 /**

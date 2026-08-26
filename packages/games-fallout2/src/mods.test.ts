@@ -291,19 +291,16 @@ describe("saveMods", () => {
   const read = async (platform: MemoryPlatform) =>
     new TextDecoder().decode(await platform.fs.read("game/mods/mods_order.txt"));
 
-  it("writes the order and copies the old file aside", async () => {
+  it("writes the order and copies nothing aside", async () => {
     const platform = seeded();
     const before = await readMods(platform, install);
     const mods = [...listMods(before)].reverse();
 
-    const outcome = await saveMods(platform, { installPath: "game", original: before.text, mods }, new Date(0));
-    expect(outcome.ok).toBe(true);
+    const outcome = await saveMods(platform, { installPath: "game", original: before.text, mods });
+    expect(outcome).toEqual({ ok: true, files: ["mods/mods_order.txt"] });
     expect(await read(platform)).toBe("extra.dat\nrpu.dat\n");
-    if (outcome.ok && outcome.backup) {
-      expect(await platform.fs.stat(`${outcome.backup}/mods/mods_order.txt`)).not.toBeNull();
-    } else {
-      expect.unreachable("a file that existed should have been backed up");
-    }
+    // An install writes the order through here too, and unwinds from the journal rather than from a copy.
+    expect(platform.allFiles()).toEqual(["game/mods/extra.dat", "game/mods/mods_order.txt", "game/mods/rpu.dat"]);
   });
 
   it("refuses a file that changed since it was read, and writes nothing", async () => {
@@ -330,7 +327,7 @@ describe("saveMods", () => {
       mods: listMods(before).map((m) => ({ ...m, enabled: true })),
     });
 
-    expect(outcome).toEqual({ ok: true, files: ["mods/mods_order.txt"], backup: null });
+    expect(outcome).toEqual({ ok: true, files: ["mods/mods_order.txt"] });
     expect(await read(platform)).toBe("rpu.dat\n");
   });
 });

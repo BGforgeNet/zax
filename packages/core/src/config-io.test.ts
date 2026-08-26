@@ -5,8 +5,6 @@ import { loadConfigFiles, saveConfigFiles } from "./config-io.js";
 const GAME = "/games/one";
 const CFG = "[sound]\r\nmusic=1\r\nmaster_volume=32767\r\n";
 const INI = "[MAIN]\r\nSCR_WIDTH=640\r\n";
-const AT = new Date(2026, 7, 5, 18, 30, 0);
-const BACKUP = "/home/t/.cache/zax/backup/2026-08-05_18-30-00";
 
 function game(files: Record<string, string> = {}) {
   return new MemoryPlatform({
@@ -32,80 +30,65 @@ describe("loading config files", () => {
 describe("saving config files", () => {
   it("rewrites only the keys that changed, leaving every other line alone", async () => {
     const platform = game();
-    const outcome = await saveConfigFiles(
-      platform,
-      {
-        installPath: GAME,
-        original: { "fallout2.cfg": CFG },
-        changes: [{ file: "fallout2.cfg", section: "sound", key: "music", value: "0" }],
-      },
-      AT,
-    );
+    const outcome = await saveConfigFiles(platform, {
+      installPath: GAME,
+      original: { "fallout2.cfg": CFG },
+      changes: [{ file: "fallout2.cfg", section: "sound", key: "music", value: "0" }],
+    });
 
-    expect(outcome).toEqual({ ok: true, files: ["fallout2.cfg"], backup: BACKUP });
+    expect(outcome).toEqual({ ok: true, files: ["fallout2.cfg"] });
     expect(platform.textAt(`${GAME}/fallout2.cfg`)).toBe("[sound]\r\nmusic=0\r\nmaster_volume=32767\r\n");
   });
 
   it("touches no file it has no change for", async () => {
     const platform = game();
-    await saveConfigFiles(
-      platform,
-      {
-        installPath: GAME,
-        original: { "fallout2.cfg": CFG, "f2_res.ini": INI },
-        changes: [{ file: "fallout2.cfg", section: "sound", key: "music", value: "0" }],
-      },
-      AT,
-    );
+    await saveConfigFiles(platform, {
+      installPath: GAME,
+      original: { "fallout2.cfg": CFG, "f2_res.ini": INI },
+      changes: [{ file: "fallout2.cfg", section: "sound", key: "music", value: "0" }],
+    });
     expect(platform.textAt(`${GAME}/f2_res.ini`)).toBe(INI);
-    expect(platform.textAt(`${BACKUP}/f2_res.ini`)).toBeUndefined();
   });
 
-  it("copies each file it is about to write to the backup directory first", async () => {
+  // Two saves rather than one: what this replaced copied the file aside on every write, so a single save
+  // would have passed that too. Asserted over every file the machine holds, since a copy taken anywhere counts.
+  it("copies nothing aside, however many times the same file is written", async () => {
     const platform = game();
-    await saveConfigFiles(
-      platform,
-      {
+    const write = (original: string, value: string) =>
+      saveConfigFiles(platform, {
         installPath: GAME,
-        original: { "fallout2.cfg": CFG },
-        changes: [{ file: "fallout2.cfg", section: "sound", key: "music", value: "0" }],
-      },
-      AT,
-    );
-    expect(platform.textAt(`${BACKUP}/fallout2.cfg`)).toBe(CFG);
+        original: { "fallout2.cfg": original },
+        changes: [{ file: "fallout2.cfg", section: "sound", key: "music", value }],
+      });
+
+    await write(CFG, "0");
+    await write(platform.textAt(`${GAME}/fallout2.cfg`)!, "2");
+
+    expect(platform.allFiles()).toEqual([`${GAME}/f2_res.ini`, `${GAME}/fallout2.cfg`]);
   });
 
   it("refuses and writes nothing when a file changed on disk since it was read", async () => {
     const platform = game();
-    const outcome = await saveConfigFiles(
-      platform,
-      {
-        installPath: GAME,
-        original: { "fallout2.cfg": "[sound]\r\nmusic=1\r\n" },
-        changes: [{ file: "fallout2.cfg", section: "sound", key: "music", value: "0" }],
-      },
-      AT,
-    );
+    const outcome = await saveConfigFiles(platform, {
+      installPath: GAME,
+      original: { "fallout2.cfg": "[sound]\r\nmusic=1\r\n" },
+      changes: [{ file: "fallout2.cfg", section: "sound", key: "music", value: "0" }],
+    });
 
     expect(outcome).toEqual({ ok: false, changed: ["fallout2.cfg"] });
     expect(platform.textAt(`${GAME}/fallout2.cfg`)).toBe(CFG);
-    expect(platform.textAt(`${BACKUP}/fallout2.cfg`)).toBeUndefined();
   });
 
   it("writes nothing at all when one of several files changed, rather than half the intention", async () => {
     const platform = game();
-    const outcome = await saveConfigFiles(
-      platform,
-      {
-        installPath: GAME,
-        original: { "fallout2.cfg": CFG, "f2_res.ini": "[MAIN]\r\n" },
-        changes: [
-          { file: "fallout2.cfg", section: "sound", key: "music", value: "0" },
-          { file: "f2_res.ini", section: "MAIN", key: "SCR_WIDTH", value: "1024" },
-        ],
-      },
-      AT,
-    );
+    const outcome = await saveConfigFiles(platform, {
+      installPath: GAME,
+      original: { "fallout2.cfg": CFG, "f2_res.ini": "[MAIN]\r\n" },
+      changes: [
+        { file: "fallout2.cfg", section: "sound", key: "music", value: "0" },
+        { file: "f2_res.ini", section: "MAIN", key: "SCR_WIDTH", value: "1024" },
+      ],
+    });
 
     expect(outcome).toEqual({ ok: false, changed: ["f2_res.ini"] });
     expect(platform.textAt(`${GAME}/fallout2.cfg`)).toBe(CFG);
@@ -113,26 +96,21 @@ describe("saving config files", () => {
 
   it("creates a file the install does not have, which is how a key gets its first value", async () => {
     const platform = game();
-    const outcome = await saveConfigFiles(
-      platform,
-      {
-        installPath: GAME,
-        original: { "ddraw.ini": undefined },
-        changes: [{ file: "ddraw.ini", section: "Debugging", key: "Init", value: "1" }],
-      },
-      AT,
-    );
+    const outcome = await saveConfigFiles(platform, {
+      installPath: GAME,
+      original: { "ddraw.ini": undefined },
+      changes: [{ file: "ddraw.ini", section: "Debugging", key: "Init", value: "1" }],
+    });
 
     expect(outcome.ok).toBe(true);
     expect(platform.textAt(`${GAME}/ddraw.ini`)).toBe("[Debugging]\nInit=1\n");
   });
 
-  it("does nothing and reports no backup when there is nothing to change", async () => {
+  it("does nothing when there is nothing to change", async () => {
     const platform = game();
-    expect(await saveConfigFiles(platform, { installPath: GAME, original: {}, changes: [] }, AT)).toEqual({
+    expect(await saveConfigFiles(platform, { installPath: GAME, original: {}, changes: [] })).toEqual({
       ok: true,
       files: [],
-      backup: null,
     });
     expect(platform.allFiles()).toEqual([`${GAME}/f2_res.ini`, `${GAME}/fallout2.cfg`]);
   });

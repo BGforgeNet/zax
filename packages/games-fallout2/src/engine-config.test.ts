@@ -154,8 +154,9 @@ describe("reading and writing an engine's files", () => {
     expect(changed).toEqual(["damage_formula=5"]);
   });
 
-  it("copies an engine's file into the backup where it sits in the install", async () => {
-    // So a backup directory reads as a partial copy of the install rather than a flat pile of names.
+  // The file whose location is not its own name is where a copy taken aside would land somewhere unintended,
+  // so it is the one worth holding to writing nothing but the file it was asked to write.
+  it("copies nothing aside for a file whose path is not its name", async () => {
     const platform = new MemoryPlatform({ dirs: [`${GAME}/data`] });
     await platform.fs.write(`${GAME}/fallout2.cfg`, bytes(vanilla()));
     await platform.fs.write(`${GAME}/data/config/game#patch.cfg`, bytes("[combat]\r\ndamage_formula=0\r\n"));
@@ -169,9 +170,6 @@ describe("reading and writing an engine's files", () => {
     });
 
     expect(outcome.ok).toBe(true);
-    if (!outcome.ok) return;
-    expect(outcome.backup).not.toBeNull();
-    const kept = await platform.fs.read(`${outcome.backup!}/data/config/game#patch.cfg`);
-    expect(text(kept)).toBe("[combat]\r\ndamage_formula=0\r\n");
+    expect(platform.allFiles()).toEqual([`${GAME}/data/config/game#patch.cfg`, `${GAME}/fallout2.cfg`]);
   });
 });

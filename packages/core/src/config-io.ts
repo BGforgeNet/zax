@@ -1,15 +1,16 @@
 /**
  * Reading and writing a game's config files.
  *
- * Two things make this more than a write. The files are the user's and are routinely hand-edited, so a file
- * that changed underneath the open window is reported rather than overwritten. And every file is copied to the
- * backup directory before the first write, so a bad save is recoverable without the user having kept a copy.
+ * What makes this more than a write: the files are the user's and are routinely hand-edited, so a file that
+ * changed underneath the open window is reported rather than overwritten.
+ *
+ * No copy is taken aside: a save rewrites one line per changed key, and doing it on every change filled the
+ * backup directory with copies nothing ever pointed at. Backups belong to the paths that replace whole files -
+ * installing and removing mods, engines and sfall.
  */
 
 import type { Platform } from "@zax/platform";
-import { backupDirectory } from "./directories.js";
 import { IniDocument } from "./ini.js";
-import { stamp } from "./stamp.js";
 import { latin1 } from "./text.js";
 
 /** One key to write. The catalog maps a setting id to this; core does not know what a setting is. */
@@ -50,7 +51,7 @@ export async function loadConfigFiles(
 }
 
 export type SaveOutcome =
-  | { ok: true; files: readonly string[]; backup: string | null }
+  | { ok: true; files: readonly string[] }
   /**
    * Files that changed on disk since they were read. Nothing is written: applying half a save and reporting the
    * other half would leave the user with settings from two different intentions and no way to tell which.
@@ -66,20 +67,11 @@ export interface SaveRequest {
   paths?: ConfigFilePaths;
 }
 
-/**
- * Writes the changed keys back, one line each, leaving every other line of the file exactly as it was.
- *
- * `now` is passed rather than read so the backup directory a save produces is predictable in a test; callers
- * pass the current time.
- */
-export async function saveConfigFiles(
-  platform: Platform,
-  request: SaveRequest,
-  now: Date = new Date(),
-): Promise<SaveOutcome> {
+/** Writes the changed keys back, one line each, leaving every other line of the file exactly as it was. */
+export async function saveConfigFiles(platform: Platform, request: SaveRequest): Promise<SaveOutcome> {
   const { installPath, original, changes, paths = {} } = request;
   const files = [...new Set(changes.map((change) => change.file))].sort();
-  if (files.length === 0) return { ok: true, files: [], backup: null };
+  if (files.length === 0) return { ok: true, files: [] };
 
   const current: Record<string, string | undefined> = {};
   const changed: string[] = [];
@@ -91,14 +83,6 @@ export async function saveConfigFiles(
   }
   if (changed.length > 0) return { ok: false, changed };
 
-  const backup = platform.paths.join(backupDirectory(platform), stamp(now));
-  for (const file of files) {
-    if (current[file] === undefined) continue;
-    // The backup mirrors the install, so a copy sits where the file it came from does.
-    const at = pathOf(paths, file);
-    await platform.fs.copy(platform.paths.join(installPath, at), platform.paths.join(backup, at));
-  }
-
   for (const file of files) {
     const document = IniDocument.parse(current[file] ?? "");
     for (const change of changes) {
@@ -107,5 +91,5 @@ export async function saveConfigFiles(
     await platform.fs.write(platform.paths.join(installPath, pathOf(paths, file)), document.toBytes());
   }
 
-  return { ok: true, files, backup };
+  return { ok: true, files };
 }

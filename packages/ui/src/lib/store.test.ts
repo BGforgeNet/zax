@@ -550,17 +550,16 @@ describe("saving", () => {
     expect(onDisk).toContain("; edited elsewhere");
   });
 
-  test("keeps a copy of what it replaced", async () => {
-    // Earlier tests in this file back up into the same directory, and its name is only accurate to the second,
-    // so the ground is cleared first and whatever is there afterwards belongs to this save.
+  test("copies nothing aside, through the same path the window saves by", async () => {
+    // Installing a mod backs up into the same directory, so the ground is cleared first and anything there
+    // afterwards belongs to this save. The write is asserted too, or a save that did nothing would pass.
     await previewPlatform.fs.remove(store.paths.backup);
     store.set(MUSIC, "0");
     await store.save();
 
-    const kept = await previewPlatform.fs.list(store.paths.backup);
-    expect(kept, "a save leaves the previous copy behind").toHaveLength(1);
-    const copy = `${store.paths.backup}/${kept[0]!.name}/fallout2.cfg`;
-    expect(new TextDecoder("latin1").decode(await previewPlatform.fs.read(copy))).toBe(fallout2cfg);
+    const onDisk = new TextDecoder("latin1").decode(await previewPlatform.fs.read(`${PREVIEW_INSTALL}/fallout2.cfg`));
+    expect(onDisk).not.toBe(fallout2cfg);
+    expect(await previewPlatform.fs.stat(store.paths.backup)).toBeNull();
   });
 });
 

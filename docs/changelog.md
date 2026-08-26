@@ -12,7 +12,7 @@ mods as well as settings.
 - **Keys the catalog does not describe still appear**, read from the file with their own comments as help, so
   a component newer than this release is editable rather than invisible.
 - **Your files are edited, not rewritten.** Comments, spacing, ordering and line endings survive: changing one
-  setting rewrites one line. Every file a save is about to write is copied to a backup directory first.
+  setting rewrites one line.
 - **Mods.** Install, upgrade and remove mods published as releases, with their settings edited like the game's
   own. Upgrades keep the changes you made to a mod's ini rather than overwriting them, an interrupted install
   can be resumed or put back exactly, and removal deletes only what was recorded as installed.

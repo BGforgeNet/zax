@@ -19,7 +19,10 @@
     otherwise look like. One confirmation for all of them: a second copy would be a second wording.
   */
   const WIPES: Record<WipeTarget, { title: string; what: string }> = {
-    backup: { title: "Backup directory", what: "Every copy ZAX kept of a config file before it wrote to it." },
+    backup: {
+      title: "Backup directory",
+      what: "Copies of what installing or removing a mod, an engine or sfall replaced in a game folder.",
+    },
     packages: {
       title: "Downloaded packages",
       what: "Downloaded sfall and engine releases. They are fetched again when needed.",
