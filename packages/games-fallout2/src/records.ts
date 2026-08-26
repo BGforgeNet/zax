@@ -96,6 +96,11 @@ export interface InstalledEngine {
   backup?: string;
   /** The commit that release was built from, absent where the project's tag did not resolve to one. */
   commit?: string;
+  /**
+   * True where the user picked this build by name. Absent means the folder follows the newest build the
+   * machine holds, so fetching a newer one moves it forward on the next run.
+   */
+  pinned?: true;
 }
 
 export interface InstallRecord {
@@ -287,6 +292,7 @@ function readEngine(entry: unknown): InstalledEngine | null {
     files,
     ...(backup !== undefined ? { backup } : {}),
     ...(commit !== undefined ? { commit } : {}),
+    ...(fields["pinned"] === true ? { pinned: true } : {}),
   };
 }
 
@@ -381,6 +387,7 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
               files: [...engine.files],
               ...(engine.backup !== undefined ? { backup: engine.backup } : {}),
               ...(engine.commit !== undefined ? { commit: engine.commit } : {}),
+              ...(engine.pinned ? { pinned: true } : {}),
             })),
           }
         : {}),

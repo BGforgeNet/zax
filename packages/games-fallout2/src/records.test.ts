@@ -238,6 +238,45 @@ describe("engines in the record", () => {
     ]);
   });
 
+  it("round-trips the pin, which says the user picked this build rather than took the newest", async () => {
+    const platform = new MemoryPlatform({ config: "cfg", cache: "cache" });
+    await saveRecord(platform, {
+      path: "/games/one",
+      mods: [],
+      engines: [
+        {
+          id: "fallout2-ce",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: ["fallout2-ce"],
+          pinned: true,
+        },
+      ],
+    });
+    expect((await loadRecord(platform, "/games/one")).engines?.[0]?.pinned).toBe(true);
+  });
+
+  // Absent rather than false: a folder that follows the newest build is the common case, and an entry saying
+  // so in a field would be one more thing every older record is read as having lied about.
+  it("leaves the pin off an entry that does not carry one", async () => {
+    const platform = new MemoryPlatform({ config: "cfg", cache: "cache" });
+    await saveRecord(platform, {
+      path: "/games/one",
+      mods: [],
+      engines: [
+        {
+          id: "fallout2-ce",
+          release: "continious",
+          published: "2026-08-23T09:37:22Z",
+          complete: true,
+          files: ["fallout2-ce"],
+        },
+      ],
+    });
+    expect((await loadRecord(platform, "/games/one")).engines?.[0]).not.toHaveProperty("pinned");
+  });
+
   it("drops an engine entry whose files reach outside the install, the way a tampered mod entry is dropped", async () => {
     const platform = new MemoryPlatform({ config: "cfg", cache: "cache" });
     await saveRecord(platform, {
