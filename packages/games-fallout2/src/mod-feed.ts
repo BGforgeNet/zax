@@ -534,7 +534,12 @@ export type Availability =
   | { kind: "retry"; version: string }
   /** Recorded as installed while no known feed follows the id - still removable, never updatable. */
   | { kind: "unfollowed" }
-  | { kind: "blocked"; why: string };
+  /**
+   * ZAX refuses this release. `from` is what the record says is installed, which several of these arms sit in
+   * front of - the sfall gate answers before the version comparison, so a refused row is often an installed
+   * mod. Absent where nothing is installed, or where the refusal is the install type and no version applies.
+   */
+  | { kind: "blocked"; why: string; from?: string };
 
 export interface ModContext {
   install: Install;
@@ -558,6 +563,13 @@ export interface ModContext {
 const offeredOnLine = (line: ModLine, held: BaseVersion | null | undefined): boolean =>
   held?.kind === "release" ? heldByLine(line, held.version) : line.counter === true;
 
+/** A refusal that carries the installed version along with it; `blockedByType` has none to carry. */
+const refuse = (why: string, from: string | undefined): Availability => ({
+  kind: "blocked",
+  why,
+  ...(from !== undefined ? { from } : {}),
+});
+
 export function availability(release: ModRelease, context: ModContext): Availability {
   const { manifest } = release;
   const held = context.record.mods.find((mod) => mod.id === manifest.id);
@@ -573,10 +585,10 @@ export function availability(release: ModRelease, context: ModContext): Availabi
     const held = context.sfall;
     if (held === null || compareVersions(held, manifest.requiresSfall) < 0) {
       const has = held === null ? "none" : held;
-      return {
-        kind: "blocked",
-        why: `${manifest.name} needs sfall ${manifest.requiresSfall} or newer - this install has ${has}. ZAX's sfall updater can raise it first.`,
-      };
+      return refuse(
+        `${manifest.name} needs sfall ${manifest.requiresSfall} or newer - this install has ${has}. ZAX's sfall updater can raise it first.`,
+        recorded?.version,
+      );
     }
   }
 
@@ -603,22 +615,19 @@ export function availability(release: ModRelease, context: ModContext): Availabi
     // Its payload is an ordinary archive, so the archive check below is the one that applies - said here
     // because the installer arm is the other kind of base mod's and does not fit this one.
     if (!release.archive)
-      return { kind: "blocked", why: `The ${manifest.name} release does not say which of its files is the mod.` };
+      return refuse(`The ${manifest.name} release does not say which of its files is the mod.`, recorded?.version);
   } else if (manifest.type === "base") {
     // A base mod's payload is its installer, and a release that publishes one for another system is not a
     // release that named nothing - the mod is real and this machine cannot run it, which is what it says.
     if (!release.installer)
-      return {
-        kind: "blocked",
-        why: `${manifest.name} publishes no installer for this system.`,
-      };
+      return refuse(`${manifest.name} publishes no installer for this system.`, recorded?.version);
   } else if (!release.archive && offeredParts(release).length === 0) {
-    return {
-      kind: "blocked",
-      why: manifest.parts
+    return refuse(
+      manifest.parts
         ? `The ${manifest.name} release publishes none of the files its parts name.`
         : `The ${manifest.name} release does not say which of its files is the mod.`,
-    };
+      recorded?.version,
+    );
   }
 
   if (recorded) {
@@ -731,6 +740,12 @@ export interface ModOffer {
    * interface gets one shape and draws one dialog.
    */
   choices?: ChoiceOffer;
+  /**
+   * Set on a row the record alone describes, where no feed follows the mod: `version` is then what is on disk
+   * rather than what is offered. Both readings otherwise have the same shape, and a retry row arrives either
+   * way, so nothing downstream could tell an offered version from an installed one without this.
+   */
+  noFeed?: true;
   availability: Availability;
 }
 
@@ -883,7 +898,12 @@ export async function readModInstallState(
 
   // Recorded but followed by no feed: an id retired from the list, or renamed upstream. The row is what keeps
   // Remove reachable - the tab is otherwise feed-driven, and such a mod would be installed yet invisible.
-  const followed = new Set(MOD_FEEDS.map((feed) => feed.id));
+  //
+  // Taken from the releases that actually resolved rather than from `MOD_FEEDS`, because a feed can be listed
+  // and still answer with nothing - every release refused, or none carrying a manifest for the id, which is
+  // where a mod that stops publishing one ends up. Keyed on the static list, such a record matched no feed's
+  // release and was skipped here too, so it had no row at all.
+  const followed = new Set(releases.map((release) => release.manifest.id));
   const unfollowed: ModOffer[] = [];
   for (const mod of record.mods) {
     if (followed.has(mod.id)) continue;
@@ -899,6 +919,7 @@ export async function readModInstallState(
       name: manifest?.name ?? mod.id,
       version: mod.version,
       type: manifest?.type ?? "pluggable",
+      noFeed: true,
       ...(manifest?.reason !== undefined ? { reason: manifest.reason } : {}),
       availability: mod.complete ? { kind: "unfollowed" } : { kind: "retry", version: mod.version },
     });

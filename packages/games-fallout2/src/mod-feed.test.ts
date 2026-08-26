@@ -299,6 +299,10 @@ describe("availability", () => {
     expect((blocked as { why: string }).why).toContain("4.1");
     expect(availability(release, context({ sfall: null }))).toMatchObject({ kind: "blocked" });
     expect(availability(release, context({ sfall: "4.4.5" }))).toEqual({ kind: "install" });
+    // The gate answers before the version comparison, so this arm is reached with a mod already installed -
+    // and the refusal is the only thing that would then say what is on disk.
+    const held = context({ sfall: "4.1", record: recorded("14.6") });
+    expect(availability(release, held)).toMatchObject({ kind: "blocked", from: "14.6" });
   });
 
   it("blocks a first install on the wrong game type, but not an install-over", () => {
@@ -318,6 +322,33 @@ describe("availability", () => {
 
 describe("the two halves of a listing, composed the way the backend composes them", () => {
   const install: Install = { path: "/games/fallout2", type: "fallout2" };
+
+  /*
+    A feed can be listed and still answer with nothing - every release refused, or none carrying a manifest for
+    the id, which is where a mod that stops publishing one lands. Keyed on the feed list rather than on what
+    resolved, such a record matched no release and was skipped as followed, leaving it installed with no row
+    and no way to remove it.
+  */
+  it("lists a recorded mod whose feed is known but answered with nothing", async () => {
+    const platform = new MemoryPlatform();
+    const record = {
+      path: install.path,
+      mods: [
+        {
+          id: "fo2tweaks",
+          version: "14.7",
+          complete: true,
+          files: ["mods/fo2tweaks.dat"],
+          manifest: 'spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "14.7"\ngame: fallout2\n',
+          shipped: {},
+        },
+      ],
+    };
+    const listing = await wholeListing(platform, install, record, null);
+    const offer = listing.offers.find((one) => one.id === "fo2tweaks");
+    expect(offer).toMatchObject({ name: "FO2tweaks", version: "14.7", noFeed: true });
+    expect(offer?.availability).toEqual({ kind: "unfollowed" });
+  });
 
   it("lists a recorded mod no feed follows, so Remove stays reachable after an id is retired", async () => {
     const platform = new MemoryPlatform();
@@ -345,7 +376,8 @@ describe("the two halves of a listing, composed the way the backend composes the
     };
     const listing = await wholeListing(platform, install, record, null);
     const offer = listing.offers.find((one) => one.id === "oldmod");
-    expect(offer).toMatchObject({ name: "Old Mod", version: "3", type: "pluggable" });
+    // `version` here is what the record says is installed, not an offer - the flag is what keeps the two apart.
+    expect(offer).toMatchObject({ name: "Old Mod", version: "3", type: "pluggable", noFeed: true });
     expect(offer?.availability).toEqual({ kind: "unfollowed" });
     expect(listing.offers.find((one) => one.id === "older")).toMatchObject({ name: "older", type: "pluggable" });
     // Every base feed gets its own row - here all failures, this network being empty. The stacking mod is
