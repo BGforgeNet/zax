@@ -263,6 +263,32 @@ export async function forgetEngine(platform: Platform, engine: EngineDefinition,
   await platform.fs.remove(releaseDirectory(platform, engine, published));
 }
 
+/**
+ * Puts one published build into the machine's cache, downloading it if this is the first time. `published`
+ * names a release, or null for the newest.
+ *
+ * Nothing is deployed: a build reaches a game folder when that folder runs it, which is what lets one machine
+ * hold several and each folder choose.
+ */
+export async function fetchEngineBuild(
+  platform: Platform,
+  engineId: string,
+  published: string | null,
+  options?: EngineProgress,
+): Promise<EngineRelease> {
+  const engine = engineById(engineId);
+  const build = buildFor(engine, platform.os, platform.arch);
+  if (build === null) {
+    throw new Error(`${engine.name} publishes no build ZAX can install for this machine. See ${engine.page}.`);
+  }
+  const releases = await engineReleases(platform, engineId);
+  const wanted = published === null ? releases[0] : releases.find((one) => one.published === published);
+  if (wanted === undefined) throw new Error(`${engine.name} has not published that build.`);
+  if (wanted.asset === null) throw new Error(`The ${engine.name} release ${wanted.release} carries no ${build.asset}.`);
+  await enginePackage(platform, engine, wanted, wanted.asset, options);
+  return wanted;
+}
+
 /** The note's fields, or null for anything this version cannot read - a truncated file, or an older format. */
 async function readNote(
   platform: Platform,

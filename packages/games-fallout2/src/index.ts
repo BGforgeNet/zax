@@ -10,14 +10,8 @@ export { planLaunch } from "./launch.js";
 export { installedSfallVersion, latestSfall, updateSfall, type SfallRelease, type SfallUpdate } from "./sfall.js";
 export { installedHiresVersion } from "./hires.js";
 export { ENGINES, buildFor, engineById } from "./engines.js";
-export { engineOutdated, latestEngine, type EngineRelease } from "./engine-release.js";
-export {
-  installEngine,
-  installedEngines,
-  removeEngine,
-  type EngineInstallOutcome,
-  type EngineRemoval,
-} from "./engine-install.js";
+export { engineOutdated, engineReleases, forgetEngine, latestEngine, type EngineRelease } from "./engine-release.js";
+export { installedEngines, type EngineInstallOutcome } from "./engine-install.js";
 export {
   MODS_DIRECTORY,
   MODS_ORDER_PATH,
@@ -89,6 +83,7 @@ export {
   RELEASES_PAGE,
   createBackend,
   type Backend,
+  type CachedBuild,
   type EngineListing,
   type MachineDescription,
   type ModSettingsGroup,

@@ -87,20 +87,85 @@ describe("the Revert all link", () => {
 });
 
 describe("the per-engine Run buttons", () => {
-  test("are absent for an engine that is neither installed here nor cached on the machine", () => {
-    const view = render(SaveBar as never, {} as never);
-    expect(view.all("button").map((b) => b.textContent?.trim())).not.toContain("Run in CE");
+  const CE = {
+    id: "fallout2-ce",
+    name: "Fallout II Community Edition",
+    short: "CE",
+    releases: "rolling",
+    versions: [
+      { release: "continious", published: "2026-08-23T09:37:22Z", commit: null },
+      { release: "continious", published: "2026-07-01T00:00:00Z", commit: null },
+    ],
+  };
+
+  const names = (view: ReturnType<typeof render>) => view.all("button").map((b) => b.textContent?.trim());
+
+  test("are absent for an engine the machine holds no build of", () => {
+    store.engines = [{ ...CE, versions: [] }] as never;
+    expect(names(render(SaveBar as never, {} as never))).not.toContain("Run in CE");
   });
 
   /*
-    Offered where the machine holds a copy, not only where this folder already has one: one download serves every
-    game folder, and the first run is what unpacks it in place.
+    Offered where the machine holds a build, not only where this folder already has one: one download serves
+    every game folder, and the first run is what unpacks it in place.
   */
-  test("appear for an engine held in the machine's cache, even with nothing installed in this folder", () => {
-    store.engines = [
-      { id: "fallout2-ce", name: "Fallout II Community Edition", short: "CE", installed: null, cached: true },
-    ] as never;
+  test("appear for a build the machine holds, with nothing deployed in this folder", () => {
+    store.engines = [CE] as never;
+    store.engineDeployed = {};
+    expect(names(render(SaveBar as never, {} as never))).toContain("Run in CE");
+  });
+
+  // One build is no choice, and a chevron over it would open a menu with a single row.
+  test("offer no chooser while the machine holds one build", () => {
+    store.engines = [{ ...CE, versions: CE.versions.slice(0, 1) }] as never;
+    expect(render(SaveBar as never, {} as never).all('[aria-label="Choose a CE build"]')).toHaveLength(0);
+  });
+
+  test("offer the chooser once the machine holds two", () => {
+    store.engines = [CE] as never;
+    expect(render(SaveBar as never, {} as never).control("Choose a CE build")).toBeTruthy();
+  });
+
+  test("tick Latest while the folder is unpinned, and the build once it is pinned", () => {
+    store.engines = [CE] as never;
+    store.engineDeployed = {};
+    const open = () => {
+      const view = render(SaveBar as never, {} as never);
+      view.control("Choose a CE build").click();
+      view.settle();
+      return view.all('[role="menuitem"].on').map((one) => one.textContent?.trim());
+    };
+    expect(open()).toEqual(["Latest"]);
+    unmountAll();
+
+    store.engineDeployed = {
+      "fallout2-ce": {
+        id: "fallout2-ce",
+        release: "continious",
+        published: "2026-07-01T00:00:00Z",
+        complete: true,
+        files: [],
+        pinned: true,
+      },
+    };
+    expect(open()).toEqual([new Date("2026-07-01T00:00:00Z").toLocaleDateString()]);
+  });
+
+  /*
+    The rows launch, so in a host that cannot start a program they are refused - and say why, which is what this
+    file exists to catch. The chooser itself stays live: opening a list of what the machine holds costs nothing.
+  */
+  test("refuse each build with the reason, while the chooser itself still opens", () => {
+    store.engines = [CE] as never;
     const view = render(SaveBar as never, {} as never);
-    expect(view.all("button").map((b) => b.textContent?.trim())).toContain("Run in CE");
+    view.control("Choose a CE build").click();
+    view.settle();
+
+    const items = view.all('[role="menuitem"]');
+    expect(items).toHaveLength(3);
+    for (const item of items) {
+      expect(item.hasAttribute("disabled"), item.textContent ?? "").toBe(true);
+      expect(item.getAttribute("title"), item.textContent ?? "").toMatch(/desktop build/i);
+    }
   });
 });

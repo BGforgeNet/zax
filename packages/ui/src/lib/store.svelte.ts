@@ -49,8 +49,10 @@ import {
   wrapMethods,
   type Backend,
   type Divergence,
+  type CachedBuild,
   type EngineListing,
   type EngineRelease,
+  type InstalledEngine,
   type HeldTarget,
   type LayoutFile,
   type MachineDescription,
@@ -405,8 +407,14 @@ class Store {
 
   sfallInstalled = $state<string | null>(null);
   sfallLatest = $state<SfallRelease | null>(null);
-  /** Every engine ZAX knows, against the selected install. Read with the install: it costs no network. */
+  /**
+   * Every engine ZAX knows, against this machine: which builds the cache holds. Read at startup and after a
+   * fetch or a drop, never on an install switch - none of it is the selected folder's business, and rereading
+   * it there is what used to take a Run in X button off the bar for the length of the reads.
+   */
   engines = $state<readonly EngineListing[]>([]);
+  /** What is deployed in the selected folder, by engine id. Read with the install. */
+  engineDeployed = $state<Record<string, InstalledEngine>>({});
   /**
    * What each engine has published, by id: asked for at startup, and by the Check button after that. One
    * release is published whichever folder is selected, so switching install leaves it alone.
@@ -500,6 +508,8 @@ class Store {
     this.autosave = state.autosave;
     this.selectedInstall = state.installs[0]?.path ?? "";
     if (problem) this.notice = { kind: "problem", text: problem };
+    // Before the install read, so the Run bar draws with its buttons rather than gaining them a moment later.
+    await this.readMachineEngines();
     await this.readInstall();
     this.loaded = true;
     // Not awaited: the interface is usable without any of it, and each answer lands in its own field when it
@@ -531,7 +541,8 @@ class Store {
         .filter((engine) => engine.build !== null)
         .map((engine) =>
           quietly(async () => {
-            this.engineLatest = { ...this.engineLatest, [engine.id]: await backend.latestEngine(engine.id) };
+            const [newest] = await backend.engineReleases(engine.id);
+            if (newest) this.engineLatest = { ...this.engineLatest, [engine.id]: newest };
           }),
         ),
     ]);
@@ -550,10 +561,9 @@ class Store {
     // Before the reads below, which are awaited and so can render between them: another game's disagreements
     // would mark rows of this one, and "nothing is split" is the reading that mismarks nothing.
     this.split = {};
-    // Only what is deployed here goes. The rest of the listing is the catalog's and the machine's and holds
-    // whichever folder is selected, and emptying it took every Run in X button off the bar until the reads
-    // below finished - a cached engine's button flickering on each switch, over a fact that had not moved.
-    this.engines = this.engines.map((one) => ({ ...one, installed: null }));
+    // `engines` is the machine's and is left alone here: a folder switch moves what is deployed, not what the
+    // cache holds, and rereading the listing took every Run in X button off the bar for the length of the reads.
+    this.engineDeployed = {};
     // Another install's standing would be wrong here. What the feeds published is left alone: one release is
     // published for every game, which is why the two are read apart in the first place.
     if (switched) {
@@ -590,9 +600,9 @@ class Store {
     await this.readMods(install);
     this.sfallInstalled = await backend.installedSfallVersion(install);
     this.hiresInstalled = await backend.installedHiresVersion(install);
-    this.engines = await backend.availableEngines(install);
-    // Last, because it reads the listing above: an engine's tab goes when the engine does, and a selection
-    // left pointing at it would show neither that tab nor any other.
+    this.engineDeployed = Object.fromEntries((await backend.deployedEngines(install)).map((one) => [one.id, one]));
+    // Last, because it reads what is deployed above: an engine's tab goes when the engine does, and a
+    // selection left pointing at it would show neither that tab nor any other.
     this.settleSettingsTab();
   }
 
@@ -823,8 +833,7 @@ class Store {
     if (def.targets.length < 2) return [];
     const here = this.targetFor(def, group);
     const live = liveTargets(def, this.contents);
-    const present = (at: SettingTarget) =>
-      at.engine === undefined || this.engines.some((one) => one.id === at.engine && one.installed !== null);
+    const present = (at: SettingTarget) => at.engine === undefined || this.engineDeployed[at.engine] !== undefined;
     return def.targets.filter((t) => t !== here && present(t)).map((at) => ({ at, live: live.includes(at) }));
   }
 
@@ -1443,8 +1452,7 @@ class Store {
     return LAYOUT.flatMap((group): SettingsGroup[] => {
       if (group.engine === undefined) return [{ group, refusal: null }];
       const engine = ENGINES.find((one) => one.id === group.engine);
-      const listing = this.engines.find((one) => one.id === group.engine);
-      if (engine === undefined || listing?.installed == null) return [];
+      if (engine === undefined || this.engineDeployed[group.engine] === undefined) return [];
       if (hasMintedSettings(engine, this.contents)) return [{ group, refusal: null }];
       return [{ group, refusal: `Run the game once with ${engine.short} - it writes these settings itself.` }];
     });
@@ -1687,13 +1695,18 @@ class Store {
     });
   }
 
-  /** Starts the game, through an installed engine when one is named and the original executable otherwise. */
-  async play(engineId: string | null = null): Promise<void> {
+  /**
+   * Starts the game, through an engine when one is named and the original executable otherwise. `published`
+   * names the build to run, or null to follow what the folder holds and what the cache offers.
+   */
+  async play(engineId: string | null = null, published: string | null = null): Promise<void> {
     const install = this.install;
     if (!install) return;
     const engine = engineId === null ? null : this.engines.find((one) => one.id === engineId);
     await this.run(engine ? `Starting the game in ${engine.short}` : "Starting the game", async () => {
-      await backend.launch(install, this.sfallInstalled, engineId);
+      await backend.launch(install, this.sfallInstalled, engineId, published);
+      // The launch may have deployed a different build here, or moved the pin; the chooser's tick reads both.
+      if (engineId !== null) await this.readInstall();
       return null;
     });
   }
@@ -1780,47 +1793,52 @@ class Store {
     });
   }
 
+  /** Rereads which builds this machine holds. Cheap - the catalog and a directory listing, no network. */
+  private async readMachineEngines(): Promise<void> {
+    this.engines = await backend.machineEngines();
+  }
+
   /** What one engine has published, for the button that asks again after the startup check. */
   async checkEngine(engineId: string): Promise<void> {
     const engine = this.engines.find((one) => one.id === engineId);
     await this.run(`Checking for a newer ${engine?.short ?? "engine"}`, async () => {
-      this.engineLatest = { ...this.engineLatest, [engineId]: await backend.latestEngine(engineId) };
+      const [newest] = await backend.engineReleases(engineId);
+      if (newest) this.engineLatest = { ...this.engineLatest, [engineId]: newest };
       return null;
     });
   }
 
-  /** Installs an engine, or replaces the build that is there. One operation, as changing sfall version is. */
-  async installEngine(engineId: string): Promise<void> {
-    const install = this.install;
-    if (!install) return;
+  /** Downloads a build into the machine's cache. Nothing reaches a game folder until one runs it. */
+  async fetchEngine(engineId: string, published: string | null = null): Promise<void> {
     const engine = this.engines.find((one) => one.id === engineId);
-    await this.run(`Installing ${engine?.name ?? "the engine"}`, async () => {
-      const outcome = await backend.installEngine(install, engineId);
-      await this.readInstall();
-      const kept = outcome.backup === null ? "" : ` Replaced files are in ${outcome.backup}.`;
-      return { kind: "done", text: `${engine?.name ?? engineId} is installed.${kept}` };
+    await this.run(`Fetching ${engine?.name ?? "the engine"}`, async () => {
+      const release = await backend.fetchEngine(engineId, published);
+      await this.readMachineEngines();
+      return { kind: "done", text: `${engine?.name ?? engineId} ${release.release} is ready to run.` };
     });
   }
 
-  async removeEngine(engineId: string): Promise<void> {
-    const install = this.install;
-    if (!install) return;
+  /** Drops one build from the cache. A folder already running it keeps the copy it holds. */
+  async forgetEngine(engineId: string, published: string): Promise<void> {
     const engine = this.engines.find((one) => one.id === engineId);
     await this.run(`Removing ${engine?.name ?? "the engine"}`, async () => {
-      const outcome = await backend.removeEngine(install, engineId);
-      await this.readInstall();
-      // Where it replaced something, the originals are still there and the user is the one who decides.
-      const kept = outcome.backup === null ? "" : ` What it replaced is in ${outcome.backup}.`;
-      return { kind: "done", text: `Removed ${outcome.removed.length} file(s).${kept}` };
+      await backend.forgetEngine(engineId, published);
+      await this.readMachineEngines();
+      return null;
     });
   }
 
-  /** Whether the installed build is behind what was found - false until someone has checked, or nothing is. */
+  /** The builds this machine holds for an engine, newest first. */
+  engineVersions(engineId: string): readonly CachedBuild[] {
+    return this.engines.find((one) => one.id === engineId)?.versions ?? [];
+  }
+
+  /** Whether the deployed build is behind what was found - false until someone has checked, or nothing is. */
   engineOutdated(engineId: string): boolean {
-    const engine = this.engines.find((one) => one.id === engineId);
+    const deployed = this.engineDeployed[engineId];
     const latest = this.engineLatest[engineId];
-    if (!engine?.installed || !latest) return false;
-    return engineOutdated(engineById(engineId), engine.installed, latest);
+    if (!deployed || !latest) return false;
+    return engineOutdated(engineById(engineId), deployed, latest);
   }
 
   async saveSlots(): Promise<readonly string[]> {

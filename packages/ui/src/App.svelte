@@ -131,13 +131,17 @@
         </span>
       </div>
 
-      <!-- Everything here acts on the selected install, so there is nothing to show until there is one. -->
-      {#if store.loaded && !store.install}
+      <!--
+        The other two act on the selected install, so there is nothing to show until there is one. The Engines
+        tab describes the machine - which builds it holds - so it draws either way, and is where a user with no
+        game folder yet goes to fetch one.
+      -->
+      {#if store.view === "engines"}
+        <EnginesView />
+      {:else if store.loaded && !store.install}
         <NoInstall />
       {:else if store.view === "mods"}
         <ModsView />
-      {:else if store.view === "engines"}
-        <EnginesView />
       {:else}
         <SettingsView />
       {/if}

@@ -17,8 +17,7 @@ const TAGGED = {
   page: "https://github.com/fallout2-ce/fallout2-ce",
   releases: "tagged",
   build: { asset: "fallout2-ce-linux-x64.tar.gz", program: "fallout2-ce" },
-  installed: null,
-  cached: false,
+  versions: [],
 } as const;
 
 const ROLLING = {
@@ -28,8 +27,7 @@ const ROLLING = {
   page: "https://github.com/cambragol/fission-ce",
   releases: "rolling",
   build: { asset: "fallout-fission-linux-x64.zip", program: "fallout-fission" },
-  installed: null,
-  cached: false,
+  versions: [],
 } as const;
 
 beforeEach(async () => {
@@ -65,7 +63,7 @@ describe("each engine's heading", () => {
     store.engines = [{ ...TAGGED, build: null, why: "Fallout II CE publishes no build for this machine." }] as never;
     const v = view();
     expect(v.one(".problem").textContent).toContain("publishes no build for this machine");
-    expect(v.control("Install").hasAttribute("disabled")).toBe(true);
+    expect(v.control("Fetch latest").hasAttribute("disabled")).toBe(true);
   });
 });
 
@@ -101,48 +99,34 @@ describe("how a build is named", () => {
   });
 });
 
-describe("an installed engine", () => {
-  test("shows what is installed and offers Update rather than Install", () => {
-    store.engines = [
-      { ...TAGGED, installed: { release: "v1.3.0", published: "2026-01-01T00:00:00Z", complete: true } },
-    ] as never;
-    const v = view();
-    expect(v.text()).toContain("v1.3.0");
-    expect(v.all("button").map((b) => b.textContent?.trim())).toContain("Update");
+describe("the builds this machine holds", () => {
+  const HELD = [
+    { release: "v1.4.0", published: "2026-05-01T00:00:00Z", commit: null },
+    { release: "v1.3.0", published: "2026-01-01T00:00:00Z", commit: null },
+  ];
+
+  test("says so plainly when the machine holds none", () => {
+    expect(view().text()).toContain("no build on this machine");
   });
 
-  /* An install that stopped part way is not an install; saying so is what stops it being read as one. */
-  test("flags an install that did not finish", () => {
-    store.engines = [
-      { ...TAGGED, installed: { release: "v1.3.0", published: "2026-01-01T00:00:00Z", complete: false } },
-    ] as never;
-    expect(view().text()).toContain("that install did not finish");
+  test("lists a row per build, newest first as the cache returns them", () => {
+    store.engines = [{ ...TAGGED, versions: HELD }] as never;
+    const rows = view().all(".held");
+    expect(rows.map((row) => row.textContent?.trim().split(/\s+/)[0])).toEqual(["v1.4.0", "v1.3.0"]);
   });
 
-  test("offers Remove only once something is installed", () => {
-    expect(view().control("Remove").hasAttribute("disabled")).toBe(true);
-    unmountAll();
-
-    store.engines = [
-      { ...TAGGED, installed: { release: "v1.3.0", published: "2026-01-01T00:00:00Z", complete: true } },
-    ] as never;
-    expect(view().control("Remove").hasAttribute("disabled")).toBe(false);
-  });
-
-  test("removes through the store, naming the engine it was asked about", () => {
-    const remove = vi.spyOn(store, "removeEngine").mockResolvedValue(undefined);
-    store.engines = [
-      { ...TAGGED, installed: { release: "v1.3.0", published: "2026-01-01T00:00:00Z", complete: true } },
-    ] as never;
-    view().control("Remove").click();
-    expect(remove).toHaveBeenCalledExactlyOnceWith("fallout2-ce");
+  test("drops one build through the store, naming which", () => {
+    const forget = vi.spyOn(store, "forgetEngine").mockResolvedValue(undefined);
+    store.engines = [{ ...TAGGED, versions: HELD }] as never;
+    view().all<HTMLButtonElement>(".drop")[0]!.click();
+    expect(forget).toHaveBeenCalledExactlyOnceWith("fallout2-ce", "2026-05-01T00:00:00Z");
   });
 });
 
 describe("the network-bound buttons", () => {
   test("are refused in a host with no machine to reach, and say which host has one", () => {
     const v = view();
-    for (const name of ["Check", "Install"]) {
+    for (const name of ["Check", "Fetch latest"]) {
       expect(v.control(name).hasAttribute("disabled"), name).toBe(true);
       expect(v.control(name).getAttribute("title"), name).toMatch(/desktop build/i);
     }
@@ -154,6 +138,6 @@ describe("the warnings", () => {
   test("warn about the lowercase rename and about installing into a running game", () => {
     const text = view().text();
     expect(text).toContain("lowercased game folder");
-    expect(text).toContain("Quit the game before installing");
+    expect(text).toContain("Quit the game before running a different build");
   });
 });

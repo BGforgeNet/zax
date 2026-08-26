@@ -1,6 +1,25 @@
 <script lang="ts">
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
+
+  const OUTSIDE = "The browser preview cannot start a program - this needs the desktop build";
+
+  /** Which engine's chooser is open, by id. One at a time: they sit side by side on one bar. */
+  let choosing = $state<string | null>(null);
+
+  const day = (instant: string) => {
+    const at = Date.parse(instant);
+    return Number.isNaN(at) ? instant : new Date(at).toLocaleDateString();
+  };
+
+  /** The tag where a project publishes versions, the date where it republishes one - as the Engines tab names it. */
+  const mark = (releases: string, build: { release: string; published: string }) =>
+    releases === "tagged" ? build.release : day(build.published);
+
+  function run(engineId: string, published: string | null): void {
+    choosing = null;
+    void store.play(engineId, published);
+  }
 </script>
 
 <!--
@@ -26,18 +45,62 @@
     Run
   </button>
   <!--
-    Installed here, or held in the machine's cache: one download serves every game folder, so an engine ZAX
-    already has is one this folder can run - the first run unpacks it in place. Offering it only where it was
-    already deployed made the user install the same archive once per game.
+    Whatever the machine holds a build of: one download serves every game folder, so an engine ZAX already has
+    is one this folder can run - the first run unpacks it in place. Offering it only where it was already
+    deployed made the user fetch the same archive once per game.
   -->
-  {#each store.engines.filter((engine) => engine.installed !== null || engine.cached) as engine (engine.id)}
-    <button
-      disabled={!store.install || isPreview || store.busy !== null}
-      title={isPreview ? "The browser preview cannot start a program - this needs the desktop build" : null}
-      onclick={() => void store.play(engine.id)}
-    >
-      Run in {engine.short}
-    </button>
+  {#each store.engines.filter((engine) => engine.versions.length > 0) as engine (engine.id)}
+    {@const deployed = store.engineDeployed[engine.id]}
+    <div class="split">
+      <button
+        disabled={!store.install || isPreview || store.busy !== null}
+        title={isPreview ? OUTSIDE : null}
+        onclick={() => run(engine.id, null)}
+      >
+        Run in {engine.short}
+      </button>
+      <!--
+        One build is no choice, and a chevron over it would open a menu with a single row. Opening the list is
+        not starting a program, so this stays live in the browser preview - the refusal sits on the rows, which
+        are what would launch, shown disabled with the reason the way the Engines tab shows its own.
+      -->
+      {#if engine.versions.length > 1}
+        <button
+          class="chevron"
+          aria-label="Choose a {engine.short} build"
+          aria-expanded={choosing === engine.id}
+          disabled={store.busy !== null}
+          onclick={() => (choosing = choosing === engine.id ? null : engine.id)}
+        >
+          <span aria-hidden="true">v</span>
+        </button>
+      {/if}
+      {#if choosing === engine.id}
+        <div class="menu" role="menu">
+          <!-- First, and what an unpinned folder follows: fetching a newer build moves it forward. -->
+          <button
+            role="menuitem"
+            class:on={deployed?.pinned !== true}
+            disabled={!store.install || isPreview || store.busy !== null}
+            title={isPreview ? OUTSIDE : null}
+            onclick={() => run(engine.id, null)}
+          >
+            Latest
+          </button>
+          {#each engine.versions as version (version.published)}
+            <button
+              role="menuitem"
+              class:on={deployed?.pinned === true && deployed.published === version.published}
+              disabled={!store.install || isPreview || store.busy !== null}
+              title={isPreview ? OUTSIDE : null}
+              onclick={() => run(engine.id, version.published)}
+            >
+              {mark(engine.releases, version)}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
   {/each}
   <!-- Status rather than an action, so it sits away from the buttons at the far end of their own bar. -->
   <div class="spacer"></div>
@@ -90,6 +153,52 @@
     font-size: 12.5px;
     color: var(--accent);
     text-decoration: underline;
+  }
+
+  /* Positioned so the menu hangs off this pair rather than off the bar, which scrolls nothing. */
+  .split {
+    position: relative;
+    display: flex;
+  }
+
+  .split button:first-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .footer .chevron {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 4px 8px;
+  }
+
+  /* Above the bar: the bar is the last thing in the window, so a menu below it would be off-screen. */
+  .menu {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    min-width: 100%;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--panel-alt);
+    overflow: hidden;
+  }
+
+  .footer .menu button {
+    border: none;
+    border-radius: 0;
+    text-align: left;
+    white-space: nowrap;
+    font-size: 12.5px;
+  }
+
+  .footer .menu button.on {
+    color: var(--accent);
+    font-weight: 550;
   }
 
   .spacer {

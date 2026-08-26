@@ -69,15 +69,9 @@ import {
   type ModInstallPlan,
   type ModRemoval,
 } from "./mod-install.js";
-import {
-  installCachedEngine,
-  installEngine,
-  installedEngines,
-  removeEngine,
-  type EngineInstallOutcome,
-  type EngineRemoval,
-} from "./engine-install.js";
-import { cachedEngine, latestEngine, type EngineRelease } from "./engine-release.js";
+import { installCachedEngine, installedEngines, pinEngine } from "./engine-install.js";
+import { cachedEngines, engineReleases, fetchEngineBuild, forgetEngine, type EngineRelease } from "./engine-release.js";
+import { chooseBuild } from "./engine-choice.js";
 import { ENGINES, buildFor, engineById, type ReleaseModel } from "./engines.js";
 import { loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
 import { readTransaction, releaseOf } from "./mod-transaction.js";
@@ -138,9 +132,18 @@ export interface ModSettingsGroup {
   dropped: readonly DroppedSetting[];
 }
 
+/** One build the machine holds, as a version list needs it. Addressed by `published`, not by tag. */
+export interface CachedBuild {
+  /** The release's tag, as published. A rolling project republishes one, so it does not identify a build. */
+  release: string;
+  /** When it was published, ISO 8601. The key a build is asked for by. */
+  published: string;
+  commit: string | null;
+}
+
 /**
- * One engine as the Engines tab needs it: what it is, what this machine would install, and what is installed
- * already. One answer rather than two, so the catalog and the record cannot disagree about an install.
+ * One engine as the Engines tab needs it: what it is, what this machine would install, and which builds it
+ * already holds. Nothing here is a game folder's business - what is deployed in one is `deployedEngines`.
  */
 export interface EngineListing {
   id: string;
@@ -152,13 +155,8 @@ export interface EngineListing {
   /** What would be installed here, or null with `why` saying there is nothing. */
   build: { asset: string; program: string } | null;
   why?: string;
-  installed: InstalledEngine | null;
-  /**
-   * Whether this machine already holds a copy to install from. Not this folder's business but the machine's,
-   * which is why it sits beside `installed` rather than in it: it says a run here costs a copy, not a
-   * download.
-   */
-  cached: boolean;
+  /** What this machine holds, newest first. Empty is an engine nothing has fetched yet. */
+  versions: readonly CachedBuild[];
 }
 
 export interface Backend {
@@ -249,19 +247,31 @@ export interface Backend {
   latestSfall(): Promise<SfallRelease>;
   updateSfall(install: Install, version: string): Promise<SfallUpdate>;
   listSfallVersions(): Promise<readonly string[]>;
-  /** Every engine ZAX knows, against this install. Answers from the catalog and the record - no network. */
-  availableEngines(install: Install): Promise<readonly EngineListing[]>;
-  latestEngine(engineId: string): Promise<EngineRelease>;
-  /** Installs the published build, or replaces the one that is there with it. */
-  installEngine(install: Install, engineId: string): Promise<EngineInstallOutcome>;
-  removeEngine(install: Install, engineId: string): Promise<EngineRemoval>;
+  /** Every engine ZAX knows, against this machine. Answers from the catalog and the cache - no network. */
+  machineEngines(): Promise<readonly EngineListing[]>;
+  /** What is deployed in one game folder, reconciled against the directory. */
+  deployedEngines(install: Install): Promise<readonly InstalledEngine[]>;
+  /** What the project has published, newest first. */
+  engineReleases(engineId: string): Promise<readonly EngineRelease[]>;
+  /** Downloads a build into the machine's cache. `published` names one, or null for the newest published. */
+  fetchEngine(engineId: string, published: string | null): Promise<EngineRelease>;
+  /** Drops one build from the cache. Nothing is removed from any game folder. */
+  forgetEngine(engineId: string, published: string): Promise<void>;
   /** Read only: nothing here installs the hi-res patch, so this reports what is there and stops. */
   installedHiresVersion(install: Install): Promise<string | null>;
   latestZax(): Promise<ZaxRelease>;
   listSaves(install: Install): Promise<readonly string[]>;
   createDebugPackage(install: Install, saves: readonly string[]): Promise<DebugPackage>;
-  /** `engineId` names an installed alternative engine, or null for the game's own executable. */
-  launch(install: Install, sfallVersion: string | null, engineId: string | null): Promise<void>;
+  /**
+   * `engineId` names an alternative engine, or null for the game's own executable. `published` names the build
+   * to run, or null to follow what the folder holds and what the cache offers - see `engine-choice.ts`.
+   */
+  launch(
+    install: Install,
+    sfallVersion: string | null,
+    engineId: string | null,
+    published: string | null,
+  ): Promise<void>;
   open(target: OpenTarget): Promise<void>;
   wipe(which: WipeTarget): Promise<void>;
 }
@@ -530,9 +540,8 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
     latestSfall: () => latestSfall(platform),
     updateSfall: (install, version) => updateSfall(platform, install, version, new Date(), reporting()),
     listSfallVersions: () => listSfallVersions(platform),
-    availableEngines: async (install) => {
-      const installed = await installedEngines(platform, install);
-      return Promise.all(
+    machineEngines: () =>
+      Promise.all(
         ENGINES.map(async (engine) => {
           const build = buildFor(engine, platform.os, platform.arch);
           return {
@@ -543,17 +552,21 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
             releases: engine.releases,
             build: build === null ? null : { asset: build.asset, program: build.program },
             ...(build === null ? { why: `${engine.name} publishes no build for this machine.` } : {}),
-            installed: installed.find((one) => one.id === engine.id) ?? null,
-            // Machine-wide rather than this folder's: one download serves every install, so a copy in the
-            // cache is what says this folder can run the engine without asking the network for anything.
-            cached: build !== null && (await cachedEngine(platform, engine, build.asset)) !== null,
+            versions:
+              build === null
+                ? []
+                : (await cachedEngines(platform, engine, build.asset)).map((one) => ({
+                    release: one.release.release,
+                    published: one.release.published,
+                    commit: one.release.commit,
+                  })),
           };
         }),
-      );
-    },
-    latestEngine: (engineId) => latestEngine(platform, engineId),
-    installEngine: (install, engineId) => installEngine(platform, install, engineId, new Date(), reporting()),
-    removeEngine: (install, engineId) => removeEngine(platform, install, engineId),
+      ),
+    deployedEngines: (install) => installedEngines(platform, install),
+    engineReleases: (engineId) => engineReleases(platform, engineId),
+    fetchEngine: (engineId, published) => fetchEngineBuild(platform, engineId, published, reporting()),
+    forgetEngine: (engineId, published) => forgetEngine(platform, engineById(engineId), published),
     installedHiresVersion: (install) => installedHiresVersion(platform, install),
     latestZax: () => latestZax(platform),
 
@@ -562,25 +575,24 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
 
     // The program comes from the record and the catalog, never from the renderer - a caller that could name
     // the program would be naming a program for the machine to start.
-    launch: async (install, sfallVersion, engineId) => {
+    launch: async (install, sfallVersion, engineId, published) => {
       let program: string | null = null;
       if (engineId !== null) {
         const engine = engineById(engineId);
         const build = buildFor(engine, platform.os, platform.arch);
         if (!build) throw new Error(`${engine.name} publishes no build ZAX can run on this machine.`);
-        const installed = (await installedEngines(platform, install)).find((one) => one.id === engineId);
-        // Not in this folder, but on this machine: unpack the copy already cached rather than refusing. The
-        // engine is offered here precisely because that copy exists, so the first run is what puts it in
-        // place - the same deployment the Engines tab performs, and it records itself the same way.
-        if (!installed) {
-          await installCachedEngine(
-            platform,
-            install,
-            engineId,
-            { published: null, pin: false },
-            new Date(),
-            reporting(),
-          );
+        const deployed = (await installedEngines(platform, install)).find((one) => one.id === engineId);
+        const choice = chooseBuild(deployed, await cachedEngines(platform, engine, build.asset), published);
+        if (choice.run === "nothing") {
+          throw new Error(`ZAX has no copy of ${engine.name} to run here. Fetch one on the Engines tab first.`);
+        }
+        // Deploying is what choosing a build amounts to: a folder holds one, so switching means unpacking the
+        // other over it - the same deployment, backup and record write an install has always made.
+        if (choice.run === "deploy") {
+          const at = { published: choice.build.release.published, pin: choice.pin };
+          await installCachedEngine(platform, install, engineId, at, new Date(), reporting());
+        } else if (choice.pin !== (deployed?.pinned ?? false)) {
+          await pinEngine(platform, install, engineId, choice.pin);
         }
         program = build.program;
       }

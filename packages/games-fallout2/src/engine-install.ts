@@ -9,13 +9,7 @@ import { backupDirectory, copyTree, stamp, temporaryDirectory } from "@zax/core"
 import type { Install } from "@zax/core";
 import type { ArchiveEntryInfo, FileStat, Platform } from "@zax/platform";
 import { preflightArchive } from "./archive-preflight.js";
-import {
-  cachedEngines,
-  enginePackage,
-  latestEngine,
-  type EngineProgress,
-  type EngineRelease,
-} from "./engine-release.js";
+import { cachedEngines, type EngineProgress, type EngineRelease } from "./engine-release.js";
 import { buildFor, engineById, type EngineBuild, type EngineDefinition, type EngineMember } from "./engines.js";
 import { assertUsable, loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
 
@@ -27,13 +21,6 @@ export interface EngineInstallOutcome {
   files: readonly string[];
   /** Which of those were already there, and so were copied aside first. */
   replaced: readonly string[];
-  backup: string | null;
-}
-
-export interface EngineRemoval {
-  engine: string;
-  removed: readonly string[];
-  /** Where that install's replaced originals are, when it replaced any. Said rather than restored. */
   backup: string | null;
 }
 
@@ -64,33 +51,6 @@ async function orDiscard<T>(platform: Platform, archive: string, action: () => P
     await platform.fs.remove(archive);
     throw error;
   }
-}
-
-/**
- * Installs an engine, or replaces the build that is there with the published one. Both are the same operation:
- * a previous copy is simply files the deployment replaces, and the backup covers them.
- */
-export async function installEngine(
-  platform: Platform,
-  install: Install,
-  engineId: string,
-  now: Date = new Date(),
-  options?: EngineProgress,
-): Promise<EngineInstallOutcome> {
-  const engine = engineById(engineId);
-  const build = buildFor(engine, platform.os, platform.arch);
-  if (build === null) {
-    throw new Error(`${engine.name} publishes no build ZAX can install for this machine. See ${engine.page}.`);
-  }
-
-  options?.onStep?.(`Checking what ${engine.name} has published`);
-  const release = await latestEngine(platform, engineId);
-  if (release.asset === null) {
-    throw new Error(`The ${engine.name} release ${release.release} carries no ${build.asset}.`);
-  }
-
-  const archive = await enginePackage(platform, engine, release, release.asset, options);
-  return deployEngine(platform, install, engine, build, release, archive, false, now, options);
 }
 
 /**
@@ -236,20 +196,16 @@ async function deployEngine(
 }
 
 /**
- * Deletes what the record says this engine deployed, and nothing else. Where it replaced something, the
- * message says where the originals are rather than putting them back: restoring is a separate promise, and an
- * install onto a stock game - which is every ordinary one - replaced nothing to restore.
+ * Sets or clears the pin on the build already deployed here, touching no file. What picking the build that is
+ * in place amounts to, and what picking `Latest` undoes.
  */
-export async function removeEngine(platform: Platform, install: Install, engineId: string): Promise<EngineRemoval> {
-  const engine = engineById(engineId);
+export async function pinEngine(platform: Platform, install: Install, engineId: string, pin: boolean): Promise<void> {
   const record = await loadRecord(platform, install.path);
   assertUsable(record, engineId);
   const entry = (record.engines ?? []).find((one) => one.id === engineId);
-  if (!entry) throw new Error(`${engine.name} is not installed here, as far as ZAX's record goes.`);
-
-  for (const file of entry.files) {
-    await platform.fs.remove(platform.paths.join(install.path, ...file.split("/")));
-  }
-  await saveRecord(platform, { ...record, engines: withEngine(record.engines ?? [], engineId, null) });
-  return { engine: engineId, removed: entry.files, backup: entry.backup ?? null };
+  if (entry === undefined) return;
+  // Rebuilt without the field rather than assigned undefined, which `exactOptionalPropertyTypes` refuses.
+  const { pinned: _cleared, ...rest } = entry;
+  const updated: InstalledEngine = { ...rest, ...(pin ? { pinned: true } : {}) };
+  await saveRecord(platform, { ...record, engines: withEngine(record.engines ?? [], engineId, updated) });
 }

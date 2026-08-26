@@ -159,7 +159,7 @@ describe("the operations", () => {
 
   it("launches through the plan for this machine", async () => {
     const platform = ready();
-    await createBackend(platform, noShell).launch({ ...install, wine: { prefix: "/p" } }, "4.5", null);
+    await createBackend(platform, noShell).launch({ ...install, wine: { prefix: "/p" } }, "4.5", null, null);
     expect(platform.launched).toEqual([
       {
         program: "wine",
@@ -343,86 +343,91 @@ describe("installing a mod", () => {
 });
 
 describe("engines across the boundary", () => {
-  it("offers the catalog with this machine's build and what is installed", async () => {
-    const platform = enginePlatform();
+  const SECOND = { path: "/games/two", type: "fallout2" } as const;
+
+  /** Fetching puts a build in the cache; nothing reaches a game folder until that folder runs it. */
+  const fetched = async (platform: ReturnType<typeof enginePlatform>) => {
     const backend = createBackend(platform, { chooseFolder: async () => null });
-    const listed = await backend.availableEngines(install);
+    await backend.fetchEngine("fallout2-ce", null);
+    return backend;
+  };
+
+  it("offers the catalog with this machine's build", async () => {
+    const backend = createBackend(enginePlatform(), { chooseFolder: async () => null });
+    const listed = await backend.machineEngines();
     expect(listed.map((one) => one.id)).toEqual(["fallout2-ce", "fission"]);
-    expect(listed[0]!.id).toBe("fallout2-ce");
     expect(listed[0]!.build?.asset).toBe("fallout2-ce-linux-x64.tar.gz");
-    expect(listed[0]!.installed).toBeNull();
   });
 
   it("says why there is nothing to install where the machine has no build", async () => {
     const platform = enginePlatform({ os: "windows", arch: "arm64" });
     const backend = createBackend(platform, { chooseFolder: async () => null });
-    const listed = await backend.availableEngines(install);
+    const listed = await backend.machineEngines();
     expect(listed[0]!.build).toBeNull();
     expect(listed[0]!.why).toMatch(/this machine/i);
   });
 
-  it("reports what is installed after installing it", async () => {
-    const platform = enginePlatform();
-    const backend = createBackend(platform, { chooseFolder: async () => null });
-    await backend.installEngine(install, "fallout2-ce");
-    const listed = await backend.availableEngines(install);
-    expect(listed[0]!.installed?.release).toBe("continious");
+  it("holds no build before anything has been fetched", async () => {
+    const backend = createBackend(enginePlatform(), { chooseFolder: async () => null });
+    expect((await backend.machineEngines())[0]!.versions).toEqual([]);
+  });
+
+  // The split this surface exists for: fetching is the machine's business and reaches no game folder.
+  it("holds a fetched build machine-wide, with nothing deployed anywhere", async () => {
+    const platform = enginePlatform({ files: { "/games/one/fallout2.exe": "", "/games/two/fallout2.exe": "" } });
+    const backend = await fetched(platform);
+
+    expect((await backend.machineEngines())[0]!.versions).toHaveLength(1);
+    expect(await backend.deployedEngines(install)).toEqual([]);
+    expect(await backend.deployedEngines(SECOND)).toEqual([]);
   });
 
   it("launches the engine's program rather than the game's", async () => {
     const platform = enginePlatform();
-    const backend = createBackend(platform, { chooseFolder: async () => null });
-    await backend.installEngine(install, "fallout2-ce");
-    await backend.launch(install, null, "fallout2-ce");
+    const backend = await fetched(platform);
+    await backend.launch(install, null, "fallout2-ce", null);
     expect(platform.launched.at(-1)?.program).toBe("./fallout2-ce");
   });
 
-  it("reports a copy the machine holds, so a folder that never had the engine can still run it", async () => {
+  it("deploys on the first run in a folder, without asking the network anything", async () => {
     const platform = enginePlatform({ files: { "/games/one/fallout2.exe": "", "/games/two/fallout2.exe": "" } });
-    const backend = createBackend(platform, { chooseFolder: async () => null });
-    await backend.installEngine(install, "fallout2-ce");
+    const backend = await fetched(platform);
 
-    const second = { path: "/games/two", type: "fallout2" } as const;
-    const listed = await backend.availableEngines(second);
-    expect(listed[0]!.installed, "nothing is deployed in the second folder").toBeNull();
-    expect(listed[0]!.cached, "but the machine holds the archive").toBe(true);
-  });
-
-  it("holds no copy before anything has been downloaded", async () => {
-    const platform = enginePlatform();
-    const backend = createBackend(platform, { chooseFolder: async () => null });
-    expect((await backend.availableEngines(install))[0]!.cached).toBe(false);
-  });
-
-  it("unpacks the cached copy on the first run in a folder that never had it", async () => {
-    const platform = enginePlatform({ files: { "/games/one/fallout2.exe": "", "/games/two/fallout2.exe": "" } });
-    const backend = createBackend(platform, { chooseFolder: async () => null });
-    await backend.installEngine(install, "fallout2-ce");
-
-    const second = { path: "/games/two", type: "fallout2" } as const;
-    // The one request the release took is already spent; a second would be this path asking the network.
+    // The requests the release took are already spent; another would be this path asking the network.
     platform.net.fetchText = () => Promise.reject(new Error("the first run asked the network"));
     platform.net.download = () => Promise.reject(new Error("the first run downloaded again"));
 
-    await backend.launch(second, null, "fallout2-ce");
+    await backend.launch(SECOND, null, "fallout2-ce", null);
     expect(platform.launched.at(-1)?.program).toBe("./fallout2-ce");
     expect(platform.launched.at(-1)?.options?.cwd).toBe("/games/two");
-    // Deployed for real, and recorded, so the next run is a plain launch.
+    // Deployed for real and recorded, so the next run is a plain launch.
     expect(await platform.fs.stat("/games/two/fallout2-ce")).not.toBeNull();
-    expect((await backend.availableEngines(second))[0]!.installed?.release).toBe("continious");
+    expect((await backend.deployedEngines(SECOND))[0]?.release).toBe("continious");
   });
 
-  it("refuses rather than launching when the machine holds no copy either", async () => {
+  it("refuses rather than launching when the machine holds no build", async () => {
     const platform = enginePlatform();
     const backend = createBackend(platform, { chooseFolder: async () => null });
-    await expect(backend.launch(install, null, "fallout2-ce")).rejects.toThrow(/no copy/i);
+    await expect(backend.launch(install, null, "fallout2-ce", null)).rejects.toThrow(/no copy/i);
     expect(platform.launched).toEqual([]);
+  });
+
+  it("drops a build from the cache without touching the folder running it", async () => {
+    const platform = enginePlatform();
+    const backend = await fetched(platform);
+    await backend.launch(install, null, "fallout2-ce", null);
+    const held = (await backend.machineEngines())[0]!.versions[0]!;
+
+    await backend.forgetEngine("fallout2-ce", held.published);
+
+    expect((await backend.machineEngines())[0]!.versions).toEqual([]);
+    expect(await platform.fs.stat("/games/one/fallout2-ce"), "the folder keeps what it runs").not.toBeNull();
   });
 
   it("launches the game itself when no engine is named", async () => {
     const platform = enginePlatform();
     const backend = createBackend(platform, { chooseFolder: async () => null });
-    await backend.launch(install, null, null);
+    await backend.launch(install, null, null, null);
     expect(platform.launched.at(-1)?.program).toBe("wine");
   });
 });

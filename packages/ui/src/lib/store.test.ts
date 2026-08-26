@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { INSTALL_MARKER, ownTarget } from "@zax/core";
 import {
   BACKEND_METHODS,
-  ENGINES,
   SETTINGS,
   loadRecord,
   saveRecord,
@@ -1347,59 +1346,66 @@ describe("engines", () => {
   test("Run starts the game on its own executable", async () => {
     const launch = launching();
     await store.play();
-    expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, null);
+    expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, null, null);
   });
 
-  test("Run in CE starts it through the engine", async () => {
+  test("Run in CE starts it through the engine, following whatever the folder holds", async () => {
     const launch = launching();
     await store.play("fallout2-ce");
-    expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, "fallout2-ce");
+    expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, "fallout2-ce", null);
+  });
+
+  test("runs the build the caller names rather than the newest", async () => {
+    const launch = launching();
+    await store.play("fallout2-ce", "2026-07-01T00:00:00Z");
+    expect(launch).toHaveBeenCalledWith(
+      expect.objectContaining({ path: PREVIEW_INSTALL }),
+      null,
+      "fallout2-ce",
+      "2026-07-01T00:00:00Z",
+    );
   });
 
   test("keeps a check across installs, and re-reads what is deployed in the one arrived at", async () => {
     // selectInstall is a no-op on the already-selected path (it would otherwise drop unsaved edits on a
     // re-click), so leaving has to mean an actual other install, not PREVIEW_INSTALL a second time.
-    const listing = vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([] as never);
+    const deployed = vi.spyOn(hostBackend, "deployedEngines").mockResolvedValue([]);
     store.installs = [...store.installs, { path: "/games/other", type: "fallout2" }];
     const published = { release: "continious", published: "2026-08-23T09:37:22Z", asset: null, commit: null };
     store.engineLatest = { "fallout2-ce": published };
     await store.selectInstall("/games/other");
     // The project published one release, not one per game folder, so the check outlives the switch.
     expect(store.engineLatest).toEqual({ "fallout2-ce": published });
-    // What is the folder's - which engine is deployed in it - is read again for the one arrived at.
-    expect(listing).toHaveBeenCalledWith(expect.objectContaining({ path: "/games/other" }));
-    expect(store.engines).toEqual([]);
+    // What is the folder's - which build is deployed in it - is read again for the one arrived at.
+    expect(deployed).toHaveBeenCalledWith(expect.objectContaining({ path: "/games/other" }));
+    expect(store.engineDeployed).toEqual({});
   });
 
-  test("holds a cached engine in the listing while the install switched to is being read", async () => {
-    // Run is drawn unconditionally and each Run in X from this listing, so emptying it for the length of the
-    // reads took the engine's button away and put it back on every switch, over a fact that had not moved.
-    const ce = ENGINES.find((one) => one.id === "fallout2-ce")!;
-    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([
-      {
-        id: ce.id,
-        name: ce.name,
-        short: ce.short,
-        page: ce.page,
-        releases: ce.releases,
-        build: { asset: "a.zip", program: "a.exe" },
-        installed: null,
-        cached: true,
-      },
-    ] as never);
+  /*
+    Run is drawn unconditionally and each Run in X off this listing, so rereading it for the length of an
+    install's reads took the engine's button away and put it back on every switch, over a fact that had not
+    moved. Now the listing is the machine's and the switch cannot touch it at all - asserted by identity, which
+    is stronger than the old check that it merely stayed non-empty.
+  */
+  test("leaves the machine listing untouched across an install switch", async () => {
+    const before = store.engines;
+    expect(before.length, "the preview seeds builds, or this asserts nothing").toBeGreaterThan(0);
+
+    const machine = vi.spyOn(hostBackend, "machineEngines");
     store.installs = [...store.installs, { path: "/games/other", type: "fallout2" }];
     await store.selectInstall("/games/other");
-
-    const during: string[][] = [];
-    const read = hostBackend.loadConfigFiles;
-    vi.spyOn(hostBackend, "loadConfigFiles").mockImplementation((path) => {
-      during.push(store.engines.map((one) => one.id));
-      return read(path);
-    });
     await store.selectInstall(PREVIEW_INSTALL);
 
-    // Read partway through the switch rather than after it: the two ends were never the problem.
-    expect(during).toEqual([["fallout2-ce"]]);
+    expect(store.engines).toBe(before);
+    expect(machine, "switching folders is not a reason to ask the machine anything").not.toHaveBeenCalled();
+  });
+
+  test("holds the machine's builds for a folder that has never run the engine", () => {
+    expect(store.engineVersions("fallout2-ce").map((one) => one.published)).toEqual([
+      "2026-08-23T09:37:22Z",
+      "2026-07-01T00:00:00Z",
+    ]);
+    expect(store.engineDeployed["fallout2-ce"], "nothing is deployed in the preview folder").toBeUndefined();
   });
 });
 
@@ -1455,20 +1461,9 @@ describe("the settings tabs an install offers", () => {
     files: ["fallout2-ce.exe"],
   });
 
-  /** The listing the Engines tab reads, with the named engines installed here and the rest not. */
+  /** What this folder has deployed. A tab is offered for an engine that has run here, not one merely cached. */
   const listing = (...installed: string[]) =>
-    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue(
-      ENGINES.map((one) => ({
-        id: one.id,
-        name: one.name,
-        short: one.short,
-        page: one.page,
-        releases: one.releases,
-        build: { asset: "a.zip", program: "a.exe" },
-        installed: installed.includes(one.id) ? deployed(one.id) : null,
-        cached: false,
-      })) as never,
-    );
+    vi.spyOn(hostBackend, "deployedEngines").mockResolvedValue(installed.map(deployed));
 
   const idsOffered = () => store.settingsGroups.map((one) => one.group.id);
 
@@ -1536,24 +1531,9 @@ describe("a row drawn under an engine's tab", () => {
     // Fission is installed and has run, fallout2-ce is not installed at all. So the mark names Fission's
     // address and says nothing about CE's - a link to software that is not here would appear on nearly every
     // vanilla row and distinguish nothing, which is the whole point of showing a mark.
-    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([
-      {
-        id: "fission",
-        name: "Fallout Fission",
-        short: "Fission",
-        page: "",
-        releases: "tagged",
-        build: null,
-        installed: {
-          id: "fission",
-          release: "continious",
-          published: "2026-08-23T09:37:22Z",
-          complete: true,
-          files: [],
-        },
-        cached: false,
-      },
-    ] as never);
+    vi.spyOn(hostBackend, "deployedEngines").mockResolvedValue([
+      { id: "fission", release: "continious", published: "2026-08-23T09:37:22Z", complete: true, files: [] },
+    ]);
     await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
     await store.start();
 
@@ -1574,24 +1554,9 @@ describe("a row drawn under an engine's tab", () => {
   test("names an installed engine's address before that engine has written its settings, and marks it", async () => {
     // The link is real and about to matter, so it is named - but flagged, because a save does not reach it
     // yet and "also writes X" of a file ZAX is deliberately leaving alone is a lie in the other direction.
-    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([
-      {
-        id: "fission",
-        name: "Fallout Fission",
-        short: "Fission",
-        page: "",
-        releases: "tagged",
-        build: null,
-        installed: {
-          id: "fission",
-          release: "continious",
-          published: "2026-08-23T09:37:22Z",
-          complete: true,
-          files: [],
-        },
-        cached: false,
-      },
-    ] as never);
+    vi.spyOn(hostBackend, "deployedEngines").mockResolvedValue([
+      { id: "fission", release: "continious", published: "2026-08-23T09:37:22Z", complete: true, files: [] },
+    ]);
     await store.start();
     expect(store.linkedTo(def, "ddraw.ini")).toEqual([
       { at: expect.objectContaining({ file: "fission.cfg" }), live: false },
@@ -1599,7 +1564,7 @@ describe("a row drawn under an engine's tab", () => {
   });
 
   test("marks nothing on an install carrying no alternative engine", async () => {
-    vi.spyOn(hostBackend, "availableEngines").mockResolvedValue([] as never);
+    vi.spyOn(hostBackend, "deployedEngines").mockResolvedValue([]);
     await store.start();
     expect(store.linkedTo(def, "ddraw.ini")).toEqual([]);
   });
@@ -1633,7 +1598,7 @@ describe("the checks ZAX makes for itself at startup", () => {
   const answering = () => {
     vi.spyOn(hostBackend, "latestZax").mockResolvedValue({ version: "9.9.9", url: "https://example.invalid" });
     vi.spyOn(hostBackend, "latestSfall").mockResolvedValue({ version: "4.4.9", url: "https://example.invalid" });
-    return vi.spyOn(hostBackend, "latestEngine").mockResolvedValue(published);
+    return vi.spyOn(hostBackend, "engineReleases").mockResolvedValue([published]);
   };
 
   test("asks at once for what ZAX, sfall and the engines have published", async () => {
@@ -1747,8 +1712,13 @@ describe("the feeds against a change of game", () => {
 
     // Installing an engine rereads the install. Nothing about which mods are on offer changed, and blanking
     // the tab back to unread over it is the bug this pins.
-    vi.spyOn(hostBackend, "installEngine").mockResolvedValue({ backup: null } as never);
-    await store.installEngine("fallout2-ce");
+    vi.spyOn(hostBackend, "fetchEngine").mockResolvedValue({
+      release: "continious",
+      published: "2026-08-23T09:37:22Z",
+      asset: null,
+      commit: null,
+    });
+    await store.fetchEngine("fallout2-ce");
 
     expect(store.modListing?.offers, "the folder on screen is the one this was read for").toEqual(
       offersFor("read-once"),

@@ -132,9 +132,7 @@ describe("a setting more than one engine carries", () => {
   })();
 
   const installed = (live: boolean) => {
-    store.engines = [
-      { id: shared.engine, name: shared.engine, short: shared.engine, installed: { id: shared.engine }, cached: true },
-    ] as never;
+    store.engineDeployed = { [shared.engine]: { id: shared.engine } } as never;
     if (live) store.contents = { ...store.contents, [shared.target.file]: "" };
   };
 

@@ -122,6 +122,23 @@ await saveRecord(previewPlatform, {
   ],
 });
 
+/*
+  Two builds of one engine, so the Run button's chooser has something to choose between and the Engines tab has
+  rows. Written the way the cache writes them - the archive, and the note naming what it is - rather than through
+  a download the preview refuses. `MemoryPlatform` is linux/x64, which is the asset `buildFor` picks.
+*/
+const cachedBuild = async (published: string) => {
+  const at = `preview/cache/packages/engines/fallout2-ce/${published.replace(/[^0-9]/g, "")}`;
+  await previewPlatform.fs.write(`${at}/fallout2-ce-linux-x64.tar.gz`, new TextEncoder().encode("preview"));
+  await previewPlatform.fs.write(
+    `${at}/release.json`,
+    new TextEncoder().encode(JSON.stringify({ release: "continious", published, commit: null })),
+  );
+};
+
+await cachedBuild("2026-07-01T00:00:00Z");
+await cachedBuild("2026-08-23T09:37:22Z");
+
 /**
  * Puts every argument through the same copy the desktop build's channel does, so an argument that could not
  * cross a process boundary fails here rather than only on the desktop. A function or a class instance is

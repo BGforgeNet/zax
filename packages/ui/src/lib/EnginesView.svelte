@@ -53,16 +53,6 @@
           {/if}
 
           <p class="line">
-            Installed
-            {#if engine.installed}
-              <strong>{mark(engine, engine.installed)}</strong>
-              {#if engine.installed.commit}<code class="sha">{sha(engine.installed.commit)}</code>{/if}
-              {#if !engine.installed.complete}<span class="problem">- that install did not finish</span>{/if}
-            {:else}
-              <span class="unknown">not installed</span>
-            {/if}
-          </p>
-          <p class="line">
             Latest
             {#if latest}
               <strong>{mark(engine, latest)}</strong>
@@ -71,6 +61,23 @@
               <span class="unknown">not checked</span>
             {/if}
           </p>
+
+          <!-- What this machine holds. A game folder gets one of these the first time it runs the engine. -->
+          {#each engine.versions as version (version.published)}
+            <p class="line held">
+              <strong>{mark(engine, version)}</strong>
+              {#if version.commit}<code class="sha">{sha(version.commit)}</code>{/if}
+              <button
+                class="drop"
+                disabled={store.busy !== null}
+                onclick={() => void store.forgetEngine(engine.id, version.published)}
+              >
+                Remove
+              </button>
+            </p>
+          {:else}
+            <p class="line"><span class="unknown">no build on this machine</span></p>
+          {/each}
 
           <div class="buttons">
             <button
@@ -81,17 +88,11 @@
               Check
             </button>
             <button
-              disabled={isPreview || store.busy !== null || !engine.build || !store.install}
+              disabled={isPreview || store.busy !== null || !engine.build}
               title={isPreview ? OUTSIDE : null}
-              onclick={() => void store.installEngine(engine.id)}
+              onclick={() => void store.fetchEngine(engine.id)}
             >
-              {engine.installed ? "Update" : "Install"}
-            </button>
-            <button
-              disabled={store.busy !== null || !engine.installed}
-              onclick={() => void store.removeEngine(engine.id)}
-            >
-              Remove
+              Fetch latest
             </button>
           </div>
 
@@ -100,8 +101,8 @@
           {/if}
           <!-- Said where it is relevant rather than done silently: it is the widest rename in the application. -->
           <p class="note">
-            A native run on a case-sensitive filesystem wants a lowercased game folder. Quit the game before installing
-            - this writes into its directory.
+            A native run on a case-sensitive filesystem wants a lowercased game folder. Quit the game before running a
+            different build - the first run of one writes into the game's directory.
           </p>
         </section>
       {/each}
@@ -181,6 +182,27 @@
   .unknown {
     color: var(--text-faint);
     font-style: italic;
+  }
+
+  .held {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* On its own row rather than in the button bar below: it acts on one build, not on the engine. */
+  .drop {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 11.5px;
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  .drop:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
   }
 
   .problem {
