@@ -1,0 +1,84 @@
+[
+ {
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v34/upu_v34.exe",
+    "digest": "sha256:7148bdced50055da822de28ac59fc57e682e577020b5f828198d1b664fe51926",
+    "name": "upu_v34.exe",
+    "size": 97135562
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v34/upu_v34.exe.torrent",
+    "digest": "sha256:fe533c02456d669caaf80ee01ff9a0a8fbd0afa572816d1307d3942f6bcbd9d0",
+    "name": "upu_v34.exe.torrent",
+    "size": 15956
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v34/upu_v34.zip",
+    "digest": "sha256:e11369a3622b1c294a3aa24503e3c3a06fa1af17e407b7769981f4b22402f6c5",
+    "name": "upu_v34.zip",
+    "size": 57621459
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v34/upu_v34.zip.torrent",
+    "digest": "sha256:6612cdf3414bcc675c348d209ee2740a1e7a64d30473727256dc40606d65e8d1",
+    "name": "upu_v34.zip.torrent",
+    "size": 18715
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v34/upu_v34_translations.zip",
+    "digest": "sha256:4f04163664a1a5477a14a20ea195bb0420bc0af9c7399f662e27ea892d09efac",
+    "name": "upu_v34_translations.zip",
+    "size": 39741484
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v34/upu_v34_translations.zip.torrent",
+    "digest": "sha256:61c79857e27b06d7a47f2ec3c2ab88ae7f2ad193fbf1764dc85318a444b13c3c",
+    "name": "upu_v34_translations.zip.torrent",
+    "size": 25402
+   }
+  ],
+  "tag_name": "v34"
+ },
+ {
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v33/upu_v33.exe",
+    "digest": null,
+    "name": "upu_v33.exe",
+    "size": 96079256
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v33/upu_v33.exe.torrent",
+    "digest": null,
+    "name": "upu_v33.exe.torrent",
+    "size": 15796
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v33/upu_v33.zip",
+    "digest": null,
+    "name": "upu_v33.zip",
+    "size": 57595944
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v33/upu_v33.zip.torrent",
+    "digest": null,
+    "name": "upu_v33.zip.torrent",
+    "size": 18695
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v33/upu_v33_translations.zip",
+    "digest": null,
+    "name": "upu_v33_translations.zip",
+    "size": 38563211
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v33/upu_v33_translations.zip.torrent",
+    "digest": null,
+    "name": "upu_v33_translations.zip.torrent",
+    "size": 24682
+   }
+  ],
+  "tag_name": "v33"
+ }
+]

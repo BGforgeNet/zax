@@ -1,0 +1,107 @@
+[
+ {
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.34/rpu_v2.4.34.exe",
+    "digest": "sha256:226b2252840a9230bb4ced1550becb2bd69d3580c15ee5c2148d5dc0a750f898",
+    "name": "rpu_v2.4.34.exe",
+    "size": 980251749
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.34/rpu_v2.4.34.exe.torrent",
+    "digest": "sha256:0aea058ae6c8736634a5034f7ef5a4d6f2599777bd740f53441baee98c11def2",
+    "name": "rpu_v2.4.34.exe.torrent",
+    "size": 19834
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.34/rpu_v2.4.34.zip",
+    "digest": "sha256:b8f8a9c900a553c4e781e74bcf805f5663bc37b3633ebfbebfc928b70470285e",
+    "name": "rpu_v2.4.34.zip",
+    "size": 866970542
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.34/rpu_v2.4.34.zip.torrent",
+    "digest": "sha256:8dd78e17503cfe65ab64a80d284c6c0a3a17f5633d044a7c5a8a772476b577d6",
+    "name": "rpu_v2.4.34.zip.torrent",
+    "size": 17674
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.34/rpu_v2.4.34_translations.zip",
+    "digest": "sha256:cc9ca1e12e477cbf4cd0156097d4b9185f370033e5ac8ce9c4ef16f741b45644",
+    "name": "rpu_v2.4.34_translations.zip",
+    "size": 140656143
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.34/rpu_v2.4.34_translations.zip.torrent",
+    "digest": "sha256:50df06d96ff3697d6f8e332330b024623ed32dbc8650de4a503631bac66fdabb",
+    "name": "rpu_v2.4.34_translations.zip.torrent",
+    "size": 22639
+   }
+  ],
+  "tag_name": "v2.4.34"
+ },
+ {
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.33/rpu_v2.4.33.exe",
+    "digest": null,
+    "name": "rpu_v2.4.33.exe",
+    "size": 979139192
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.33/rpu_v2.4.33.exe.torrent",
+    "digest": null,
+    "name": "rpu_v2.4.33.exe.torrent",
+    "size": 19814
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.33/rpu_v2.4.33.zip",
+    "digest": null,
+    "name": "rpu_v2.4.33.zip",
+    "size": 866926960
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.33/rpu_v2.4.33.zip.torrent",
+    "digest": null,
+    "name": "rpu_v2.4.33.zip.torrent",
+    "size": 17674
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.33/rpu_v2.4.33_translations.zip",
+    "digest": null,
+    "name": "rpu_v2.4.33_translations.zip",
+    "size": 139415351
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.33/rpu_v2.4.33_translations.zip.torrent",
+    "digest": null,
+    "name": "rpu_v2.4.33_translations.zip.torrent",
+    "size": 22439
+   }
+  ],
+  "tag_name": "v2.4.33"
+ },
+ {
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.3.34/rpu_v2.3.34.exe",
+    "digest": "sha256:12e18ba15f409a10d4b5b7a6491ce9ee22485395aa6d15e36a390c99e67b8956",
+    "name": "rpu_v2.3.34.exe",
+    "size": 980415370
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.3.34/rpu_v2.3.34.zip",
+    "digest": "sha256:c9433bfb3c45a451dc7ff4e6a8622a641a78cd1cfa20b047b1e95421834957fa",
+    "name": "rpu_v2.3.34.zip",
+    "size": 867147794
+   },
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.3.34/rpu_v2.3.34_translations.zip",
+    "digest": "sha256:5333eee1758ff35a281ec5ef4ca631e65faefc7ea7547b2f665eefc5aa854aa4",
+    "name": "rpu_v2.3.34_translations.zip",
+    "size": 140644773
+   }
+  ],
+  "tag_name": "v2.3.34"
+ }
+]

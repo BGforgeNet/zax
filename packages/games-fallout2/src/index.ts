@@ -44,6 +44,7 @@ export {
 export {
   MOD_FEEDS,
   availability,
+  feedCachePath,
   compareInLine,
   fetchFeed,
   fetchFeedAt,

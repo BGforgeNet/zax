@@ -183,6 +183,16 @@ const slug = (text: string): string => text.replace(/[^\w.-]+/g, "-");
 const feedsDirectory = (platform: Platform): string => platform.paths.join(platform.paths.cache, "feeds");
 
 /**
+ * Where a repository's listing is cached, and where one release's manifest is - the base path, which the
+ * reader completes with the suffix that says what it found. Exported because a host can seed this cache
+ * instead of answering the network for it, and it must write the paths the reader reads.
+ */
+export function feedCachePath(platform: Platform, repository: string, tag?: string): string {
+  const base = platform.paths.join(feedsDirectory(platform), slug(repository));
+  return tag === undefined ? `${base}.json` : `${base}-${slug(tag)}`;
+}
+
+/**
  * GitHub's release feed for a repository, newest first.
  *
  * 100 is the most one request may ask for, and this asks for it rather than taking the default 30: a mod with
@@ -235,7 +245,7 @@ function readReleases(body: string): FeedRelease[] {
  * install path re-verifies everything that matters against digests anyway.
  */
 async function fetchReleases(platform: Platform, repository: string, now: Date): Promise<FeedRelease[]> {
-  const cachePath = platform.paths.join(feedsDirectory(platform), `${slug(repository)}.json`);
+  const cachePath = feedCachePath(platform, repository);
   const cached = await platform.fs.stat(cachePath);
   if (cached?.kind === "file" && now.getTime() - cached.modified < FEED_CACHE_MS) {
     return readReleases(new TextDecoder().decode(await platform.fs.read(cachePath)));
@@ -299,7 +309,7 @@ async function fetchManifestText(
 ): Promise<FetchedManifest | null> {
   const asset = release.assets.find((entry) => entry.name === MANIFEST_NAME);
   const fromAsset = asset !== undefined;
-  const base = platform.paths.join(feedsDirectory(platform), `${slug(feed.repository)}-${slug(release.tag)}`);
+  const base = feedCachePath(platform, feed.repository, release.tag);
   const kept = `${base}.yml`;
   if ((await platform.fs.stat(kept))?.kind === "file")
     return { text: new TextDecoder().decode(await platform.fs.read(kept)), fromAsset };

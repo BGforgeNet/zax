@@ -1,0 +1,13 @@
+[
+ {
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v1.16.3771/Fallout1in2.zip",
+    "digest": "sha256:68777c2c32b911da902992c2d1cd5d4ce895059bd182909b579aa1eaeda0c686",
+    "name": "Fallout1in2.zip",
+    "size": 408198121
+   }
+  ],
+  "tag_name": "v1.16.3771"
+ }
+]

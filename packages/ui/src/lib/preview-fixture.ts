@@ -40,6 +40,9 @@ let seededModIni: Uint8Array | null = null;
  * and they pass, because "absent" is also what a closed gate looks like.
  */
 export async function reseedPreview(): Promise<void> {
+  // One install, deliberately narrower than the six a fresh preview lists: these cases are about adding,
+  // refusing and relabelling, and each of them asserts against the whole list. The other five directories stay
+  // on the disk - the state file is what decides which are listed, so they are inert until something adds them.
   const seeded = `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`;
   await previewPlatform.fs.write("preview/config/zax.yml", new TextEncoder().encode(seeded));
   // The config files too: a test that saves rewrites them, and the next test would inherit that.
