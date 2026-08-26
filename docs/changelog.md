@@ -28,9 +28,13 @@ mods as well as settings.
   recommended order, and forget entries whose files are gone.
 - **sfall updates.** See the installed version, update to the latest or to a version you pick, and keep your
   `ddraw.ini` settings - the release's own defaults are merged in, so new keys arrive and your choices stay.
-- **Alternative engines.** Install Fallout II Community Edition or Fallout Fission alongside the game's own
-  engine, keep them up to date, and run whichever you like - no Wine needed on Linux or macOS, since they are
-  native builds.
+- **Alternative engines.** Fetch Fallout II Community Edition or Fallout Fission and run either alongside the
+  game's own engine - no Wine needed on Linux or macOS, since they are native builds. The Engines tab is about
+  the machine rather than one game: a build fetched once is offered to every game folder, and reaches a folder
+  the first time that folder runs it.
+- **More than one build of an engine.** Keep several and pick which to run from the arrow beside Run in CE.
+  Games follow the newest build you hold until you choose otherwise, and a game you pin to an older build stays
+  on it.
 - **Update checks run at startup.** What ZAX, sfall, the engines and the mod feeds have published is asked for
   when the window opens rather than waiting on a Check button - once, since none of it depends on which game is
   selected. Switching games only re-checks that game's folder. A machine that cannot reach any of it is left as

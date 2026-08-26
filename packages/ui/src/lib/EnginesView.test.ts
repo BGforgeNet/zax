@@ -106,7 +106,7 @@ describe("the builds this machine holds", () => {
   ];
 
   test("says so plainly when the machine holds none", () => {
-    expect(view().text()).toContain("no build on this machine");
+    expect(view().text()).toContain("On this machine no build yet");
   });
 
   test("lists a row per build, newest first as the cache returns them", () => {

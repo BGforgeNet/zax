@@ -20,7 +20,18 @@
     choosing = null;
     void store.play(engineId, published);
   }
+
+  /**
+   * Anywhere outside the open chooser closes it, which is what every menu does and the only way to dismiss it
+   * without picking. On pointerdown rather than click so it fires before a button underneath acts.
+   */
+  function dismiss(event: PointerEvent): void {
+    if (choosing === null) return;
+    if (!(event.target instanceof Element) || !event.target.closest(".split")) choosing = null;
+  }
 </script>
+
+<svelte:window onpointerdown={dismiss} />
 
 <!--
   Both sat under the settings tabs in the previous interface, not in the window chrome. One bar shared by every
@@ -72,7 +83,7 @@
           disabled={store.busy !== null}
           onclick={() => (choosing = choosing === engine.id ? null : engine.id)}
         >
-          <span aria-hidden="true">v</span>
+          <span class="arrow" aria-hidden="true"></span>
         </button>
       {/if}
       {#if choosing === engine.id}
@@ -170,7 +181,17 @@
     border-left: none;
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    padding: 4px 8px;
+    padding: 4px 9px;
+  }
+
+  /* Drawn rather than typed: the glyphs that read as a chevron are all outside ASCII. */
+  .arrow {
+    display: block;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid currentColor;
   }
 
   /* Above the bar: the bar is the last thing in the window, so a menu below it would be off-screen. */

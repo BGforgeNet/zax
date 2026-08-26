@@ -62,7 +62,15 @@
             {/if}
           </p>
 
-          <!-- What this machine holds. A game folder gets one of these the first time it runs the engine. -->
+          <!--
+            What this machine holds. Labelled, or the dated rows read as a continuation of the Latest line
+            above them rather than as a list of something else. A game folder gets one of these the first time
+            it runs the engine.
+          -->
+          <p class="line">
+            On this machine
+            {#if engine.versions.length === 0}<span class="unknown">no build yet</span>{/if}
+          </p>
           {#each engine.versions as version (version.published)}
             <p class="line held">
               <strong>{mark(engine, version)}</strong>
@@ -75,8 +83,6 @@
                 Remove
               </button>
             </p>
-          {:else}
-            <p class="line"><span class="unknown">no build on this machine</span></p>
           {/each}
 
           <div class="buttons">
