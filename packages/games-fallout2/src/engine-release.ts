@@ -191,22 +191,22 @@ export interface CachedEngine {
 }
 
 /**
- * The newest release of this engine already in the cache, or null where nothing there can be installed here.
- * What makes a second game folder a copy rather than a download.
+ * Every release of this engine already in the cache that this machine could install, newest first. What makes
+ * a second game folder a copy rather than a download, and what the Run button's version list offers.
  *
  * A directory with no note is one an older ZAX cached, and is passed over rather than guessed at: it would
  * take a tag and a commit this version cannot recover from the name. Its archive is downloaded again the next
  * time that release is asked for, which writes the note.
  */
-export async function cachedEngine(
+export async function cachedEngines(
   platform: Platform,
   engine: EngineDefinition,
   assetName: string,
-): Promise<CachedEngine | null> {
+): Promise<readonly CachedEngine[]> {
   const root = platform.paths.join(packageDirectory(platform), "engines", engine.id);
-  if ((await platform.fs.stat(root))?.kind !== "dir") return null;
+  if ((await platform.fs.stat(root))?.kind !== "dir") return [];
 
-  let best: CachedEngine | null = null;
+  const held: CachedEngine[] = [];
   for (const entry of await platform.fs.list(root)) {
     if (entry.kind !== "dir") continue;
     const directory = platform.paths.join(root, entry.name);
@@ -217,13 +217,21 @@ export async function cachedEngine(
 
     const note = await readNote(platform, platform.paths.join(directory, NOTE_NAME));
     if (note === null) continue;
-    if (best === null || note.published > best.release.published) {
-      // No asset: the cache holds the file rather than a way to fetch it, and an invented url is one
-      // something downstream would eventually try to download.
-      best = { release: { ...note, asset: null }, archive };
-    }
+    // No asset: the cache holds the file rather than a way to fetch it, and an invented url is one
+    // something downstream would eventually try to download.
+    held.push({ release: { ...note, asset: null }, archive });
   }
-  return best;
+  // The instants are ISO 8601, so lexical order is chronological - the comparison the note write already relies on.
+  return held.sort((a, b) => b.release.published.localeCompare(a.release.published));
+}
+
+/** The newest of those, or null where nothing the cache holds can be installed here. */
+export async function cachedEngine(
+  platform: Platform,
+  engine: EngineDefinition,
+  assetName: string,
+): Promise<CachedEngine | null> {
+  return (await cachedEngines(platform, engine, assetName))[0] ?? null;
 }
 
 /** The note's fields, or null for anything this version cannot read - a truncated file, or an older format. */

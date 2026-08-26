@@ -1,7 +1,7 @@
 import { MemoryPlatform } from "@zax/platform/memory";
 import { describe, expect, it } from "vitest";
 import { engineById } from "./engines.js";
-import { cachedEngine, enginePackage, engineOutdated, latestEngine } from "./engine-release.js";
+import { cachedEngine, cachedEngines, enginePackage, engineOutdated, latestEngine } from "./engine-release.js";
 
 const CE = engineById("fallout2-ce");
 const FISSION = engineById("fission");
@@ -234,6 +234,24 @@ describe("the copy the machine already holds", () => {
     await held(platform, "2026-08-23T09:37:22Z", note("continious", "2026-08-23T09:37:22Z"));
     await platform.fs.write(`${directory("2026-08-23T09:37:22Z")}/${ASSET}`, new Uint8Array());
     expect(await cachedEngine(platform, CE, ASSET)).toBeNull();
+  });
+
+  it("lists every build the cache holds, newest first", async () => {
+    const platform = seeded();
+    await held(platform, "2026-07-01T00:00:00Z", note("old", "2026-07-01T00:00:00Z"));
+    await held(platform, "2026-08-23T09:37:22Z", note("new", "2026-08-23T09:37:22Z"));
+    const all = await cachedEngines(platform, CE, ASSET);
+    expect(all.map((one) => one.release.release)).toEqual(["new", "old"]);
+  });
+
+  // What the singular cannot see: it returns the newest either way, so only the list says a skip dropped one
+  // entry rather than everything after it.
+  it("leaves out the build it cannot identify and keeps the rest", async () => {
+    const platform = seeded();
+    await held(platform, "2026-07-01T00:00:00Z", note("old", "2026-07-01T00:00:00Z"));
+    await held(platform, "2026-08-23T09:37:22Z", null);
+    const all = await cachedEngines(platform, CE, ASSET);
+    expect(all.map((one) => one.release.release)).toEqual(["old"]);
   });
 
   it("writes the note beside an archive cached before this version wrote them", async () => {
