@@ -11,7 +11,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { fromMethods } from "@zax/fallout2/backend-methods";
 import type { OperationProgress } from "@zax/fallout2";
-import { CHANNEL, GLOBAL, PROGRESS_CHANNEL, PROGRESS_GLOBAL } from "./channel.js";
+import { BUSY_CHANNEL, BUSY_GLOBAL, CHANNEL, GLOBAL, PROGRESS_CHANNEL, PROGRESS_GLOBAL } from "./channel.js";
 import { unwrapped } from "./ipc-error.js";
 
 const backend = fromMethods(
@@ -28,4 +28,10 @@ contextBridge.exposeInMainWorld(PROGRESS_GLOBAL, {
   subscribe: (listener: (progress: OperationProgress) => void) => {
     ipcRenderer.on(PROGRESS_CHANNEL, (_event, progress: OperationProgress) => listener(progress));
   },
+});
+
+// Sent rather than invoked: the interface is telling the window something, not asking it for anything, and an
+// operation must not wait on the answer to a message about itself.
+contextBridge.exposeInMainWorld(BUSY_GLOBAL, {
+  set: (what: string | null) => ipcRenderer.send(BUSY_CHANNEL, what),
 });

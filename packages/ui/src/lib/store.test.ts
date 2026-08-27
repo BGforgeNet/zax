@@ -10,7 +10,7 @@ import {
   type ModFeedListing,
   type ModInstallState,
 } from "@zax/fallout2";
-import { PREVIEW_INSTALL, backend as hostBackend, previewPlatform } from "./host.js";
+import { PREVIEW_INSTALL, backend as hostBackend, busySink, previewPlatform } from "./host.js";
 import { MOD_INI, ORDER_FILE, bytes, reseedPreview } from "./preview-fixture.js";
 import { store, unwrapArguments } from "./store.svelte.js";
 import fallout2cfg from "../../../../fixtures/f2up/fallout2.cfg?raw";
@@ -969,6 +969,49 @@ describe("a long operation", () => {
     store.busy = null;
     store.progress = null;
     expect(store.progressText).toBeNull();
+  });
+
+  describe("what the shell is told about it", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    // Held open rather than awaited to the end: what the desktop window reads is the state during the
+    // operation, and a test that only ever sees the settled state would stay green if the report moved after
+    // the work it is about.
+    const heldScan = () => {
+      let finish = () => {};
+      vi.spyOn(hostBackend, "scanForInstalls").mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = () => resolve([]);
+          }),
+      );
+      return () => finish();
+    };
+
+    test("names the operation while it runs, and takes it back once it has stopped", async () => {
+      const told = vi.spyOn(busySink, "set");
+      const finish = heldScan();
+
+      // Taken while it runs and asserted after: the store is a singleton these tests share, and an assertion
+      // that threw before the operation was let go would leave it busy for every test after this one.
+      const scanning = store.scan();
+      const midFlight = [...told.mock.calls];
+      finish();
+      await scanning;
+
+      expect(midFlight, "the window has nothing else to ask about").toEqual([["Scanning"]]);
+      expect(told.mock.calls).toEqual([["Scanning"], [null]]);
+    });
+
+    test("takes it back when the operation fails, which is where a window could be left unclosable", async () => {
+      const told = vi.spyOn(busySink, "set");
+      vi.spyOn(hostBackend, "scanForInstalls").mockRejectedValue(new Error("nothing to scan"));
+
+      await store.scan();
+
+      expect(store.notice?.kind, "the failure is still the user's to read").toBe("problem");
+      expect(told.mock.calls).toEqual([["Scanning"], [null]]);
+    });
   });
 
   test("says a second request was refused rather than dropping it in silence", async () => {

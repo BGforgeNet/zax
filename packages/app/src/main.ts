@@ -9,7 +9,8 @@ import { dirname, join } from "node:path";
 import { appendLog, type LogLevel } from "@zax/core";
 import { createBackend, type Backend } from "@zax/fallout2";
 import { nodePlatform } from "@zax/platform-node";
-import { CHANNEL, PROGRESS_CHANNEL } from "./channel.js";
+import { BUSY_CHANNEL, CHANNEL, PROGRESS_CHANNEL } from "./channel.js";
+import { CLOSE_ANYWAY, busyLabel, closePrompt } from "./closing.js";
 import { createDispatch, describeError } from "./dispatch.js";
 import { isOwnContent, isWebUrl } from "./navigation.js";
 import { folderPicked, pickerOptions } from "./picker.js";
@@ -33,6 +34,12 @@ function logLine(level: LogLevel, text: string): Promise<void> {
 // A crash with no window leaves nothing to read; these lines are the only trace a bug report can carry.
 process.on("uncaughtException", (error) => void logLine("error", `uncaught: ${describeError(error)}`));
 process.on("unhandledRejection", (reason) => void logLine("error", `unhandled rejection: ${describeError(reason)}`));
+
+/** The operation the interface has running, as it last reported. Null once it has none. */
+let busy: string | null = null;
+ipcMain.on(BUSY_CHANNEL, (_event, what: unknown) => {
+  busy = busyLabel(what);
+});
 
 function register(backend: Backend): void {
   // Every line this sink is handed is an operation that failed; the renderer's notice carries the message and
@@ -106,6 +113,40 @@ function createWindow(): BrowserWindow {
   });
 
   window.once("ready-to-show", () => window.show());
+
+  // A close while an operation is running ends it where it stands, so the window asks first rather than taking
+  // the click as the answer. `asking` keeps a second click from stacking a second dialog on the first, and
+  // `leaving` lets the answered close through: the window is closed again from here rather than destroyed, so
+  // it still unwinds the way any other close does.
+  let asking = false;
+  let leaving = false;
+  window.on("close", (event) => {
+    if (busy === null || leaving) return;
+    event.preventDefault();
+    if (asking) return;
+    asking = true;
+    void dialog
+      .showMessageBox(window, closePrompt(busy))
+      .then(({ response }) => {
+        asking = false;
+        leaving = response === CLOSE_ANYWAY;
+        if (leaving) window.close();
+      })
+      .catch((error: unknown) => {
+        // A dialog that could not be shown must not leave a window that cannot be closed.
+        asking = false;
+        leaving = true;
+        void logLine("error", `could not ask about closing: ${describeError(error)}`);
+        window.close();
+      });
+  });
+
+  // A page that has just loaded has nothing running, whatever the page before it last said. Without this a
+  // reload during an operation - the dev server's, or a renderer that crashed and came back - would leave the
+  // window refusing to close over an operation that no longer exists.
+  window.webContents.on("did-finish-load", () => {
+    busy = null;
+  });
 
   // The interface is local; anything else belongs to the browser, not to a window with a preload attached.
   window.webContents.setWindowOpenHandler(({ url }) => {

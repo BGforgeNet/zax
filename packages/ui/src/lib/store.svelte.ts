@@ -73,7 +73,7 @@ import {
   type Place,
   type SfallRelease,
 } from "@zax/fallout2";
-import { backend as host, isPreview, progressSource } from "./host.js";
+import { backend as host, busySink, isPreview, progressSource } from "./host.js";
 
 /**
  * Every argument is unwrapped before it leaves the interface. The store holds its state in reactive proxies,
@@ -947,6 +947,16 @@ class Store {
   }
 
   /**
+   * The gate the interface greys its controls out on, and the same fact the desktop window asks about before it
+   * closes on one. Set in one place so the two cannot disagree: a window refusing to close over an operation
+   * that has finished would be as wrong as one closing on an operation that has not.
+   */
+  private setBusy(what: string | null): void {
+    this.busy = what;
+    busySink.set(what);
+  }
+
+  /**
    * Runs one outward-facing operation, reporting whatever it fails with rather than swallowing it. `on` names
    * the mod row it belongs to, when it has one: set here rather than by the caller so a refused click cannot
    * mark a row that never started, and cleared with `busy` so no row can be left claiming to be working.
@@ -962,7 +972,7 @@ class Store {
       this.notice = { kind: "problem", text: `${this.busy} is still running - wait for it to finish.` };
       return;
     }
-    this.busy = what;
+    this.setBusy(what);
     this.modOperation = on ?? null;
     this.notice = null;
     try {
@@ -971,7 +981,7 @@ class Store {
       const reason = error instanceof Error ? error.message : String(error);
       this.notice = { kind: "problem", text: `${what} failed: ${reason}` };
     } finally {
-      this.busy = null;
+      this.setBusy(null);
       this.modOperation = null;
       this.progress = null;
     }

@@ -41,12 +41,19 @@ export interface ProgressSource {
   subscribe(listener: (progress: OperationProgress) => void): void;
 }
 
+/** How it says one is running, which is what the desktop window asks about before it closes on one. */
+export interface BusySink {
+  set(what: string | null): void;
+}
+
 declare global {
   interface Window {
     /** Installed by the desktop build's preload script. Absent in a browser. */
     zax?: Backend;
     /** Its companion, carrying the one thing that travels the other way. */
     zaxProgress?: ProgressSource;
+    /** And the one that travels back. */
+    zaxBusy?: BusySink;
   }
 }
 
@@ -272,6 +279,10 @@ export const backend: Backend =
 export const progressSource: ProgressSource = (typeof window === "undefined" ? undefined : window.zaxProgress) ?? {
   subscribe: (listener) => previewListeners.push(listener),
 };
+
+// Dropped in the preview rather than acted on: a browser tab's close is the browser's to decide, and the disk
+// under the preview is in memory - nothing there outlives the tab to be left part way through.
+export const busySink: BusySink = (typeof window === "undefined" ? undefined : window.zaxBusy) ?? { set: () => {} };
 
 /** True where an operation that leaves this page - a launch, a version check - cannot run. */
 export const isPreview = hostKind === "preview";
