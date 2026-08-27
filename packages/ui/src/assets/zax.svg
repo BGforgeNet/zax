@@ -1,41 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"
      role="img" aria-label="ZAX">
   <!--
-    The source the icon PNGs are generated from - see docs/building.md. A lens in an armoured panel: the
-    housing is chamfered rather than round so the silhouette is not another circle in a taskbar full of them.
-    Four flat tones and no gradient, because at 32px the only things that survive are the olive ring, the amber
-    core and the outline - the seams and bolts are detail for the sizes that can hold them.
+    The source the icon PNGs are generated from - see docs/building.md. A lens in an open panel: the housing is
+    chamfered rather than round so the silhouette is not another circle in a taskbar full of them, and it is drawn
+    as an outline rather than a filled tile so whatever sits behind shows through.
+    Three shapes on one stroke weight: 13 units lands on a pixel and a half at 32px, and anything beyond the
+    frame, the ring and the core is lost at the size the icon is actually seen.
   -->
-  <!-- Olive edge, not a darker one: against a black taskbar an unlit charcoal housing has no silhouette left. -->
-  <path d="M36 10 H220 L246 36 V220 L220 246 H36 L10 220 V36 Z" fill="#343A34" stroke="#5B644F" stroke-width="7"
+  <path d="M36 10 H220 L246 36 V220 L220 246 H36 L10 220 V36 Z" fill="none" stroke="#5B644F" stroke-width="13"
     stroke-linejoin="round" />
-
-  <g stroke="#111713" stroke-width="7" stroke-linecap="square" fill="none">
-    <path d="M44 74 V44 H74" />
-    <path d="M182 44 H212 V74" />
-    <path d="M212 182 V212 H182" />
-    <path d="M74 212 H44 V182" />
-  </g>
-
-  <circle cx="128" cy="128" r="72" fill="#5B644F" />
-  <circle cx="128" cy="128" r="52" fill="#111713" />
-
-  <g fill="none" stroke="#5B644F">
-    <circle cx="128" cy="128" r="42" stroke-width="5" />
-    <circle cx="128" cy="128" r="30" stroke-width="3" />
-  </g>
-
-  <circle cx="128" cy="128" r="23" fill="none" stroke="#EFB44A" stroke-width="2.5" />
-  <circle cx="128" cy="128" r="16" fill="#EFB44A" />
-
-  <g fill="#111713">
-    <circle cx="128.00" cy="66.00" r="5" />
-    <circle cx="171.84" cy="84.16" r="5" />
-    <circle cx="190.00" cy="128.00" r="5" />
-    <circle cx="171.84" cy="171.84" r="5" />
-    <circle cx="128.00" cy="190.00" r="5" />
-    <circle cx="84.16" cy="171.84" r="5" />
-    <circle cx="66.00" cy="128.00" r="5" />
-    <circle cx="84.16" cy="84.16" r="5" />
-  </g>
+  <circle cx="128" cy="128" r="62" fill="none" stroke="#5B644F" stroke-width="13" />
+  <circle cx="128" cy="128" r="24" fill="#EFB44A" />
 </svg>
