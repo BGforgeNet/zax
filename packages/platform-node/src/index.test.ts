@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { nodePlatform } from "./index.js";
@@ -73,12 +73,38 @@ describe("node archives", () => {
     await expect(platform.archive.extract(at("not-an-archive.7z"), at("nope"))).rejects.toThrow(/Could not extract/);
   }, 30_000);
 
+  // A game folder reached through a symbolic link is an ordinary thing for someone to have, and 7-Zip runs
+  // against a filesystem that cannot follow one: it mounts a host directory by what `lstat` says the path is,
+  // so a link is mounted as a link and the first lookup through it fails.
+  it("extracts into a directory reached through a symbolic link", async () => {
+    await platform.fs.write(at("linked", "src", "ddraw.ini"), new TextEncoder().encode("[Main]\r\n"));
+    await platform.archive.createZip(at("linked", "one.zip"), [
+      { source: at("linked", "src", "ddraw.ini"), name: "ddraw.ini" },
+    ]);
+    await platform.fs.mkdir(at("linked", "real-game"));
+    await symlink(at("linked", "real-game"), at("linked", "game"));
+
+    await platform.archive.extract(at("linked", "one.zip"), at("linked", "game"));
+    expect(utf8.decode(await platform.fs.read(at("linked", "real-game", "ddraw.ini")))).toBe("[Main]\r\n");
+  }, 30_000);
+
+  it("reads an archive that sits behind a symbolic link", async () => {
+    await platform.fs.write(at("held", "src", "ddraw.ini"), new TextEncoder().encode("[Main]\r\n"));
+    await platform.archive.createZip(at("held", "real", "two.zip"), [
+      { source: at("held", "src", "ddraw.ini"), name: "ddraw.ini" },
+    ]);
+    await symlink(at("held", "real"), at("held", "shelf"));
+
+    expect((await platform.archive.list(at("held", "shelf", "two.zip"))).map((entry) => entry.name)).toEqual([
+      "ddraw.ini",
+    ]);
+  }, 30_000);
+
   it("says what a failure inside the worker was, where 7-Zip never got to run", async () => {
-    // The worker mounts the archive's own folder before it opens anything, so a folder that is not there is
-    // the shortest route to emscripten's `FS.ErrnoError` - a plain object that reads as "[object Object]"
-    // unless the message is built from what it carries.
+    // The worker resolves the archive's own folder before it opens anything, so a folder that is not there
+    // fails before 7-Zip runs at all - the path whose failures used to reach the caller as a placeholder.
     await expect(platform.archive.extract(at("absent-folder", "mod.zip"), at("into"))).rejects.toThrow(
-      `into ${at("into")}: ErrnoError (errno 44)`,
+      `lstat '${at("absent-folder")}'`,
     );
   }, 30_000);
 

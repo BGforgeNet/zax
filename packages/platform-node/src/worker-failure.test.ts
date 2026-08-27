@@ -5,7 +5,11 @@ import { failureText } from "./worker-failure.js";
  * The shapes emscripten throws, as its own glue declares them: `class ErrnoError { name = "ErrnoError";
  * constructor(errno) { this.errno = errno } }` and `class ExitStatus { name = "ExitStatus"; constructor(status)
  * { this.message = ...; this.status = status } }`. Neither extends `Error`, which is the whole reason this
- * module exists. A real one is produced by `index.test.ts`, which drives 7-Zip until it throws.
+ * module exists.
+ *
+ * Quoted rather than produced by a real run: since the extraction worker resolves a host directory before it
+ * mounts one, no input this package accepts still gets emscripten to raise one - which was the point of that
+ * change. The shapes hold for anything else thrown across the boundary all the same.
  */
 const errnoError = (errno: number) => ({ name: "ErrnoError", errno });
 const exitStatus = (status: number) => ({

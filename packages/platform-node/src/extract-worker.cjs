@@ -6,7 +6,16 @@
  */
 "use strict";
 const { parentPort, workerData } = require("node:worker_threads");
+const { realpathSync } = require("node:fs");
 const { dirname, basename } = require("node:path");
+
+/**
+ * A host directory as the WebAssembly filesystem has to be handed it: resolved, never as the caller spelled
+ * it. The mount takes the path as `lstat` reports it, so a symbolic link is mounted as a link rather than as
+ * the directory behind it, and the first lookup through that root fails with ENOENT - which is what a game
+ * folder reached through a symlink did.
+ */
+const hostDirectory = (path) => realpathSync(path);
 
 (async () => {
   // Resolved from this file's own location: beside the sources in development, beside the bundle when packaged.
@@ -19,7 +28,7 @@ const { dirname, basename } = require("node:path");
   sz.FS.mkdir(inside);
   // Both sides are mounted as host directories rather than copied through the WebAssembly heap, so a large
   // archive does not have to fit in memory twice.
-  sz.FS.mount(sz.NODEFS, { root: dirname(workerData.archive) }, inside);
+  sz.FS.mount(sz.NODEFS, { root: hostDirectory(dirname(workerData.archive)) }, inside);
   const archive = `${inside}/${basename(workerData.archive)}`;
 
   if (listing) {
@@ -32,7 +41,7 @@ const { dirname, basename } = require("node:path");
 
   const outside = "/zax-out";
   sz.FS.mkdir(outside);
-  sz.FS.mount(sz.NODEFS, { root: workerData.destination }, outside);
+  sz.FS.mount(sz.NODEFS, { root: hostDirectory(workerData.destination) }, outside);
   sz.FS.chdir(outside);
   // Named files only when the caller asked for some; 7-Zip treats no names as "everything".
   const wanted = workerData.only ?? [];
