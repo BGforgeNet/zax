@@ -202,14 +202,17 @@ export async function planCreateInstall(
     if (refusal !== null) throw new Error(refusal);
   }
 
+  // The download lands in ZAX's cache and the payload in the game folder, which on most machines are not the
+  // same drive - so each is measured where its bytes actually go. The directory has to exist to be measured.
   const download = archive.size ?? 0;
-  const free = await platform.fs.freeSpace(install.path);
-  if (free !== null && download > 0 && free < download)
+  const work = modWorkDirectory(platform, install, manifest.id);
+  await platform.fs.mkdir(work);
+  const room = await platform.fs.freeSpace(work);
+  if (room !== null && download > 0 && room < download)
     throw new Error(
-      `${manifest.name} needs ${download} bytes to download and this drive has ${free} free. Nothing was downloaded.`,
+      `${manifest.name} needs ${download} bytes to download and this drive has ${room} free. Nothing was downloaded.`,
     );
 
-  const work = modWorkDirectory(platform, install, manifest.id);
   const archivePath = await fetchAsset(
     platform,
     work,
@@ -221,6 +224,9 @@ export async function planCreateInstall(
   options?.onStep?.(`Reading ${archive.name}`);
   const entries = await confinedEntries(platform, archivePath, archive, manifest, creates);
   const unpacked = entries.reduce((total, entry) => total + entry.size, 0);
+  // Read after the download rather than before it: where the cache and the game folder do share a drive, the
+  // archive that has just landed on it is room the unpack no longer has.
+  const free = await platform.fs.freeSpace(install.path);
   if (free !== null && free < unpacked)
     throw new Error(
       `${manifest.name} unpacks to ${unpacked} bytes and this drive has ${free} free. Nothing was installed.`,

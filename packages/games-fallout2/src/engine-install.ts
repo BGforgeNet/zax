@@ -104,13 +104,22 @@ async function deployEngine(
     );
 
     // Null where the host cannot say - a check that cannot run is not a check that failed.
+    //
+    // Both drives, because the release lands on both: the whole archive is unpacked into ZAX's cache, and the
+    // build's own files are then copied into the game folder. On most machines those are not the same drive,
+    // and the cache is the one asked to hold everything.
     const needed = entries.reduce((sum, entry) => sum + entry.size, 0);
-    const free = await platform.fs.freeSpace(install.path);
-    if (free !== null && free < needed) {
-      throw new Error(
-        `${engine.name} ${release.release} needs ${needed} bytes unpacked, and the drive holding ${install.path} has ${free}.`,
-      );
-    }
+    const refuseIfShort = async (where: string) => {
+      const drive = await platform.fs.freeSpace(where);
+      if (drive !== null && drive < needed) {
+        throw new Error(
+          `${engine.name} ${release.release} needs ${needed} bytes unpacked, and the drive holding ${where} has ${drive}.`,
+        );
+      }
+    };
+    await platform.fs.mkdir(work);
+    await refuseIfShort(work);
+    await refuseIfShort(install.path);
 
     options?.onStep?.(`Unpacking ${engine.name}`);
     await orDiscard(platform, archive, () => platform.archive.extract(archive, work));

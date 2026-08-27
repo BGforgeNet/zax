@@ -118,6 +118,23 @@ describe("planning a base install", () => {
     await expect(planBaseInstall(tight, install, await release())).rejects.toThrow(/unpacks to/);
   });
 
+  it("measures the download against the drive the cache is on, not the game folder's", async () => {
+    const platform: MemoryPlatform = basePlatform({
+      freeSpace: (path) => (path.startsWith(platform.paths.cache) ? PAYLOAD.length - 1 : 1_000_000),
+    });
+    await expect(planBaseInstall(platform, install, await release())).rejects.toThrow(/Nothing was downloaded/);
+    expect(platform.downloaded).toEqual([]);
+  });
+
+  it("measures the unpack against the room left after the download rather than before it", async () => {
+    // One drive holding both the cache and the game folder, which is what a single-disk machine has: roomy
+    // until the archive lands on it, and not afterwards.
+    const platform: MemoryPlatform = basePlatform({
+      freeSpace: () => (platform.downloaded.length === 0 ? 1_000_000 : 1),
+    });
+    await expect(planBaseInstall(platform, install, await release())).rejects.toThrow(/unpacks to/);
+  });
+
   it("plans where the host cannot say how much space there is - a check that cannot run is not a failure", async () => {
     // The in-memory platform answers null unless a test says otherwise, which is the browser's answer too.
     const plan = await planBaseInstall(basePlatform(), install, await release());

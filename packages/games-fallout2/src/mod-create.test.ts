@@ -136,6 +136,25 @@ describe("planning an install that creates another", () => {
     await expect(planCreateInstall(platform, install, await release(), inputs, TOOL)).rejects.toThrow(/unpacks to/);
   });
 
+  it("measures the download against the drive the cache is on, not the game folder's", async () => {
+    const platform: MemoryPlatform = createPlatform({
+      freeSpace: (path) => (path.startsWith(platform.paths.cache) ? PAYLOAD.length - 1 : 1_000_000),
+    });
+    await expect(planCreateInstall(platform, install, await release(), inputs, TOOL)).rejects.toThrow(
+      /Nothing was downloaded/,
+    );
+    expect(platform.downloaded).toEqual([]);
+  });
+
+  it("measures the unpack against the room left after the download rather than before it", async () => {
+    // One drive holding both the cache and the game folder, which is what a single-disk machine has: roomy
+    // until the archive lands on it, and not afterwards.
+    const platform: MemoryPlatform = createPlatform({
+      freeSpace: () => (platform.downloaded.length === 0 ? 1_000_000 : 1),
+    });
+    await expect(planCreateInstall(platform, install, await release(), inputs, TOOL)).rejects.toThrow(/unpacks to/);
+  });
+
   it("fingerprints the folder it was pointed at, so a confirmed plan cannot read from another", async () => {
     const platform = createPlatform({ files: { "/other/master.dat": "DAT1" } });
     const first = await planCreateInstall(platform, install, await release(), inputs, TOOL);

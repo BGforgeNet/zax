@@ -116,6 +116,24 @@ describe("installing an engine", () => {
     expect(await cramped.fs.stat("/games/one/fallout2-ce")).toBeNull();
   });
 
+  it("refuses where the cache has not the room to unpack, though the game folder's drive has", async () => {
+    // The archive is unpacked into ZAX's cache and only the build's own files are copied into the game
+    // folder, so it is the cache's drive that has to hold the whole release.
+    const cramped: MemoryPlatform = new MemoryPlatform({
+      os: "linux",
+      arch: "x64",
+      config: "cfg",
+      cache: "cache",
+      responses: { [FEED]: RELEASE },
+      downloads: { [URL]: "payload" },
+      archives: { payload: INSIDE },
+      files: { "/games/one/fallout2.exe": "" },
+      freeSpace: (path) => (path.startsWith(cramped.paths.cache) ? 1 : 1_000_000),
+    });
+    await expect(fetchAndDeploy(cramped, INSTALL, NOW)).rejects.toThrow(/needs/i);
+    expect(await cramped.fs.stat("/games/one/fallout2-ce")).toBeNull();
+  });
+
   it("refuses where the machine has no build, without touching the install", async () => {
     const platform = new MemoryPlatform({
       os: "windows",

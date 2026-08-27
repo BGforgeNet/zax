@@ -100,8 +100,11 @@ export interface MemoryOptions {
   /**
    * What `fs.freeSpace` answers. Null by default because this platform has no disk, which is also the arm
    * where a preflight's check cannot run; a test that means to exercise the refusal states a number.
+   *
+   * A function where the answer has to vary: ZAX's cache and a game folder are usually different drives, and
+   * a drive's room changes as an install fills it, so a single number cannot express either.
    */
-  freeSpace?: number;
+  freeSpace?: number | ((path: string) => number | null);
 }
 
 export class MemoryPlatform implements Platform {
@@ -205,7 +208,8 @@ export class MemoryPlatform implements Platform {
       makeExecutable: async (path) => {
         this.executable.push(normalize(path));
       },
-      freeSpace: async () => options.freeSpace ?? null,
+      freeSpace: async (path) =>
+        typeof options.freeSpace === "function" ? options.freeSpace(normalize(path)) : (options.freeSpace ?? null),
     };
 
     this.registry = {
