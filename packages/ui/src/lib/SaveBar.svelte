@@ -149,7 +149,10 @@
     color: var(--text);
   }
 
+  /* Floored at the width of "Saving...", the wider of the two labels: unfloored the button grew by 31px the
+     moment a save began and pulled the chip beside it left, which is the shift the button is placed to avoid. */
   .footer .primary {
+    min-width: 104px;
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
