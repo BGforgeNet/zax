@@ -73,6 +73,15 @@ describe("node archives", () => {
     await expect(platform.archive.extract(at("not-an-archive.7z"), at("nope"))).rejects.toThrow(/Could not extract/);
   }, 30_000);
 
+  it("says what a failure inside the worker was, where 7-Zip never got to run", async () => {
+    // The worker mounts the archive's own folder before it opens anything, so a folder that is not there is
+    // the shortest route to emscripten's `FS.ErrnoError` - a plain object that reads as "[object Object]"
+    // unless the message is built from what it carries.
+    await expect(platform.archive.extract(at("absent-folder", "mod.zip"), at("into"))).rejects.toThrow(
+      `into ${at("into")}: ErrnoError (errno 44)`,
+    );
+  }, 30_000);
+
   it("lists an archive's entries with sizes, and flags a symlink entry", async () => {
     // Built with fflate rather than shipped as a fixture: no ordinary tool writes a symlink into a zip, and
     // the attack this listing exists to refuse arrives exactly as these Unix-mode bits.

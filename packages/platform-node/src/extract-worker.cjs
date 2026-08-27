@@ -40,5 +40,7 @@ const { dirname, basename } = require("node:path");
   const code = sz.callMain(["x", archive, "-y", ...wanted]);
   parentPort.postMessage({ code: typeof code === "number" ? code : 0 });
 })().catch((error) => {
-  parentPort.postMessage({ error: error instanceof Error ? error.message : String(error) });
+  // Posted as it was caught rather than as text: emscripten throws plain objects whose fields are the whole
+  // diagnosis, and the caller is what turns one into a message.
+  parentPort.postMessage({ error });
 });

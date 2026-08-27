@@ -39,6 +39,7 @@ import { downloadFile, type AttemptNote } from "./download.js";
 import { throughGzip } from "./gunzip.js";
 import { applicationDirectories } from "./paths.js";
 import { registryValue } from "./registry.js";
+import { failureText } from "./worker-failure.js";
 
 /**
  * What the shell wants told about work that happens out of sight. A failed download is the one thing a bug
@@ -112,15 +113,25 @@ const WASI_WORKER = new URL("./wasi-worker.cjs", import.meta.url);
 /**
  * Runs one throwaway worker and answers with its message, or with why there was not one. Resolve-once:
  * whichever of the three arrives first decides, and the rest fall on an already-settled promise.
+ *
+ * A worker reports a failure by posting what it caught, not a description of it: turning a thrown value into
+ * text is `failureText`'s business, and doing it here is what keeps the three workers from each having their
+ * own idea of what a thrown object says.
  */
 async function inWorker<T>(script: URL, what: string, workerData: unknown): Promise<T | { error: string }> {
   const worker = new Worker(script, { workerData });
   return new Promise<T | { error: string }>((resolve) => {
-    worker.once("message", resolve);
-    worker.once("error", (error) => resolve({ error: error instanceof Error ? error.message : String(error) }));
+    worker.once("message", (message: T | { error: unknown }) =>
+      resolve(threw(message) ? { error: failureText(message.error) } : message),
+    );
+    worker.once("error", (error) => resolve({ error: failureText(error) }));
     worker.once("exit", (status) => resolve({ error: `the ${what} worker exited with ${status}` }));
   }).finally(() => void worker.terminate());
 }
+
+/** No answer a worker gives carries an `error` key, so its presence is what marks the message a failure. */
+const threw = <T>(message: T | { error: unknown }): message is { error: unknown } =>
+  typeof message === "object" && message !== null && "error" in message;
 
 /**
  * One entry from 7-Zip's `-slt` listing: field-per-line blocks, blank lines between entries. A symlink names
@@ -398,8 +409,11 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
             // the time it gets here, and the structured clone into the worker refuses one.
             only: options?.only ? [...options.only] : [],
           });
-          if ("error" in outcome) throw new Error(`Could not extract ${archive}: ${outcome.error}`);
-          if (outcome.code !== 0) throw new Error(`Could not extract ${archive}: 7-Zip exited with ${outcome.code}`);
+          // Both folders named, because the worker reads both before 7-Zip runs and a failure there says only
+          // what went wrong, not which of the two it was.
+          const where = `${archive} into ${destination}`;
+          if ("error" in outcome) throw new Error(`Could not extract ${where}: ${outcome.error}`);
+          if (outcome.code !== 0) throw new Error(`Could not extract ${where}: 7-Zip exited with ${outcome.code}`);
         });
       },
 

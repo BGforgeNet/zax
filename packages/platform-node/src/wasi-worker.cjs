@@ -56,5 +56,6 @@ try {
   const output = readFileSync(log, "utf8");
   finish({ code: typeof code === "number" ? code : 0, output });
 } catch (error) {
-  finish({ error: error instanceof Error ? error.message : String(error) });
+  // As it was caught: the caller describes it, so the three workers cannot disagree about what one says.
+  finish({ error });
 }

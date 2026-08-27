@@ -20,5 +20,6 @@ try {
   writeFileSync(workerData.destination, zipSync(contents, { level: 6 }));
   parentPort.postMessage({ ok: true });
 } catch (error) {
-  parentPort.postMessage({ error: error instanceof Error ? error.message : String(error) });
+  // As it was caught: the caller describes it, so the three workers cannot disagree about what one says.
+  parentPort.postMessage({ error });
 }
