@@ -225,11 +225,19 @@ carries an entry outside it is refused.
 rather than unpacked over it - and both readings of "already there" count: the directory inside this
 installation, and an installation that is itself what `becomes` names, which is what a created install added to
 the list is. The reason is that a manifest of this shape describes a fresh unpack and nothing else: there is no
-upgrade for ZAX to perform, and laying a release over an install would overwrite whatever the mod keeps in its
-own configuration files and load order with the release's defaults, since only `fallout2.cfg`, `f2_res.ini` and
-`ddraw.ini` are held aside and merged. The way to a newer release is a fresh folder. An install that never
-finished is the one exception: that directory is the same install part-way through, and resuming it continues
-rather than repeats it.
+upgrade for ZAX to perform, and laying a release over an install would put the release's defaults back over
+everything in it. The way to a newer release is a fresh folder. An install that never finished is the one
+exception: that directory is the same install part-way through, and resuming it continues rather than repeats
+it.
+
+Resuming is therefore the one write this route makes over files that are already there, and what belongs to the
+user in a whole game is more than the three files ZAX's own tabs edit. Two kinds are held aside first, and they
+are not interchangeable. **Settings** are merged key by key: `state` where the manifest declares one, and
+otherwise the game's config files plus every `.ini` the payload carries - derived from the payload rather than
+listed, since a mod that installs a game ships its own directory of settings and a copy of that list would go
+stale against the release that adds one. The **load order** (`mods/mods_order.txt`) is put back exactly as it
+was instead: it is a list of names rather than keys, so a merge would find nothing of the user's in it and keep
+the release's copy. A `state` path is read inside the created directory, as `extract-dat`'s paths are.
 
 Each entry of `inputs` is a folder ZAX asks the user for, checked by the file it `holds`. `extract-dat` unpacks
 one input's archive into the created install: `from` names the input, `list` is the response file the payload

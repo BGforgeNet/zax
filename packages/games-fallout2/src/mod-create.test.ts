@@ -43,10 +43,15 @@ extract-dat:
 
 const LIST = "ART\\SCENERY\\CSTALAG2.FRM\r\nSOUND\\MUSIC\\01.ACM\r\n";
 
-/** What the payload carries: everything under the one directory it creates, as the real release does. */
+/**
+ * What the payload carries: everything under the one directory it creates, as the real release does - which
+ * includes the mod's own configuration and its load order, neither of which is a file ZAX's own tabs edit.
+ */
 const CONTENTS = {
   "Fallout1in2/Fallout2.exe": "EXE",
   "Fallout1in2/ddraw.ini": "[Misc]\nVersionString=FALLOUT ET TU v1.16.3771\n",
+  "Fallout1in2/config/fo1_settings.ini": "[main]\nfixt_enabled=0\n",
+  "Fallout1in2/mods/mods_order.txt": "fo1_base\nfo1_interface\n",
   "Fallout1in2/mods/fo1_base/order.txt": "",
   "Fallout1in2/undat_files.txt": LIST,
 };
@@ -241,6 +246,78 @@ describe("performing an install that creates another", () => {
     // release's own copy of the file is what the payload just wrote here.
     const after = new TextDecoder().decode(await platform.fs.read(`${GAME}/Fallout1in2/ddraw.ini`));
     expect(after).toContain("VersionString=FALLOUT ET TU v1.16.3771");
+  });
+});
+
+/*
+  A resumed attempt is the one write this route makes over a directory that is already there, so it is where
+  the user's own files are at stake. The mod installs a whole game: what belongs to the user is not the three
+  files ZAX's tabs edit but the mod's own configuration - nine inis under `config/` in the real release - and
+  the load order, which the settings merge cannot carry because it is a list of names rather than keys.
+*/
+describe("what a resumed attempt keeps", () => {
+  const written = (text: string) => new TextEncoder().encode(text);
+  const read = async (platform: MemoryPlatform, path: string) => new TextDecoder().decode(await platform.fs.read(path));
+
+  /** An install that got as far as unpacking the payload and then failed, leaving the folder and a record. */
+  const interrupted = async () => {
+    const platform = createPlatform();
+    const found = await release();
+    const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
+    const ran = platform.process.run.bind(platform.process);
+    platform.process.run = async (program, args, options) =>
+      args[0] === "x" ? { code: 1, output: "Error: stopped part way" } : ran(program, args, options);
+    await expect(applyCreateInstall(platform, install, found, plan, TOOL)).rejects.toThrow(/stopped part way/);
+    // Put back, so the resume below runs the way a second attempt really does.
+    platform.process.run = ran;
+    const resume = async () => {
+      const again = await planCreateInstall(platform, install, found, inputs, TOOL);
+      return applyCreateInstall(platform, install, found, again, TOOL);
+    };
+    return { platform, resume };
+  };
+
+  it("merges what the user changed in the mod's own configuration, not only ZAX's three files", async () => {
+    const { platform, resume } = await interrupted();
+    await platform.fs.write(`${GAME}/Fallout1in2/config/fo1_settings.ini`, written("[main]\nfixt_enabled=1\n"));
+
+    await resume();
+
+    expect(await read(platform, `${GAME}/Fallout1in2/config/fo1_settings.ini`)).toContain("fixt_enabled=1");
+  });
+
+  it("puts the load order back as it was, which merging a list of names cannot do", async () => {
+    const { platform, resume } = await interrupted();
+    const ordered = "fo1_interface\nfo1_base\n";
+    await platform.fs.write(`${GAME}/Fallout1in2/mods/mods_order.txt`, written(ordered));
+
+    await resume();
+
+    // Byte for byte: the release ships its own copy of this file, and a merge would have found nothing of the
+    // user's in either - no keys - and kept the release's.
+    expect(await read(platform, `${GAME}/Fallout1in2/mods/mods_order.txt`)).toBe(ordered);
+  });
+
+  it("takes the manifest's own list where it declares one, read inside the install it makes", async () => {
+    const declaring = MANIFEST.replace("extract-dat:", "state:\n  - mods/sfall-mods.ini\nextract-dat:");
+    const platform = createPlatform({
+      archives: { [PAYLOAD]: { ...CONTENTS, "Fallout1in2/mods/sfall-mods.ini": "[Main]\nHighlight=0\n" } },
+    });
+    const found = await releaseOf(declaring);
+    const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
+    const ran = platform.process.run.bind(platform.process);
+    platform.process.run = async (program, args, options) =>
+      args[0] === "x" ? { code: 1, output: "Error: stopped part way" } : ran(program, args, options);
+    await expect(applyCreateInstall(platform, install, found, plan, TOOL)).rejects.toThrow(/stopped part way/);
+    platform.process.run = ran;
+
+    // Declared as `mods/sfall-mods.ini`, which is where it sits in the game the mod installs - the folder that
+    // game is in is ZAX's to know.
+    await platform.fs.write(`${GAME}/Fallout1in2/mods/sfall-mods.ini`, written("[Main]\nHighlight=1\n"));
+    const again = await planCreateInstall(platform, install, found, inputs, TOOL);
+    await applyCreateInstall(platform, install, found, again, TOOL);
+
+    expect(await read(platform, `${GAME}/Fallout1in2/mods/sfall-mods.ini`)).toContain("Highlight=1");
   });
 });
 

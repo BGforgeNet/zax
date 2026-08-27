@@ -28,8 +28,9 @@ import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import { createdInstallPath, noUpgradeHere } from "./mod-created.js";
 import type { ModRelease, ReleaseAsset } from "./mod-feed.js";
 import { refusalFor } from "./mod-install.js";
-import { holdUserFiles, mergeUserFiles } from "./mod-state.js";
+import { holdUserFiles, mergeUserFiles, restoreUserFiles } from "./mod-state.js";
 import { modWorkDirectory } from "./mod-transaction.js";
+import { MODS_ORDER_PATH } from "./mods.js";
 import { assertUsable, loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 
 /**
@@ -172,6 +173,34 @@ async function confinedEntries(
       `${archive.name} carries "${outside.name}", which is outside the ${creates.directory} folder ${manifest.name} creates - refused.`,
     );
   return entries;
+}
+
+/**
+ * The files in the created install that belong to the user, relative to the host - what the manifest declares,
+ * or the game's own config files plus every ini the payload carries.
+ *
+ * Derived from the payload rather than listed here, and that is the point: a mod that installs a whole game
+ * carries a directory of settings of its own, and a copy of that list in ZAX would be a second home for a set
+ * the release owns - stale the moment upstream adds one. The other two install routes read `state` the same
+ * way, each defaulting to what its own payload is.
+ *
+ * Case-insensitively unique: the manifest spells the directory its own way and the archive spells its entries
+ * theirs, so `ddraw.ini` arrives from both sides and holding one file twice would back it up twice.
+ */
+function userSettings(
+  manifest: ModManifest,
+  creates: ModCreates,
+  entries: readonly ArchiveEntryInfo[],
+): readonly string[] {
+  // A declared path is read inside the install this makes, as `extract-dat`'s are: the manifest describes the
+  // game it installs, and the folder that game sits in is ZAX's to know rather than the author's to repeat.
+  const declared =
+    manifest.state?.map((name) => `${creates.directory}/${name}`) ??
+    CONFIG_FILES.map((name) => `${creates.directory}/${name}`).concat(
+      entries.filter((entry) => entry.kind === "file" && /\.ini$/i.test(entry.name)).map((entry) => entry.name),
+    );
+  const seen = new Set<string>();
+  return declared.filter((path) => (seen.has(path.toLowerCase()) ? false : seen.add(path.toLowerCase())));
 }
 
 /**
@@ -337,6 +366,11 @@ export async function applyCreateInstall(
 
   const list = await fetchList(platform, work, archivePath, manifest, creates);
 
+  // Read before the record is written rather than only before the extraction: what keeps a payload out of the
+  // host install is this list rather than anything the archive promises, and a payload refused here is one
+  // nothing was started for. It is also what says which of its files belong to the user.
+  const entries = await confinedEntries(platform, archivePath, archive, manifest, creates);
+
   const pending: InstalledMod = {
     id: manifest.id,
     version: manifest.version,
@@ -350,17 +384,22 @@ export async function applyCreateInstall(
   };
   await saveRecord(platform, withMod(record, pending));
 
-  // The user's own settings in the created install, where a resumed attempt left some - the payload unpacks
-  // the release's copies of the same files over them.
-  const stateFiles = CONFIG_FILES.map((name) => `${creates.directory}/${name}`);
+  // The user's own files in the created install, where a resumed attempt left some - the payload unpacks the
+  // release's copies of the same files over them. Two kinds, and they are not interchangeable: settings are
+  // merged key by key, and the load order is put back as it was.
+  //
+  // The load order half is this route's alone, not the delegated one's: a payload that installs a whole game
+  // ships that game's order file, while an installer that adds a mod to this game rewrites the order to put
+  // its own dat in - and putting the user's copy back over that would take the mod they just installed out.
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
+  const stateFiles = userSettings(manifest, creates, entries);
   const mine = await holdUserFiles(platform, install.path, stateFiles, backup);
+  const ordering = [`${creates.directory}/${MODS_ORDER_PATH}`];
+  const order = await holdUserFiles(platform, install.path, ordering, backup);
 
   options?.onStep?.(`Installing ${manifest.name} ${manifest.version}`);
-  // Again here, not only in the plan: this is the call that writes, and what keeps a payload out of the host
-  // install is this list rather than anything the archive itself promises.
-  await confinedEntries(platform, archivePath, archive, manifest, creates);
   await platform.archive.extract(archivePath, install.path);
+  await restoreUserFiles(platform, install.path, order);
 
   let extracted = 0;
   let skipped: readonly string[] = [];

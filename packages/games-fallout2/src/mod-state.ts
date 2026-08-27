@@ -32,6 +32,22 @@ export async function holdUserFiles(
   return held;
 }
 
+/**
+ * Puts held copies back exactly as they were, for a file the merge cannot carry: `mods_order.txt` is a list of
+ * names rather than keys, so an ini merge would find nothing of the user's in it and keep the release's copy -
+ * dropping a load order the user built. Paired with `holdUserFiles` and kept beside it, since a hold whose
+ * restore lives somewhere else is a pair nobody can check.
+ *
+ * Files that were not there are not created: what was held is what comes back.
+ */
+export async function restoreUserFiles(
+  platform: Platform,
+  root: string,
+  held: ReadonlyMap<string, Uint8Array>,
+): Promise<void> {
+  for (const [path, bytes] of held) await platform.fs.write(insidePath(platform, root, path), bytes);
+}
+
 export interface MergedState {
   /** What the release shipped, latin1 text - the base the next upgrade's merge compares against. */
   shipped: Record<string, string>;
