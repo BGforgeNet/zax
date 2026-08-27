@@ -1,6 +1,6 @@
 <script lang="ts">
   import { GAME_TYPES, ownTarget, type GameType } from "@zax/core";
-  import { type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
+  import { createsInPlace, type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
   import SettingRow from "./SettingRow.svelte";
   import { isPreview } from "./host.js";
@@ -152,6 +152,14 @@
   /** The name ZAX gives the game a base mod turns this install into. */
   const gameName = (type: GameType): string => GAME_TYPES[type].name;
 
+  /**
+   * Whether the install this mod makes is the one on screen rather than a folder inside it, which is what the
+   * game it creates looks like once that folder is on the list itself. Naming the folder there would send the
+   * user looking inside their own game for a copy of it.
+   */
+  const isThisInstall = (offer: ModOffer): boolean =>
+    store.install !== undefined && createsInPlace(store.install.type, offer);
+
   /** Sizes as a person reads them. Bytes are what the release states; nobody counts in them. */
   const megabytes = (bytes: number): string =>
     bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -299,11 +307,14 @@
                   {#if offer.type === "base"}
                     <!-- Said before install as well as after, because it is the thing to know going in. The two
                      kinds of base mod need different sentences: one replaces this installation and the other
-                     leaves it alone, so the way back differs as much as the install does. -->
+                     leaves it alone, so the way back differs as much as the install does - and the folder one
+                     of them makes is this installation itself once that folder is on the list. -->
                     <p class="status">
-                      {offer.creates
-                        ? `ZAX will not remove it: what it installs is a whole game in ${offer.creates}, which is a folder to delete by hand.`
-                        : "Cannot be uninstalled: it replaces the installation rather than adding to it."}
+                      {offer.creates && isThisInstall(offer)
+                        ? "ZAX will not remove it: what it installs is this whole game, which is a folder to delete by hand."
+                        : offer.creates
+                          ? `ZAX will not remove it: what it installs is a whole game in ${offer.creates}, which is a folder to delete by hand.`
+                          : "Cannot be uninstalled: it replaces the installation rather than adding to it."}
                     </p>
                   {/if}
                   {#if offer.type === "permanent" && offer.reason !== undefined}

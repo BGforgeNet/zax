@@ -956,18 +956,50 @@ extract-dat:
     expect(availability(release, where({ baseVersion: { kind: "release", version: "1.16.3771" } }))).toEqual({
       kind: "installed",
     });
-    expect(availability(release, where({ baseVersion: { kind: "release", version: "1.15.3735" } }))).toEqual({
-      kind: "upgrade",
-      from: "1.15.3735",
-    });
     expect(availability(release, where({ baseVersion: { kind: "release", version: "1.17.3800" } }))).toEqual({
       kind: "downgrade",
       from: "1.17.3800",
     });
   });
 
-  it("offers the release over a directory that is there but says nothing about itself", () => {
-    expect(availability(release, where({ present: true }))).toEqual({ kind: "install-over" });
+  /*
+    An install this mod made takes no release over it. Upstream publishes an unpack into a folder that has none
+    and no upgrade of any kind, and one laid over an installation would overwrite the mod's own configuration
+    and load order with the release's defaults - neither of which is among the files ZAX holds aside. Every way
+    of finding that the install is there answers the same, and the installed version rides along so the row
+    still says what is on disk.
+  */
+  it("refuses a newer release over an install it made rather than offering an upgrade", () => {
+    const older = availability(release, where({ baseVersion: { kind: "release", version: "1.15.3735" } }));
+    expect(older).toMatchObject({ kind: "blocked", from: "1.15.3735" });
+    expect((older as { why: string }).why).toMatch(/Fallout1in2 holds Fallout et tu already.*no way to update one/s);
+  });
+
+  it("refuses over a directory that is there and says nothing about itself", () => {
+    expect(availability(release, where({ present: true }))).toMatchObject({ kind: "blocked" });
+  });
+
+  it("refuses over a nightly build the same way, since it is an install being written over either way", () => {
+    expect(availability(release, where({ baseVersion: { kind: "nightly", commit: "abc1234" } }))).toMatchObject({
+      kind: "blocked",
+    });
+  });
+
+  it("names this installation rather than a folder where the install is the one on screen", async () => {
+    // The folder Fallout et tu was unpacked into, on the list as a game of its own. Its version is stamped
+    // where every base install stamps one - in its own root, not in a directory of the same name inside it -
+    // and telling this user to look in a Fallout1in2 folder would send them one directory too deep.
+    const ettu: Install = { path: "/games/fallout2/Fallout1in2", type: "fo1in2" };
+    const platform = new MemoryPlatform({
+      files: {
+        [`${ettu.path}/fallout2.exe`]: "",
+        [`${ettu.path}/ddraw.ini`]: "[Misc]\nVersionString=FALLOUT ET TU v1.15.3735\n",
+      },
+    });
+    const state = await readModInstallState(platform, [release], ettu, { path: ettu.path, mods: [] }, null);
+    const stood = state.standing["fo1in2"]?.availability;
+    expect(stood).toMatchObject({ kind: "blocked", from: "1.15.3735" });
+    expect((stood as { why: string }).why).toMatch(/^This installation is Fallout et tu already/);
   });
 
   it("carries what to ask the user for, so the interface never reads a manifest", async () => {

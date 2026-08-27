@@ -219,6 +219,26 @@ describe("what an offer's status says", () => {
     expect(text).not.toContain("Turns this installation into");
   });
 
+  /*
+    The same mod on the game it made, once that folder is on the list as an installation of its own: the folder
+    it names is this installation, and sending the user to look for a copy of their game inside their game is
+    the mistake the branch is here to avoid. Driven through the preview's own et tu install rather than a
+    hand-made offer, since what decides is the type ZAX reads off that directory.
+  */
+  test("names this installation rather than a folder inside it where the created game is the one on screen", async () => {
+    await store.addInstall("fixtures/fo1in2");
+    await store.selectInstall("fixtures/fo1in2");
+    await vi.waitFor(() => expect(store.readingOffers).toBe(false));
+    expect(store.install?.type, "the preview fixture ZAX reads as Fallout et tu").toBe("fo1in2");
+
+    publish({ type: "base", becomes: "fo1in2", creates: "Fallout1in2" }, { kind: "install" });
+    const notes = view()
+      .all("p.status")
+      .map((p) => p.textContent ?? "");
+    expect(notes.some((line) => line.includes("what it installs is this whole game"))).toBe(true);
+    expect(notes.some((line) => line.includes("a whole game in Fallout1in2"))).toBe(false);
+  });
+
   test("a converting mod says which direction removability moves", () => {
     const gone = status({ kind: "convert", from: "14.7", was: "pluggable" });
     expect(gone).toContain("installing it gives that up");

@@ -63,7 +63,7 @@ export const PREVIEW_REASON = "The browser preview has no machine to reach - thi
   something in it and to be selected - but each is detected the way a real one is, from the marker files its
   type is actually known by rather than from anything declared here.
 */
-const PREVIEW_GAMES: readonly { path: string; marks: readonly string[] }[] = [
+const PREVIEW_GAMES: readonly { path: string; marks: readonly string[]; stamp?: string }[] = [
   // First because the interface opens on it: this is the one with a mods folder, a record and an engine
   // already deployed, so the preview starts on the install that has something to show rather than a bare one.
   { path: PREVIEW_INSTALL, marks: ["up-changelog.txt"] },
@@ -73,7 +73,11 @@ const PREVIEW_GAMES: readonly { path: string; marks: readonly string[] }[] = [
   { path: "fixtures/f2rpu", marks: ["mods/rpu.dat"] },
   // A directory in a real install, holding the Fallout 1 data the conversion runs on; the type is read off
   // the entry's name, so what is under it only has to make the directory exist.
-  { path: "fixtures/fo1in2", marks: ["mods/fo1_base/fo1_base.dat"] },
+  //
+  // Stamped with a Fallout et tu version rather than the sfall one every other fixture shares: this install
+  // states its own, and a release behind the feed's is what a user of it usually has - which is the state its
+  // mod row is about. `v1.15.3735` is the release before the one the canned feed offers.
+  { path: "fixtures/fo1in2", marks: ["mods/fo1_base/fo1_base.dat"], stamp: "FALLOUT ET TU v1.15.3735" },
 ];
 
 /** The state file a fresh preview starts from. The test fixture seeds its own, narrower, baseline. */
@@ -85,7 +89,12 @@ const gameFiles = (): Record<string, string> =>
     PREVIEW_GAMES.flatMap((game) => [
       [`${game.path}/fallout2.cfg`, fallout2cfg],
       [`${game.path}/f2_res.ini`, f2resini],
-      [`${game.path}/ddraw.ini`, ddrawini],
+      // One line of the shared file rewritten where a game states its own version, so the fixture keeps every
+      // sfall setting the tabs edit and differs only in what it says it is.
+      [
+        `${game.path}/ddraw.ini`,
+        game.stamp ? ddrawini.replace(/^VersionString=.*$/m, `VersionString=${game.stamp}`) : ddrawini,
+      ],
       [`${game.path}/fallout2.exe`, ""],
       ...game.marks.map((mark) => [`${game.path}/${mark}`, ""] as const),
     ]),

@@ -221,6 +221,16 @@ its default of any type, since nothing outside the created directory is written.
 writes: the payload's own entries are checked against it before anything is extracted, and a release that
 carries an entry outside it is refused.
 
+**An install of this kind is made once, and never upgraded.** Where one is already there, the mod is refused
+rather than unpacked over it - and both readings of "already there" count: the directory inside this
+installation, and an installation that is itself what `becomes` names, which is what a created install added to
+the list is. The reason is that a manifest of this shape describes a fresh unpack and nothing else: there is no
+upgrade for ZAX to perform, and laying a release over an install would overwrite whatever the mod keeps in its
+own configuration files and load order with the release's defaults, since only `fallout2.cfg`, `f2_res.ini` and
+`ddraw.ini` are held aside and merged. The way to a newer release is a fresh folder. An install that never
+finished is the one exception: that directory is the same install part-way through, and resuming it continues
+rather than repeats it.
+
 Each entry of `inputs` is a folder ZAX asks the user for, checked by the file it `holds`. `extract-dat` unpacks
 one input's archive into the created install: `from` names the input, `list` is the response file the payload
 ships - one path per line, as the archive spells them - and `into` is where they land. Both paths are read

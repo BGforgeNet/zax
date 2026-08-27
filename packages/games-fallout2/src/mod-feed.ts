@@ -31,6 +31,7 @@ import {
 import { vendoredManifestFor } from "./mod-vendored.js";
 import type { ChoiceGroup } from "./mod-choice.js";
 import { installedBaseVersion, type BaseVersion } from "./base-version.js";
+import { createdInstallPath, noUpgradeHere } from "./mod-created.js";
 import { carryOver, type CarriedSelection } from "./mod-parts.js";
 import type { InstallRecord } from "./records.js";
 import { MODS_DIRECTORY, answersToId } from "./mods.js";
@@ -619,6 +620,23 @@ export function availability(release: ModRelease, context: ModContext): Availabi
     if (newness < 0) return { kind: "downgrade", from: context.baseVersion.version };
   }
 
+  // An install this mod made is installed once. Every arm above answers where the version on disk is this
+  // release's or newer; anything else would be laying a release over a whole game, and there is no such
+  // operation to offer - upstream publishes an unpack into a folder that has none and nothing else, and doing
+  // it anyway would overwrite the mod's own configuration and load order with the release's defaults.
+  //
+  // Any of the three is that install being there: a record of it, a version stamped in it, or the directory
+  // itself. `install-over` and `upgrade` are what this arm replaces, and the plan refuses the same thing again
+  // where a row is reached another way.
+  // Null where the directory was read and stamps no version, absent where nothing read it; neither is a
+  // version, and both are that directory being there.
+  const stamped = context.baseVersion ?? undefined;
+  if (manifest.creates && (recorded !== undefined || stamped !== undefined || context.present))
+    return refuse(
+      noUpgradeHere(manifest, context.install),
+      recorded?.version ?? (stamped?.kind === "release" ? stamped.version : undefined),
+    );
+
   // Everything from here on is an offer to download, which a release that never names its payload cannot make.
   // For a parts release the payload is whatever parts resolved: one asset short is not nothing to install.
   if (manifest.creates) {
@@ -648,16 +666,9 @@ export function availability(release: ModRelease, context: ModContext): Availabi
     return { kind: "upgrade", from: recorded.version };
   }
 
-  // A created install's own version, where one is there and this release is newer than it. The earlier arm
-  // answered the other two directions; this is the upgrade an install ZAX never performed can still take.
-  if (manifest.creates) {
-    if (context.baseVersion?.kind === "nightly") return { kind: "nightly", commit: context.baseVersion.commit };
-    if (context.baseVersion) return { kind: "upgrade", from: context.baseVersion.version };
-    // A directory that is there and says nothing about itself: the release goes over it, which is what
-    // unpacking a payload over an existing folder does anyway.
-    if (context.present) return { kind: "install-over" };
-    return blockedByType(manifest, context) ?? { kind: "install" };
-  }
+  // A mod that creates an install has nowhere to put one here, or the arm above would have refused it: what
+  // is left is a first install, on a host of a type the manifest allows.
+  if (manifest.creates) return blockedByType(manifest, context) ?? { kind: "install" };
 
   // Presence always comes from the directory. For a base mod that means the type the directory reports and
   // nothing else - a hand-installed RPU is the common state, and this arm is both its upgrade path and its
@@ -878,9 +889,10 @@ export async function readModInstallState(
   for (const release of releases) {
     // A parts mod declares nothing at the top level, so presence is judged against every part's entries:
     // any one of them in the folder is the mod being there. A mod that creates an install is not in the
-    // mods folder at all: what answers for it is the directory it makes.
+    // mods folder at all: what answers for it is the directory it makes - or this installation, where that
+    // is already what this one is.
     const creates = release.manifest.creates;
-    const created = creates ? platform.paths.join(install.path, creates.directory) : null;
+    const created = creates ? createdInstallPath(platform.paths, install, { ...release.manifest, creates }) : null;
     const declared = release.manifest.entries ?? partOptions(release.manifest).flatMap((part) => part.entries ?? []);
     const present =
       created === null

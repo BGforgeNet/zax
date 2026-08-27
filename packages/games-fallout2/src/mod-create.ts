@@ -10,6 +10,12 @@
  *
  * The archive the mod unpacks belongs to the user, not to the release: it is their own copy of Fallout 1,
  * and the folder it sits in is what ZAX asks for.
+ *
+ * Once, and only where there is none: an install this makes is never upgraded in place. Upstream publishes a
+ * fresh unpack and nothing else - no installer, no update script, no instructions for one - and laying a
+ * release over an installation would overwrite the mod's own configuration and load order, which sit outside
+ * the files ZAX holds aside, with the release's defaults. `mod-created.ts` says where the install would be,
+ * and a directory already there is refused rather than written into.
  */
 
 import { backupDirectory, fnv1a, stamp, type GameType, type Install, type MergeConflict } from "@zax/core";
@@ -19,6 +25,7 @@ import { preflightArchive } from "./archive-preflight.js";
 import { datReadError, extractFromDat, type ReadyDatTool } from "./dat-tool.js";
 import type { ModCreates, ModInput, ModManifest } from "./manifest.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
+import { createdInstallPath, noUpgradeHere } from "./mod-created.js";
 import type { ModRelease, ReleaseAsset } from "./mod-feed.js";
 import { refusalFor } from "./mod-install.js";
 import { holdUserFiles, mergeUserFiles } from "./mod-state.js";
@@ -168,6 +175,13 @@ async function confinedEntries(
 }
 
 /**
+ * The row's own refusal, with what the other refusals here end on: this one is thrown at the moment the user
+ * asked for the install, where saying that nothing happened is the half they came for.
+ */
+const alreadyThere = (manifest: ModManifest, install: Install): string =>
+  `${noUpgradeHere(manifest, install)} Nothing was installed.`;
+
+/**
  * Resolves what creating this install would do, and downloads what it needs to say so - without writing
  * anything into the game folder.
  *
@@ -195,9 +209,17 @@ export async function planCreateInstall(
     if (unreadable !== null) throw new Error(`ZAX cannot read ${source}: ${unreadable}`);
   }
 
-  const created = insidePath(platform, install.path, creates.directory);
-  const upgrading = (await platform.fs.stat(created)) !== null;
-  if (!upgrading) {
+  // Where the install would be, which on an installation that already is what this makes is that installation
+  // itself. Either way a directory that is there is one this does not write into: there is no upgrade to
+  // perform, and the refusal comes before the download rather than after 400 MB of it.
+  //
+  // The unfinished attempt a record describes is the exception - that directory is this install part-way
+  // through, and resuming it is not a second install. Its `refuse` rules are skipped with it, since what they
+  // guard against is another base mod's files and half of this one's are already there.
+  const created = createdInstallPath(platform.paths, install, { becomes, creates });
+  const resuming = record.mods.some((mod) => mod.id === manifest.id && !mod.complete);
+  if (!resuming) {
+    if ((await platform.fs.stat(created)) !== null) throw new Error(alreadyThere(manifest, install));
     const refusal = await refusalFor(platform, install, release);
     if (refusal !== null) throw new Error(refusal);
   }
@@ -280,7 +302,7 @@ export async function applyCreateInstall(
 ): Promise<CreateInstallOutcome> {
   // What the created install becomes is not read here: the caller identifies the directory by reading
   // it, so a payload that did not produce what it claimed is visible rather than recorded.
-  const { manifest, creates, archive } = creatingRelease(release);
+  const { manifest, creates, becomes, archive } = creatingRelease(release);
   const record = await loadRecord(platform, install.path);
   assertUsable(record, manifest.id);
   const previous = record.mods.find((mod) => mod.id === manifest.id && mod.complete);
@@ -290,9 +312,16 @@ export async function applyCreateInstall(
   const archives = await archivesFor(platform, manifest, plan.inputs);
   const source = sourceArchive(manifest, archives);
 
-  const created = insidePath(platform, install.path, creates.directory);
-  const upgrading = previous !== undefined || (await platform.fs.stat(created)) !== null;
-  if (!upgrading) {
+  // Asked again here rather than trusted from the plan: this is the call that writes, and the directory may
+  // have appeared since - a second window, a hand-unpacked copy. Resuming an unfinished attempt is the one
+  // case that writes into a directory that is there, as in the plan.
+  //
+  // The directory decides, not the record: a completed one describing a folder the user has since deleted by
+  // hand is the state the row offers a fresh install in, and refusing it here would refuse what it offered.
+  const created = createdInstallPath(platform.paths, install, { becomes, creates });
+  const resuming = record.mods.some((mod) => mod.id === manifest.id && !mod.complete);
+  if (!resuming) {
+    if ((await platform.fs.stat(created)) !== null) throw new Error(alreadyThere(manifest, install));
     const refusal = await refusalFor(platform, install, release);
     if (refusal !== null) throw new Error(refusal);
   }
@@ -321,8 +350,8 @@ export async function applyCreateInstall(
   };
   await saveRecord(platform, withMod(record, pending));
 
-  // The user's own settings in the created install, where there is one already - an upgrade unpacks the
-  // release's copies of the same files over them.
+  // The user's own settings in the created install, where a resumed attempt left some - the payload unpacks
+  // the release's copies of the same files over them.
   const stateFiles = CONFIG_FILES.map((name) => `${creates.directory}/${name}`);
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
   const mine = await holdUserFiles(platform, install.path, stateFiles, backup);

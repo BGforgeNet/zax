@@ -235,18 +235,82 @@ describe("performing an install that creates another", () => {
     expect(record.mods[0]).toMatchObject({ id: "fo1in2", complete: false });
   });
 
-  it("keeps the user's settings in the created install across an upgrade", async () => {
+  it("keeps the user's own settings out of the way while the payload writes", async () => {
     const { platform } = await finished();
-    // The user changed something ZAX's own tabs edit, in the install that was created.
-    const edited = "[Misc]\nVersionString=FALLOUT ET TU v1.16.3771\nMyOwn=7\n";
-    await platform.fs.write(`${GAME}/Fallout1in2/ddraw.ini`, new TextEncoder().encode(edited));
+    // Held aside and merged back, which is what a resumed attempt over a half-written folder needs. The
+    // release's own copy of the file is what the payload just wrote here.
+    const after = new TextDecoder().decode(await platform.fs.read(`${GAME}/Fallout1in2/ddraw.ini`));
+    expect(after).toContain("VersionString=FALLOUT ET TU v1.16.3771");
+  });
+});
+
+describe("a release offered where this mod's install is already there", () => {
+  /*
+    Fallout et tu is installed once. Upstream publishes an unpack into a folder that has none and no upgrade of
+    any kind - no installer, no script, no instructions - and a release laid over an installation would
+    overwrite the mod's own configuration (`config/*.ini`) and load order (`mods/mods_order.txt`) with the
+    release's defaults, neither of which is among the files ZAX holds aside. So both halves refuse.
+  */
+  const ETTU = `${GAME}/Fallout1in2`;
+
+  it("refuses a newer release over the install it created, before anything is downloaded", async () => {
+    const platform = createPlatform();
+    const found = await release();
+    const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
+    await applyCreateInstall(platform, install, found, plan, TOOL);
+    const downloads = platform.downloaded.length;
 
     const upgraded = await releaseOf(MANIFEST.replace('version: "1.16.3771"', 'version: "1.17.3800"'));
-    const plan = await planCreateInstall(platform, install, upgraded, inputs, TOOL);
-    await applyCreateInstall(platform, install, upgraded, plan, TOOL);
+    await expect(planCreateInstall(platform, install, upgraded, inputs, TOOL)).rejects.toThrow(
+      /Fallout1in2 holds Fallout et tu already.*no way to update one.*Nothing was installed/s,
+    );
+    expect(platform.downloaded.length, "and nothing was fetched to find that out").toBe(downloads);
+  });
 
-    const after = new TextDecoder().decode(await platform.fs.read(`${GAME}/Fallout1in2/ddraw.ini`));
-    expect(after).toContain("MyOwn=7");
+  it("refuses over a folder ZAX never installed, which is how most of them got there", async () => {
+    // A hand-unpacked Fallout et tu in the host, with no record of it anywhere.
+    const platform = createPlatform({ files: { [`${ETTU}/fallout2.exe`]: "" } });
+    await expect(planCreateInstall(platform, install, await release(), inputs, TOOL)).rejects.toThrow(
+      /no way to update one/,
+    );
+  });
+
+  it("refuses on an installation that already is what it creates, saying that rather than naming a folder", async () => {
+    // The Fallout et tu folder on the install list as a game of its own: it is the install, so a sentence
+    // about a folder inside it would send the user looking for one.
+    const here: Install = { path: ETTU, type: "fo1in2" };
+    const platform = createPlatform({ files: { [`${ETTU}/fallout2.exe`]: "" } });
+    const refusal = planCreateInstall(platform, here, await release(), inputs, TOOL);
+    await expect(refusal).rejects.toThrow(/This installation is Fallout et tu already/);
+    await expect(refusal).rejects.toThrow(/fresh folder/);
+  });
+
+  it("refuses at the install too, for a folder that appeared after the plan was confirmed", async () => {
+    const platform = createPlatform();
+    const found = await release();
+    const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
+    // A second window, or a hand-unpacked copy, between the confirmation and the install.
+    await platform.fs.write(`${ETTU}/fallout2.exe`, new TextEncoder().encode(""));
+    await expect(applyCreateInstall(platform, install, found, plan, TOOL)).rejects.toThrow(/no way to update one/);
+  });
+
+  it("still finishes an attempt that never completed, which is the record's own directory", async () => {
+    const platform = createPlatform();
+    const found = await release();
+    const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
+    // The install fails part way through the extraction, leaving the folder and an incomplete record.
+    const ran = platform.process.run.bind(platform.process);
+    platform.process.run = async (program, args, options) =>
+      args[0] === "x" ? { code: 1, output: "Error: stopped part way" } : ran(program, args, options);
+    await expect(applyCreateInstall(platform, install, found, plan, TOOL)).rejects.toThrow(/stopped part way/);
+    expect(await platform.fs.stat(`${ETTU}/Fallout2.exe`), "the folder it left behind").not.toBeNull();
+
+    // The retry is this install continuing, not a release over an install that is already there.
+    platform.process.run = ran;
+    const again = await planCreateInstall(platform, install, found, inputs, TOOL);
+    const outcome = await applyCreateInstall(platform, install, found, again, TOOL);
+    expect(outcome.created).toBe(ETTU);
+    expect((await loadRecord(platform, GAME)).mods[0]).toMatchObject({ id: "fo1in2", complete: true });
   });
 });
 

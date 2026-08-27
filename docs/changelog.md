@@ -18,8 +18,12 @@ mods as well as settings.
   can be resumed or put back exactly, and removal deletes only what was recorded as installed.
 - **Big mods too.** Restoration Project and the Unofficial Patch install through their own installers, with the
   components they offer chosen in ZAX on Windows. The Restoration Project's 2.3 and 2.4 lines are two entries
-  rather than one: each updates within its own line, and only one of them installs on any game. Fallout et tu builds a second game beside this one out of
-  your own copy of Fallout 1, and joins the game list when it is done.
+  rather than one: each updates within its own line, and only one of them installs on any game. Fallout et tu
+  builds a second game beside this one out of your own copy of Fallout 1, and joins the game list when it is
+  done. It is installed once and never updated in place: where one is already there - a folder in this game, or
+  a Fallout et tu installation on the list - the row says so rather than offering to unpack a release over it,
+  since Fallout et tu publishes no update of any kind and one laid over an install would overwrite the mod's
+  own configuration and load order.
 - **An older release, where you want one.** Every mod row can install a version other than the newest its feed
   publishes - never one below what is already installed, which a base mod's installer has no way to undo.
 - **What a release offers is asked before it downloads.** A mod publishing variants or add-ons asks which you
