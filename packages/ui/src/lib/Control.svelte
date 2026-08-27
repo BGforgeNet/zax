@@ -242,7 +242,6 @@
   .toggle.on {
     background: var(--accent);
     border-color: var(--accent);
-    justify-content: flex-end;
   }
 
   .knob {
@@ -254,7 +253,10 @@
     transition: transform 120ms ease;
   }
 
+  /* Slid, not re-laid-out: as `justify-content: flex-end` the knob crossed in a single frame, no transition
+     being able to interpolate it. The 16px track is the toggle's 30px content box less the knob. */
   .toggle.on .knob {
+    transform: translateX(16px);
     border-color: transparent;
   }
 </style>
