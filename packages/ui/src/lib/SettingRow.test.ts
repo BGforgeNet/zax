@@ -98,12 +98,12 @@ describe("a value ZAX pins", () => {
     fight a value ZAX is going to rewrite.
   */
   test("is shown as text with its reason, and draws no control at all", () => {
-    const managed = SETTINGS.find((setting) => setting.managed);
-    if (!managed) return; // No setting is pinned in this catalog; nothing to assert.
-    const view = render(SettingRow as never, { def: managed } as never);
+    const pinned = SETTINGS.find((setting) => setting.managed);
+    if (!pinned?.managed) throw new Error("no setting in this catalog is pinned - the state this row draws is gone");
+    const view = render(SettingRow as never, { def: pinned } as never);
     expect(view.all(".pinned")).toHaveLength(1);
     expect(view.all("fieldset")).toHaveLength(0);
-    expect(view.text()).toContain(managed.managed!.reason);
+    expect(view.text()).toContain(pinned.managed.reason);
   });
 });
 

@@ -6,6 +6,7 @@ import {
   loadRecord,
   saveRecord,
   type Backend,
+  type InstalledEngine,
   type ModFeedListing,
   type ModInstallState,
 } from "@zax/fallout2";
@@ -1768,33 +1769,59 @@ describe("the feeds against a change of game", () => {
     expect(asked).toHaveBeenCalledWith(true);
   });
 
-  test("the game's own half is read again for the game arrived at, without waiting to be asked", async () => {
+  test("the game's own half lands with the rest of the reading, not on its own", async () => {
     published();
-    // Held open so the switch is over while the read is still out, which is the state the tab has to describe.
+    // Held open so the switch is still out while the tab is on screen, which is the state it has to describe.
     let release = (): void => {};
     const held = new Promise<ModInstallState>((resolve) => {
-      release = () => resolve(standingOf("mine"));
+      release = () => resolve(standingOf("theirs"));
     });
-    const asked = vi.spyOn(hostBackend, "modInstallState").mockReturnValue(held);
+    const asked = vi
+      .spyOn(hostBackend, "modInstallState")
+      .mockImplementation((install) => (install.path === other.path ? held : Promise.resolve(standingOf("mine"))));
     store.installs = [...store.installs, other];
+    await store.loadModOffers();
+    expect(store.modListing?.offers).toEqual(offersFor("mine"));
 
-    // The switch reads the install itself before it reaches the feeds, and the tab is on screen throughout.
     const switching = store.selectInstall(other.path);
-    expect(store.modListing, "the previous game's offers go at once").toBeNull();
-    expect(store.readingOffers, "and the tab says so from the same moment").toBe(true);
-    await switching;
-    // Off the `busy` gate: the switch itself is over before the answer is, and a read nobody asked for must
-    // not grey out the controls.
+    await vi.waitFor(() => expect(asked).toHaveBeenCalledWith(expect.objectContaining({ path: other.path })));
+    // Neither blanked nor half-replaced. Emptied on the first line of the switch, the tab threw its table away
+    // and said it was reading, for the length of a read of the folder it already had the answer for.
+    expect(store.modListing?.offers, "the game left behind, whole").toEqual(offersFor("mine"));
+    // Off the `busy` gate: a read nobody asked for must not grey out the controls.
     expect(store.busy).toBeNull();
-    // What the tab must not be left holding is the previous game's offers, nor - for however long the read
-    // takes - the claim that the feeds were never asked.
-    expect(store.modListing).toBeNull();
-    expect(store.readingOffers).toBe(true);
 
     release();
-    await vi.waitFor(() => expect(store.modListing?.offers).toEqual(offersFor("mine")));
-    expect(store.readingOffers).toBe(false);
-    expect(asked).toHaveBeenCalledWith(expect.objectContaining({ path: other.path }));
+    await switching;
+    expect(store.modListing?.offers, "and the game arrived at, whole").toEqual(offersFor("theirs"));
+  });
+
+  test("refuses a mod flow started against rows the switch has not caught up with", async () => {
+    published();
+    let release = (): void => {};
+    const held = new Promise<ModInstallState>((resolve) => {
+      release = () => resolve(standingOf("theirs"));
+    });
+    const asked = vi
+      .spyOn(hostBackend, "modInstallState")
+      .mockImplementation((install) => (install.path === other.path ? held : Promise.resolve(standingOf("mine"))));
+    const planned = vi.spyOn(hostBackend, "planMod");
+    store.installs = [...store.installs, other];
+    await store.loadModOffers();
+    const [onScreen] = store.modListing?.offers ?? [];
+    if (!onScreen) throw new Error("the tab drew no row for the game we start on, so there is nothing to click");
+
+    const switching = store.selectInstall(other.path);
+    await vi.waitFor(() => expect(asked).toHaveBeenCalledWith(expect.objectContaining({ path: other.path })));
+    // The row describes the folder it was read for, and the flow would act on the one now selected.
+    await store.prepareMod(onScreen);
+
+    expect(planned).not.toHaveBeenCalled();
+    expect(store.notice?.kind).toBe("problem");
+    expect(store.notice?.text).toContain("still being read");
+
+    release();
+    await switching;
   });
 
   test("survive a reread of the same game, which is what saving and installing do", async () => {
@@ -1820,7 +1847,7 @@ describe("the feeds against a change of game", () => {
 
   test("drop an answer that arrives for a game that is no longer the selected one", async () => {
     published();
-    // Held open so the second switch lands while the first read is still out - the only way the two cross.
+    // Held open so the second switch is over while the first read is still out - the only way the two cross.
     let release = (): void => {};
     const held = new Promise<ModInstallState>((resolve) => {
       release = () => resolve(standingOf("stale"));
@@ -1830,11 +1857,73 @@ describe("the feeds against a change of game", () => {
     );
     store.installs = [...store.installs, other];
 
-    await store.selectInstall(other.path);
+    const switching = store.selectInstall(other.path);
     await store.selectInstall(PREVIEW_INSTALL);
     release();
-    await held;
+    await switching;
 
-    await vi.waitFor(() => expect(store.modListing?.offers).toEqual(offersFor("mine")));
+    expect(store.modListing?.offers).toEqual(offersFor("mine"));
+  });
+});
+
+describe("one reading of an install, published whole", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const other = { path: "/games/other", type: "fallout2" } as const;
+  /** Deployed in the game switched away from, so its tab is on screen for the length of the read. */
+  const fission: InstalledEngine = {
+    id: "fission",
+    release: "v1.0",
+    published: "2026-01-01T00:00:00Z",
+    complete: true,
+    files: ["fallout-fission-x64.exe"],
+  };
+
+  test("shows none of it until all of it has been read", async () => {
+    store.installs = [...store.installs, other];
+    vi.spyOn(hostBackend, "deployedEngines").mockResolvedValue([fission]);
+    await store.selectInstall(other.path);
+    expect(store.engineDeployed["fission"]).toBeDefined();
+    const engines = store.engineDeployed;
+    const contents = store.contents;
+
+    // The last read of the switch, held open so the rest of it has answered while the switch is still out.
+    let release = (): void => {};
+    const held = new Promise<readonly InstalledEngine[]>((resolve) => {
+      release = () => resolve([]);
+    });
+    const asked = vi.spyOn(hostBackend, "deployedEngines").mockReturnValue(held);
+
+    const switching = store.selectInstall(PREVIEW_INSTALL);
+    await vi.waitFor(() => expect(asked).toHaveBeenCalled());
+    // Assigned as each answer landed, these crossed over one at a time and the pane drew a mixture of two
+    // games - an engine's tab blinking out on the first line of the read and back on its last.
+    expect(store.engineDeployed, "the engines the pane draws tabs from").toBe(engines);
+    expect(store.contents, "and the values under them").toBe(contents);
+
+    release();
+    await switching;
+    expect(store.engineDeployed).toEqual({});
+    expect(store.contents).not.toBe(contents);
+  });
+
+  test("drops a reading the user has already moved on from", async () => {
+    store.installs = [...store.installs, other];
+    // Held open so the second switch is over while the first read is still out - the only way the two cross.
+    let release = (): void => {};
+    const held = new Promise<readonly InstalledEngine[]>((resolve) => {
+      release = () => resolve([fission]);
+    });
+    const asked = vi
+      .spyOn(hostBackend, "deployedEngines")
+      .mockImplementation((install) => (install.path === other.path ? held : Promise.resolve([])));
+
+    const switching = store.selectInstall(other.path);
+    await vi.waitFor(() => expect(asked).toHaveBeenCalled());
+    await store.selectInstall(PREVIEW_INSTALL);
+    release();
+    await switching;
+
+    expect(store.engineDeployed, "the game left behind may not land on top of the one selected").toEqual({});
   });
 });

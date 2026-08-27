@@ -191,6 +191,109 @@ function discover(documents: Record<string, IniDocument>): SettingDef[] {
 }
 
 /**
+ * The values on disk and every key the files hold, for one reading of one install's config files. Computed
+ * rather than derived: this is three file parses and a pass over 227 settings.
+ */
+interface Indexed {
+  discovered: SettingDef[];
+  baseline: Record<string, string | undefined>;
+  rawBaseline: Record<string, string | undefined>;
+}
+
+function indexFor(contents: ConfigFileContents, modDefs: readonly SettingDef[]): Indexed {
+  // The mods' ini files parse alongside the engine's; `discover` still walks CONFIG_FILES alone, so the
+  // raw every-key view never extends to mod inis - the schema is their whole surface, by design.
+  const files = [...new Set<string>([...CONFIG_FILES, ...modDefs.map((s) => ownTarget(s).file)])];
+  const documents = Object.fromEntries(files.map((f) => [f, IniDocument.parse(contents[f] ?? "")]));
+  // Read at the setting's own address. Reconciling a linked setting's targets against each other needs the
+  // engine's own record of what ZAX last wrote, which no file here carries.
+  const valueOf = (s: SettingDef) => {
+    const at = ownTarget(s);
+    return documents[at.file]?.get(at.section, at.key);
+  };
+  const discovered = discover(documents);
+  return {
+    discovered,
+    baseline: Object.fromEntries([...SETTINGS, ...modDefs].map((s) => [s.id, valueOf(s)])),
+    rawBaseline: Object.fromEntries(discovered.map((s) => [s.id, valueOf(s)])),
+  };
+}
+
+/** A curated setting's value where it has one, and a discovered key's otherwise - `baselineOf` on a reading. */
+function baselineIn(index: Indexed, id: string): string | undefined {
+  return id in index.baseline ? index.baseline[id] : index.rawBaseline[id];
+}
+
+/**
+ * Values ZAX pins regardless of what the file says, and which the file does not already carry. UAC_AWARE=1
+ * makes the high-resolution patch read its settings from roaming appdata instead of the game folder, so
+ * leaving it on means editing an ini the patch never reads.
+ */
+function pinsFor(contents: ConfigFileContents, index: Indexed): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const s of SETTINGS) {
+    // Not for a file the install does not have: a pending change there would put the config file of an
+    // uninstalled component into the game folder on the next save, which is the opposite of pinning a value.
+    if (contents[ownTarget(s).file] === undefined) continue;
+    if (s.managed && baselineIn(index, s.id) !== s.managed.value) out[s.id] = s.managed.value;
+  }
+  return out;
+}
+
+function changesFor(
+  contents: ConfigFileContents,
+  index: Indexed,
+  modById: ReadonlyMap<string, ModSetting>,
+  values: Record<string, string>,
+): ConfigChange[] {
+  const out: ConfigChange[] = [];
+  for (const [id, value] of Object.entries(values)) {
+    const def = BY_ID.get(id) ?? modById.get(id) ?? index.discovered.find((s) => s.id === id);
+    if (!def) continue;
+    // Every address the setting has that is actually writable here - one edit, one value, however many
+    // names the installed engines keep it under. `liveTargets` is what leaves a dormant engine's alone.
+    for (const at of liveTargets(def, contents)) {
+      out.push({ file: at.file, section: at.section, key: at.key, value });
+    }
+  }
+  return out;
+}
+
+/** What reconciling one install's linked settings produced - see `reconcileLinked`. */
+interface Linked {
+  overrides: Record<string, string>;
+  carried: Record<string, Reconciled>;
+  choices: Divergence[];
+  split: Record<string, true>;
+}
+
+/**
+ * One whole reading of one install, before any of it is on screen. Every field the pane draws is in here, so
+ * publishing is one assignment block and the interface never renders a mixture of two games - see
+ * `readInstall`.
+ */
+interface InstallRead {
+  /** The install this is a reading of - what publishing it records as the game now on screen. */
+  path: string;
+  contents: ConfigFileContents;
+  modSettings: readonly ModSettingsGroup[];
+  modById: Map<string, ModSetting>;
+  index: Indexed;
+  overrides: Record<string, string>;
+  reconciled: Record<string, Reconciled>;
+  settingsChoices: Divergence[];
+  split: Record<string, true>;
+  /** The banner the carry raised, or null where nothing was carried. */
+  carry: Notice | null;
+  mods: ModsSnapshot;
+  sfall: string | null;
+  hires: string | null;
+  engineDeployed: Record<string, InstalledEngine>;
+  /** Where the game stands against the published mods, or null where this reading did not ask. */
+  standing: ModInstallState | null;
+}
+
+/**
  * Troubleshooting's own tab. A fix is one click and a report is a sequence you work through, so they are
  * separated rather than stacked on one screen where neither reads as the whole of it.
  */
@@ -317,7 +420,18 @@ class Store {
    * either, and a reactive read here would tie every view that touches the install to them.
    */
   private readFor = "";
+  /**
+   * Which reading is the current one. Two clicks between games leave two reads in flight, and only the newer
+   * one may publish: the slower would otherwise land last and put a game nobody selected on screen.
+   */
+  private readToken = 0;
   private standingRequest = 0;
+  /**
+   * Which install the standing on screen was read for. The mod flows act on the selected folder, and the tab
+   * keeps the previous game's rows until the new game's reading lands - so between the two there is a moment
+   * where a row on screen describes a folder the buttons under it would no longer act on.
+   */
+  private standingFor = "";
   /**
    * A resolved install plan awaiting the user's word, with the offer it belongs to. Two shapes: a stacking
    * mod's names every file, and a base mod's names the release and the space, the installer owning the rest.
@@ -474,37 +588,20 @@ class Store {
   private split: Record<string, true> = $state({});
   discovered = $state<SettingDef[]>([]);
 
-  private index(): void {
-    const modDefs = [...this.modById.values()];
-    // The mods' ini files parse alongside the engine's; `discover` still walks CONFIG_FILES alone, so the
-    // raw every-key view never extends to mod inis - the schema is their whole surface, by design.
-    const files = [...new Set<string>([...CONFIG_FILES, ...modDefs.map((s) => ownTarget(s).file)])];
-    const documents = Object.fromEntries(files.map((f) => [f, IniDocument.parse(this.contents[f] ?? "")]));
-    // Read at the setting's own address. Reconciling a linked setting's targets against each other needs the
-    // engine's own record of what ZAX last wrote, which no file here carries.
-    const valueOf = (s: SettingDef) => {
-      const at = ownTarget(s);
-      return documents[at.file]?.get(at.section, at.key);
-    };
-    this.discovered = discover(documents);
-    this.baseline = Object.fromEntries([...SETTINGS, ...modDefs].map((s) => [s.id, valueOf(s)]));
-    this.rawBaseline = Object.fromEntries(this.discovered.map((s) => [s.id, valueOf(s)]));
+  /** The reading currently on screen, for the helpers that work over one. */
+  private get indexed(): Indexed {
+    return { discovered: this.discovered, baseline: this.baseline, rawBaseline: this.rawBaseline };
   }
 
-  /**
-   * Values ZAX pins regardless of what the file says, and which the file does not already carry. UAC_AWARE=1
-   * makes the high-resolution patch read its settings from roaming appdata instead of the game folder, so
-   * leaving it on means editing an ini the patch never reads. `applyPins` is what writes them.
-   */
+  private applyIndex(index: Indexed): void {
+    this.discovered = index.discovered;
+    this.baseline = index.baseline;
+    this.rawBaseline = index.rawBaseline;
+  }
+
+  /** The pinned values this install does not already carry - `pinsFor` over what is currently on screen. */
   private managedOverrides(): Record<string, string> {
-    const out: Record<string, string> = {};
-    for (const s of SETTINGS) {
-      // Not for a file the install does not have: a pending change there would put the config file of an
-      // uninstalled component into the game folder on the next save, which is the opposite of pinning a value.
-      if (!this.hasFile(ownTarget(s).file)) continue;
-      if (s.managed && this.baselineOf(s.id) !== s.managed.value) out[s.id] = s.managed.value;
-    }
-    return out;
+    return pinsFor(this.contents, this.indexed);
   }
 
   /** Reads the machine's own description and state file, then the selected install. Runs once, at startup. */
@@ -564,7 +661,14 @@ class Store {
     ]);
   }
 
-  /** Rereads the selected install: its config files, which sfall and hi-res patch it has, and its engines. */
+  /**
+   * Rereads the selected install: its config files, which sfall and hi-res patch it has, and its engines.
+   *
+   * Gathered whole, then published in one assignment. Assigned as each answer arrived, the fields crossed
+   * over one at a time and the pane drew states that were never true together - the new game's values under
+   * the old game's pending edits, an engine's tab blinking out and back on every save. What is on screen is
+   * one whole reading until the next whole one replaces it.
+   */
   private async readInstall(): Promise<void> {
     const install = this.install;
     // Every caller rereads the install, but only a few change which one it is - and where the mods stand is
@@ -572,53 +676,155 @@ class Store {
     // Saving a setting or installing an engine used to blank the Mods tab back to unread over it.
     const switched = (install?.path ?? "") !== this.readFor;
     this.readFor = install?.path ?? "";
-    this.sfallInstalled = null;
-    this.hiresInstalled = null;
-    // Before the reads below, which are awaited and so can render between them: another game's disagreements
-    // would mark rows of this one, and "nothing is split" is the reading that mismarks nothing.
-    this.split = {};
-    // `engines` is the machine's and is left alone here: a folder switch moves what is deployed, not what the
-    // cache holds, and rereading the listing took every Run in X button off the bar for the length of the reads.
-    this.engineDeployed = {};
-    // Another install's standing would be wrong here. What the feeds published is left alone: one release is
-    // published for every game, which is why the two are read apart in the first place.
-    if (switched) {
-      this.modStanding = null;
-      // Started on the line that empties the tab rather than after the rest of the install has been reread:
-      // nothing below feeds it, and the gap between the two is time spent saying the feeds were never asked.
-      if (install) void quietly(() => this.refreshModOffers(install));
-    }
+    // Before the feeds are in, nothing can be drawn from the standing anyway - `modListing` needs both halves
+    // - so this read is left to run on its own rather than hold the first paint of the window on a network
+    // round trip. Once they are in the standing is a local read, and `gatherInstall` takes it.
+    if (switched && install && this.modFeeds === null) void quietly(() => this.refreshModOffers(install));
     // A held plan is dropped whichever install this is: it is how the flow that just ran closes its dialog.
     this.modPlan = null;
     this.modParts = null;
     this.modInputs = null;
+    const token = ++this.readToken;
     if (!install) {
       this.contents = {};
       this.modSettings = [];
       this.modById = new Map();
-      this.index();
+      this.applyIndex(indexFor({}, []));
       this.overrides = {};
       // With nothing selected there is nothing to reconcile, and a question left standing would be asked
       // about a game no longer on screen.
       this.reconciled = {};
       this.settingsChoices = [];
       this.split = {};
+      this.sfallInstalled = null;
+      this.hiresInstalled = null;
+      // `engines` is the machine's and is left alone here: a folder switch moves what is deployed, not what
+      // the cache holds, and rereading the listing took every Run in X button off the bar for the reads.
+      this.engineDeployed = {};
+      // No folder to stand against. Cleared here rather than on every switch, where the reading brings its own.
+      this.modStanding = null;
+      this.standingFor = "";
       this.setMods({ text: undefined, present: [], owners: [] });
       return;
     }
-    this.contents = await backend.loadConfigFiles(install.path);
-    // Before the index, which folds the schemas' values into the baseline the controls read.
-    this.modSettings = await backend.modSettings(install);
-    this.modById = new Map(this.modSettings.flatMap((group) => group.settings.map((s) => [s.id, s])));
-    this.index();
-    this.overrides = await this.applyPins(install.path);
-    await this.settleLinked(install.path);
-    await this.readMods(install);
-    this.sfallInstalled = await backend.installedSfallVersion(install);
-    this.hiresInstalled = await backend.installedHiresVersion(install);
-    this.engineDeployed = Object.fromEntries((await backend.deployedEngines(install)).map((one) => [one.id, one]));
-    // Last, because it reads what is deployed above: an engine's tab goes when the engine does, and a
-    // selection left pointing at it would show neither that tab nor any other.
+    const read = await this.gatherInstall(install, switched);
+    // A read the user has already moved on from: two quick clicks between games leave two of these in flight,
+    // and the slower one landing last would publish the game that is no longer selected.
+    if (token !== this.readToken) return;
+    this.publish(read);
+  }
+
+  /** Everything one reading of an install produces, held together so it can be published in a single frame. */
+  private async gatherInstall(install: Install, switched: boolean): Promise<InstallRead> {
+    // Together rather than one after another: these reads do not feed each other, and every round trip in
+    // series is time the pane spends showing the game the user has already clicked away from.
+    const [onDisk, modSettings] = await Promise.all([
+      backend.loadConfigFiles(install.path),
+      backend.modSettings(install),
+    ]);
+    // Only the files move from here: writing the pins below rereads them.
+    let contents = onDisk;
+    const modById = new Map(modSettings.flatMap((group) => group.settings.map((s) => [s.id, s])));
+    const modDefs = [...modById.values()];
+    let index = indexFor(contents, modDefs);
+
+    /*
+      A pin is ZAX's own, not the user's, so it is written on sight rather than queued behind the Save button
+      and counted as an unsaved change - which left every install permanently one edit behind with nothing the
+      user had done to explain it. The setting still shows its pinned value and the reason for it, which is
+      where a user sees a pin; the unsaved count is for their own edits. Written whatever `autosave` says, for
+      the same reason: the setting governs edits, and this is not one.
+
+      A pin that does not take stays a pending change, so it is visible rather than silently retried on every
+      read - and so this cannot write in a loop against a file that will not hold the value.
+    */
+    let overrides: Record<string, string> = {};
+    const wanted = pinsFor(contents, index);
+    if (Object.keys(wanted).length > 0) {
+      const outcome = await backend.saveConfigFiles({
+        installPath: install.path,
+        original: contents,
+        changes: changesFor(contents, index, modById, wanted),
+      });
+      if (!outcome.ok) overrides = wanted;
+      else {
+        contents = await backend.loadConfigFiles(install.path);
+        index = indexFor(contents, modDefs);
+        overrides = pinsFor(contents, index);
+      }
+    }
+
+    let linked = await this.reconcileLinked(install.path, contents, overrides);
+    let carry: Notice | null = null;
+    const count = Object.keys(linked.carried).length;
+    if (count > 0) {
+      const what = count === 1 ? "One setting was" : `${count} settings were`;
+      const said = `${what} changed outside ZAX and carried across to the other engines.`;
+      const written = this.autosave ? await this.writeCarried(install.path, contents, index, modById, linked) : null;
+      if (written) {
+        contents = written.contents;
+        index = written.index;
+        // Read back rather than assumed: the write moved each address's base with it, so this settles nothing
+        // further and leaves the rows describing the install as it now stands.
+        linked = await this.reconcileLinked(install.path, contents, written.overrides);
+      }
+      carry = { kind: "note", text: written ? said : `${said} Save to keep them, or revert.` };
+    }
+
+    // Where the game stands against the published mods is the one half a change of game invalidates, and it
+    // is read from the folder this names, so nothing but a switch can have moved it - `refreshModOffers` is
+    // what the mod flows call, having moved it themselves.
+    const [mods, sfall, hires, deployed, standing] = await Promise.all([
+      backend.loadMods(install),
+      backend.installedSfallVersion(install),
+      backend.installedHiresVersion(install),
+      backend.deployedEngines(install),
+      switched && this.modFeeds !== null ? backend.modInstallState(install) : null,
+    ]);
+    return {
+      path: install.path,
+      contents,
+      modSettings,
+      modById,
+      index,
+      overrides: linked.overrides,
+      reconciled: linked.carried,
+      settingsChoices: linked.choices,
+      split: linked.split,
+      carry,
+      mods,
+      sfall,
+      hires,
+      engineDeployed: Object.fromEntries(deployed.map((one) => [one.id, one])),
+      standing,
+    };
+  }
+
+  /** One reading, onto the screen, with nothing awaited in between - see `readInstall`. */
+  private publish(read: InstallRead): void {
+    this.contents = read.contents;
+    this.modSettings = read.modSettings;
+    this.modById = read.modById;
+    this.applyIndex(read.index);
+    this.overrides = read.overrides;
+    this.reconciled = read.reconciled;
+    this.settingsChoices = read.settingsChoices;
+    this.split = read.split;
+    this.setMods(read.mods);
+    this.sfallInstalled = read.sfall;
+    this.hiresInstalled = read.hires;
+    this.engineDeployed = read.engineDeployed;
+    if (read.standing !== null) {
+      this.modStanding = read.standing;
+      this.standingFor = read.path;
+      // Nothing else may land on top of it: a read this one overtook is about the game just left behind.
+      this.standingRequest += 1;
+    }
+    // Held by identity, so reverting the carry takes its own banner down and not a save's report on top of it.
+    this.carryNotice = read.carry;
+    if (read.carry) this.notice = read.carry;
+    // After what it reads: an engine's tab goes when the engine does, and a selection left pointing at it
+    // would show neither that tab nor any other.
     this.settleSettingsTab();
   }
 
@@ -630,70 +836,68 @@ class Store {
   }
 
   /**
-   * Carries a linked setting's newer value across to the engines that have not got it yet.
+   * Weighs each engine's copy of a linked setting against its base, queues what ZAX can settle, and answers
+   * the whole reading: the overrides with the carries folded in, what was carried, what is left to choose,
+   * and every address that disagrees.
    *
-   * Left pending rather than written where the user saves for themselves: this is a value they set somewhere
-   * else - inside an engine's own preferences screen, or by hand - so it is put in front of them as an edit
-   * they can undo, not applied to three files during a load they only meant as a load. A setting whose
-   * engines have both moved is not settled at all; which value survives is theirs to pick.
-   *
-   * Under autosave it is written here instead, for the same reason the pending form exists: the user has to
-   * be able to act on it. Autosave disables Save and draws no revert control, so a carry queued there is an
-   * edit nobody can save or undo, under a banner asking for both - and it blocks every mod flow, which
-   * refuses to run over unsaved edits. Written, the banner reports what happened rather than asking.
+   * A carry is left pending rather than written where the user saves for themselves: this is a value they set
+   * somewhere else - inside an engine's own preferences screen, or by hand - so it is put in front of them as
+   * an edit they can undo, not applied to three files during a load they only meant as a load. A setting
+   * whose engines have both moved is not settled at all; which value survives is theirs to pick.
    */
-  private async settleLinked(installPath: string): Promise<void> {
-    const carried = await this.reconcileLinked(installPath);
-    const count = Object.keys(carried).length;
-    this.carryNotice = null;
-    if (count === 0) return;
-    const what = count === 1 ? "One setting was" : `${count} settings were`;
-    const carry = `${what} changed outside ZAX and carried across to the other engines.`;
-    if (this.autosave && (await this.writeCarried(installPath, carried))) {
-      // Read back rather than assumed: the write moved each address's base with it, so this settles nothing
-      // further and leaves the rows describing the install as it now stands.
-      await this.reconcileLinked(installPath);
-      this.carryNotice = this.notice = { kind: "note", text: carry };
-      return;
-    }
-    this.carryNotice = this.notice = { kind: "note", text: `${carry} Save to keep them, or revert.` };
-  }
-
-  /** Weighs each engine's copy against its base, queues what ZAX can settle, and answers what it carried. */
-  private async reconcileLinked(installPath: string): Promise<Record<string, Reconciled>> {
-    const found = reconcileSettings(SETTINGS, this.contents, await backend.settingsBase(installPath));
+  private async reconcileLinked(
+    installPath: string,
+    contents: ConfigFileContents,
+    overrides: Record<string, string>,
+  ): Promise<Linked> {
+    const found = reconcileSettings(SETTINGS, contents, await backend.settingsBase(installPath));
     const carried: Record<string, Reconciled> = {};
-    const next = { ...this.overrides };
+    const next = { ...overrides };
     for (const one of found) {
       if (!one.settle) continue;
       next[one.id] = one.settle.value;
       carried[one.id] = { from: one.settle.target.file, at: one.at };
     }
-    this.overrides = next;
-    this.reconciled = carried;
-    this.settingsChoices = found.filter((one) => one.choose !== undefined);
-    // Every disagreement, including the ones already accepted - what makes an edit to them count as one.
-    this.split = Object.fromEntries(found.map((one) => [one.id, true as const]));
-    return carried;
+    return {
+      overrides: next,
+      carried,
+      choices: found.filter((one) => one.choose !== undefined),
+      // Every disagreement, including the ones already accepted - what makes an edit to them count as one.
+      split: Object.fromEntries(found.map((one) => [one.id, true as const])),
+    };
   }
 
   /**
-   * Writes the values just carried across, answering whether they took. A refusal leaves them queued, which
-   * is the state the banner then describes - the alternative is a load that quietly loses them.
+   * Writes the values just carried across, answering with the files as they then stand, or null where the
+   * write was refused. A refusal leaves them queued, which is the state the banner then describes - the
+   * alternative is a load that quietly loses them.
+   *
+   * Under autosave the carry is written rather than queued, for the same reason the pending form exists: the
+   * user has to be able to act on it. Autosave disables Save and draws no revert control, so a carry queued
+   * there is an edit nobody can save or undo, under a banner asking for both - and it blocks every mod flow,
+   * which refuses to run over unsaved edits. Written, the banner reports what happened rather than asking.
    */
-  private async writeCarried(installPath: string, carried: Record<string, Reconciled>): Promise<boolean> {
-    const values = Object.fromEntries(Object.entries(this.overrides).filter(([id]) => id in carried));
+  private async writeCarried(
+    installPath: string,
+    contents: ConfigFileContents,
+    index: Indexed,
+    modById: ReadonlyMap<string, ModSetting>,
+    linked: Linked,
+  ): Promise<{ contents: ConfigFileContents; index: Indexed; overrides: Record<string, string> } | null> {
+    const values = Object.fromEntries(Object.entries(linked.overrides).filter(([id]) => id in linked.carried));
     const outcome = await backend.saveConfigFiles({
       installPath,
-      original: this.contents,
-      changes: this.pendingChanges(values),
+      original: contents,
+      changes: changesFor(contents, index, modById, values),
     });
-    if (!outcome.ok) return false;
-    this.contents = await backend.loadConfigFiles(installPath);
-    this.index();
-    // Dropped before the read back, which would otherwise carry them forward as edits of the user's own.
-    this.overrides = Object.fromEntries(Object.entries(this.overrides).filter(([id]) => !(id in carried)));
-    return true;
+    if (!outcome.ok) return null;
+    const written = await backend.loadConfigFiles(installPath);
+    return {
+      contents: written,
+      index: indexFor(written, [...modById.values()]),
+      // Dropped before the read back, which would otherwise carry them forward as edits of the user's own.
+      overrides: Object.fromEntries(Object.entries(linked.overrides).filter(([id]) => !(id in linked.carried))),
+    };
   }
 
   /**
@@ -740,34 +944,6 @@ class Store {
     this.modsText = snapshot.text;
     this.mods = listMods(snapshot);
     this.modsBaseline = this.mods;
-  }
-
-  /**
-   * Writes the pinned values, and answers with whatever would not take.
-   *
-   * A pin is ZAX's own, not the user's, so it is written on sight rather than queued behind the Save button and
-   * counted as an unsaved change - which left every install permanently one edit behind with nothing the user
-   * had done to explain it. The setting still shows its pinned value and the reason for it, which is where a
-   * user sees a pin; the unsaved count is for their own edits. Written whatever `autosave` says, for the same
-   * reason: the setting governs edits, and this is not one.
-   *
-   * A pin that does not take is returned as a pending change, so it is visible rather than silently retried on
-   * every read - and so this cannot write in a loop against a file that will not hold the value.
-   */
-  private async applyPins(installPath: string): Promise<Record<string, string>> {
-    const wanted = this.managedOverrides();
-    if (Object.keys(wanted).length === 0) return {};
-
-    const outcome = await backend.saveConfigFiles({
-      installPath,
-      original: this.contents,
-      changes: this.pendingChanges(wanted),
-    });
-    if (!outcome.ok) return wanted;
-
-    this.contents = await backend.loadConfigFiles(installPath);
-    this.index();
-    return this.managedOverrides();
   }
 
   /**
@@ -1110,7 +1286,10 @@ class Store {
       // a slower earlier answer can still be out when it lands - and would arrive either on top of the answer
       // the Refresh button just fetched, or under a game that is no longer selected, forgetting it having
       // been dropped from the list among them.
-      if (request === this.standingRequest && this.selectedInstall === install.path) this.modStanding = standing;
+      if (request === this.standingRequest && this.selectedInstall === install.path) {
+        this.modStanding = standing;
+        this.standingFor = install.path;
+      }
     } finally {
       this.modReads -= 1;
     }
@@ -1154,6 +1333,12 @@ class Store {
   private modFlowRefusal(): Notice | null {
     if (this.modsChanged || this.modifiedCount > 0) {
       return { kind: "problem", text: "There are unsaved edits - save or revert them before changing mods." };
+    }
+    // The rows on screen belong to the game the standing was read for, and a switch leaves them there until
+    // the new game's reading lands. A click inside that window would run the row's action against a folder
+    // the row never described - it says which mods are eligible, and eligibility is per game.
+    if (this.standingFor !== this.selectedInstall) {
+      return { kind: "problem", text: "The mods for this game are still being read - try that again in a moment." };
     }
     return null;
   }
@@ -1693,17 +1878,7 @@ class Store {
 
   /** Values to write, as the keys they write. The queued edits unless another set is named. */
   private pendingChanges(values: Record<string, string> = this.overrides): ConfigChange[] {
-    const out: ConfigChange[] = [];
-    for (const [id, value] of Object.entries(values)) {
-      const def = this.defOf(id) ?? this.discovered.find((s) => s.id === id);
-      if (!def) continue;
-      // Every address the setting has that is actually writable here - one edit, one value, however many
-      // names the installed engines keep it under. `liveTargets` is what leaves a dormant engine's alone.
-      for (const at of liveTargets(def, this.contents)) {
-        out.push({ file: at.file, section: at.section, key: at.key, value });
-      }
-    }
-    return out;
+    return changesFor(this.contents, this.indexed, this.modById, values);
   }
 
   async save(): Promise<void> {

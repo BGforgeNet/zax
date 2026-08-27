@@ -55,7 +55,7 @@ describe("a hidden setting", () => {
 
   test("is drawn anyway where ZAX pins its value", () => {
     const pinned = SETTINGS.find((one) => one.managed);
-    if (!pinned) return; // No setting is pinned in this catalog; nothing to assert.
+    if (!pinned) throw new Error("no setting in this catalog is pinned - the state this case names is gone");
     const view = draw([{ kind: "setting", id: pinned.id, hidden: true }] as never);
     expect(view.text()).toContain(pinned.label);
   });

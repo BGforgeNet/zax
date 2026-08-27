@@ -23,8 +23,10 @@
   $effect(() => {
     // Re-read when the selected install changes: another install's slots are not this one's.
     const path = store.install?.path;
-    void path;
     void store.saveSlots().then((found) => {
+      // The read is a round trip, and two of them are out after two quick switches: the slower one landing
+      // last would list the game left behind, with its slots ticked into a report about this one.
+      if (store.install?.path !== path) return;
       slots = found;
       chosen = [];
     });
