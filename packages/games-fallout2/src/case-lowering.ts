@@ -6,13 +6,22 @@
  * hand; the Windows route never meets the problem and carries no such check. So this is ZAX's to do, and it
  * is the widest-reaching rename in the application - hence the guards. It runs only where the filesystem
  * actually distinguishes case, only on entries that actually differ from their lowercase form, never inside
- * `backup/`, and not at all if two entries would collide, which is the one outcome that loses a file.
+ * `backup/` or a `.git/`, and not at all if two entries would collide, which is the one outcome that loses a
+ * file.
  */
 
 import type { Platform } from "@zax/platform";
 
 /** Where the install's own way back lives. Renaming inside it would rewrite the history it exists to keep. */
 const BACKUP = "backup";
+
+/**
+ * A repository's own bookkeeping. `HEAD`, `ORIG_HEAD` and a branch named with a capital are all uppercase by
+ * design, so lowercasing inside one leaves a repository git can no longer open - and the game never reads it.
+ * Matched case-insensitively like `backup`: on a case-sensitive filesystem `.GIT` is not a repository, and
+ * renaming it to `.git` would hand git a directory it then believes is one.
+ */
+const GIT = ".git";
 
 const inside = (platform: Platform, root: string, relative: string): string =>
   platform.paths.join(root, ...relative.split("/"));
@@ -60,8 +69,11 @@ export async function mixedCasePaths(platform: Platform, root: string): Promise<
 
     for (const entry of entries) {
       const path = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
-      // The one exclusion, and it is the whole of it: everything else in the tree is the game's.
+      // The two exclusions, and they are the whole of them: everything else in the tree is the game's.
       if (prefix === "" && entry.kind === "dir" && entry.name.toLowerCase() === BACKUP) continue;
+      // At any depth, where backup is the root's alone: a repository around a mods directory, or one a mod
+      // was unpacked from, breaks exactly as thoroughly as one at the top.
+      if (entry.kind === "dir" && entry.name.toLowerCase() === GIT) continue;
       if (entry.kind === "dir") await walk(path);
       if (entry.name !== entry.name.toLowerCase()) out.push(path);
     }

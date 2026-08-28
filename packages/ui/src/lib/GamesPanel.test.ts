@@ -121,10 +121,52 @@ describe("adding an install", () => {
 });
 
 describe("removing an install", () => {
-  test("removes the selected one", () => {
+  test("asks before removing anything, and names the install it is asking about", () => {
     const remove = vi.spyOn(store, "removeInstall").mockResolvedValue(undefined);
-    panel().control("Remove from list").click();
-    expect(remove).toHaveBeenCalledWith(PREVIEW_INSTALL);
+    const view = panel();
+
+    view.control("Remove from list").click();
+    view.settle();
+
+    expect(view.text()).toContain("Remove from the list?");
+    // The dialog's own copy of the path, not the row's: what it names is what it will remove.
+    expect(view.one(".ask.path").textContent).toBe(PREVIEW_INSTALL);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  /* The button says Remove beside an Add, which is what an uninstall looks like; this is the sentence that
+     says the game folder is not what goes. */
+  test("says the game folder is left alone", () => {
+    const view = panel();
+    view.control("Remove from list").click();
+    view.settle();
+
+    expect(view.text()).toContain("Nothing in the game folder is touched");
+    expect(view.text()).toContain("no files are deleted");
+  });
+
+  test("confirming removes the selected one", () => {
+    const remove = vi.spyOn(store, "removeInstall").mockResolvedValue(undefined);
+    const view = panel();
+
+    view.control("Remove from list").click();
+    view.settle();
+    view.control("Remove it").click();
+
+    expect(remove).toHaveBeenCalledExactlyOnceWith(PREVIEW_INSTALL);
+  });
+
+  test("Cancel closes the question without removing anything", () => {
+    const remove = vi.spyOn(store, "removeInstall").mockResolvedValue(undefined);
+    const view = panel();
+
+    view.control("Remove from list").click();
+    view.settle();
+    view.control("Cancel").click();
+    view.settle();
+
+    expect(remove).not.toHaveBeenCalled();
+    expect(view.one<HTMLDialogElement>("dialog").open).toBe(false);
   });
 
   test("is off with nothing selected", () => {

@@ -71,6 +71,17 @@ describe("what the pass would rename", () => {
     expect(await mixedCasePaths(platform, GAME)).toEqual([]);
   });
 
+  it("leaves a .git alone wherever it sits, not only at the top", async () => {
+    // A game folder somebody keeps under version control, and one where a mod was unpacked from a clone: the
+    // exclusion is the directory, not the depth it was found at.
+    const platform = gamePlatform({
+      [`${GAME}/.git/HEAD`]: "ref: refs/heads/main",
+      [`${GAME}/.git/refs/heads/Fixes`]: "SHA",
+      [`${GAME}/mods/rpu/.git/ORIG_HEAD`]: "SHA",
+    });
+    expect(await mixedCasePaths(platform, GAME)).toEqual([]);
+  });
+
   it("refuses the whole pass when two entries differ only by case", async () => {
     // Legal on a case-sensitive filesystem and impossible afterwards: renaming one onto the other loses it.
     const platform = gamePlatform({ [`${GAME}/mods/Rpu.dat`]: "ONE", [`${GAME}/mods/rpu.dat`]: "TWO" });
@@ -102,6 +113,17 @@ describe("lowercasing the tree", () => {
     await expect(lowercaseTree(platform, GAME)).rejects.toThrow(/Rpu\.dat/);
     // The unrelated entry is still where it was: the refusal is of the pass, not of one rename in it.
     expect(platform.textAt(`${GAME}/Other.dat`)).toBe("X");
+  });
+
+  it("renames around a repository rather than through it", async () => {
+    // `HEAD` lowercased is a repository git cannot open, and the game reads none of these files anyway.
+    const platform = gamePlatform({
+      [`${GAME}/.git/HEAD`]: "ref: refs/heads/main",
+      [`${GAME}/Master.dat`]: "MASTER",
+    });
+    expect(await lowercaseTree(platform, GAME)).toEqual(["Master.dat"]);
+    expect(platform.textAt(`${GAME}/.git/HEAD`)).toBe("ref: refs/heads/main");
+    expect(await platform.fs.stat(`${GAME}/.git/head`)).toBeNull();
   });
 
   it("does nothing to a tree that is already lowercase", async () => {

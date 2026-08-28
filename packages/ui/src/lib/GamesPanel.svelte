@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { GAME_TYPES, displayName } from "@zax/core";
+  import { GAME_TYPES, displayName, type Install } from "@zax/core";
+  import Dialog from "./Dialog.svelte";
   import { isPreview, PREVIEW_REASON } from "./host.js";
   import { GAME_ICON } from "./icons.js";
   import { store } from "./store.svelte.js";
@@ -8,6 +9,19 @@
 
   let adding = $state(false);
   let candidate = $state("");
+
+  /*
+    The button sits beside Add game and says Remove, which is what an uninstall looks like from here, so the
+    confirmation exists to say what it does not do. The install is held rather than re-read on confirm: what
+    the dialog names is what it removes.
+  */
+  let confirming = $state<Install | null>(null);
+
+  function remove(): void {
+    const install = confirming;
+    confirming = null;
+    if (install) void store.removeInstall(install.path);
+  }
 
   function submit() {
     void store.addInstall(candidate).then(() => {
@@ -90,12 +104,29 @@
   {:else}
     <div class="buttons">
       <button onclick={() => (adding = true)}>Add game</button>
-      <button class="remove" disabled={!current} onclick={() => current && void store.removeInstall(current.path)}>
+      <button class="remove" disabled={!current} onclick={() => (confirming = current ?? null)}>
         Remove from list
       </button>
     </div>
   {/if}
 </div>
+
+<Dialog open={confirming !== null} title="Remove from the list?" dismiss={() => (confirming = null)}>
+  {#if confirming}
+    <p class="ask"><strong>{displayName(confirming)}</strong></p>
+    <p class="ask path">{confirming.path}</p>
+    <p class="ask">
+      ZAX forgets this installation: it drops off the list, along with what ZAX recorded about it. Nothing in the game
+      folder is touched - no files are deleted, and the game stays playable. Adding the folder again brings it back.
+    </p>
+  {/if}
+  {#snippet footer()}
+    <button onclick={() => (confirming = null)}>Cancel</button>
+    <!-- Not "Remove from list" again: two controls of that name are on screen at once, and the one that acts
+         should not be the one the user has already pressed. -->
+    <button class="danger" onclick={remove}>Remove it</button>
+  {/snippet}
+</Dialog>
 
 <style>
   .panel {
@@ -230,5 +261,32 @@
   .buttons button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
+  }
+
+  .ask {
+    margin: 0 0 8px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  .ask:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Compound, so the path keeps the rows' quiet mono against .ask's paragraph type whatever the source order. */
+  .ask.path {
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  /* The clothes the wipe confirmations wear, since this is the same kind of button in the same kind of footer. */
+  .danger {
+    background: var(--panel);
+    border: 1px solid var(--invalid);
+    border-radius: 6px;
+    padding: 3px 10px;
+    color: var(--invalid);
+    font-size: 12px;
   }
 </style>
