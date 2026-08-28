@@ -364,12 +364,12 @@ export async function applyCreateInstall(
     options,
   );
 
-  const list = await fetchList(platform, work, archivePath, manifest, creates);
-
-  // Read before the record is written rather than only before the extraction: what keeps a payload out of the
-  // host install is this list rather than anything the archive promises, and a payload refused here is one
-  // nothing was started for. It is also what says which of its files belong to the user.
+  // Before anything is taken out of the archive, and so before the record is written: what keeps a payload out
+  // of the host install is this list rather than anything the archive promises, and reading the payload's own
+  // extraction list is itself an extraction. It is also what says which of its files belong to the user.
   const entries = await confinedEntries(platform, archivePath, archive, manifest, creates);
+
+  const list = await fetchList(platform, work, archivePath, manifest, creates);
 
   const pending: InstalledMod = {
     id: manifest.id,

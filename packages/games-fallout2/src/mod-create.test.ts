@@ -226,6 +226,26 @@ describe("performing an install that creates another", () => {
     expect(await apart.fs.stat(`${GAME}/Fallout1in2/Fallout2.exe`)).not.toBeNull();
   });
 
+  it("judges the archive before it takes anything out of it, not after", async () => {
+    // The payload's own list is read out of the archive before the payload lands, and reading it is an
+    // extraction like any other - so the archive has to have been judged first. Planned against a listing that
+    // declares only files and installed against one that declares a link, which is the case the preflight
+    // exists for: what an archive says it holds is a declaration, and the one the plan saw is not the one the
+    // install reads.
+    const platform = createPlatform();
+    const found = await release();
+    const plan = await planCreateInstall(platform, install, found, inputs, TOOL);
+    const planted = createPlatform();
+    const listed = planted.archive.list.bind(planted.archive);
+    planted.archive.list = async (archive) => [
+      ...(await listed(archive)),
+      { name: "Fallout1in2/link", kind: "link", size: 0 },
+    ];
+
+    await expect(applyCreateInstall(planted, install, found, plan, TOOL)).rejects.toThrow(/symbolic link/);
+    expect(planted.extracted).toEqual([]);
+  });
+
   it("leaves the record incomplete when the extraction fails, so a relaunch says so", async () => {
     const platform = createPlatform();
     const found = await release();
