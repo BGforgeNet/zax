@@ -9,9 +9,19 @@
  */
 
 import { parse, stringify } from "yaml";
-import { fnv1a } from "@zax/core";
+import { fnv1a, identifyInstall, type GameType } from "@zax/core";
 import type { Platform } from "@zax/platform";
-import { insideMods, isConfined, isModId, isModVersion, mayWrite, parseManifest, type ModType } from "./manifest.js";
+import {
+  insideMods,
+  isConfined,
+  isModId,
+  isModVersion,
+  mayWrite,
+  parseManifest,
+  type ModManifest,
+  type ModType,
+} from "./manifest.js";
+import { createdInstallPath } from "./mod-created.js";
 import { grantsFor } from "./mod-grants.js";
 
 /**
@@ -399,10 +409,66 @@ export async function saveRecord(platform: Platform, record: InstallRecord): Pro
   await platform.fs.write(at, new TextEncoder().encode(body));
 }
 
+/** The manifest a record kept, or null where this version cannot read it back. */
+function recordedManifest(mod: InstalledMod): ModManifest | null {
+  try {
+    return parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version });
+  } catch {
+    // An unreadable snapshot is not evidence the mod was removed, so the entry is judged by what else it has.
+    return null;
+  }
+}
+
 /**
- * Reconciles a record against the directory it describes. A mod whose recorded files are all gone was
- * removed behind ZAX's back and is dropped - the two cannot drift far - while a directory that cannot be
- * read at all sets the record aside untouched, the same tolerance the install list extends to the install.
+ * Whether the directory still holds this mod.
+ *
+ * A recorded file list answers for itself. A base mod has none - its installer decides what lands, so the
+ * record is written with an empty list on purpose - and what answers for it instead is what the directory has
+ * become: the type read off the directory now, against the type the mod's manifest says it makes. Without
+ * this second arm a base mod removed behind ZAX's back stays "installed and current" against a folder that
+ * reads as vanilla everywhere else in the interface, since the empty list can never be found missing.
+ */
+async function stillInstalled(
+  platform: Platform,
+  root: string,
+  identified: GameType | null,
+  mod: InstalledMod,
+): Promise<boolean> {
+  for (const file of mod.files) {
+    if ((await platform.fs.stat(platform.paths.join(root, ...file.split("/"))))?.kind === "file") return true;
+  }
+  if (mod.files.length > 0) return false;
+
+  // An unfinished install is a transaction marker rather than a claim about the directory - it is what lets a
+  // relaunch offer the retry, and a directory part way through an install is exactly what it describes.
+  if (!mod.complete) return true;
+
+  // The same tolerance the caller extends to an unreadable directory: a path that no longer reads as an
+  // install at all says the installation is gone, not that this mod was taken out of it.
+  if (identified === null) return true;
+
+  const manifest = recordedManifest(mod);
+  // Nothing to test against - an entry written before the manifest was kept, or one this version cannot
+  // parse. Kept, which is what the empty file list alone did before this arm existed.
+  if (manifest?.becomes === undefined) return true;
+
+  // A mod that makes its own install answers from the directory it made; one that converts this installation
+  // answers from what this installation now is. Read the same way `readModInstallState` reads presence, so
+  // the row and the record cannot disagree about which directory decides.
+  if (manifest.creates) {
+    const where = { becomes: manifest.becomes, creates: manifest.creates };
+    return (
+      (await platform.fs.stat(createdInstallPath(platform.paths, { path: root, type: identified }, where)))?.kind ===
+      "dir"
+    );
+  }
+  return identified === manifest.becomes;
+}
+
+/**
+ * Reconciles a record against the directory it describes. A mod the directory no longer holds was removed
+ * behind ZAX's back and is dropped - the two cannot drift far - while a directory that cannot be read at all
+ * sets the record aside untouched, the same tolerance the install list extends to the install.
  * The pruned record is saved when anything changed, so the drop happens once rather than on every load.
  */
 export async function reconcileRecord(platform: Platform, record: InstallRecord): Promise<InstallRecord> {
@@ -410,17 +476,13 @@ export async function reconcileRecord(platform: Platform, record: InstallRecord)
   if (record.laterFormat !== undefined) return record;
   if ((await platform.fs.stat(record.path))?.kind !== "dir") return record;
 
+  // Once for the pass rather than per entry: every mod asks the same directory what it has become, and this
+  // is two listings.
+  const identified = await identifyInstall(platform, record.path);
+
   const kept: InstalledMod[] = [];
   for (const mod of record.mods) {
-    let present = mod.files.length === 0;
-    for (const file of mod.files) {
-      const at = platform.paths.join(record.path, ...file.split("/"));
-      if ((await platform.fs.stat(at))?.kind === "file") {
-        present = true;
-        break;
-      }
-    }
-    if (present) kept.push(mod);
+    if (await stillInstalled(platform, record.path, identified, mod)) kept.push(mod);
   }
   const keptEngines: InstalledEngine[] = [];
   for (const engine of record.engines ?? []) {

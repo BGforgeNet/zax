@@ -1791,6 +1791,54 @@ describe("the feeds against a change of game", () => {
     return vi.spyOn(hostBackend, "publishedMods").mockResolvedValue(feeds);
   };
 
+  test("are read before the standing on the first reading, so both halves describe one set of releases", async () => {
+    // Where an install stands is decided against the releases the backend is holding, so a read that
+    // replaces them has to land first. Started the other way round, the two halves could describe different
+    // sets - and `listingFrom` drops a mod published by one and unknown to the other without a word, which
+    // is a row that vanishes until Refresh happens to read both again.
+    const order: string[] = [];
+    let answerFeeds!: () => void;
+    const held = new Promise<void>((resolve) => (answerFeeds = resolve));
+    vi.spyOn(hostBackend, "publishedMods").mockImplementation(async () => {
+      order.push("feeds");
+      await held;
+      return feeds;
+    });
+    vi.spyOn(hostBackend, "modInstallState").mockImplementation(async () => {
+      order.push("standing");
+      return standingOf("mine");
+    });
+
+    // Neither half read yet, which is the state a launch starts in.
+    store.modFeeds = null;
+    store.installs = [...store.installs, other];
+    await store.selectInstall(other.path);
+
+    await vi.waitFor(() => expect(order).toEqual(["feeds"]));
+    expect(order, "the standing may not be asked while the feeds are still out").toEqual(["feeds"]);
+    answerFeeds();
+    await vi.waitFor(() => expect(order).toEqual(["feeds", "standing"]));
+  });
+
+  test("leave the tab unsettled, with the reason, until the reading its rows describe has landed", async () => {
+    const answered = published();
+    vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(standingOf("mine"));
+    await store.loadModOffers();
+    expect(store.modsSettled, "both halves in, for this game, with nothing out").toBe(true);
+    expect(store.modsUnsettled, "nothing to explain while they agree").toBeNull();
+
+    // The moment a change of game opens: the rows on screen are the game left behind, and an install fired
+    // at them would act on a folder the row never described.
+    store.installs = [...store.installs, other];
+    store.selectedInstall = other.path;
+    expect(store.modsSettled).toBe(false);
+    expect(store.modsUnsettled).toBe(
+      "Reading this game's folder. Until it answers, the rows below are the game you were on.",
+    );
+
+    expect(answered).toHaveBeenCalled();
+  });
+
   test("are not read again for a change of game - one release is published for every install", async () => {
     const asked = published();
     vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(standingOf("mine"));

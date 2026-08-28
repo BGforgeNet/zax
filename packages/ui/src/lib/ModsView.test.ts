@@ -332,6 +332,30 @@ describe("what a row offers to do", () => {
     expect(actions({ kind: "convert", from: "14.7", was: "pluggable" }, { type: "permanent" })).toContain("Remove");
   });
 
+  /*
+    A change of game leaves the previous game's rows on screen until the new game's reading lands. Disabled
+    for that moment rather than clickable-and-refused: the row describes a folder the button would no longer
+    act on, and the tab has no other way to say so before the click.
+  */
+  test("keeps a row's actions live, and says nothing, while the rows describe the selected game", () => {
+    publish();
+    const drawn = view();
+    expect(drawn.all(".offer .primary")[0]?.hasAttribute("disabled")).toBe(false);
+    expect(drawn.all(".pending")).toHaveLength(0);
+  });
+
+  test("disables a row's actions while the rows describe some other game, and says why", () => {
+    publish();
+    const selected = store.selectedInstall;
+    store.selectedInstall = "/games/elsewhere";
+    const drawn = view();
+    expect(drawn.all(".offer .primary")[0]?.hasAttribute("disabled")).toBe(true);
+    // The reason on screen, not only a greyed control: both come from one sentence in the store.
+    expect(drawn.one(".pending").textContent).toBe(store.modsUnsettled);
+    expect(drawn.text()).toContain("Reading this game's folder.");
+    store.selectedInstall = selected;
+  });
+
   test("refuses the version picker where the feeds cannot be read, and says which host can", () => {
     publish();
     const button = view().control("Other version");

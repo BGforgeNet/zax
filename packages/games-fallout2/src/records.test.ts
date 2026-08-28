@@ -135,6 +135,90 @@ describe("record reconciliation", () => {
   });
 });
 
+/**
+ * A base mod is recorded with no file list at all - its installer decides what lands - so the file test above
+ * can never find one missing. What answers for it is the type the directory reads as now.
+ */
+describe("reconciling a base mod, which records no files", () => {
+  /** As `applyBaseInstall` writes one. */
+  const upu = (over: Partial<InstalledMod> = {}): InstalledMod => ({
+    id: "upu",
+    version: "34",
+    type: "base",
+    complete: true,
+    files: [],
+    manifest:
+      "spec: 1\nid: upu\nname: Unofficial Patch Updated\ngame: fallout2\ntype: base\nbecomes: fallout2upu\n" +
+      // Named because a base mod carries an installer or a `creates`, and one without either is refused.
+      "installer:\n  other:\n    asset: upu_v34.zip\n    run: upu-install.sh\n",
+    shipped: {},
+    ...over,
+  });
+
+  /** What `detectGameType` reads: the marker every install has, and the dat that names UPU. */
+  const vanilla = { [`${GAME}/fallout2.exe`]: "MZ" };
+  const patched = { ...vanilla, [`${GAME}/mods/upu.dat`]: "dat" };
+
+  it("drops it once the folder has gone back to vanilla - a reset behind ZAX's back", async () => {
+    const platform = new MemoryPlatform({ files: vanilla });
+    await saveRecord(platform, { path: GAME, mods: [upu()] });
+    expect((await reconcileRecord(platform, await loadRecord(platform, GAME))).mods).toEqual([]);
+    // Pruned on disk as well, so the row and the game list agree on the next load too.
+    expect((await loadRecord(platform, GAME)).mods).toEqual([]);
+  });
+
+  it("keeps it while the folder still reads as what the mod makes", async () => {
+    const platform = new MemoryPlatform({ files: patched });
+    await saveRecord(platform, { path: GAME, mods: [upu()] });
+    expect((await reconcileRecord(platform, await loadRecord(platform, GAME))).mods).toHaveLength(1);
+  });
+
+  it("keeps an unfinished one, which is the retry the next launch offers", async () => {
+    const platform = new MemoryPlatform({ files: vanilla });
+    await saveRecord(platform, { path: GAME, mods: [upu({ complete: false })] });
+    expect((await reconcileRecord(platform, await loadRecord(platform, GAME))).mods).toHaveLength(1);
+  });
+
+  it("keeps it where the folder no longer reads as an install at all", async () => {
+    // The installation itself is gone or unreadable, which says nothing about this mod having been removed.
+    const platform = new MemoryPlatform({ dirs: [GAME] });
+    await saveRecord(platform, { path: GAME, mods: [upu()] });
+    expect((await reconcileRecord(platform, await loadRecord(platform, GAME))).mods).toHaveLength(1);
+  });
+
+  it("keeps one whose manifest snapshot will not parse, having nothing to test it against", async () => {
+    const platform = new MemoryPlatform({ files: vanilla });
+    await saveRecord(platform, { path: GAME, mods: [upu({ manifest: "spec: 99\n" })] });
+    expect((await reconcileRecord(platform, await loadRecord(platform, GAME))).mods).toHaveLength(1);
+  });
+
+  /** Fallout et tu: a base mod whose install is a folder inside this one, so this one stays vanilla. */
+  const etTu = (over: Partial<InstalledMod> = {}): InstalledMod => ({
+    id: "fo1in2",
+    version: "1.16.3771",
+    type: "base",
+    complete: true,
+    files: [],
+    manifest:
+      "spec: 1\nid: fo1in2\nname: Fallout et tu\ngame: fallout2\ntype: base\nbecomes: fo1in2\n" +
+      "archive: Fallout1in2.zip\ncreates:\n  directory: Fallout1in2\n",
+    shipped: {},
+    ...over,
+  });
+
+  it("judges one that makes its own install by that directory rather than by this one", async () => {
+    const platform = new MemoryPlatform({ files: { ...vanilla, [`${GAME}/Fallout1in2/fallout2.exe`]: "MZ" } });
+    await saveRecord(platform, { path: GAME, mods: [etTu()] });
+    expect((await reconcileRecord(platform, await loadRecord(platform, GAME))).mods).toHaveLength(1);
+  });
+
+  it("drops one whose created install the user deleted by hand", async () => {
+    const platform = new MemoryPlatform({ files: vanilla });
+    await saveRecord(platform, { path: GAME, mods: [etTu()] });
+    expect((await reconcileRecord(platform, await loadRecord(platform, GAME))).mods).toEqual([]);
+  });
+});
+
 describe("a record a later ZAX wrote", () => {
   /** The same record with its format bumped past what this version writes - what a downgrade meets. */
   const laterOnDisk = async (platform: MemoryPlatform): Promise<string> => {

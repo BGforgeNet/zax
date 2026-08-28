@@ -430,8 +430,34 @@ class Store {
    * Which install the standing on screen was read for. The mod flows act on the selected folder, and the tab
    * keeps the previous game's rows until the new game's reading lands - so between the two there is a moment
    * where a row on screen describes a folder the buttons under it would no longer act on.
+   *
+   * `$state`, unlike the read bookkeeping above it: `modsSettled` reads this to disable those buttons for
+   * that moment rather than let them be clicked and refused.
    */
-  private standingFor = "";
+  private standingFor = $state("");
+  /**
+   * Why the rows on screen are not the folder as it now stands, or null when they are.
+   *
+   * One sentence, held here rather than written at the sites that need it: the tab disables its actions on
+   * this and says it in the same breath, and a reason shown that did not match the reason enforced would be
+   * worse than either alone. Only where a listing is drawn - before that the tab says it is reading, and a
+   * second sentence about the same wait would be two answers to one question.
+   */
+  modsUnsettled = $derived<string | null>(
+    this.modListing === null
+      ? null
+      : this.standingFor !== this.selectedInstall
+        ? "Reading this game's folder. Until it answers, the rows below are the game you were on."
+        : this.readingOffers
+          ? "Rereading the feeds and this game's folder. The rows below may be a moment out of date."
+          : null,
+  );
+  /**
+   * Whether the rows describe the folder as it is now, which is what every action on the tab is aimed at. An
+   * install or a removal fired at rows ZAX has not finished reading would act on what was there rather than
+   * on what is. `modFlowRefusal` still stands behind this for the click that gets through.
+   */
+  modsSettled = $derived(this.modListing !== null && this.modsUnsettled === null);
   /**
    * A resolved install plan awaiting the user's word, with the offer it belongs to. Two shapes: a stacking
    * mod's names every file, and a base mod's names the release and the space, the installer owning the rest.
@@ -631,10 +657,14 @@ class Store {
   }
 
   /**
-   * Every check the views otherwise wait for a click to make: what ZAX, sfall, the engines and the mod feeds
-   * have published. Off the `busy` gate on purpose - nobody asked for these, so holding the gate would grey
-   * out the controls and refuse the user's first click over a request of ZAX's own making. All four are the
-   * same answer for every install, which is why they are asked here once and not per game.
+   * Every check the views otherwise wait for a click to make: what ZAX, sfall and the engines have published.
+   * Off the `busy` gate on purpose - nobody asked for these, so holding the gate would grey out the controls
+   * and refuse the user's first click over a request of ZAX's own making. All are the same answer for every
+   * install, which is why they are asked here once and not per game.
+   *
+   * The mod feeds are not among them, though they are published the same way: where the install stands is read
+   * against the releases the backend is holding, so the two halves have to be read in order and by one caller.
+   * `readModListing` is that caller, and the read of the selected install starts it.
    *
    * A failure leaves its field alone rather than reporting: the views already have a state for an answer that
    * has not arrived, and several notices about an offline machine would bury the state file's own problems.
@@ -648,7 +678,6 @@ class Store {
       quietly(async () => {
         this.sfallLatest = await backend.latestSfall();
       }),
-      quietly(() => this.refreshModFeeds()),
       // Only the ones this machine could actually install, which is the condition the Check button carries.
       ...this.engines
         .filter((engine) => engine.build !== null)
@@ -676,10 +705,11 @@ class Store {
     // Saving a setting or installing an engine used to blank the Mods tab back to unread over it.
     const switched = (install?.path ?? "") !== this.readFor;
     this.readFor = install?.path ?? "";
-    // Before the feeds are in, nothing can be drawn from the standing anyway - `modListing` needs both halves
-    // - so this read is left to run on its own rather than hold the first paint of the window on a network
-    // round trip. Once they are in the standing is a local read, and `gatherInstall` takes it.
-    if (switched && install && this.modFeeds === null) void quietly(() => this.refreshModOffers(install));
+    // The first reading of both halves, left to run on its own rather than hold the first paint of the window
+    // on a network round trip. Once the feeds are in the standing is a local read, and `gatherInstall` takes
+    // it. Both halves rather than the standing alone: they have to describe one set of releases, and the tab
+    // draws nothing from either until both are in.
+    if (switched && install && this.modFeeds === null) void quietly(() => this.readModListing(install, false));
     // A held plan is dropped whichever install this is: it is how the flow that just ran closes its dialog.
     this.modPlan = null;
     this.modParts = null;
@@ -1316,8 +1346,24 @@ class Store {
   }
 
   /**
-   * Both halves, for the first read and for the Mods tab's Refresh button - which is the one control that
-   * asks the feeds again rather than be told what they said before.
+   * Both halves of the listing, from one reading of the feeds.
+   *
+   * In order rather than together, and every caller goes through here so that the order cannot be got wrong
+   * in one of them: where an install stands is decided against the releases the backend is holding, so a read
+   * that replaces them has to land first. Started either side of that boundary the two halves describe
+   * different sets of releases, and `listingFrom` drops a mod published by one and unknown to the other -
+   * silently, since a row that says nothing is worse than none. Startup used to ask for the standing first
+   * and the feeds after, which is how a feed that failed on that first attempt and answered on the retry cost
+   * its mod a row until Refresh read both again.
+   */
+  private async readModListing(install: Install, refresh: boolean): Promise<void> {
+    await this.refreshModFeeds(refresh);
+    await this.refreshModOffers(install);
+  }
+
+  /**
+   * Both halves, for the Mods tab's Refresh button - the one control that asks the feeds again rather than be
+   * told what they said before. On the `busy` gate because the user asked for it; the startup read is not.
    */
   async loadModOffers(refresh = false): Promise<void> {
     const install = this.install;
@@ -1326,11 +1372,7 @@ class Store {
       return;
     }
     await this.run("Reading the mod feeds", async () => {
-      // In order rather than together: where an install stands is read against what the feeds last published,
-      // so a refresh that replaces them has to land first - otherwise the tab draws the new set of mods
-      // against an answer taken about the old one, and a mod the refresh added has nothing to say about it.
-      await this.refreshModFeeds(refresh);
-      await this.refreshModOffers(install);
+      await this.readModListing(install, refresh);
       return null;
     });
   }

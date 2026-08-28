@@ -271,6 +271,11 @@
         {#if store.modListing === null}
           <p class="empty">{store.readingOffers ? "Reading the mod feeds..." : "The feeds have not been read yet."}</p>
         {:else}
+          <!-- Why every action below is refused, said where the rows are rather than only as a greyed button:
+             a control that will not answer and gives no reason reads as broken rather than as busy. -->
+          {#if store.modsUnsettled}
+            <p class="pending" role="status">{store.modsUnsettled}</p>
+          {/if}
           <div class="offers">
             {#if store.modListing.offers.length > 0}
               <!-- A heading for the two columns: a bare pair of versions beside a name does not say which is
@@ -327,7 +332,7 @@
                   {@const refusal = installRefusal(offer)}
                   <button
                     class="primary"
-                    disabled={refusal !== null || store.busy !== null}
+                    disabled={refusal !== null || store.busy !== null || !store.modsSettled}
                     title={refusal}
                     onclick={() => void store.prepareMod(offer)}
                   >
@@ -340,7 +345,7 @@
                      hidden where the list cannot be read, as the sfall panel's buttons are. -->
                   {#if installLabel(offer) !== null && installRefusal(offer) === null}
                     <button
-                      disabled={isPreview || store.busy !== null}
+                      disabled={isPreview || store.busy !== null || !store.modsSettled}
                       title={isPreview ? PREVIEW_FEEDS : null}
                       onclick={() => void openVersions(offer)}
                     >
@@ -348,12 +353,19 @@
                     </button>
                   {/if}
                   {#if offer.availability.kind === "retry"}
-                    <button disabled={store.busy !== null} onclick={() => void store.restoreMod(offer)}>
+                    <button
+                      disabled={store.busy !== null || !store.modsSettled}
+                      onclick={() => void store.restoreMod(offer)}
+                    >
                       {store.modWorking(offer.id, "restore") ? "Restoring..." : "Restore"}
                     </button>
                   {/if}
                   {#if removable(offer)}
-                    <button class="danger" disabled={store.busy !== null} onclick={() => void store.removeMod(offer)}>
+                    <button
+                      class="danger"
+                      disabled={store.busy !== null || !store.modsSettled}
+                      onclick={() => void store.removeMod(offer)}
+                    >
                       {store.modWorking(offer.id, "remove") ? "Removing..." : "Remove"}
                     </button>
                   {/if}
@@ -923,6 +935,20 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+  }
+
+  /*
+    Why the rows below cannot be acted on. Carries the accent bar the frame titles use rather than a warning
+    colour: nothing has gone wrong, ZAX is still reading - and it holds its space above the rows instead of
+    floating over them, so the list does not jump when the reading lands.
+  */
+  .pending {
+    margin: 8px var(--gutter) 0;
+    padding: 8px 12px;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    color: var(--text);
+    font-size: 13px;
   }
 
   /* The tab names the content, so the one control up here sits alone at the edge rather than under a heading. */
