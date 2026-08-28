@@ -9,6 +9,12 @@ Node 24 and pnpm. Its version is pinned in the root `package.json`'s `packageMan
 long as this is built and tested against Node 24. An update tool reporting it as two majors behind is
 describing the runtime, not the pin.
 
+TypeScript stays on the 6.0 line for the same kind of reason. The 7.0 compiler is stable, but it ships without
+a stable programmatic API until 7.1, and both `typescript-eslint` and `svelte-check` are built on that API and
+cap their peer range at 6 - so `pnpm lint` and `pnpm check` are what the bump is waiting on rather than the
+compiler itself. On 7.0 `pnpm check` fails first in `seam.test.ts`, which calls `ts.preProcessFile`, one of the
+entry points that surface does not yet carry.
+
 ```bash
 pnpm install
 ```
