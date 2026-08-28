@@ -31,6 +31,10 @@ export default defineConfig({
         "packages/app/src/main.ts",
         "packages/app/src/preload.ts",
         "packages/ui/src/main.ts",
+        // The names the two processes agree on, and nothing else - no branches to cover. Only the entry points
+        // above import it, so it is reported unexecuted whatever the suite does, and asserting a constant
+        // equals itself would be the only way to move the number.
+        "packages/app/src/channel.ts",
       ],
       // A floor that only rises, set below what the suite currently reaches so ordinary movement does not trip
       // it. It is here to make an untested path visible, not to be aimed at: raising it to whatever the last
