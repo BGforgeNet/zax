@@ -10,6 +10,7 @@
 
 import {
   NetworkError,
+  OperationCancelled,
   type Architecture,
   type Archive,
   type ArchiveEntry,
@@ -261,6 +262,9 @@ export class MemoryPlatform implements Platform {
       },
       download: async (url, destination, options) => {
         this.downloaded.push({ url, destination });
+        // Refused before the payload is looked up, so a test can cancel a download this platform has no canned
+        // answer for and still get the cancel rather than the absence.
+        if (options?.signal?.aborted) throw new OperationCancelled();
         const payload = this.payloads[url];
         if (payload === undefined) throw new NetworkError("offline", url, `No canned download for ${url}`);
         const data = typeof payload === "string" ? bytes(payload) : payload;

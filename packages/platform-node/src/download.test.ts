@@ -11,7 +11,7 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { NetworkError } from "@zax/platform";
+import { NetworkError, OperationCancelled } from "@zax/platform";
 import { downloadFile } from "./download.js";
 
 /** The payload every case serves, when it serves a whole one. */
@@ -246,5 +246,101 @@ describe("what is left on disk", () => {
 
     expect(notes[0]).toBe("1 status 503 0");
     expect(notes[1]).toBe(`2 ok ${BODY.length}`);
+  });
+});
+
+describe("cancelling", () => {
+  /**
+   * A server that hands over a first piece and then holds the connection open, so a cancel lands part way
+   * through a body rather than between whole ones - which is where a real one lands.
+   */
+  const stalling = (first: number) => {
+    handler = (response) => {
+      response.writeHead(200, { "content-length": String(BODY.length) });
+      response.write(BODY.subarray(0, first));
+    };
+  };
+
+  it("stops the transfer and says so, rather than reporting a network failure", async () => {
+    stalling(700);
+    const controller = new AbortController();
+    const failure = await downloadFile(`${base}/f`, destination(), {
+      policy: QUICK,
+      signal: controller.signal,
+      // After bytes have actually landed: the first report fires at zero, before the body is read at all.
+      onProgress: ({ received }) => void (received > 0 && controller.abort()),
+    }).catch((e: unknown) => e);
+
+    expect(failure).toBeInstanceOf(OperationCancelled);
+    expect(failure, "a cancel is not one of the network's failures").not.toBeInstanceOf(NetworkError);
+  });
+
+  /*
+    The point of cancelling rather than failing: the bytes already paid for on a poor connection are what a
+    later attempt resumes from. The failure path deliberately clears the partial, so this asserts the two do
+    not share it.
+  */
+  it("keeps what it already fetched, which is what makes starting again a resume", async () => {
+    stalling(700);
+    const controller = new AbortController();
+    await downloadFile(`${base}/f`, destination(), {
+      policy: QUICK,
+      signal: controller.signal,
+      // After bytes have actually landed: the first report fires at zero, before the body is read at all.
+      onProgress: ({ received }) => void (received > 0 && controller.abort()),
+    }).catch(() => undefined);
+
+    expect(await exists(partial()), "the partial survives a cancel").toBe(true);
+    expect((await stat(partial())).size).toBeGreaterThan(0);
+    expect(await exists(destination()), "and nothing is passed off as a finished download").toBe(false);
+  });
+
+  it("does not retry, where every network failure would", async () => {
+    let calls = 0;
+    handler = (response) => {
+      calls += 1;
+      response.writeHead(200, { "content-length": String(BODY.length) });
+      response.write(BODY.subarray(0, 700));
+    };
+    const controller = new AbortController();
+    await downloadFile(`${base}/f`, destination(), {
+      policy: QUICK,
+      signal: controller.signal,
+      // After bytes have actually landed: the first report fires at zero, before the body is read at all.
+      onProgress: ({ received }) => void (received > 0 && controller.abort()),
+    }).catch(() => undefined);
+
+    expect(calls, "one request, where a dropped connection would have made three").toBe(1);
+  });
+
+  it("logs the attempt as cancelled rather than as an error of unknown kind", async () => {
+    stalling(700);
+    const controller = new AbortController();
+    const notes: string[] = [];
+    await downloadFile(`${base}/f`, destination(), {
+      policy: QUICK,
+      signal: controller.signal,
+      note: (n) => notes.push(n.outcome),
+      // After bytes have actually landed: the first report fires at zero, before the body is read at all.
+      onProgress: ({ received }) => void (received > 0 && controller.abort()),
+    }).catch(() => undefined);
+
+    expect(notes).toEqual(["cancelled"]);
+  });
+
+  it("refuses before it asks for anything when the signal is already spent", async () => {
+    let calls = 0;
+    handler = (response) => {
+      calls += 1;
+      response.writeHead(200, { "content-length": String(BODY.length) });
+      response.end(BODY);
+    };
+    const failure = await downloadFile(`${base}/f`, destination(), {
+      policy: QUICK,
+      signal: AbortSignal.abort(),
+    }).catch((e: unknown) => e);
+
+    expect(failure).toBeInstanceOf(OperationCancelled);
+    expect(calls, "nothing was fetched").toBe(0);
   });
 });

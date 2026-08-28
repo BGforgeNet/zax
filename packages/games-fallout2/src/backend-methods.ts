@@ -50,6 +50,7 @@ export const BACKEND_METHODS = [
   "launch",
   "open",
   "wipe",
+  "cancel",
 ] as const satisfies ReadonlyArray<keyof Backend>;
 
 export type BackendMethod = (typeof BACKEND_METHODS)[number];

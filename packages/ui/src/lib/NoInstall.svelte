@@ -12,7 +12,9 @@
   <p>ZAX edits the config files inside a Fallout 2 folder, so it needs to know where one is.</p>
   <div class="actions">
     <button class="primary" onclick={() => (store.panel = "games")}> Add one from the Games column </button>
-    <button disabled={store.busy !== null} onclick={() => void store.scan()}>Scan the usual places</button>
+    <button disabled={store.busy !== null} title={store.busyReason} onclick={() => void store.scan()}
+      >Scan the usual places</button
+    >
   </div>
   {#if store.busy === "Scanning"}<p class="working">Looking...</p>{/if}
 </div>

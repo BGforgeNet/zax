@@ -41,7 +41,7 @@
 <div class="footer">
   <button
     disabled={!store.install || isPreview || store.busy !== null}
-    title={isPreview ? "The browser preview cannot start a program - this needs the desktop build" : null}
+    title={isPreview ? OUTSIDE : store.busyReason}
     onclick={() => void store.play()}
   >
     Run
@@ -56,7 +56,7 @@
     <div class="split">
       <button
         disabled={!store.install || isPreview || store.busy !== null}
-        title={isPreview ? OUTSIDE : null}
+        title={isPreview ? OUTSIDE : store.busyReason}
         onclick={() => run(engine.id, null)}
       >
         Run in {engine.short}
@@ -72,6 +72,7 @@
           aria-label="Choose a {engine.short} build"
           aria-expanded={choosing === engine.id}
           disabled={store.busy !== null}
+          title={store.busyReason}
           onclick={() => (choosing = choosing === engine.id ? null : engine.id)}
         >
           <span class="arrow" aria-hidden="true"></span>
@@ -84,7 +85,7 @@
             role="menuitem"
             class:on={deployed?.pinned !== true}
             disabled={!store.install || isPreview || store.busy !== null}
-            title={isPreview ? OUTSIDE : null}
+            title={isPreview ? OUTSIDE : store.busyReason}
             onclick={() => run(engine.id, null)}
           >
             Latest
@@ -94,7 +95,7 @@
               role="menuitem"
               class:on={deployed?.pinned === true && deployed.published === version.published}
               disabled={!store.install || isPreview || store.busy !== null}
-              title={isPreview ? OUTSIDE : null}
+              title={isPreview ? OUTSIDE : store.busyReason}
               onclick={() => run(engine.id, version.published)}
             >
               {mark(engine.releases, version)}
@@ -123,7 +124,7 @@
   <button
     class="primary"
     disabled={store.autosave || !store.install || store.modifiedCount === 0 || store.busy !== null}
-    title={store.autosave ? "Autosave is on - every change is written as it is made" : null}
+    title={store.autosave ? "Autosave is on - every change is written as it is made" : store.busyReason}
     onclick={() => void store.save()}
   >
     {store.busy === "Saving" ? "Saving..." : "Save"}

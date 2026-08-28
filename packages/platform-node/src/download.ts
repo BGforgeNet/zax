@@ -19,7 +19,7 @@ import { mkdir, open, rename, rm, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { once } from "node:events";
 import { finished } from "node:stream/promises";
-import { NetworkError, type DownloadOptions, type NetworkFailure } from "@zax/platform";
+import { NetworkError, OperationCancelled, type DownloadOptions, type NetworkFailure } from "@zax/platform";
 
 /**
  * How long the transfer may produce nothing before it is abandoned. Deliberately not a limit on the whole
@@ -141,17 +141,25 @@ async function attempt(
     }, ms);
   };
 
+  // The caller's cancel and the idle deadline stop the same transfer, so `fetch` is given both as one signal.
+  // Composed rather than listened to: the pair is discarded with the attempt, where a listener on the caller's
+  // signal would outlive it and accumulate one per retry.
+  const cancelled = () => options.signal?.aborted === true;
+  if (cancelled()) throw new OperationCancelled();
+  const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
+
   arm(policy.responseTimeoutMs);
   let response: Response;
   try {
     response = await fetch(url, {
-      signal: controller.signal,
+      signal,
       // A resumed attempt asks for the rest; a first attempt sends no range, so a mirror that mishandles one
       // is never given the chance.
       ...(from > 0 ? { headers: { Range: `bytes=${from}-` } } : {}),
     });
   } catch (error) {
     clearTimeout(idle);
+    if (cancelled()) throw new OperationCancelled();
     // `fetch` rejects only when no response could be had; anything the server said arrives as a Response,
     // however unwelcome. A reused keep-alive socket that the server has since dropped rejects here too, which
     // is a lost connection rather than an absent network.
@@ -196,9 +204,11 @@ async function attempt(
     await finished(sink);
   } catch (error) {
     // Closed rather than destroyed: `destroy` drops whatever is still buffered, and those bytes are exactly
-    // what the next attempt resumes from. Losing them silently turns resume back into starting over.
+    // what the next attempt resumes from. Losing them silently turns resume back into starting over. A cancel
+    // wants that flush for the same reason, so it happens before the two part ways.
     sink.end();
     await finished(sink).catch(() => undefined);
+    if (cancelled()) throw new OperationCancelled();
     // A connection dropped mid-body and a connection that went quiet are both "the file did not arrive"; the
     // only distinction worth drawing is which of the two the log should say.
     const kind: NetworkFailure = silent ? "timeout" : "incomplete";
@@ -246,15 +256,21 @@ export async function downloadFile(url: string, destination: string, options: Do
       last = error;
       const failure = error instanceof NetworkError ? error : null;
       const status = failure?.status;
+      const stopped = error instanceof OperationCancelled;
       options.note?.({
         url,
         attempt: n,
         received: await partialSize(partial),
         total: null,
         ms: Date.now() - started,
-        outcome: `${failure?.kind ?? "error"}${status === undefined ? "" : ` ${status}`}`,
+        outcome: stopped ? "cancelled" : `${failure?.kind ?? "error"}${status === undefined ? "" : ` ${status}`}`,
         resumedFrom: from,
       });
+
+      // Nothing failed, so there is nothing to retry and nothing to clear away: the bytes already fetched are
+      // what makes resuming a cancelled download cheaper than starting it over. Thrown rather than broken out
+      // of, since the exit below drops the partial.
+      if (stopped) throw error;
 
       // A range the server would not satisfy means the partial is not a prefix of what is being fetched.
       // Dropping it costs one restart; keeping it corrupts every attempt after this one.

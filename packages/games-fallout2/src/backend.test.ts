@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { OperationCancelled } from "@zax/platform";
 import { MemoryPlatform } from "@zax/platform/memory";
 import { BACKEND_METHODS } from "./backend-methods.js";
 import { RELEASES_PAGE, createBackend } from "./backend.js";
-import type { Backend } from "./backend.js";
+import type { Backend, OperationProgress } from "./backend.js";
 
 const install = { path: "/games/one", type: "fallout2" as const };
 
@@ -339,6 +340,66 @@ describe("installing a mod", () => {
       createBackend(feed, noShell).installMod(install, "fo2tweaks", retry.fingerprint),
     ).resolves.toMatchObject({ version: "14.7" });
     expect(platform.textAt("/games/one/mods/fo2tweaks.dat")).toBe("DAT-14.7");
+  });
+});
+
+describe("stopping a long operation", () => {
+  /*
+    Only the transfer takes notice of a cancel, so the interface has to be told which steps those are. Inferring
+    it from the byte counts being present would put the button on any step that happened to have them.
+  */
+  it("declares which steps a cancel would reach", async () => {
+    const reports: OperationProgress[] = [];
+    const shell = { chooseFolder: async () => null, report: (at: OperationProgress) => reports.push(at) };
+    await createBackend(enginePlatform(), shell).fetchEngine("fallout2-ce", null);
+
+    expect(
+      reports.some((at) => at.cancellable === true && at.received !== undefined),
+      "the transfer says so",
+    ).toBe(true);
+    expect(
+      reports.some((at) => at.cancellable === false),
+      "and the steps around it say the opposite",
+    ).toBe(true);
+  });
+
+  /*
+    The wiring the whole feature rests on: the operation mints a signal, the transfer is given it, and `cancel`
+    is what aborts it. Held open at the download so the cancel lands while it is running, which is the only
+    moment it means anything.
+  */
+  it("hands the transfer a signal that cancel aborts", async () => {
+    const platform = enginePlatform();
+    let seen: AbortSignal | undefined;
+    let reached = () => {};
+    let release = () => {};
+    const atDownload = new Promise<void>((resolve) => (reached = resolve));
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const real = platform.net.download.bind(platform.net);
+    platform.net.download = async (url, destination, options) => {
+      seen = options?.signal;
+      reached();
+      await held;
+      return real(url, destination, options);
+    };
+
+    const backend = createBackend(platform, noShell);
+    const fetching = backend.fetchEngine("fallout2-ce", null);
+    await atDownload;
+
+    expect(seen, "the transfer was given one").toBeDefined();
+    expect(seen?.aborted, "and it is untouched until asked").toBe(false);
+
+    await backend.cancel();
+    expect(seen?.aborted).toBe(true);
+
+    // And the operation ends as cancelled rather than as a result or a network failure, all the way up.
+    release();
+    await expect(fetching).rejects.toBeInstanceOf(OperationCancelled);
+  });
+
+  it("does nothing rather than failing when there is nothing to stop", async () => {
+    await expect(createBackend(enginePlatform(), noShell).cancel()).resolves.toBeUndefined();
   });
 });
 

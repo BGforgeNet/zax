@@ -41,16 +41,15 @@
       -->
       <button
         disabled={isPreview || store.busy !== null}
-        title={isPreview ? OUTSIDE : null}
+        title={isPreview ? OUTSIDE : store.busyReason}
         onclick={() => void store.checkSfallVersion()}
       >
         {store.busy === "Checking for a newer sfall" ? "Checking..." : "Check"}
       </button>
       <button
         disabled={!store.sfallOutdated || store.busy !== null}
-        title={store.sfallOutdated
-          ? "Replace the installed sfall, keeping your settings"
-          : "Nothing newer has been found"}
+        title={store.busyReason ??
+          (store.sfallOutdated ? "Replace the installed sfall, keeping your settings" : "Nothing newer has been found")}
         onclick={() => void store.updateSfall()}
       >
         {store.busy === "Updating sfall" ? "Updating..." : "Update"}
@@ -58,7 +57,7 @@
       <!-- Going back matters as much as going forward: mods pin particular sfall versions. -->
       <button
         disabled={isPreview || !store.install || store.busy !== null}
-        title={isPreview ? OUTSIDE : null}
+        title={isPreview ? OUTSIDE : store.busyReason}
         onclick={open}
       >
         {store.busy === "Reading the sfall versions" ? "Reading..." : "Change version"}
@@ -97,6 +96,7 @@
     <button onclick={() => (changing = false)}>Cancel</button>
     <button
       disabled={wanted === "" || wanted === store.sfallInstalled || store.busy !== null}
+      title={store.busyReason}
       onclick={() => void store.changeSfall(wanted, `Changing sfall to ${wanted}`).then(() => (changing = false))}
     >
       {store.busy === `Changing sfall to ${wanted}` ? "Applying..." : "Apply"}

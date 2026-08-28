@@ -78,6 +78,7 @@
               <button
                 class="drop"
                 disabled={store.busy !== null}
+                title={store.busyReason}
                 onclick={() => void store.forgetEngine(engine.id, version.published)}
               >
                 Remove
@@ -88,14 +89,14 @@
           <div class="buttons">
             <button
               disabled={isPreview || store.busy !== null || !engine.build}
-              title={isPreview ? OUTSIDE : null}
+              title={isPreview ? OUTSIDE : store.busyReason}
               onclick={() => void store.checkEngine(engine.id)}
             >
               Check
             </button>
             <button
               disabled={isPreview || store.busy !== null || !engine.build}
-              title={isPreview ? OUTSIDE : null}
+              title={isPreview ? OUTSIDE : store.busyReason}
               onclick={() => void store.fetchEngine(engine.id)}
             >
               Fetch latest

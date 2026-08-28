@@ -69,7 +69,7 @@
   <div class="buttons">
     <button
       disabled={isPreview || store.busy !== null}
-      title={isPreview ? OUTSIDE : null}
+      title={isPreview ? OUTSIDE : store.busyReason}
       onclick={() => void store.checkZaxVersion()}
     >
       Check
@@ -86,7 +86,7 @@
 
   <h2 class="section">Auto scan for games</h2>
   <div class="buttons">
-    <button disabled={store.busy !== null} onclick={() => void store.scan()}>Scan</button>
+    <button disabled={store.busy !== null} title={store.busyReason} onclick={() => void store.scan()}>Scan</button>
   </div>
 
   <h2 class="section">Backup directory</h2>
@@ -95,7 +95,8 @@
     <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("backup")}>
       Open
     </button>
-    <button disabled={store.busy !== null} onclick={() => (confirming = "backup")}>Wipe</button>
+    <button disabled={store.busy !== null} title={store.busyReason} onclick={() => (confirming = "backup")}>Wipe</button
+    >
   </div>
 
   <h2 class="section">Downloaded packages</h2>
@@ -105,7 +106,9 @@
       Open
     </button>
     <!-- Emptying costs nothing but a download next time, which is what makes this a cache rather than state. -->
-    <button disabled={store.busy !== null} onclick={() => (confirming = "packages")}>Wipe</button>
+    <button disabled={store.busy !== null} title={store.busyReason} onclick={() => (confirming = "packages")}
+      >Wipe</button
+    >
   </div>
 
   <h2 class="section">Debug archive directory</h2>
@@ -114,7 +117,7 @@
     <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("debug")}>
       Open
     </button>
-    <button disabled={store.busy !== null} onclick={() => (confirming = "debug")}>Wipe</button>
+    <button disabled={store.busy !== null} title={store.busyReason} onclick={() => (confirming = "debug")}>Wipe</button>
   </div>
 
   <h2 class="section">Log file</h2>
@@ -123,7 +126,7 @@
     <button disabled={isPreview} title={isPreview ? OUTSIDE : null} onclick={() => void store.open("log")}>
       View
     </button>
-    <button disabled={store.busy !== null} onclick={() => (confirming = "log")}>Clear</button>
+    <button disabled={store.busy !== null} title={store.busyReason} onclick={() => (confirming = "log")}>Clear</button>
   </div>
   <!-- Said here rather than only in the file: the ceiling is why an old failure may no longer be in it. -->
   <p class="note">Trimmed to its most recent half when it passes a megabyte.</p>

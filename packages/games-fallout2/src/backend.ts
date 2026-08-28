@@ -274,6 +274,15 @@ export interface Backend {
   ): Promise<void>;
   open(target: OpenTarget): Promise<void>;
   wipe(which: WipeTarget): Promise<void>;
+  /**
+   * Stops the running operation's transfer, if it has one. Resolves either way rather than reporting that
+   * nothing was cancellable: the answer the caller acts on is what the operation itself then does, and a step
+   * that finished between the click and this arriving is not an error anyone can act on.
+   *
+   * The operation rejects with `OperationCancelled` in place of its result. Whatever it had already fetched
+   * stays where it is, so starting again resumes rather than repeating the transfer.
+   */
+  cancel(): Promise<void>;
 }
 
 /**
@@ -286,6 +295,12 @@ export interface OperationProgress {
   /** Bytes so far and bytes expected, when the step is a transfer and the server said how big it is. */
   received?: number;
   total?: number | null;
+  /**
+   * Whether `cancel` would reach this step. Declared rather than inferred from the byte counts being present:
+   * the interface offers the button on this, and a control that is offered and does nothing is worse than one
+   * that was never there.
+   */
+  cancellable?: boolean;
 }
 
 /**
@@ -304,19 +319,32 @@ export interface Shell {
 
 export function createBackend(platform: Platform, shell: Shell): Backend {
   /**
+   * The running operation's cancel. One at a time because the interface refuses to start a second while one
+   * runs, and cleared as it is used so a click that arrives late cannot reach whatever started next.
+   */
+  let running: AbortController | null = null;
+
+  /**
    * Carries the step and the byte counts to the interface as one message. They arrive separately - the step
    * from whichever part of the operation is starting, the counts from the transport, which knows nothing about
    * what it is fetching - so the last step named is what a set of counts is reported under.
+   *
+   * Also where the operation's cancel is minted, since this is the one thing every long operation takes. Only
+   * the transfer honours it: a step that names no byte counts says so, and the interface stops offering the
+   * button rather than offering one that would be ignored.
    */
   const reporting = () => {
+    const controller = new AbortController();
+    running = controller;
     let step = "";
     return {
+      signal: controller.signal,
       onStep: (named: string) => {
         step = named;
-        shell.report?.({ step });
+        shell.report?.({ step, cancellable: false });
       },
       onProgress: ({ received, total }: { received: number; total: number | null }) =>
-        shell.report?.({ step, received, total }),
+        shell.report?.({ step, received, total, cancellable: true }),
     };
   };
 
@@ -622,6 +650,14 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       if (which === "log") return platform.fs.remove(logFile(platform));
       await platform.fs.remove(own(which));
       await platform.fs.mkdir(own(which));
+    },
+
+    // Taken as it is used, so a click that lands after its operation has already finished cannot abort the one
+    // that started next.
+    cancel: async () => {
+      const controller = running;
+      running = null;
+      controller?.abort();
     },
   };
 }

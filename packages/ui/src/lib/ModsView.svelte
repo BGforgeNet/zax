@@ -263,7 +263,12 @@
       {#if store.modsTab === "installation"}
         <div class="feed-tools">
           <!-- The one control that asks the feeds again: everything else is told what they said before. -->
-          <button class="link" disabled={store.busy !== null} onclick={() => void store.loadModOffers(true)}>
+          <button
+            class="link"
+            disabled={store.busy !== null}
+            title={store.busyReason}
+            onclick={() => void store.loadModOffers(true)}
+          >
             Refresh
           </button>
         </div>
@@ -333,7 +338,7 @@
                   <button
                     class="primary"
                     disabled={refusal !== null || store.busy !== null || !store.modsSettled}
-                    title={refusal}
+                    title={refusal ?? store.busyReason ?? store.modsUnsettled}
                     onclick={() => void store.prepareMod(offer)}
                   >
                     {installButtonLabel(offer)}
@@ -346,7 +351,7 @@
                   {#if installLabel(offer) !== null && installRefusal(offer) === null}
                     <button
                       disabled={isPreview || store.busy !== null || !store.modsSettled}
-                      title={isPreview ? PREVIEW_FEEDS : null}
+                      title={isPreview ? PREVIEW_FEEDS : (store.busyReason ?? store.modsUnsettled)}
                       onclick={() => void openVersions(offer)}
                     >
                       {store.busy === `Reading the ${offer.name} versions` ? "Reading..." : "Other version"}
@@ -355,6 +360,7 @@
                   {#if offer.availability.kind === "retry"}
                     <button
                       disabled={store.busy !== null || !store.modsSettled}
+                      title={store.busyReason ?? store.modsUnsettled}
                       onclick={() => void store.restoreMod(offer)}
                     >
                       {store.modWorking(offer.id, "restore") ? "Restoring..." : "Restore"}
@@ -364,6 +370,7 @@
                     <button
                       class="danger"
                       disabled={store.busy !== null || !store.modsSettled}
+                      title={store.busyReason ?? store.modsUnsettled}
                       onclick={() => void store.removeMod(offer)}
                     >
                       {store.modWorking(offer.id, "remove") ? "Removing..." : "Remove"}
@@ -552,6 +559,7 @@
     <button
       class="primary"
       disabled={wantedVersion === "" || store.busy !== null}
+      title={store.busyReason}
       onclick={() => {
         const held = store.modVersionPick;
         const version = wantedVersion;

@@ -179,9 +179,27 @@ export interface DownloadProgress {
   total: number | null;
 }
 
+/**
+ * The user stopped it, as opposed to it failing. Its own type rather than a `NetworkError` kind: nothing went
+ * wrong with the network, nothing is worth retrying, and the partial file is worth keeping rather than clearing
+ * away - all three the opposite of what a failure means here.
+ */
+export class OperationCancelled extends Error {
+  constructor(message = "Cancelled.") {
+    super(message);
+    this.name = "OperationCancelled";
+  }
+}
+
 export interface DownloadOptions {
   /** Called as the body arrives, for an interface that shows how far along a long download is. */
   onProgress?: (progress: DownloadProgress) => void;
+  /**
+   * Stops the transfer where it is, rejecting with `OperationCancelled` and leaving the partial file for a
+   * later call to resume from. Only the transfer: whatever the caller does with the file afterwards is its own
+   * to abandon or finish.
+   */
+  signal?: AbortSignal;
 }
 
 export interface Network {

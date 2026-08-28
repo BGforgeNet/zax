@@ -99,6 +99,7 @@
         <button
           class="package"
           disabled={!store.install || store.busy !== null}
+          title={store.busyReason}
           onclick={() => void store.createDebugPackage(chosen)}
         >
           {store.busy === "Creating the debug package" ? "Collecting..." : "Create debug package"}

@@ -38,7 +38,7 @@
   {#if file === "ddraw.ini"}
     <button
       disabled={isPreview || store.busy !== null}
-      title={isPreview ? PREVIEW_REASON : null}
+      title={isPreview ? PREVIEW_REASON : store.busyReason}
       onclick={() => void store.installSfall()}
     >
       {store.busy === "Installing sfall" ? "Installing..." : "Install the latest sfall"}

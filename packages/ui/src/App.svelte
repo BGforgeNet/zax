@@ -7,6 +7,7 @@
   import SaveBar from "./lib/SaveBar.svelte";
   import SettingsView from "./lib/SettingsView.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
+  import StatusBar from "./lib/StatusBar.svelte";
   import { store } from "./lib/store.svelte.js";
 
   // Reading the state file and the selected install's config files is the first thing that happens, and it is
@@ -89,18 +90,6 @@
           </button>
         </div>
 
-        <!--
-          What is running, for every operation rather than only the ones whose own button changes label. An
-          sfall update is minutes of work on a poor connection, and the buttons that start it are in a panel
-          the user may well have scrolled away from - without this the whole window simply sat there.
-        -->
-        {#if store.busy}
-          <span class="working" role="status">
-            <span class="busy-dot" aria-hidden="true"></span>
-            {store.progressText ?? store.busy}
-          </span>
-        {/if}
-
         <!-- The shell hands a web link to the browser rather than following it, so this needs no operation. -->
         <span class="powered">
           <!--
@@ -176,6 +165,12 @@
       <button class="dismiss" onclick={() => (store.notice = null)}>Dismiss</button>
     </div>
   {/if}
+
+  <!--
+    The floor, under the notice as well as the columns: an outcome that has just arrived is a thing to read,
+    while this says what is happening now, and the two read in that order down the window.
+  -->
+  <StatusBar />
 </div>
 
 <style>
@@ -319,26 +314,6 @@
 
   .powered a.mark svg {
     fill: currentColor;
-  }
-
-  .working {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 12.5px;
-    color: var(--text-dim);
-  }
-
-  /*
-    Still rather than animated: the text beside it names the operation and changes as it progresses, so motion
-    would add nothing the chip does not already say. Named apart from the tab's marker dot rather than sharing
-    its class - one `.dot` block silently took the other's size, colour and hidden state.
-  */
-  .busy-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--accent);
   }
 
   /* The outer gutter, which is the centring one: it is the margin outside the pair, not an inset within it. */

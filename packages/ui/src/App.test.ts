@@ -97,26 +97,36 @@ describe("the notice band", () => {
   });
 });
 
-describe("the busy indicator", () => {
+describe("the status bar", () => {
   /*
-    For every operation rather than only the ones whose own button changes label: an sfall update is minutes of
-    work, and the button that starts it may be in a panel the user has scrolled away from.
+    Moved out of the tab strip and onto the window's floor. It shared that row with the tabs and the credit, and
+    a step naming a mod is as long as the mod's name: the tabs were the only thing there that could give way, so
+    a long download squeezed three fixed labels into a strip the user had to scroll.
   */
-  test("is absent while nothing is running", () => {
-    expect(app().all(".working")).toHaveLength(0);
+  test("stands at the bottom whether or not anything is running", () => {
+    const view = app();
+    expect(view.all(".statusbar")).toHaveLength(1);
+    expect(view.one(".statusbar").textContent?.trim()).toBe("");
+  });
+
+  test("is no longer in the tab strip, which is what squeezed the tabs", () => {
+    store.busy = "Updating sfall";
+    expect(app().all(".topbar .statusbar")).toHaveLength(0);
   });
 
   test("names what is running, announced as a status", () => {
     store.busy = "Updating sfall";
-    const working = app().one(".working");
-    expect(working.getAttribute("role")).toBe("status");
-    expect(working.textContent).toContain("Updating sfall");
+    const status = app().one(".statusbar");
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.textContent).toContain("Updating sfall");
   });
 
   test("prefers the progress text over the bare operation name once there is one", () => {
     store.busy = "Updating sfall";
-    store.progress = { label: "Downloading sfall", received: 5, total: 10 } as never;
-    expect(app().one(".working").textContent).toContain(store.progressText ?? "");
+    store.progress = { step: "Downloading sfall", received: 5, total: 10 };
+    const view = app();
+    expect(view.one(".statusbar .step").textContent).toBe("Downloading sfall");
+    expect(view.one(".statusbar .amount").textContent).toBe("50% of 0.0 MB");
     store.progress = null;
   });
 });

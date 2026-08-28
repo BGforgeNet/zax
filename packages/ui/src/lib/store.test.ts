@@ -954,21 +954,21 @@ describe("autosave", () => {
 
 describe("a long operation", () => {
   test("reports its step and proportion while it runs, and nothing once it has stopped", async () => {
-    expect(store.progressText, "nothing is running").toBeNull();
+    expect(store.progressParts, "nothing is running").toBeNull();
 
     // What the backend reports as a download advances. Delivered through the same subscription the desktop
     // build uses - the preview builds one over its own in-process backend.
     store.busy = "Updating sfall";
     store.progress = { step: "Downloading sfall 4.5", received: 440_000, total: 880_000 };
-    expect(store.progressText).toBe("Downloading sfall 4.5 - 50% of 0.8 MB");
+    expect(store.progressParts).toEqual({ step: "Downloading sfall 4.5", amount: "50% of 0.8 MB" });
 
     // A step with no length says what it is doing and claims no proportion it cannot know.
     store.progress = { step: "Merging your settings" };
-    expect(store.progressText).toBe("Merging your settings");
+    expect(store.progressParts).toEqual({ step: "Merging your settings", amount: null });
 
     store.busy = null;
     store.progress = null;
-    expect(store.progressText).toBeNull();
+    expect(store.progressParts).toBeNull();
   });
 
   describe("what the shell is told about it", () => {
@@ -1022,6 +1022,108 @@ describe("a long operation", () => {
 
     expect(store.notice).toEqual({ kind: "problem", text: "Updating sfall is still running - wait for it to finish." });
     store.busy = null;
+  });
+
+  describe("stopping it", () => {
+    afterEach(() => {
+      store.busy = null;
+      store.progress = null;
+      store.cancelling = false;
+      vi.restoreAllMocks();
+    });
+
+    /** An operation the test resolves by hand, so the state during it is what gets asserted. */
+    const held = () => {
+      let settle: (error?: Error) => void = () => {};
+      vi.spyOn(hostBackend, "scanForInstalls").mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            settle = (error) => (error ? reject(error) : resolve([]));
+          }),
+      );
+      return (error?: Error) => settle(error);
+    };
+
+    /*
+      Read from what the backend declares about the running step, not from the byte counts being there. Only the
+      transfer honours a cancel, and a button offered over a step that would ignore it is worse than no button.
+    */
+    test("is offered only where the running step says a cancel would reach it", () => {
+      expect(store.cancellable, "nothing is running").toBe(false);
+
+      store.busy = "Installing Restoration Project Updated";
+      store.progress = { step: "Downloading Restoration Project Updated", received: 1, total: 10, cancellable: true };
+      expect(store.cancellable).toBe(true);
+
+      // Past the transfer: the same operation, still running, no longer stoppable.
+      store.progress = { step: "Installing the files", cancellable: false };
+      expect(store.cancellable).toBe(false);
+    });
+
+    test("stops offering itself once it has been asked for", async () => {
+      const settle = held();
+      const asked = vi.spyOn(hostBackend, "cancel");
+      const scanning = store.scan();
+      store.progress = { step: "Downloading", received: 1, total: 10, cancellable: true };
+
+      await store.cancel();
+      expect(asked).toHaveBeenCalledTimes(1);
+      expect(store.cancelling).toBe(true);
+      expect(store.cancellable, "the button goes rather than being pressed twice").toBe(false);
+
+      // A second press reaches nothing, which is what stops two cancels racing one operation.
+      await store.cancel();
+      expect(asked).toHaveBeenCalledTimes(1);
+
+      settle(new Error("Cancelled."));
+      await scanning;
+    });
+
+    /*
+      The point of the flag. What comes back has crossed a process boundary that keeps the message and drops the
+      type, so the only side that still knows this was asked for is the side that asked - without it a cancel
+      reads to the user as the operation having broken.
+    */
+    test("reports a stopped operation as stopped, not as a failure", async () => {
+      const settle = held();
+      const scanning = store.scan();
+      store.progress = { step: "Downloading", received: 1, total: 10, cancellable: true };
+      await store.cancel();
+
+      settle(new Error("Cancelled."));
+      await scanning;
+
+      expect(store.notice?.kind, "not a fault the user should go looking into").toBe("note");
+      expect(store.notice?.text).toBe("Scanning was stopped. What had been downloaded is kept.");
+      expect(store.cancelling, "and the next operation starts clean").toBe(false);
+    });
+
+    test("still reports a genuine failure as one", async () => {
+      const settle = held();
+      const scanning = store.scan();
+
+      settle(new Error("nothing to scan"));
+      await scanning;
+
+      expect(store.notice?.kind).toBe("problem");
+      expect(store.notice?.text).toBe("Scanning failed: nothing to scan");
+    });
+
+    /*
+      What every control that is greyed out shows. A button that will not answer and says nothing reads as
+      broken rather than as busy, which is the whole complaint this exists to answer.
+    */
+    test("says why the controls are refused, in a sentence, and nothing when they are not", () => {
+      expect(store.busyReason, "nothing is running").toBeNull();
+
+      store.busy = "Installing Restoration Project Updated";
+      expect(store.busyReason).toBe("Installing Restoration Project Updated is running.");
+
+      store.cancelling = true;
+      expect(store.busyReason, "and it changes once stopping is under way").toBe(
+        "Stopping Installing Restoration Project Updated.",
+      );
+    });
   });
 });
 

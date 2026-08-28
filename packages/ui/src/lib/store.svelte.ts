@@ -552,13 +552,53 @@ class Store {
     return this.modOperation?.id === id && this.modOperation.action === action;
   }
 
-  /** The step and, where the length is known, the proportion - for one line under the operation's name. */
-  get progressText(): string | null {
+  /**
+   * The step and, where the length is known, the proportion - kept apart rather than joined into one line. The
+   * step names a mod, so its length is the mod's and the status bar has to be free to cut it; the proportion is
+   * a dozen characters and is the half being watched, so it must not be what a narrow window takes away.
+   */
+  get progressParts(): { step: string; amount: string | null } | null {
     const at = this.progress;
     if (!at) return null;
-    if (at.received === undefined || at.total === undefined || at.total === null || at.total === 0) return at.step;
+    if (at.received === undefined || at.total === undefined || at.total === null || at.total === 0)
+      return { step: at.step, amount: null };
     const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
-    return `${at.step} - ${Math.floor((at.received / at.total) * 100)}% of ${mb(at.total)} MB`;
+    return { step: at.step, amount: `${Math.floor((at.received / at.total) * 100)}% of ${mb(at.total)} MB` };
+  }
+
+  /**
+   * Set from the moment cancelling is asked for until the operation it was asked of has finished unwinding.
+   * The button reads it to stop offering itself twice, and `run` reads it to report what came back as the
+   * user's own doing rather than as a failure - which is what the thrown value cannot say for itself, having
+   * crossed a process boundary that leaves only a message behind.
+   */
+  cancelling = $state(false);
+
+  /**
+   * Whether stopping the running operation would reach it. Only the transfer honours a cancel, and the backend
+   * says per message which steps those are, so this follows what is actually running rather than assuming a
+   * long operation is a stoppable one throughout.
+   */
+  cancellable = $derived(this.busy !== null && this.progress?.cancellable === true && !this.cancelling);
+
+  /**
+   * Why a control that acts on the machine is refused, in a sentence, or null when none is. Every such control
+   * shows this rather than only grey: a button that will not answer and says nothing reads as broken, and the
+   * one thing the user wants to know is what it is waiting for.
+   */
+  get busyReason(): string | null {
+    if (this.busy === null) return null;
+    return this.cancelling ? `Stopping ${this.busy}.` : `${this.busy} is running.`;
+  }
+
+  /**
+   * Asks the running operation to stop. It rejects in its own time - a transfer part way through a chunk
+   * finishes that chunk first - so this only asks, and `run` reports whatever comes back.
+   */
+  async cancel(): Promise<void> {
+    if (!this.cancellable) return;
+    this.cancelling = true;
+    await backend.cancel();
   }
 
   sfallInstalled = $state<string | null>(null);
@@ -1008,12 +1048,20 @@ class Store {
     try {
       this.notice = await work();
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      this.notice = { kind: "problem", text: `${what} failed: ${reason}` };
+      // Read from what was asked for rather than from what came back: the rejection crosses a process boundary
+      // that keeps the message and drops the type, so the only place that still knows a cancel was requested
+      // is the side that requested it.
+      if (this.cancelling) {
+        this.notice = { kind: "note", text: `${what} was stopped. What had been downloaded is kept.` };
+      } else {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.notice = { kind: "problem", text: `${what} failed: ${reason}` };
+      }
     } finally {
       this.setBusy(null);
       this.modOperation = null;
       this.progress = null;
+      this.cancelling = false;
     }
   }
 
