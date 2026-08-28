@@ -1052,10 +1052,20 @@
     The icon keeps its column even where a feed has none, so the names of two rows still line up rather than
     stepping in and out with whichever mods happen to ship art. Wide enough for the one project whose mark is
     a banner rather than a disc, since a track sized to the discs renders that one as an unreadable strip.
+
+    The slack goes to the empty track after the version columns rather than to the name, which is what keeps
+    Mod, Current and Available where they are from one game to the next. Taking it, the name grew by whatever
+    a game's buttons did not need, and a game offering no install at all collapsed both button tracks and
+    moved the version columns a quarter of the pane.
+
+    Its ceiling is what makes that hold, so it sits under the narrowest room any game leaves and above the
+    longest name beside its badge - the version columns are cut to their own widest word to afford both. The
+    buttons stay sized to their text: the longest label names a version, and no fixed track can promise to
+    hold one.
   */
   .offers {
     display: grid;
-    grid-template-columns: 64px minmax(0, 1fr) 7.5rem 7.5rem auto auto;
+    grid-template-columns: 64px minmax(0, 19rem) 6.75rem 6.75rem minmax(0, 1fr) auto auto;
     column-gap: 12px;
     padding: 0 var(--gutter);
   }
@@ -1163,7 +1173,7 @@
     a button sized to its text would leave the track it was measured for.
   */
   .primary {
-    grid-column: 5;
+    grid-column: 6;
     grid-row: 1;
     justify-self: stretch;
   }
@@ -1173,7 +1183,7 @@
     align-items: center;
     gap: 8px;
     justify-self: end;
-    grid-column: 6;
+    grid-column: 7;
     grid-row: 1;
   }
 
