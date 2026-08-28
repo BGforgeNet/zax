@@ -415,14 +415,10 @@ class Store {
    */
   readingOffers = $derived(this.modReads > 0);
   /**
-   * Which install the per-install state was last read for, so a reread can tell a change of game from a
-   * reread of the same one, and how many reads of it have been started. Plain, not `$state`: nothing renders
-   * either, and a reactive read here would tie every view that touches the install to them.
-   */
-  private readFor = "";
-  /**
    * Which reading is the current one. Two clicks between games leave two reads in flight, and only the newer
-   * one may publish: the slower would otherwise land last and put a game nobody selected on screen.
+   * one may publish: the slower would otherwise land last and put a game nobody selected on screen. Plain,
+   * not `$state`: nothing renders it, and a reactive read here would tie every view that touches the install
+   * to the bookkeeping.
    */
   private readToken = 0;
   private standingRequest = 0;
@@ -740,16 +736,24 @@ class Store {
    */
   private async readInstall(): Promise<void> {
     const install = this.install;
-    // Every caller rereads the install, but only a few change which one it is - and where the mods stand is
-    // the one thing here that no other caller can have changed, since it is read from the folder this names.
-    // Saving a setting or installing an engine used to blank the Mods tab back to unread over it.
-    const switched = (install?.path ?? "") !== this.readFor;
-    this.readFor = install?.path ?? "";
-    // The first reading of both halves, left to run on its own rather than hold the first paint of the window
-    // on a network round trip. Once the feeds are in the standing is a local read, and `gatherInstall` takes
-    // it. Both halves rather than the standing alone: they have to describe one set of releases, and the tab
-    // draws nothing from either until both are in.
-    if (switched && install && this.modFeeds === null) void quietly(() => this.readModListing(install, false));
+    // Whether this reading owes a standing, asked of the one on screen rather than of the install last read
+    // for. A reread of the same game overtaking the switch that started it is no switch by the second measure,
+    // and it is the reading that publishes - so nothing carried a standing and the tab read for ever.
+    const owed = install !== undefined && this.standingFor !== install.path;
+    /*
+      The first reading of both halves, left to run on its own rather than hold the first paint of the window
+      on a network round trip. Once the feeds are in the standing is a local read, and `gatherInstall` takes
+      it. Both halves rather than the standing alone: they have to describe one set of releases, and the tab
+      draws nothing from either until both are in.
+
+      Asked of the feeds themselves rather than of whether this is a new game: the read is quiet, so a first
+      attempt that failed left the tab saying the feeds had never been read until the user happened to switch
+      game or press Refresh. Every reading of an install now retries while they are still unread, and
+      `readingOffers` is what keeps a second one off the first while it is still out.
+    */
+    if (install && this.modFeeds === null && !this.readingOffers) {
+      void quietly(() => this.readModListing(install, false));
+    }
     // A held plan is dropped whichever install this is: it is how the flow that just ran closes its dialog.
     this.modPlan = null;
     this.modParts = null;
@@ -777,7 +781,7 @@ class Store {
       this.setMods({ text: undefined, present: [], owners: [] });
       return;
     }
-    const read = await this.gatherInstall(install, switched);
+    const read = await this.gatherInstall(install, owed);
     // A read the user has already moved on from: two quick clicks between games leave two of these in flight,
     // and the slower one landing last would publish the game that is no longer selected.
     if (token !== this.readToken) return;
@@ -785,7 +789,7 @@ class Store {
   }
 
   /** Everything one reading of an install produces, held together so it can be published in a single frame. */
-  private async gatherInstall(install: Install, switched: boolean): Promise<InstallRead> {
+  private async gatherInstall(install: Install, owed: boolean): Promise<InstallRead> {
     // Together rather than one after another: these reads do not feed each other, and every round trip in
     // series is time the pane spends showing the game the user has already clicked away from.
     const [onDisk, modSettings] = await Promise.all([
@@ -843,13 +847,14 @@ class Store {
 
     // Where the game stands against the published mods is the one half a change of game invalidates, and it
     // is read from the folder this names, so nothing but a switch can have moved it - `refreshModOffers` is
-    // what the mod flows call, having moved it themselves.
+    // what the mod flows call, having moved it themselves. Asked only where the standing on screen is for
+    // some other folder, so a save or an install rereading the game already on screen does not ask again.
     const [mods, sfall, hires, deployed, standing] = await Promise.all([
       backend.loadMods(install),
       backend.installedSfallVersion(install),
       backend.installedHiresVersion(install),
       backend.deployedEngines(install),
-      switched && this.modFeeds !== null ? backend.modInstallState(install) : null,
+      owed && this.modFeeds !== null ? backend.modInstallState(install) : null,
     ]);
     return {
       path: install.path,

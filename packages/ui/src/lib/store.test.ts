@@ -1922,6 +1922,47 @@ describe("the feeds against a change of game", () => {
     await vi.waitFor(() => expect(order).toEqual(["feeds", "standing"]));
   });
 
+  test("are asked again by the next reading of an install when the first attempt failed", async () => {
+    // The read is quiet, so a feed that was unreachable on the first attempt left the tab saying the feeds
+    // had never been read - with nothing to retry it but a change of game or Refresh.
+    const asked = vi
+      .spyOn(hostBackend, "publishedMods")
+      .mockRejectedValueOnce(new Error("the machine was offline"))
+      .mockResolvedValue(feeds);
+    vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(standingOf("mine"));
+
+    store.modFeeds = null;
+    store.installs = [...store.installs, other];
+    await store.selectInstall(other.path);
+    await vi.waitFor(() => expect(asked).toHaveBeenCalledTimes(1));
+    expect(store.modFeeds, "the attempt failed, and quietly").toBeNull();
+
+    // Saving rereads the install. It is not a change of game, which is what used to be asked here.
+    await store.save();
+
+    await vi.waitFor(() => expect(store.modListing?.offers).toEqual(offersFor("mine")));
+  });
+
+  test("are not asked a second time while the first attempt is still out", async () => {
+    let answerFeeds!: () => void;
+    const held = new Promise<void>((resolve) => (answerFeeds = resolve));
+    const asked = vi.spyOn(hostBackend, "publishedMods").mockImplementation(async () => {
+      await held;
+      return feeds;
+    });
+    vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(standingOf("mine"));
+
+    store.modFeeds = null;
+    store.installs = [...store.installs, other];
+    await store.selectInstall(other.path);
+    await vi.waitFor(() => expect(asked).toHaveBeenCalledTimes(1));
+    await store.save();
+
+    expect(asked, "the retry above must not fire on a read that has not answered yet").toHaveBeenCalledTimes(1);
+    answerFeeds();
+    await vi.waitFor(() => expect(store.modListing?.offers).toEqual(offersFor("mine")));
+  });
+
   test("leave the tab unsettled, with the reason, until the reading its rows describe has landed", async () => {
     const answered = published();
     vi.spyOn(hostBackend, "modInstallState").mockResolvedValue(standingOf("mine"));
@@ -2038,6 +2079,39 @@ describe("the feeds against a change of game", () => {
     );
   });
 
+  test("settle when a reread of the same game overtakes the switch's own reading", async () => {
+    published();
+    // Only the switch's own read is held. The reread that overtakes it answers at once, which is what makes
+    // it the reading that publishes.
+    let release = (): void => {};
+    const held = new Promise<ModInstallState>((resolve) => {
+      release = () => resolve(standingOf("overtaken"));
+    });
+    let outstanding = true;
+    const asked = vi.spyOn(hostBackend, "modInstallState").mockImplementation((install) => {
+      if (install.path !== other.path) return Promise.resolve(standingOf("mine"));
+      if (outstanding) {
+        outstanding = false;
+        return held;
+      }
+      return Promise.resolve(standingOf("theirs"));
+    });
+    store.installs = [...store.installs, other];
+    await store.loadModOffers();
+
+    const switching = store.selectInstall(other.path);
+    await vi.waitFor(() => expect(asked).toHaveBeenCalledWith(expect.objectContaining({ path: other.path })));
+    // A save inside the window the switch is open for - it holds no gate, so nothing refuses this. It reads
+    // the same folder, and its reading is the one that lands: the switch's is dropped for being the older.
+    await store.save();
+    release();
+    await switching;
+
+    expect(store.modsUnsettled, "the folder has been read, so there is nothing left to explain").toBeNull();
+    expect(store.modsSettled).toBe(true);
+    expect(store.modListing?.offers).toEqual(offersFor("theirs"));
+  });
+
   test("drop an answer that arrives for a game that is no longer the selected one", async () => {
     published();
     // Held open so the second switch is over while the first read is still out - the only way the two cross.
@@ -2049,8 +2123,13 @@ describe("the feeds against a change of game", () => {
       install.path === other.path ? held : Promise.resolve(standingOf("mine")),
     );
     store.installs = [...store.installs, other];
+    // The game switched away from, read and on screen: the answer held below has to be dropped on top of
+    // something known, or nothing distinguishes it landing from it being dropped.
+    await store.loadModOffers();
 
     const switching = store.selectInstall(other.path);
+    // Nothing is read for this one: its own standing is still the one on screen, the switch away never having
+    // published. What the case is about is the held answer arriving after it.
     await store.selectInstall(PREVIEW_INSTALL);
     release();
     await switching;
