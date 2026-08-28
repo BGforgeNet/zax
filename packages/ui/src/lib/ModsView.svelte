@@ -17,6 +17,12 @@
    */
   let wantedVersion = $state("");
 
+  /**
+   * Why the rows cannot be acted on, on the one tab whose rows the sentence is about - it names the offers,
+   * which is not what the other two draw.
+   */
+  const unsettled = $derived(store.modsTab === "installation" ? store.modsUnsettled : null);
+
   async function openVersions(offer: ModOffer): Promise<void> {
     await store.chooseModVersion(offer);
     wantedVersion = store.modVersionPick?.versions[0] ?? "";
@@ -259,7 +265,7 @@
 
   <main>
     <!-- One scrolling region per tab, so the save bar stays put while the content moves. -->
-    <div class="scroll">
+    <div class="scroll" class:dimmed={unsettled !== null} inert={unsettled !== null}>
       {#if store.modsTab === "installation"}
         <div class="feed-tools">
           <!-- The one control that asks the feeds again: everything else is told what they said before. -->
@@ -276,11 +282,6 @@
         {#if store.modListing === null}
           <p class="empty">{store.readingOffers ? "Reading the mod feeds..." : "The feeds have not been read yet."}</p>
         {:else}
-          <!-- Why every action below is refused, said where the rows are rather than only as a greyed button:
-             a control that will not answer and gives no reason reads as broken rather than as busy. -->
-          {#if store.modsUnsettled}
-            <p class="pending" role="status">{store.modsUnsettled}</p>
-          {/if}
           <div class="offers">
             {#if store.modListing.offers.length > 0}
               <!-- A heading for the two columns: a bare pair of versions beside a name does not say which is
@@ -528,6 +529,16 @@
         {/each}
       {/if}
     </div>
+
+    <!-- Why the rows cannot be acted on, over them rather than above them. Held out of the flow on purpose:
+       in the flow it took its height from the list on every switch of game, so the rows it describes jumped
+       down and back for the length of one read. The tab under it is dimmed and inert for the same moment,
+       which is the part that says "not yet" without a control having to be read one at a time. -->
+    {#if unsettled}
+      <div class="reading">
+        <p role="status">{unsettled}</p>
+      </div>
+    {/if}
   </main>
 </div>
 
@@ -939,24 +950,55 @@
     font-size: 0.92em;
   }
 
+  /* The frame the message is placed against, so it follows the tab rather than the list's scroll position. */
+  main {
+    position: relative;
+  }
+
   .scroll {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
   }
 
+  /* What the rows are while the reading is out: still legible, so the message can say they are the game left
+     behind, but plainly not the surface being offered. `inert` on the element is what actually refuses them. */
+  .dimmed {
+    opacity: 0.4;
+    filter: saturate(0.6);
+  }
+
   /*
-    Why the rows below cannot be acted on. Carries the accent bar the frame titles use rather than a warning
-    colour: nothing has gone wrong, ZAX is still reading - and it holds its space above the rows instead of
-    floating over them, so the list does not jump when the reading lands.
+    Why the rows cannot be acted on, over the tab rather than in its flow. Carries the accent bar the frame
+    titles use rather than a warning colour: nothing has gone wrong, ZAX is still reading.
+
+    Near the top rather than centred: the message belongs to the rows it is about, and a sentence floating in
+    the middle of a long list reads as a dialog waiting for an answer. Clear of the column headings, though -
+    a heading covered over reads as a defect where a covered row reads as the float it is.
   */
-  .pending {
-    margin: 8px var(--gutter) 0;
-    padding: 8px 12px;
+  .reading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 96px var(--gutter) 0;
+    /* The dimmed tab underneath is the signal; this layer only carries the sentence. */
+    pointer-events: none;
+  }
+
+  .reading p {
+    margin: 0;
+    max-width: 46ch;
+    padding: 10px 14px;
     border-left: 3px solid var(--accent);
+    border-radius: 4px;
     background: var(--accent-soft);
     color: var(--text);
     font-size: 13px;
+    /* An outline rather than a shadow: nothing else in ZAX casts one, and the dimmed rows behind this are
+       what separates it - the border only has to hold where a row happens to sit right under it. */
+    outline: 1px solid var(--border-strong);
   }
 
   /* The tab names the content, so the one control up here sits alone at the edge rather than under a heading. */

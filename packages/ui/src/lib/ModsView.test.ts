@@ -341,7 +341,8 @@ describe("what a row offers to do", () => {
     publish();
     const drawn = view();
     expect(drawn.all(".offer .primary")[0]?.hasAttribute("disabled")).toBe(false);
-    expect(drawn.all(".pending")).toHaveLength(0);
+    expect(drawn.all(".reading")).toHaveLength(0);
+    expect(drawn.one(".scroll").hasAttribute("inert")).toBe(false);
   });
 
   test("disables a row's actions while the rows describe some other game, and says why", () => {
@@ -351,8 +352,21 @@ describe("what a row offers to do", () => {
     const drawn = view();
     expect(drawn.all(".offer .primary")[0]?.hasAttribute("disabled")).toBe(true);
     // The reason on screen, not only a greyed control: both come from one sentence in the store.
-    expect(drawn.one(".pending").textContent).toBe(store.modsUnsettled);
+    expect(drawn.one(".reading p").textContent).toBe(store.modsUnsettled);
     expect(drawn.text()).toContain("Reading this game's folder.");
+    // The whole tab under it, refused in one act rather than control by control.
+    expect(drawn.one(".scroll").hasAttribute("inert")).toBe(true);
+    store.selectedInstall = selected;
+  });
+
+  test("places the reason outside the scrolling flow, so the rows it describes do not move under it", () => {
+    // The sentence used to sit above the rows and take its height from them, so every change of game pushed
+    // the list down and let it back up for the length of one read.
+    publish();
+    const selected = store.selectedInstall;
+    store.selectedInstall = "/games/elsewhere";
+    const drawn = view();
+    expect(drawn.one(".scroll").contains(drawn.one(".reading"))).toBe(false);
     store.selectedInstall = selected;
   });
 
