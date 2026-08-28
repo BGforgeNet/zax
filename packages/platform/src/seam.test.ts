@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -19,7 +20,7 @@ import { describe, expect, it } from "vitest";
 const INSIDE_THE_SEAM: Readonly<Record<string, readonly string[]>> = {
   platform: [],
   core: ["@zax/platform", "yaml"],
-  "games-fallout2": ["@zax/core", "@zax/platform", "pe-library", "pluggable", "resedit", "yaml"],
+  "games-fallout2": ["@zax/core", "@zax/platform", "pe-library", "resedit", "yaml"],
   ui: ["@zax/core", "@zax/fallout2", "@zax/platform", "@zax/platform/memory", "svelte"],
 };
 
@@ -30,11 +31,12 @@ const BUILTINS = new Set(builtinModules);
 const isBuiltin = (spec: string) => spec.startsWith("node:") || BUILTINS.has(spec.split("/")[0]!);
 
 /**
- * Static and dynamic imports alike: `import()` is the form that would otherwise slip past a scan for `from`.
- * The specifier is held to the characters one can hold, because the generated catalog carries a label ending
- * in the word "from" and a looser class matches the prose after it.
+ * What a file imports, from the compiler's own pre-processor rather than a scan of the text: it catches every
+ * form - bare `import "x"`, dynamic `import()`, `export ... from` - and ignores comments, where a rationale
+ * ending in the phrase `from "pluggable"` otherwise reads as an import. Svelte files pass through as they are.
  */
-const IMPORT_RE = /(?:\bfrom|\bimport\s*\()\s*"([\w./@:-]+)"/g;
+const importsOf = (source: string): readonly string[] =>
+  ts.preProcessFile(source, true, true).importedFiles.map((file) => file.fileName);
 
 function* sourcesOf(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -56,9 +58,9 @@ describe.each(Object.entries(INSIDE_THE_SEAM))("%s stays inside the platform sea
   it(`imports nothing beyond its own files${allowed.length ? ` and ${allowed.join(", ")}` : ""}`, () => {
     for (const file of files) {
       const where = relative(PACKAGES, file);
-      for (const [, spec] of readFileSync(file, "utf8").matchAll(IMPORT_RE)) {
-        if (spec!.startsWith(".") || allowed.includes(spec!)) continue;
-        const why = isBuiltin(spec!) ? "reaches around the platform seam for" : "imports";
+      for (const spec of importsOf(readFileSync(file, "utf8"))) {
+        if (spec.startsWith(".") || allowed.includes(spec)) continue;
+        const why = isBuiltin(spec) ? "reaches around the platform seam for" : "imports";
         expect.fail(`${where} ${why} ${spec}`);
       }
     }
