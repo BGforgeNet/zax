@@ -260,7 +260,6 @@ function readMod(entry: unknown): InstalledMod | null {
   };
 }
 
-/** One recorded engine, or null when the entry is not one this version can read. */
 /**
  * The recorded bases, as text pairs. A malformed entry is dropped rather than refusing the whole record: a
  * lost base costs a preference between two values, where a refused record costs the knowledge of what is
@@ -276,6 +275,7 @@ function readWritten(entry: unknown): Record<string, string> {
   return out;
 }
 
+/** One recorded engine, or null when the entry is not one this version can read. */
 function readEngine(entry: unknown): InstalledEngine | null {
   if (entry === null || typeof entry !== "object") return null;
   const fields = entry as Record<string, unknown>;
