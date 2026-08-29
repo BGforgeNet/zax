@@ -7,5 +7,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./memory": "./src/memory.ts"
+  },
+  "dependencies": {
+    "spark-md5": "3.0.2"
+  },
+  "devDependencies": {
+    "@types/spark-md5": "3.0.5"
   }
 }

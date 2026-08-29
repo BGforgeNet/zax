@@ -91,6 +91,18 @@ function kindOf(entry: { isFile(): boolean; isDirectory(): boolean }): FileKind 
   return entry.isFile() ? "file" : entry.isDirectory() ? "dir" : "other";
 }
 
+// Streamed rather than read whole: the largest thing this hashes is a downloaded mod archive, and RPU's runs
+// to a gigabyte.
+function streamHash(path: string, algorithm: "sha256" | "md5"): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const digest = createHash(algorithm);
+    createReadStream(path)
+      .on("error", reject)
+      .on("data", (chunk) => digest.update(chunk))
+      .on("end", () => resolve(digest.digest("hex")));
+  });
+}
+
 /**
  * 7-Zip compiled to WebAssembly - sfall ships its releases as `.7z` and nothing in Node reads that format; a
  * WebAssembly build keeps this to one portable artifact rather than a native binary per platform that then has
@@ -438,16 +450,8 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
     },
 
     hash: {
-      // Streamed rather than read whole: the largest thing this hashes is a downloaded mod archive, and RPU's
-      // runs to a gigabyte.
-      sha256: (path) =>
-        new Promise<string>((resolve, reject) => {
-          const digest = createHash("sha256");
-          createReadStream(path)
-            .on("error", reject)
-            .on("data", (chunk) => digest.update(chunk))
-            .on("end", () => resolve(digest.digest("hex")));
-        }),
+      sha256: (path) => streamHash(path, "sha256"),
+      md5: (path) => streamHash(path, "md5"),
     },
   };
 }

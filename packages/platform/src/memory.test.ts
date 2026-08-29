@@ -139,6 +139,13 @@ describe("memory platform", () => {
     );
     await expect(platform.hash.sha256("/downloads/absent.bin")).rejects.toThrow(/No such file/);
   });
+
+  it("hashes a file to the published MD5 test vector, agreeing with the Node platform", async () => {
+    const platform = new MemoryPlatform({ files: { "/downloads/digest.bin": "abc" } });
+    // RFC 1321's own example for "abc", so a wrong algorithm or encoding cannot agree by accident.
+    expect(await platform.hash.md5("/downloads/digest.bin")).toBe("900150983cd24fb0d6963f7d28e17f72");
+    await expect(platform.hash.md5("/downloads/absent.bin")).rejects.toThrow(/No such file/);
+  });
 });
 
 describe("the memory platform's new seam members", () => {

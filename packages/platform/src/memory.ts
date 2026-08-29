@@ -8,6 +8,7 @@
  * archives written. Asserting on those records is how a test checks an effect that has no return value.
  */
 
+import SparkMD5 from "spark-md5";
 import {
   NetworkError,
   OperationCancelled,
@@ -315,6 +316,14 @@ export class MemoryPlatform implements Platform {
         // Copied: WebCrypto's types want a plain ArrayBuffer view, which a stored slice may not be.
         const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(found));
         return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      },
+      // WebCrypto has no MD5 - the algorithm was left out of the standard - so this is the one hash the
+      // browser preview cannot get from the platform itself; spark-md5 is a pure-JS implementation that runs
+      // the same in the browser and in Node, keeping this platform's behavior identical to both.
+      md5: async (path) => {
+        const found = this.files.get(normalize(path));
+        if (!found) throw new Error(`No such file: ${path}`);
+        return SparkMD5.ArrayBuffer.hash(new Uint8Array(found).buffer);
       },
     };
   }

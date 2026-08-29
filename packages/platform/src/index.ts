@@ -252,6 +252,8 @@ export interface Archive {
 export interface Hashing {
   /** Lowercase hex SHA-256 of the file at a path - what a release asset's stated digest is checked against. */
   sha256(path: string): Promise<string>;
+  /** Lowercase hex MD5 of the file at a path - what SourceForge's own file listing publishes per release. */
+  md5(path: string): Promise<string>;
 }
 
 /**

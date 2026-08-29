@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
  * too - they run on Node.
  */
 const INSIDE_THE_SEAM: Readonly<Record<string, readonly string[]>> = {
-  platform: [],
+  platform: ["spark-md5"],
   core: ["@zax/platform", "yaml"],
   "games-fallout2": ["@zax/core", "@zax/platform", "pe-library", "resedit", "yaml"],
   ui: ["@zax/core", "@zax/fallout2", "@zax/platform", "@zax/platform/memory", "svelte"],

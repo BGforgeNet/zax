@@ -143,6 +143,12 @@ describe("node hashing", () => {
   it("rejects hashing a path that is not there", async () => {
     await expect(platform.hash.sha256(at("absent.bin"))).rejects.toThrow();
   });
+
+  it("hashes a file to the published MD5 test vector", async () => {
+    await platform.fs.write(at("digest.bin"), new TextEncoder().encode("abc"));
+    // RFC 1321's own example for "abc", so a wrong algorithm or encoding cannot agree by accident.
+    expect(await platform.hash.md5(at("digest.bin"))).toBe("900150983cd24fb0d6963f7d28e17f72");
+  });
 });
 
 describe("node processes", () => {
