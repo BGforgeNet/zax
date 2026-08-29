@@ -6,3 +6,8 @@ set -euo pipefail
 node scripts/gen/gen-catalog.mjs
 node scripts/gen/gen-layout.mjs
 git diff --exit-code packages/games-fallout2/src/catalog.ts packages/games-fallout2/src/layout.ts
+
+# The committed icons are a rendering of zax.svg, not hand-authored - the runner image ships Chrome, which
+# gen-icons.mjs already looks for on PATH.
+node scripts/gen-icons.mjs
+git diff --exit-code packages/ui/public/zax.png packages/app/build/icon.png
