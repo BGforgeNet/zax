@@ -400,6 +400,23 @@ button {
 }
 
 /*
+  The status banner a settings tab shows in place of its rows - a linked-setting conflict, a file the tab has
+  nothing to edit yet. Global for the same reason `.frame` below is: two components draw the same banner, and a
+  second copy would drift.
+*/
+.tab-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px var(--gutter);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+/*
   A group of rows inside a settings list, with its heading. Global rather than scoped to the component that
   renders the catalog, because it is the same vocabulary as `.list .row` above and the install tab groups its
   Wine fields with it - a second copy would drift.

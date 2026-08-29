@@ -13,7 +13,7 @@
 {#each store.settingsChoices as choice (choice.id)}
   {@const def = store.defOf(choice.id)}
   {#if def && choice.choose}
-    <div class="choice" role="alert">
+    <div class="tab-banner choice" role="alert">
       <span class="what">
         <strong>{def.label}</strong> was changed in more than one place. Which one is right?
       </span>
@@ -28,19 +28,6 @@
 {/each}
 
 <style>
-  /* The same banner the unavailable notice draws, in the warning ink: this one is waiting on an answer. */
-  .choice {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 9px var(--gutter);
-    background: var(--accent-soft);
-    border-bottom: 1px solid var(--border);
-    font-size: 12.5px;
-    color: var(--text);
-  }
-
   .what {
     flex: 1 1 auto;
   }

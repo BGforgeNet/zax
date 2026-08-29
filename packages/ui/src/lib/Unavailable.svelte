@@ -28,7 +28,7 @@
   );
 </script>
 
-<div class="missing" role="status">
+<div class="tab-banner missing" role="status">
   <span>
     {reason ||
       (file === "f2_res.ini"
@@ -47,18 +47,6 @@
 </div>
 
 <style>
-  .missing {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 9px var(--gutter);
-    background: var(--accent-soft);
-    border-bottom: 1px solid var(--border);
-    font-size: 12.5px;
-    color: var(--text);
-  }
-
   button {
     background: var(--panel);
     border: 1px solid var(--border-strong);
