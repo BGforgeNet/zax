@@ -1,7 +1,6 @@
 /**
  * An action is a user intention expressed as one click - "enable full debugging" rather than eleven toggles
- * across two files. Its targets are the substrate it
- * writes to.
+ * across two files. Its targets are the substrate it writes to.
  */
 
 /**
