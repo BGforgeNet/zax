@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": "24"
+  },
   "scripts": {
     "dev": "pnpm --filter @zax/ui dev",
     "build": "pnpm --filter @zax/ui build",

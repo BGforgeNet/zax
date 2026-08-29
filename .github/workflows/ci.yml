@@ -28,7 +28,7 @@ jobs:
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version-file: package.json
           cache: pnpm
       # Install scripts only fetch the Electron and esbuild binaries, which the typecheck and the tests never
       # run; skipping them keeps the job to the packages it actually loads.
@@ -79,7 +79,7 @@ jobs:
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version-file: package.json
           cache: pnpm
       # The Electron runtime is a 130-200 MB download per platform, and it changes only when the pin does.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
