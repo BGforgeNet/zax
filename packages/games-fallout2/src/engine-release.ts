@@ -167,6 +167,10 @@ const NOTE_NAME = "release.json";
  * not license to trust whatever is already there, which is what a zero-byte file from a broken earlier
  * response would otherwise pass for ever. A mismatch came from an answer that was not the file - an error page
  * served with a 200, a body that stopped early - and is discarded rather than handed out again.
+ *
+ * No digest check, unlike a mod's payload or sfall's: neither fallout2-ce nor Fission publishes one, on GitHub
+ * or in a release's own notes - checked directly against their release APIs, not assumed. The size match and
+ * the archive-open check below are what integrity this download gets.
  */
 export async function enginePackage(
   platform: Platform,

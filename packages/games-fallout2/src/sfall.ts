@@ -127,6 +127,26 @@ async function isArchive(platform: Platform, path: string): Promise<boolean> {
 }
 
 /**
+ * The MD5 SourceForge's own file listing publishes for a version, or null when the feed does not name one -
+ * an older release that has scrolled off the capped 100-entry list, or a feed the network could not reach.
+ * Best-effort: a caller getting null still installs on the archive-validity check alone, since a metadata
+ * lookup failing is not evidence the download itself is bad.
+ */
+async function sfallMd5(platform: Platform, version: string): Promise<string | null> {
+  try {
+    const feed = await platform.net.fetchText(RELEASE_LIST);
+    const name = `sfall_${version}.7z`;
+    for (const item of feed.split("<item>").slice(1)) {
+      if (!item.includes(name)) continue;
+      return /<media:hash algo="md5">([0-9a-f]{32})<\/media:hash>/i.exec(item)?.[1]?.toLowerCase() ?? null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The cached archive for a version, downloaded if this is the first time it is asked for.
  *
  * What is on disk is checked rather than assumed, in both directions: a cached file that is not an archive is
@@ -149,6 +169,16 @@ export async function sfallPackage(platform: Platform, version: string, options?
     await platform.fs.remove(path);
     throw new Error(
       `What ${new URL(releaseUrl(version)).host} sent for sfall ${version} was not an archive - the mirror may have answered with an error page. Trying again may reach a different one.`,
+    );
+  }
+
+  // Beyond magic bytes: SourceForge's own listing publishes an MD5 per file, catching a corrupted or
+  // substituted download that still happens to open as a valid archive.
+  const digest = await sfallMd5(platform, version);
+  if (digest !== null && (await platform.hash.md5(path)) !== digest) {
+    await platform.fs.remove(path);
+    throw new Error(
+      `What ${new URL(releaseUrl(version)).host} sent for sfall ${version} does not match the digest SourceForge publishes for it - the download may have been corrupted or tampered with. Trying again may reach a different mirror.`,
     );
   }
   return path;

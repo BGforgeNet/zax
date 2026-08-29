@@ -198,6 +198,53 @@ describe("an answer that is not the archive it was meant to be", () => {
 });
 
 /*
+  SourceForge's own file listing publishes an MD5 per release, which the archive-validity check above cannot
+  see: a corrupted or substituted file that still opens as a valid 7z would pass it. Checked only when the
+  feed names a digest for this version - a metadata lookup failing is not evidence the download itself is bad.
+*/
+describe("verifying against the published digest", () => {
+  const PACKAGE = "/home/t/.cache/zax/packages/sfall-4.5.7z";
+  const LIST = "https://sourceforge.net/projects/sfall/rss?path=/sfall";
+  // MD5 of archiveBytes("release 4.5"), independently computed.
+  const PUBLISHED_DIGEST = "8d0f601406987758465cad0bb781814c";
+  const feedNaming = (digest: string) =>
+    `<rss><item><title>/sfall/sfall_4.5.7z</title><media:hash algo="md5">${digest}</media:hash></item></rss>`;
+
+  const withFeed = (feed: string) =>
+    new MemoryPlatform({
+      home: "/home/t",
+      files: { "/games/one/fallout2.exe": "MZ" },
+      downloads: { [releaseUrl("4.5")]: archiveBytes("release 4.5") },
+      responses: { [LIST]: feed },
+    });
+
+  it("refuses a download that does not match the digest the feed publishes for it", async () => {
+    const platform = withFeed(feedNaming("0".repeat(32)));
+    await expect(sfallPackage(platform, "4.5")).rejects.toThrow(/does not match the digest/);
+    expect(platform.fileAt(PACKAGE), "a mismatched download is not left behind").toBeUndefined();
+  });
+
+  it("accepts a download that matches the digest the feed publishes for it", async () => {
+    const platform = withFeed(feedNaming(PUBLISHED_DIGEST));
+    expect(await sfallPackage(platform, "4.5")).toBe(PACKAGE);
+  });
+
+  it("installs normally when the feed does not name this version", async () => {
+    const platform = withFeed(`<rss><item><title>/sfall/sfall_4.4.7z</title></item></rss>`);
+    expect(await sfallPackage(platform, "4.5")).toBe(PACKAGE);
+  });
+
+  it("installs normally when the feed itself could not be reached", async () => {
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      files: { "/games/one/fallout2.exe": "MZ" },
+      downloads: { [releaseUrl("4.5")]: archiveBytes("release 4.5") },
+    });
+    expect(await sfallPackage(platform, "4.5")).toBe(PACKAGE);
+  });
+});
+
+/*
   The release is a third-party archive unpacked over the user's game folder, so it is judged before anything is
   extracted - by the same bounds a mod payload gets, since the two paths differ in where the archive comes from
   and not in what an archive can do.
