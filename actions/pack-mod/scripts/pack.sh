@@ -35,11 +35,22 @@ name="${NAME:-${GITHUB_REPOSITORY##*/}}"
 archive="${name}_${GITHUB_REF_NAME}.zip"
 # Removed first: zip ADDS to an archive that already exists, so a build that packed one under this name - or a
 # re-run - would ship its entries merged with these rather than replaced.
-rm -f "$archive"
-# Word splitting is the point: PATHS is one path per line. -X drops the extra file attributes, which are
-# per-machine and would change the archive's digest between two builds of identical content.
-# shellcheck disable=SC2086
-zip -rXq "$archive" $PATHS
+rm -f -- "$archive"
+# Split only at line boundaries. Ordinary shell expansion also splits at spaces and treats wildcard characters
+# as patterns, turning a path list into a different set of files before zip ever sees it.
+paths=()
+while IFS= read -r path; do
+  # A multiline action input uses LF, but accepting CRLF here costs nothing and avoids making the CR a filename.
+  path=${path%$'\r'}
+  if [ -n "$path" ]; then paths+=("$path"); fi
+done <<<"${PATHS:-}"
+if [ ${#paths[@]} -eq 0 ]; then
+  echo "No paths were given to pack." >&2
+  exit 1
+fi
+# -X drops per-machine file attributes. The archive's ./ prefix makes its own leading hyphen inert, while the
+# later -- does the same for every input path; Info-ZIP requires its archive name to come before that marker.
+zip -rXq "./$archive" -- "${paths[@]}"
 
 # Only when it was built somewhere else: with the default directory the archive is already there, and moving a
 # file onto itself is an error rather than a no-op.
