@@ -21,7 +21,15 @@ directories:
 # dead copy of their TypeScript sources.
 files:
   - dist/**
+  # Development keeps maps beside its bundles. Packaged Node processes do not enable source-map support, so
+  # these files cannot improve a stack trace there and only enlarge the archive.
+  - "!dist/**/*.map"
   - package.json
+
+# The interface itself is English-only. Keeping every Chromium translation localizes no ZAX text and adds 55
+# resource packs to each platform; `en` retains both regional English packs where Electron supplies them.
+electronLanguages:
+  - en
 
 # These are reached by path at runtime rather than imported, and a path inside the archive is not a path the
 # operating system can open: each worker is started with `new Worker(url)`, and 7z-wasm loads its `.wasm` from
