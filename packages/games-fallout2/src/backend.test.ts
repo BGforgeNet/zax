@@ -193,7 +193,7 @@ describe("the operations", () => {
         "https://api.github.com/repos/BGforgeNet/zax/releases/latest": JSON.stringify({
           tag_name: "v0.9",
           html_url: "https://example/page",
-          assets: [{ name: "zax", browser_download_url: "https://example/zax" }],
+          assets: [{ name: "ZAX-0.9-linux-x64.AppImage", browser_download_url: "https://example/zax" }],
         }),
       },
     });

@@ -32,9 +32,18 @@ export async function latestZax(platform: Platform): Promise<ZaxRelease> {
       typeof (asset as { browser_download_url?: unknown }).browser_download_url === "string",
   );
 
-  // One build per platform, told apart by extension: the Windows one is an .exe and the other is not.
-  const windows = platform.os === "windows";
-  const match = named.find((asset) => asset.name.toLowerCase().endsWith(".exe") === windows);
+  // These are the `os` macros and preferred portable targets in electron-builder.yml. Extension alone cannot
+  // distinguish the Windows and macOS zips, and the release also carries an SBOM that no machine can run.
+  const target =
+    platform.arch === "other"
+      ? undefined
+      : {
+          windows: { os: "win", extension: "exe" },
+          linux: { os: "linux", extension: "appimage" },
+          macos: { os: "mac", extension: "zip" },
+        }[platform.os];
+  const suffix = target && `-${target.os}-${platform.arch}.${target.extension}`;
+  const match = suffix === undefined ? undefined : named.find((asset) => asset.name.toLowerCase().endsWith(suffix));
   const page = typeof body.html_url === "string" ? body.html_url : LATEST_RELEASE;
   return { version, url: httpsOnly(match?.browser_download_url) ?? httpsOnly(page) ?? LATEST_RELEASE };
 }
