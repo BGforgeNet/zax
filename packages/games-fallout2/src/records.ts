@@ -60,9 +60,9 @@ export interface InstalledMod {
   /** State files as that release shipped them, latin1 text - the base an upgrade's merge compares against. */
   shipped: Readonly<Record<string, string>>;
   /**
-   * Fields this version has no rule for, kept as read and written back unchanged. A later ZAX records more
-   * per mod than this one knows - the profile a mod was installed under, say - and rewriting the file for an
-   * unrelated install would otherwise throw that away while every field this one knows round-tripped.
+   * Fields this version has no rule for, kept as read and written back unchanged. A later ZAX may record more
+   * per mod than this one knows, and rewriting the file for an unrelated install would otherwise throw that
+   * away while every field this one knows round-tripped.
    */
   carried?: Readonly<Record<string, unknown>>;
 }

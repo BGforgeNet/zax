@@ -354,7 +354,7 @@ export interface Reconciled {
 
 /**
  * Edits are held as a sparse override map rather than applied to the parsed documents. That keeps
- * "what did I change" and revert trivial, and it is the shape a saved profile will store.
+ * "what did I change" and revert trivial.
  */
 /*
   One object rather than one per view, and long because of it. The split that suggests itself - settings,

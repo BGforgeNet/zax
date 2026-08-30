@@ -1,8 +1,7 @@
 /**
  * A setting's typed definition. One object drives parsing, validation, rendering, search and diffing.
  *
- * `id` is deliberately independent of the addresses it writes: saved profiles and presets store ids, so an
- * upstream rename of a config key does not invalidate user data.
+ * `id` joins the catalog to layout, actions and search. Its first address mints it; later targets keep it.
  */
 
 export interface ChoiceOption {

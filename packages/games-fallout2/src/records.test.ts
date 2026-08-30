@@ -280,13 +280,13 @@ describe("a record a later ZAX wrote", () => {
 
   it("carries a per-mod field it has no rule for through a rewrite", async () => {
     const platform = new MemoryPlatform();
-    // A field this version has no rule for - a profile the mod was installed under, say. It was `parts`
-    // until this version learned to read those, which is the point: the stand-in has to be genuinely unknown.
-    await saveRecord(platform, { path: GAME, mods: [mod({ carried: { profile: "hardcore" } })] });
+    // This was `parts` until this version learned to read those, which is the point: the stand-in has to be
+    // genuinely unknown.
+    await saveRecord(platform, { path: GAME, mods: [mod({ carried: { provenance: "manual" } })] });
     const loaded = await loadRecord(platform, GAME);
-    expect(loaded.mods[0]?.carried).toEqual({ profile: "hardcore" });
+    expect(loaded.mods[0]?.carried).toEqual({ provenance: "manual" });
     await saveRecord(platform, loaded);
-    expect((await loadRecord(platform, GAME)).mods[0]?.carried).toEqual({ profile: "hardcore" });
+    expect((await loadRecord(platform, GAME)).mods[0]?.carried).toEqual({ provenance: "manual" });
   });
 });
 
