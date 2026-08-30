@@ -24,14 +24,31 @@ export function isWebUrl(target: string): boolean {
  * Whether a target is the interface itself: the dev server when one is given, otherwise the built files.
  * Navigating anywhere else would leave the preload's bridge attached to whatever loaded next.
  *
- * `devServer` is passed rather than read here so this makes the same truthiness test the window's own load
- * makes, from the one value, and the two cannot disagree about which mode this is.
+ * `ownContent` is the address the window was actually told to load. Development serves a module graph from one
+ * origin; a packaged application has one HTML entry point, with only its fragment allowed to vary.
  */
-export function isOwnContent(target: string, devServer: string | undefined): boolean {
+export function isOwnContent(target: string, ownContent: string): boolean {
   try {
     const url = new URL(target);
-    return devServer ? url.origin === new URL(devServer).origin : url.protocol === "file:";
+    const own = new URL(ownContent);
+    if (own.protocol !== "file:") return url.origin === own.origin;
+    url.hash = "";
+    own.hash = "";
+    return url.href === own.href;
   } catch {
     return false;
   }
+}
+
+interface SenderFrame {
+  readonly url: string;
+}
+
+/** Only the main frame at the application address receives the authority carried by the preload bridge. */
+export function isTrustedIpcSender(
+  sender: SenderFrame | null,
+  mainFrame: SenderFrame | null,
+  ownContent: string,
+): boolean {
+  return sender !== null && sender === mainFrame && isOwnContent(sender.url, ownContent);
 }

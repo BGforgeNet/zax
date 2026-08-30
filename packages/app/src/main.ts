@@ -4,7 +4,7 @@
  */
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { appendLog, type LogLevel } from "@zax/core";
 import { createBackend, type Backend } from "@zax/fallout2";
@@ -12,13 +12,15 @@ import { nodePlatform } from "@zax/platform-node";
 import { BUSY_CHANNEL, CHANNEL, PROGRESS_CHANNEL } from "./channel.js";
 import { CLOSE_ANYWAY, busyLabel, closePrompt } from "./closing.js";
 import { createDispatch, describeError } from "./dispatch.js";
-import { isOwnContent, isWebUrl } from "./navigation.js";
+import { isOwnContent, isTrustedIpcSender, isWebUrl } from "./navigation.js";
 import { folderPicked, pickerOptions } from "./picker.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** Where the interface is served from: the built files beside this one, or the dev server when one is given. */
 const DEV_SERVER = process.env["ZAX_DEV_SERVER"];
+const RENDERER = join(here, "renderer", "index.html");
+const OWN_CONTENT = DEV_SERVER || pathToFileURL(RENDERER).href;
 
 // The platform reports what it did out of sight - failed and resumed downloads above all, which are the one
 // thing a bug report from a poor connection cannot reconstruct from the interface. It can be handed `logLine`
@@ -37,7 +39,11 @@ process.on("unhandledRejection", (reason) => void logLine("error", `unhandled re
 
 /** The operation the interface has running, as it last reported. Null once it has none. */
 let busy: string | null = null;
-ipcMain.on(BUSY_CHANNEL, (_event, what: unknown) => {
+ipcMain.on(BUSY_CHANNEL, (event, what: unknown) => {
+  if (!isTrustedIpcSender(event.senderFrame, event.sender.mainFrame, OWN_CONTENT)) {
+    void logLine("warn", "refused a busy message from outside the application");
+    return;
+  }
   busy = busyLabel(what);
 });
 
@@ -45,7 +51,13 @@ function register(backend: Backend): void {
   // Every line this sink is handed is an operation that failed; the renderer's notice carries the message and
   // the log carries the stack.
   const dispatch = createDispatch(backend, (line) => void logLine("error", line));
-  ipcMain.handle(CHANNEL, (_event, method: string, args: unknown[]) => dispatch(method, args));
+  ipcMain.handle(CHANNEL, (event, method: string, args: unknown[]) => {
+    if (!isTrustedIpcSender(event.senderFrame, event.sender.mainFrame, OWN_CONTENT)) {
+      void logLine("warn", "refused a backend request from outside the application");
+      throw new Error("The backend request did not come from the application.");
+    }
+    return dispatch(method, args);
+  });
 }
 
 /**
@@ -158,14 +170,14 @@ function createWindow(): BrowserWindow {
   // Navigating away would leave the preload's bridge attached to whatever loaded next, so the window stays on
   // its own content and a web link is handed to the browser instead.
   window.webContents.on("will-navigate", (event, url) => {
-    if (isOwnContent(url, DEV_SERVER)) return;
+    if (isOwnContent(url, OWN_CONTENT)) return;
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
     else void logLine("warn", `refused to navigate to ${url}`);
   });
 
   if (DEV_SERVER) void window.loadURL(DEV_SERVER);
-  else void window.loadFile(join(here, "renderer", "index.html"));
+  else void window.loadFile(RENDERER);
 
   return window;
 }
