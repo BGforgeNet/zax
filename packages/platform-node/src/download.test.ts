@@ -41,6 +41,7 @@ afterEach(async () => {
 
 const destination = () => join(directory, "payload.bin");
 const partial = () => `${destination()}.zax-partial`;
+const partialIdentity = () => `${partial()}.json`;
 
 const exists = async (path: string) => {
   try {
@@ -291,8 +292,69 @@ describe("cancelling", () => {
     }).catch(() => undefined);
 
     expect(await exists(partial()), "the partial survives a cancel").toBe(true);
+    expect(await exists(partialIdentity()), "its source identity survives with it").toBe(true);
     expect((await stat(partial())).size).toBeGreaterThan(0);
     expect(await exists(destination()), "and nothing is passed off as a finished download").toBe(false);
+  });
+
+  it("resumes those bytes when a later invocation asks for the same URL", async () => {
+    let first = true;
+    let resumedRange: string | undefined;
+    handler = (response, range) => {
+      if (first) {
+        response.writeHead(200, { "content-length": String(BODY.length) });
+        response.write(BODY.subarray(0, 700));
+        return;
+      }
+      resumedRange = range;
+      const from = Number(/bytes=(\d+)-/.exec(range ?? "")?.[1] ?? 0);
+      response.writeHead(206, {
+        "content-length": String(BODY.length - from),
+        "content-range": `bytes ${from}-${BODY.length - 1}/${BODY.length}`,
+      });
+      response.end(BODY.subarray(from));
+    };
+    const controller = new AbortController();
+    await downloadFile(`${base}/f`, destination(), {
+      policy: QUICK,
+      signal: controller.signal,
+      onProgress: ({ received }) => void (received > 0 && controller.abort()),
+    }).catch(() => undefined);
+
+    first = false;
+    await downloadFile(`${base}/f`, destination(), { policy: QUICK });
+
+    expect(resumedRange).toBe("bytes=700-");
+    expect(await readFile(destination())).toEqual(BODY);
+    expect(await exists(partialIdentity()), "the identity is gone once the download is complete").toBe(false);
+  });
+
+  it("does not append a partial fetched from a different URL", async () => {
+    let first = true;
+    let laterRange: string | undefined;
+    const replacement = Buffer.from(BODY).reverse();
+    handler = (response, range) => {
+      if (first) {
+        response.writeHead(200, { "content-length": String(BODY.length) });
+        response.write(BODY.subarray(0, 700));
+        return;
+      }
+      laterRange = range;
+      response.writeHead(200, { "content-length": String(replacement.length) });
+      response.end(replacement);
+    };
+    const controller = new AbortController();
+    await downloadFile(`${base}/old`, destination(), {
+      policy: QUICK,
+      signal: controller.signal,
+      onProgress: ({ received }) => void (received > 0 && controller.abort()),
+    }).catch(() => undefined);
+
+    first = false;
+    await downloadFile(`${base}/new`, destination(), { policy: QUICK });
+
+    expect(laterRange).toBeUndefined();
+    expect(await readFile(destination())).toEqual(replacement);
   });
 
   it("does not retry, where every network failure would", async () => {

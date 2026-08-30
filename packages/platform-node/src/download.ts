@@ -15,7 +15,7 @@
  */
 
 import { createWriteStream } from "node:fs";
-import { mkdir, open, rename, rm, stat } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { once } from "node:events";
 import { finished } from "node:stream/promises";
@@ -116,6 +116,27 @@ async function partialSize(path: string): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+/** Removes the bytes and the source record together, so neither can give meaning to the other after failure. */
+async function discardPartial(partial: string, identity: string): Promise<void> {
+  await Promise.all([rm(partial, { force: true }), rm(identity, { force: true })]);
+}
+
+/**
+ * Keeps a partial only when it belongs to this request. A destination is routinely reused for another release,
+ * and byte count alone cannot say that its prefix came from the URL now asking to append to it.
+ */
+async function preparePartial(partial: string, identity: string, url: string): Promise<void> {
+  let sameSource = false;
+  try {
+    const saved = JSON.parse(await readFile(identity, "utf8")) as { version?: unknown; url?: unknown };
+    sameSource = saved.version === 1 && saved.url === url;
+  } catch {
+    // A missing or interrupted record grants no identity to the bytes beside it.
+  }
+  if (!sameSource) await discardPartial(partial, identity);
+  await writeFile(identity, JSON.stringify({ version: 1, url }), "utf8");
 }
 
 /**
@@ -239,10 +260,12 @@ export async function downloadFile(url: string, destination: string, options: Do
   const policy = { ...DEFAULT_POLICY, ...options.policy };
   await mkdir(dirname(destination), { recursive: true });
   const partial = `${destination}.zax-partial`;
+  const identity = `${partial}.json`;
+  await preparePartial(partial, identity, url);
 
   let last: unknown;
   for (let n = 1; n <= policy.attempts; n++) {
-    const from = n === 1 ? 0 : await partialSize(partial);
+    const from = await partialSize(partial);
     const started = Date.now();
     try {
       const { received, total } = await attempt(url, partial, from, options, policy);
@@ -251,6 +274,7 @@ export async function downloadFile(url: string, destination: string, options: Do
       const handle = await open(partial, "r+");
       await handle.sync().finally(() => handle.close());
       await rename(partial, destination);
+      await rm(identity, { force: true });
       return;
     } catch (error) {
       last = error;
@@ -270,11 +294,14 @@ export async function downloadFile(url: string, destination: string, options: Do
       // Nothing failed, so there is nothing to retry and nothing to clear away: the bytes already fetched are
       // what makes resuming a cancelled download cheaper than starting it over. Thrown rather than broken out
       // of, since the exit below drops the partial.
-      if (stopped) throw error;
+      if (stopped) {
+        if ((await partialSize(partial)) === 0) await discardPartial(partial, identity);
+        throw error;
+      }
 
       // A range the server would not satisfy means the partial is not a prefix of what is being fetched.
       // Dropping it costs one restart; keeping it corrupts every attempt after this one.
-      if (status === 416 || status === 404) await rm(partial, { force: true });
+      if (status === 416 || status === 404) await discardPartial(partial, identity);
 
       const kind = failure?.kind;
       const retryable =
@@ -289,6 +316,6 @@ export async function downloadFile(url: string, destination: string, options: Do
 
   // Nothing usable is left: a stale partial would be resumed onto by a later call for a different file that
   // happens to want the same destination.
-  await rm(partial, { force: true });
+  await discardPartial(partial, identity);
   throw last;
 }
