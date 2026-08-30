@@ -49,7 +49,9 @@ export async function preflightArchive(
   let total = 0;
   for (const entry of entries) {
     if (entry.kind === "link")
-      throw new Error(`${label} contains a symbolic link (${entry.name}) - refused, nothing was extracted.`);
+      throw new Error(
+        `${label} contains a symbolic link or hard link (${entry.name}) - refused, nothing was extracted.`,
+      );
     if (escapesDirectory(entry.name))
       throw new Error(`${label} names a path outside the folder it unpacks into (${entry.name}) - refused.`);
     if (entry.name.split(/[/\\]/).length > MAX_PATH_DEPTH)

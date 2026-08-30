@@ -146,9 +146,9 @@ const threw = <T>(message: T | { error: unknown }): message is { error: unknown 
   typeof message === "object" && message !== null && "error" in message;
 
 /**
- * One entry from 7-Zip's `-slt` listing: field-per-line blocks, blank lines between entries. A symlink names
- * its target in `Symbolic Link` (tar, which prints the field empty for everything else) or carries a mode
- * string starting `l` in `Attributes` (zip with Unix attributes); both are folded to the one kind.
+ * One entry from 7-Zip's `-slt` listing: field-per-line blocks, blank lines between entries. A link names its
+ * target in `Symbolic Link` or `Hard Link`, or carries a mode string starting `l` in `Attributes` (zip with
+ * Unix attributes); all are folded to the one kind.
  */
 function listedEntry(fields: Readonly<Record<string, string>>): ArchiveEntryInfo | null {
   const name = fields["Path"];
@@ -156,7 +156,10 @@ function listedEntry(fields: Readonly<Record<string, string>>): ArchiveEntryInfo
   const attributes = fields["Attributes"] ?? "";
   // A tar prints this field for every entry and leaves it empty unless the entry really is a link; a zip with
   // Unix attributes says so in the mode string instead.
-  const link = (fields["Symbolic Link"] ?? "") !== "" || /(^|\s)l[rwxst-]{9}$/.test(attributes);
+  const link =
+    (fields["Symbolic Link"] ?? "") !== "" ||
+    (fields["Hard Link"] ?? "") !== "" ||
+    /(^|\s)l[rwxst-]{9}$/.test(attributes);
   const kind = link
     ? "link"
     : fields["Folder"] === "+" || /(^|\s)D/.test(attributes.split(" ")[0] ?? "")

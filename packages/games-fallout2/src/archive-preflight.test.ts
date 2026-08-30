@@ -50,9 +50,9 @@ describe("preflightArchive", () => {
     await expect(judge(...entries)).resolves.toEqual(entries);
   });
 
-  it("refuses a symbolic link, naming which entry it was", async () => {
+  it("refuses a link, naming which entry it was", async () => {
     await expect(judge({ name: "mods/link", size: 0, kind: "link" })).rejects.toThrow(
-      "a mod release contains a symbolic link (mods/link) - refused, nothing was extracted.",
+      "a mod release contains a symbolic link or hard link (mods/link) - refused, nothing was extracted.",
     );
   });
 
