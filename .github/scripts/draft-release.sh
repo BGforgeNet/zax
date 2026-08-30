@@ -47,10 +47,15 @@ fi
 echo "Attaching ${#files[@]} files:"
 printf '  %s\n' "${files[@]}"
 
-# Re-running a release must not fail on the draft that already exists, so an existing one is replaced rather
-# than added to - otherwise a second run attaches a second copy of every file.
-if gh release view "${TAG}" >/dev/null 2>&1; then
-  echo "Release ${TAG} already exists; deleting it before drafting again."
+# Re-running a release must not fail on the draft that already exists, so an existing draft is replaced rather
+# than added to - otherwise a second run attaches a second copy of every file. A published release is immutable
+# here: deleting one turns a routine workflow rerun into the disappearance of a release users already have.
+if draft=$(gh release view "${TAG}" --json isDraft --jq .isDraft 2>/dev/null); then
+  if [[ "${draft}" != "true" ]]; then
+    echo "Release ${TAG} is already published; refusing to replace it." >&2
+    exit 1
+  fi
+  echo "Draft ${TAG} already exists; deleting it before drafting again."
   gh release delete "${TAG}" --yes
 fi
 
