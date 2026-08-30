@@ -178,6 +178,78 @@ export function offeredParts(release: ModRelease): readonly ModPartGroup[] {
 }
 
 const FEED_CACHE_MS = 30 * 60 * 1000;
+const FEED_REQUEST_CONCURRENCY = 6;
+const FEED_RELEASE_CONCURRENCY = 6;
+
+interface FeedRead {
+  releases: Map<string, Promise<FeedRelease[]>>;
+  fetchText(url: string): Promise<string>;
+}
+
+/** One cold listing may inspect dozens of tags, but it must not turn that into dozens of simultaneous requests. */
+function feedRead(platform: Platform): FeedRead {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  const enter = (): Promise<void> => {
+    if (active < FEED_REQUEST_CONCURRENCY) {
+      active += 1;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      waiting.push(() => {
+        active += 1;
+        resolve();
+      });
+    });
+  };
+  const leave = (): void => {
+    active -= 1;
+    waiting.shift()?.();
+  };
+
+  return {
+    releases: new Map(),
+    fetchText: async (url) => {
+      await enter();
+      try {
+        return await platform.net.fetchText(url);
+      } finally {
+        leave();
+      }
+    },
+  };
+}
+
+/** Maps in input order, stopping new work after a failure and waiting for work already started to settle. */
+async function mapConcurrent<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  transform: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  const failures: Array<{ index: number; error: unknown }> = [];
+  let next = 0;
+  let stopped = false;
+
+  const worker = async (): Promise<void> => {
+    while (!stopped) {
+      const index = next;
+      if (index >= values.length) return;
+      next += 1;
+      try {
+        results[index] = await transform(values[index]!);
+      } catch (error) {
+        failures.push({ index, error });
+        stopped = true;
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, worker));
+  const failure = failures.toSorted((a, b) => a.index - b.index)[0];
+  if (failure) throw failure.error;
+  return results;
+}
 
 const slug = (text: string): string => text.replace(/[^\w.-]+/g, "-");
 
@@ -245,7 +317,12 @@ function readReleases(body: string): FeedRelease[] {
  * cache again when the network refuses - a listing that worked yesterday beats an empty tab today, and the
  * install path re-verifies everything that matters against digests anyway.
  */
-async function fetchReleases(platform: Platform, repository: string, now: Date): Promise<FeedRelease[]> {
+async function readRepositoryReleases(
+  platform: Platform,
+  repository: string,
+  now: Date,
+  read: FeedRead,
+): Promise<FeedRelease[]> {
   const cachePath = feedCachePath(platform, repository);
   const cached = await platform.fs.stat(cachePath);
   if (cached?.kind === "file" && now.getTime() - cached.modified < FEED_CACHE_MS) {
@@ -253,7 +330,7 @@ async function fetchReleases(platform: Platform, repository: string, now: Date):
   }
   let body: string;
   try {
-    body = await platform.net.fetchText(releasesUrl(repository));
+    body = await read.fetchText(releasesUrl(repository));
   } catch (error) {
     if (error instanceof NetworkError && cached?.kind === "file") {
       return readReleases(new TextDecoder().decode(await platform.fs.read(cachePath)));
@@ -262,6 +339,15 @@ async function fetchReleases(platform: Platform, repository: string, now: Date):
   }
   await platform.fs.write(cachePath, new TextEncoder().encode(body));
   return readReleases(body);
+}
+
+/** Shares a repository listing between rows, including while its first request is still in flight. */
+function fetchReleases(platform: Platform, repository: string, now: Date, read: FeedRead): Promise<FeedRelease[]> {
+  const held = read.releases.get(repository);
+  if (held) return held;
+  const pending = readRepositoryReleases(platform, repository, now, read);
+  read.releases.set(repository, pending);
+  return pending;
 }
 
 /** The manifest as committed, at the tag the release names - the route that costs an author no build step. */
@@ -307,6 +393,7 @@ async function fetchManifestText(
   feed: FeedSource,
   release: FeedRelease,
   version: string | undefined,
+  read: FeedRead,
 ): Promise<FetchedManifest | null> {
   const asset = release.assets.find((entry) => entry.name === MANIFEST_NAME);
   const fromAsset = asset !== undefined;
@@ -326,7 +413,7 @@ async function fetchManifestText(
 
   let text: string;
   try {
-    text = await platform.net.fetchText(asset ? asset.url : repositoryManifestUrl(feed.repository, release.tag));
+    text = await read.fetchText(asset ? asset.url : repositoryManifestUrl(feed.repository, release.tag));
   } catch (error) {
     // A tag with no manifest is a release that is not for ZAX, not a broken feed - every other failure is,
     // ZAX carrying a copy or not: offering from a copy while the network is down would offer an install that
@@ -422,9 +509,10 @@ async function releaseFrom(
   feed: FeedSource,
   release: FeedRelease,
   notes: FeedNotes,
+  read: FeedRead,
 ): Promise<ModRelease | null> {
   const tagged = versionFromTag(release.tag);
-  const found = await fetchManifestText(platform, feed, release, tagged);
+  const found = await fetchManifestText(platform, feed, release, tagged, read);
   if (found === null) return null;
   notes.sawManifest = true;
   const inferred = soleArchive(release.assets);
@@ -471,7 +559,7 @@ export async function listModVersions(
   now: Date = new Date(),
 ): Promise<readonly string[]> {
   const seen = new Set<string>();
-  for (const release of await fetchReleases(platform, feed.repository, now)) {
+  for (const release of await fetchReleases(platform, feed.repository, now, feedRead(platform))) {
     const tagged = versionFromTag(release.tag);
     if (tagged === undefined) continue;
     if (feed.line && !heldByLine(feed.line, tagged)) continue;
@@ -491,23 +579,29 @@ export async function fetchFeedAt(
   version: string,
   now: Date = new Date(),
 ): Promise<ModRelease> {
+  const read = feedRead(platform);
   const notes: FeedNotes = { sawManifest: false, firstRefusal: null };
-  for (const release of await fetchReleases(platform, feed.repository, now)) {
+  for (const release of await fetchReleases(platform, feed.repository, now, read)) {
     if (versionFromTag(release.tag) !== version) continue;
-    const built = await releaseFrom(platform, feed, release, notes);
+    const built = await releaseFrom(platform, feed, release, notes, read);
     if (built !== null) return built;
   }
   if (notes.firstRefusal) throw notes.firstRefusal;
   throw new Error(`No release of ${feed.repository} publishes "${feed.id}" ${version}.`);
 }
 
-export async function fetchFeed(platform: Platform, feed: FeedSource, now: Date = new Date()): Promise<ModRelease> {
-  const releases = worthAsking(feed, await fetchReleases(platform, feed.repository, now));
+async function fetchFeedUsing(platform: Platform, feed: FeedSource, now: Date, read: FeedRead): Promise<ModRelease> {
+  const releases = worthAsking(feed, await fetchReleases(platform, feed.repository, now, read));
   const notes: FeedNotes = { sawManifest: false, firstRefusal: null };
   let best: ModRelease | null = null;
 
-  for (const release of releases) {
-    const built = await releaseFrom(platform, feed, release, notes);
+  const attempts = await mapConcurrent(releases, FEED_RELEASE_CONCURRENCY, async (release) => {
+    const one: FeedNotes = { sawManifest: false, firstRefusal: null };
+    return { built: await releaseFrom(platform, feed, release, one, read), notes: one };
+  });
+  for (const { built, notes: one } of attempts) {
+    notes.sawManifest ||= one.sawManifest;
+    notes.firstRefusal ??= one.firstRefusal;
     if (built === null) continue;
     // Strictly higher, so a version published twice keeps its newest release's assets.
     if (best !== null && compareInLine(feed.line, built.manifest.version, best.manifest.version) <= 0) continue;
@@ -521,6 +615,10 @@ export async function fetchFeed(platform: Platform, feed: FeedSource, now: Date 
       ? `No release of ${feed.repository} carries a manifest for "${feed.id}".`
       : `No release of ${feed.repository} ships a ZAX manifest yet.`,
   );
+}
+
+export async function fetchFeed(platform: Platform, feed: FeedSource, now: Date = new Date()): Promise<ModRelease> {
+  return fetchFeedUsing(platform, feed, now, feedRead(platform));
 }
 
 /** What the interface offers for one mod on one install, decided from what is already known. */
@@ -854,20 +952,46 @@ export async function readModFeeds(
   platform: Platform,
   now: Date = new Date(),
 ): Promise<{ listing: ModFeedListing; releases: readonly ModRelease[] }> {
+  type Answer = { release: ModRelease } | { error: unknown };
+  const read = feedRead(platform);
+  const answers = new Array<Answer>(MOD_FEEDS.length);
+  const repositories = new Map<string, Array<{ index: number; feed: ModFeed }>>();
+  for (const [index, feed] of MOD_FEEDS.entries()) {
+    const held = repositories.get(feed.repository) ?? [];
+    held.push({ index, feed });
+    repositories.set(feed.repository, held);
+  }
+
+  // Repositories overlap, while rows from one repository stay ordered so they share both its listing and any
+  // immutable tag cache entries. Answers are assembled below in catalog order, not in network completion order.
+  await Promise.all(
+    [...repositories.values()].map(async (feeds) => {
+      for (const { index, feed } of feeds) {
+        try {
+          answers[index] = { release: await fetchFeedUsing(platform, feed, now, read) };
+        } catch (error) {
+          answers[index] = { error };
+        }
+      }
+    }),
+  );
+
   const published: PublishedMod[] = [];
   const releases: ModRelease[] = [];
   const failures: { repository: string; id: string; name: string; why: string }[] = [];
-  for (const feed of MOD_FEEDS) {
-    try {
-      const release = await fetchFeed(platform, feed, now);
+  for (const [index, feed] of MOD_FEEDS.entries()) {
+    const answer = answers[index]!;
+    if ("release" in answer) {
+      const { release } = answer;
       releases.push(release);
       published.push(publishedFrom(release, componentsOf(release)));
-    } catch (error) {
+    } else {
       // Only a base mod earns a row here: that one is the whole installation, so a user who cannot get it
       // needs to know why. A stacking mod that is unreachable or has not adopted the format offers the same
       // sentence about a repository they never asked after.
       if (!feed.base) continue;
       const { repository, id, name } = feed;
+      const { error } = answer;
       failures.push({ repository, id, name, why: error instanceof Error ? error.message : String(error) });
     }
   }

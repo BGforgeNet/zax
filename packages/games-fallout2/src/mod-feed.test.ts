@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Platform } from "@zax/platform";
 import { MemoryPlatform, type MemoryOptions } from "@zax/platform/memory";
 import type { Install } from "@zax/core";
 import {
@@ -64,6 +65,30 @@ const atTag = (tag: string) => `https://raw.githubusercontent.com/${REPO}/${tag}
 const committed = (id: string, rest = "") => `spec: 1\nid: ${id}\nname: ${id}\ngame: fallout2\n${rest}`;
 
 const feedPlatform = (options: MemoryOptions = {}) => new MemoryPlatform(options);
+
+function measuredNetwork(platform: MemoryPlatform): { platform: Platform; peak: () => number } {
+  let active = 0;
+  let peak = 0;
+  return {
+    platform: {
+      ...platform,
+      net: {
+        ...platform.net,
+        fetchText: async (url) => {
+          active += 1;
+          peak = Math.max(peak, active);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          try {
+            return await platform.net.fetchText(url);
+          } finally {
+            active -= 1;
+          }
+        },
+      },
+    },
+    peak: () => peak,
+  };
+}
 
 describe("fetchFeed", () => {
   it("takes the newest release that carries the followed id, skipping ones without a manifest", async () => {
@@ -149,6 +174,21 @@ describe("fetchFeed", () => {
     await expect(fetchFeed(platform, FEED)).rejects.toThrow(/no release of .* ships a zax manifest yet/i);
   });
 
+  it("checks cold manifests concurrently without opening more than six requests", async () => {
+    const releases = Array.from({ length: 12 }, (_, index) => release(`v${index + 1}`, false));
+    const base = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify(releases),
+        ...Object.fromEntries(releases.map((one) => [atTag(one.tag_name), 404])),
+      },
+    });
+    const observed = measuredNetwork(base);
+
+    await expect(fetchFeed(observed.platform, FEED)).rejects.toThrow(/ships a zax manifest yet/i);
+    expect(observed.peak()).toBeGreaterThan(1);
+    expect(observed.peak()).toBeLessThanOrEqual(6);
+  });
+
   it("takes the version from the tag and the payload from the sole archive, when the release states neither", async () => {
     const platform = feedPlatform({
       responses: {
@@ -219,6 +259,35 @@ describe("fetchFeed", () => {
   it("reports a repository that cannot be reached rather than reading it as a tag without a manifest", async () => {
     const platform = feedPlatform({ responses: { [RELEASES_URL]: JSON.stringify([release("v15", false)]) } });
     await expect(fetchFeed(platform, FEED)).rejects.toThrow(/No canned response/);
+  });
+});
+
+describe("reading every feed", () => {
+  it("shares repository listings and caps concurrent cold requests across feeds", async () => {
+    const tags: Record<string, readonly string[]> = {
+      "BGforgeNet/Fallout2_Restoration_Project": ["v2.3.34", "v2.4.34"],
+      "BGforgeNet/Fallout2_Unofficial_Patch": ["v34"],
+      "rotators/Fo1in2": ["v1.16.3771"],
+      "BGforgeNet/FO2tweaks": Array.from({ length: 12 }, (_, index) => `v${index + 1}`),
+    };
+    const responses: Record<string, string | number> = {};
+    for (const [repository, versions] of Object.entries(tags)) {
+      responses[`https://api.github.com/repos/${repository}/releases?per_page=100`] = JSON.stringify(
+        versions.map((tag) => ({ tag_name: tag, assets: [] })),
+      );
+      for (const tag of versions) {
+        responses[`https://raw.githubusercontent.com/${repository}/${tag}/f2mod.yml`] = 404;
+      }
+    }
+    const base = feedPlatform({ responses });
+    const observed = measuredNetwork(base);
+
+    await readModFeeds(observed.platform, new Date(1_700_000_100_000));
+
+    expect(observed.peak()).toBeGreaterThan(1);
+    expect(observed.peak()).toBeLessThanOrEqual(6);
+    const rpu = "https://api.github.com/repos/BGforgeNet/Fallout2_Restoration_Project/releases?per_page=100";
+    expect(base.fetched.filter((url) => url === rpu)).toHaveLength(1);
   });
 });
 
