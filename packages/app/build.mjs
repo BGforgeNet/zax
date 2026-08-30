@@ -7,7 +7,7 @@
  */
 
 import { build } from "esbuild";
-import { copyFile, rm, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -74,7 +74,18 @@ await /** @type {Promise<void>} */ (
   new Promise((resolve, reject) => {
     const child = spawn(
       "pnpm",
-      ["--filter", "@zax/ui", "exec", "vite", "build", "--outDir", join(dist, "renderer"), "--emptyOutDir"],
+      [
+        "--filter",
+        "@zax/ui",
+        "exec",
+        "vite",
+        "build",
+        "--mode",
+        "desktop",
+        "--outDir",
+        join(dist, "renderer"),
+        "--emptyOutDir",
+      ],
       // On Windows pnpm is a `.cmd`, which `spawn` cannot execute without a shell - it looks for an extensionless
       // file and fails with ENOENT. The arguments here are fixed, so a shell adds no injection surface.
       { stdio: "inherit", cwd: join(here, "../.."), shell: process.platform === "win32" },
@@ -85,3 +96,14 @@ await /** @type {Promise<void>} */ (
 );
 
 console.log(`built into ${dist}`);
+
+// The browser preview carries a complete in-memory backend and real fixture data. A desktop renderer has its
+// backend in the main process; finding this marker means the preview crossed that boundary into the package.
+const rendererAssets = join(dist, "renderer", "assets");
+for (const entry of await readdir(rendererAssets)) {
+  if (!entry.endsWith(".js")) continue;
+  const contents = await readFile(join(rendererAssets, entry), "utf8");
+  if (contents.includes("preview/config/zax.yml")) {
+    throw new Error(`The desktop renderer includes the browser preview backend in ${entry}.`);
+  }
+}

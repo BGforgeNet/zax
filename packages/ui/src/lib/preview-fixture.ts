@@ -9,14 +9,14 @@
 
 import { flushSync, mount, unmount, type Component } from "svelte";
 import { ENGINE_CONFIG_FILES } from "@zax/fallout2";
-import { PREVIEW_INSTALL, previewPlatform } from "./host.js";
+import { PREVIEW_INSTALL, previewPlatform } from "./preview-host.js";
 import { store } from "./store.svelte.js";
 import fallout2cfg from "../../../../fixtures/f2up/fallout2.cfg?raw";
 import f2resini from "../../../../fixtures/f2up/f2_res.ini?raw";
 import ddrawini from "../../../../fixtures/f2up/ddraw.ini?raw";
 
 /** Re-exported so a test names the install it drives through the same module it gets its setup from. */
-export { PREVIEW_INSTALL } from "./host.js";
+export { PREVIEW_INSTALL } from "./preview-host.js";
 
 /** latin1, as every config file this application reads and writes is. */
 export const bytes = (text: string) => {

@@ -10,7 +10,8 @@ import {
   type ModFeedListing,
   type ModInstallState,
 } from "@zax/fallout2";
-import { PREVIEW_INSTALL, backend as hostBackend, busySink, previewPlatform } from "./host.js";
+import { backend as hostBackend, busySink } from "./host.js";
+import { PREVIEW_INSTALL, previewPlatform } from "./preview-host.js";
 import { MOD_INI, ORDER_FILE, bytes, reseedPreview } from "./preview-fixture.js";
 import { store, unwrapArguments } from "./store.svelte.js";
 import fallout2cfg from "../../../../fixtures/f2up/fallout2.cfg?raw";
