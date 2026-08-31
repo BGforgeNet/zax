@@ -43,7 +43,7 @@ ZAX_DEV_SERVER=http://localhost:5173 pnpm --filter @zax/app start
 ```bash
 pnpm check           # tsc over the TypeScript packages and over the build and generator scripts, then
                      # svelte-check over the interface
-pnpm lint            # eslint, then prettier --check
+pnpm lint            # oxlint, then eslint over the components, then oxfmt --check
 pnpm test            # the whole suite
 pnpm test:coverage   # the same, measured against a floor
 ```

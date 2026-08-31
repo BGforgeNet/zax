@@ -226,6 +226,7 @@ async function mapConcurrent<T, R>(
   concurrency: number,
   transform: (value: T) => Promise<R>,
 ): Promise<R[]> {
+  // oxlint-disable-next-line unicorn/no-new-array -- sized once, then filled by index out of order by the workers.
   const results = new Array<R>(values.length);
   const failures: Array<{ index: number; error: unknown }> = [];
   let next = 0;
@@ -954,6 +955,7 @@ export async function readModFeeds(
 ): Promise<{ listing: ModFeedListing; releases: readonly ModRelease[] }> {
   type Answer = { release: ModRelease } | { error: unknown };
   const read = feedRead(platform);
+  // oxlint-disable-next-line unicorn/no-new-array -- sized once, then filled by index as each feed answers.
   const answers = new Array<Answer>(MOD_FEEDS.length);
   const repositories = new Map<string, Array<{ index: number; feed: ModFeed }>>();
   for (const [index, feed] of MOD_FEEDS.entries()) {

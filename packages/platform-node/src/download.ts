@@ -272,7 +272,11 @@ export async function downloadFile(url: string, destination: string, options: Do
       options.note?.({ url, attempt: n, received, total, ms: Date.now() - started, outcome: "ok", resumedFrom: from });
       // Flushed before the rename, so the destination never names bytes that are still only in a cache.
       const handle = await open(partial, "r+");
-      await handle.sync().finally(() => handle.close());
+      try {
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
       await rename(partial, destination);
       await rm(identity, { force: true });
       return;

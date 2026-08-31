@@ -818,7 +818,13 @@ describe("crossing the process boundary", () => {
   test("unwraps the reactive state it sends, rather than handing the proxy across", async () => {
     const seen: unknown[][] = [];
     const recorder = Object.fromEntries(
-      BACKEND_METHODS.map((name) => [name, (...args: unknown[]) => (seen.push(args), Promise.resolve(undefined))]),
+      BACKEND_METHODS.map((name) => [
+        name,
+        (...args: unknown[]) => {
+          seen.push(args);
+          return Promise.resolve(undefined);
+        },
+      ]),
     ) as unknown as Backend;
 
     await unwrapArguments(recorder).saveState({

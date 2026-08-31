@@ -1,0 +1,26 @@
+{
+  "printWidth": 120,
+  // Off because the key order in a package.json is meaningful to read - name, scripts, then dependencies - and
+  // oxfmt's sort is not the one any other tool here produces.
+  "sortPackageJson": false,
+  // Opt-in, and it fails open: with this false, or with the svelte package unresolvable, .svelte files are not
+  // formatted and not reported - the check passes having read none of them. `format.test.ts` pins it.
+  "svelte": true,
+  // Everything git ignores is skipped already; these are the tracked paths whose bytes are not ours to reflow.
+  "ignorePatterns": [
+    // Generated modules keep their generator's one-setting-per-line output; reformatting them is churn the next
+    // regeneration undoes. They stay linted - only formatting is excluded.
+    "packages/games-fallout2/src/catalog.ts",
+    "packages/games-fallout2/src/layout.ts",
+    // Machine-emitted extraction snapshots, and format definitions kept byte-identical to their python-branch
+    // source.
+    "scripts/gen/layout.json",
+    "scripts/gen/py-layout.json",
+    "scripts/gen/formats/",
+    "pnpm-lock.yaml",
+    // Fixtures are copies of files other people publish, kept byte-for-byte so the round-trip tests and the
+    // preview see what a real install and a real mod release carry. The manifest specimens beside them are
+    // pinned to what they parse to, which makes their quoting and flow style content rather than formatting.
+    "fixtures/"
+  ]
+}

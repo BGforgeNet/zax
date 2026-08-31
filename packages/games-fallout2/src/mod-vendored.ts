@@ -114,7 +114,8 @@ const QOL = `          - id: qol
 
 const rpu =
   (id: string, name: string) =>
-  (version: string): string => `spec: 1
+  (version: string): string =>
+    `spec: 1
 id: ${id}
 name: ${name}
 game: fallout2

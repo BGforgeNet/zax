@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [svelte({ configFile: "packages/ui/svelte.config.js" })],
   resolve: { conditions: ["browser"] },
   test: {
-    include: ["packages/*/src/**/*.test.ts"],
+    include: ["packages/*/src/**/*.test.ts", "scripts/**/*.test.ts"],
     coverage: {
       provider: "v8",
       // Text for the run's own output, and the lcov data on its own for anything that reads it afterwards.

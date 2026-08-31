@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // oxlint reports correctness findings as warnings and still exits 0; the gate needs them to fail.
+  "categories": { "correctness": "error" },
+  "options": {
+    // Reaches .ts only - a .svelte script block gets the syntactic set, as it did under eslint.
+    "typeAware": true
+  },
+  "rules": {
+    // The two rules the type-aware pass is here for. `typeAware` alone does not enable them: a type-aware rule
+    // left unnamed reports nothing, and the config still parses, so the gate would look enforced and be silent.
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+
+    // Every site is a destructure of plain functions off an object or a module (`platform.paths`, `node:path`).
+    // They have no `this` to lose, and the rule cannot tell them from class methods.
+    "typescript/unbound-method": "off",
+    // Each spread here snapshots a collection the loop then mutates; dropping it is the bug the spread prevents.
+    "unicorn/no-useless-spread": "off"
+  },
+  "overrides": [
+    {
+      // A test double is built by spreading a platform and replacing one capability. Nothing the doubles call
+      // lives on the prototype the rule protects, and production code stays covered.
+      "files": ["**/*.test.ts"],
+      "rules": { "typescript/no-misused-spread": "off" }
+    }
+  ]
+}

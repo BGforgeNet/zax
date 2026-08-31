@@ -44,7 +44,7 @@ function fieldTypes(header) {
       out.set(struct, new Map());
       continue;
     }
-    if (/^\};/.test(line)) {
+    if (line.startsWith("};")) {
       struct = null;
       continue;
     }
@@ -108,7 +108,7 @@ function readCommunityEdition() {
       section = opened[1];
       continue;
     }
-    if (/^#undef SECT/.test(line)) {
+    if (line.startsWith("#undef SECT")) {
       section = null;
       continue;
     }
@@ -206,7 +206,7 @@ function readFission() {
 const READERS = {
   "fallout2-ce": () => {
     const notes = communityEditionNotes();
-    return readCommunityEdition().map((one) => ({ ...one, ...(notes.get(`${one.section}.${one.key}`) ?? {}) }));
+    return readCommunityEdition().map((one) => ({ ...one, ...notes.get(`${one.section}.${one.key}`) }));
   },
   fission: readFission,
 };

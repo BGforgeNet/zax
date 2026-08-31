@@ -12,5 +12,5 @@
     "noImplicitAny": false,
     "types": ["node"]
   },
-  "include": ["scripts/**/*.mjs", "packages/app/build.mjs"]
+  "include": ["scripts/**/*.mjs", "scripts/**/*.test.ts", "packages/app/build.mjs"]
 }
