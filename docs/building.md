@@ -15,6 +15,13 @@ cap their peer range at 6 - so `pnpm lint` and `pnpm check` are what the bump is
 compiler itself. On 7.0 `pnpm check` fails first in `seam.test.ts`, which calls `ts.preProcessFile`, one of the
 entry points that surface does not yet carry.
 
+Electron stays a major behind the newest for a while after one ships. A `.0.0` has no patch release behind it
+yet, and what a bad Electron does here is break packaging - which surfaces in the `build` job on three runners
+rather than in anything `pnpm test` runs, so the cost of finding out late is a release that cannot be built. A
+new major waits for a patch on its line, or for its first minor; `renovate.json5` parks electron and
+electron-builder behind dashboard approval so the wait is a decision somebody makes rather than a bump that
+lands on a schedule.
+
 ```bash
 pnpm install
 ```

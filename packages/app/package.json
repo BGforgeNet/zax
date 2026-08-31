@@ -14,7 +14,7 @@
     "@zax/core": "workspace:*",
     "@zax/fallout2": "workspace:*",
     "@zax/platform-node": "workspace:*",
-    "electron": "44.0.0",
+    "electron": "43.4.1",
     "electron-builder": "26.15.7",
     "esbuild": "0.28.2"
   },
