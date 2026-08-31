@@ -2307,3 +2307,85 @@ describe("the list of sfall versions to change to", () => {
     expect(store.sfallVersions).toEqual(["4.5", "4.4"]);
   });
 });
+
+describe("the engine builds this machine holds", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const RELEASE = { release: "continious", published: "2026-08-23T09:37:22Z", asset: null, commit: null };
+
+  test("records what a check found, so the row can offer it without asking again", async () => {
+    vi.spyOn(hostBackend, "engineReleases").mockResolvedValue([RELEASE]);
+    await store.checkEngine("fallout2-ce");
+    expect(store.engineLatest["fallout2-ce"]).toEqual(RELEASE);
+  });
+
+  // The feed answering with nothing is not a failure, and the row keeps whatever it already knew.
+  test("leaves what it knew alone when the check found no release at all", async () => {
+    vi.spyOn(hostBackend, "engineReleases").mockResolvedValue([RELEASE]);
+    await store.checkEngine("fallout2-ce");
+    vi.spyOn(hostBackend, "engineReleases").mockResolvedValue([]);
+    await store.checkEngine("fallout2-ce");
+    expect(store.engineLatest["fallout2-ce"]).toEqual(RELEASE);
+  });
+
+  test("rereads what the machine holds after dropping a build", async () => {
+    const forget = vi.spyOn(hostBackend, "forgetEngine").mockResolvedValue();
+    const machine = vi.spyOn(hostBackend, "machineEngines");
+    await store.forgetEngine("fallout2-ce", "2026-08-23T09:37:22Z");
+    expect(forget).toHaveBeenCalledWith("fallout2-ce", "2026-08-23T09:37:22Z");
+    // Dropping a build without rereading leaves the row offering a copy that is no longer there.
+    expect(machine).toHaveBeenCalled();
+  });
+
+  test("names an engine it does not know by its id, rather than by nothing", async () => {
+    const asked = vi.spyOn(hostBackend, "engineReleases").mockResolvedValue([RELEASE]);
+    await store.checkEngine("not-an-engine");
+    expect(asked).toHaveBeenCalledWith("not-an-engine");
+  });
+});
+
+describe("the buttons on the ZAX pane", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  test("says where the debug package went and how much went into it", async () => {
+    vi.spyOn(hostBackend, "createDebugPackage").mockResolvedValue({
+      path: "/home/t/.local/share/zax/debug/zax-debug.zip",
+      contents: ["ddraw.ini", "f2_res.ini", "SLOT01"],
+    });
+    const opened = vi.spyOn(hostBackend, "open").mockResolvedValue();
+    await store.createDebugPackage(["SLOT01"]);
+    expect(opened).toHaveBeenCalledWith("debug");
+    expect(store.notice).toEqual({
+      kind: "done",
+      text: "Wrote /home/t/.local/share/zax/debug/zax-debug.zip - 3 files.",
+    });
+  });
+
+  // The archive is what was asked for, so a machine with no way to open a directory still reports success.
+  test("still says where the package went when the directory could not be opened", async () => {
+    vi.spyOn(hostBackend, "createDebugPackage").mockResolvedValue({ path: "/tmp/zax-debug.zip", contents: [] });
+    vi.spyOn(hostBackend, "open").mockRejectedValue(new Error("no file manager here"));
+    await store.createDebugPackage([]);
+    expect(store.notice).toEqual({ kind: "done", text: "Wrote /tmp/zax-debug.zip - 0 files." });
+  });
+
+  test("opens a target and says nothing about it, there being nothing to report", async () => {
+    const opened = vi.spyOn(hostBackend, "open").mockResolvedValue();
+    await store.open("download");
+    expect(opened).toHaveBeenCalledWith("download");
+    expect(store.notice).toBeNull();
+  });
+
+  // The two wipes read differently because one empties a directory and the other truncates a file.
+  test("reports clearing the log in its own words", async () => {
+    vi.spyOn(hostBackend, "wipe").mockResolvedValue();
+    await store.wipe("log");
+    expect(store.notice).toEqual({ kind: "done", text: "Cleared the log." });
+  });
+
+  test("and names the directory it emptied for the others", async () => {
+    vi.spyOn(hostBackend, "wipe").mockResolvedValue();
+    await store.wipe("packages");
+    expect(store.notice).toEqual({ kind: "done", text: "Emptied the packages directory." });
+  });
+});
