@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 const config = readFileSync(new URL("../electron-builder.yml", import.meta.url), "utf8");
 
 function list(name: string): string[] {
-  const lines = config.split("\n");
+  // Either terminator: a Windows checkout converts this file to CRLF, and splitting on "\n" alone leaves a
+  // trailing "\r" on every line, so the header never matches and each list reads as empty rather than wrong.
+  const lines = config.split(/\r?\n/);
   const start = lines.indexOf(`${name}:`);
   if (start < 0) return [];
 
