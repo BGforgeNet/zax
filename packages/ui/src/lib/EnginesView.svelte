@@ -106,13 +106,20 @@
           {#if store.engineOutdated(engine.id)}
             <p class="note">A newer build has been published.</p>
           {/if}
-          <!-- Said where it is relevant rather than done silently: it is the widest rename in the application. -->
-          <p class="note">
-            A native run on a case-sensitive filesystem wants a lowercased game folder. Quit the game before running a
-            different build - the first run of one writes into the game's directory.
-          </p>
         </section>
       {/each}
+
+      <!--
+        Said where it is relevant rather than done silently: it is the widest rename in the application. Once
+        below the list rather than under each engine - it is true of running any native build, so per-engine it
+        was the same two lines repeated, and one more repeat for every engine added.
+      -->
+      {#if store.engines.length > 0}
+        <p class="note">
+          A native run on a case-sensitive filesystem wants a lowercased game folder. Quit the game before running a
+          different build - the first run of one writes into the game's directory.
+        </p>
+      {/if}
     </div>
   </main>
 </div>
@@ -172,6 +179,14 @@
   .engine + .engine {
     border-top: 1px solid var(--border);
     margin-top: 10px;
+  }
+
+  /* The list's own note, separated from the last engine the way the engines are from each other. Without the
+     rule it sits flush under that engine's buttons and reads as a line of it rather than of the list. */
+  .engine + .note {
+    border-top: 1px solid var(--border);
+    margin-top: 10px;
+    padding-top: 8px;
   }
 
   .line {
