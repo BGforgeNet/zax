@@ -103,6 +103,10 @@ describe("the All settings tab", () => {
     store.settingsTab = "all";
   });
 
+  /** The Install offer among the results, which shares its label with the group tab that is always drawn. */
+  const offer = (v: ReturnType<typeof view>) =>
+    v.all("button.found").find((button) => (button.textContent ?? "").trim() === "Install");
+
   test("offers a filter with an accessible name", () => {
     expect(view().one<HTMLInputElement>("input[type=search]").getAttribute("aria-label")).toBe("Filter settings");
   });
@@ -140,5 +144,40 @@ describe("the All settings tab", () => {
     heads[0]!.click();
     v.settle();
     expect(store.settingsTab).not.toBe("all");
+  });
+
+  /*
+    Install is the one settings tab holding nothing from the catalog, so search cannot reach it the way it
+    reaches the rest: without this, "folder" reports nothing while the tab sits in plain view.
+  */
+  test("offers the Install tab as its own result, and going there clears the filter behind you", () => {
+    store.query = "folder";
+    const v = view();
+    expect(store.installMatches, "the term the offer rests on").toBe(true);
+
+    // Inside the results rather than by name: "Install" is also the group tab, which is always on screen.
+    offer(v)!.click();
+    v.settle();
+    expect(store.settingsTab).toBe("install");
+    // Cleared, or coming back to All settings would land on a filter the user has already moved past.
+    expect(store.query).toBe("");
+  });
+
+  test("draws no Install offer for a term the tab has nothing to do with", () => {
+    store.query = "damage";
+    expect(store.installMatches).toBe(false);
+    expect(offer(view())).toBeUndefined();
+  });
+
+  // Ctrl-F from the window: the tab is opened by the store, and the pane is what puts the caret in the box.
+  test("focuses and selects the filter when the window asks for search", () => {
+    store.query = "damage";
+    const v = view();
+    const box = v.one<HTMLInputElement>("input[type=search]");
+    expect(document.activeElement).not.toBe(box);
+
+    store.searchSettings();
+    v.settle();
+    expect(document.activeElement, "so the next keystroke replaces what is there").toBe(box);
   });
 });

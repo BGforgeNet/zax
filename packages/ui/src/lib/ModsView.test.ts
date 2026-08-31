@@ -81,6 +81,33 @@ describe("the tab strip", () => {
     v.settle();
     expect(store.modsTab).toBe("order");
   });
+
+  // Each tab is its own handler, so a strip where one of the three does not switch is a live possibility.
+  test("every tab in the strip reaches its own pane", () => {
+    const v = view();
+    const strip = v.all(".tabbar [role=tab]");
+    for (const [at, expected] of [
+      [2, "settings"],
+      [0, "installation"],
+    ] as const) {
+      strip[at]!.click();
+      v.settle();
+      expect(store.modsTab).toBe(expected);
+    }
+  });
+});
+
+describe("asking the feeds again", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  test("re-reads past the cache, which is the whole point of the button", () => {
+    const asked = vi.spyOn(store, "loadModOffers").mockResolvedValue();
+    const v = view();
+    v.control("Refresh").click();
+    v.settle();
+    // `true` is the refresh: without it the button would answer from the same cached listing it just showed.
+    expect(asked).toHaveBeenCalledWith(true);
+  });
 });
 
 describe("before the feeds have answered", () => {
@@ -493,6 +520,37 @@ describe("the load order", () => {
     store.mods = [];
     const v = view();
     expect(v.one("p.empty").textContent).toContain("Nothing in this install's");
+  });
+
+  /*
+    The two bulk actions. Both rewrite the whole file in one press, and neither is reachable except by clicking
+    - so the tooltip tests above assert what they say while nothing asserted what they do.
+  */
+  test("sorting to the recommendation reorders the file and marks it changed", () => {
+    const v = view();
+    const sort = v.control("Sort to the recommendation") as HTMLButtonElement;
+    expect(store.againstRecommendation.length, "the seed has to be out of order for this to move").toBeGreaterThan(0);
+
+    const before = store.mods.map((mod) => mod.name);
+    sort.click();
+    v.settle();
+    expect(store.mods.map((mod) => mod.name)).not.toEqual(before);
+    expect(store.modsChanged).toBe(true);
+  });
+
+  test("forgetting the missing entries drops them from the list and leaves the rest", () => {
+    const v = view();
+    const before = store.mods.length;
+    const missing = store.missingMods.length;
+    expect(missing, "the seed has to carry at least one dead entry for this to mean anything").toBeGreaterThan(0);
+
+    // One row's own Forget where that is all there is, the bulk control where the view offers it.
+    const bulk = v.all("button").find((button) => button.textContent?.trim() === "Forget all missing");
+    (bulk ?? v.all(".mod.gone button").find((b) => b.textContent?.trim() === "Forget"))!.click();
+    v.settle();
+
+    expect(store.mods).toHaveLength(before - (bulk ? missing : 1));
+    expect(store.modsChanged).toBe(true);
   });
 });
 
