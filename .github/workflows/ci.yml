@@ -36,6 +36,9 @@ jobs:
       # The trust policy in pnpm-workspace.yaml judges a version's provenance at install time; nothing there
       # re-checks published advisories, which is what this reads the lockfile against.
       - run: pnpm audit
+      # A second copy of a transitive package is not an install failure, so nothing else in the job would say
+      # so: the lockfile simply grows a duplicate and every consumer of it resolves one version or the other.
+      - run: pnpm dedupe --check
       - run: pnpm check
       - run: pnpm lint
       # Its own step rather than part of `pnpm lint`: what it reports is dead surface rather than a defect in
