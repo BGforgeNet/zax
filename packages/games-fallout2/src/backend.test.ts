@@ -3,6 +3,7 @@ import { OperationCancelled } from "@zax/platform";
 import { MemoryPlatform } from "@zax/platform/memory";
 import { BACKEND_METHODS } from "./backend-methods.js";
 import { RELEASES_PAGE, createBackend } from "./backend.js";
+import { saveRecord } from "./records.js";
 import type { Backend, OperationProgress } from "./backend.js";
 
 const install = { path: "/games/one", type: "fallout2" as const };
@@ -340,6 +341,136 @@ describe("installing a mod", () => {
       createBackend(feed, noShell).installMod(install, "fo2tweaks", retry.fingerprint),
     ).resolves.toMatchObject({ version: "14.7" });
     expect(platform.textAt("/games/one/mods/fo2tweaks.dat")).toBe("DAT-14.7");
+  });
+});
+
+/**
+ * The same confirmation guard as above, on the two branches that reach it by another route. A base mod and a
+ * mod that creates its own install each plan through their own planner, so the check sits three times in one
+ * method - and the two that are not the plain-mod path had never run.
+ */
+describe("installing a base mod", () => {
+  const REPO = "BGforgeNet/Fallout2_Unofficial_Patch";
+  const RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
+  const ZIP = "https://example.test/upu.zip";
+  const PAYLOAD = "ZIP-UPU";
+  const MANIFEST = `spec: 1
+id: upu
+name: UPU
+version: "1.4"
+game: fallout2
+type: base
+becomes: fallout2upu
+installer:
+  other:
+    asset: upu.zip
+    run: upu-install.sh
+`;
+
+  const sha = async (value: string) => {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  };
+
+  const feeding = async () =>
+    new MemoryPlatform({
+      home: "/home/t",
+      // Linux, so the release resolves to the `other` route rather than the Windows installer program.
+      os: "linux",
+      files: { "/games/one/fallout2.exe": "MZ" },
+      responses: {
+        [RELEASES]: JSON.stringify([
+          {
+            tag_name: "v1.4",
+            assets: [
+              { name: "f2mod.yml", browser_download_url: "https://example.test/f2mod.yml" },
+              { name: "upu.zip", browser_download_url: ZIP, digest: `sha256:${await sha(PAYLOAD)}` },
+            ],
+          },
+        ]),
+        "https://example.test/f2mod.yml": MANIFEST,
+      },
+      downloads: { [ZIP]: PAYLOAD },
+      archives: { [PAYLOAD]: { "upu-install.sh": "#!/bin/sh\n", "mods/upu.dat": "DAT" } },
+      runs: { "/games/one/upu-install.sh": { code: 0, output: "installed" } },
+    });
+
+  /*
+    Driven by a fingerprint that is not this plan's rather than by moving the folder, as the plain-mod case
+    above does: a base plan is fingerprinted over the release - version, asset digest, route, components - so
+    the folder cannot move it, and what a mismatch stands for here is the publisher replacing the asset.
+  */
+  it("refuses a base install against a fingerprint that is not the plan's", async () => {
+    const platform = await feeding();
+    const backend = createBackend(platform, noShell);
+    await backend.planMod(install, "upu");
+
+    await expect(backend.installMod(install, "upu", "not-this-plan")).rejects.toThrow(/confirm again/);
+    expect(platform.textAt("/games/one/mods/upu.dat"), "and nothing was written").toBeUndefined();
+    expect(platform.ran, "nor was the installer script run").toEqual([]);
+  });
+
+  it("carries out the base install the plan described, and says what the install became", async () => {
+    const platform = await feeding();
+    const backend = createBackend(platform, noShell);
+    const plan = await backend.planMod(install, "upu");
+    expect(plan).toMatchObject({ kind: "base", becomes: "fallout2upu" });
+
+    await expect(backend.installMod(install, "upu", plan.fingerprint)).resolves.toMatchObject({ version: "1.4" });
+    expect(platform.textAt("/games/one/mods/upu.dat")).toBe("DAT");
+  });
+});
+
+/**
+ * The gate on what the interface's "open this file" button may reach. Two conditions, and either one closes
+ * it: the record has to name the file, and the file has to be one a mod of that id may write at all - so a
+ * record naming something outside its reach opens nothing.
+ */
+describe("opening one of a mod's files", () => {
+  const MANIFEST = `spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "14.7"\ngame: fallout2\narchive: fo2tweaks.zip\n`;
+
+  const recorded = async (shipped: Record<string, string>) => {
+    const platform = new MemoryPlatform({ home: "/home/t", files: { "/games/one/fallout2.exe": "MZ" } });
+    await saveRecord(platform, {
+      path: "/games/one",
+      mods: [
+        {
+          id: "fo2tweaks",
+          version: "14.7",
+          complete: true,
+          files: Object.keys(shipped),
+          manifest: MANIFEST,
+          shipped,
+        },
+      ],
+    });
+    return platform;
+  };
+
+  it("opens a file the record names, at its path inside the install", async () => {
+    const platform = await recorded({ "mods/fo2tweaks.ini": "[main]\n" });
+    await createBackend(platform, noShell).openModFile(install, "fo2tweaks", "mods/fo2tweaks.ini");
+    expect(platform.opened).toEqual(["/games/one/mods/fo2tweaks.ini"]);
+  });
+
+  it("refuses a file the record does not name, however ordinary the path looks", async () => {
+    const platform = await recorded({ "mods/fo2tweaks.ini": "[main]\n" });
+    const backend = createBackend(platform, noShell);
+    await expect(backend.openModFile(install, "fo2tweaks", "mods/other.ini")).rejects.toThrow(
+      '"mods/other.ini" is not one of fo2tweaks\'s files.',
+    );
+    expect(platform.opened).toEqual([]);
+  });
+
+  // A record naming a path the mod may not write does not load at all - the reader drops the whole entry -
+  // so this asks for a file of a mod that is not there, which is the state such a record leaves behind.
+  it("refuses when the record names no such mod", async () => {
+    const platform = await recorded({ "data/sound/music/01.acm": "" });
+    const backend = createBackend(platform, noShell);
+    await expect(backend.openModFile(install, "fo2tweaks", "data/sound/music/01.acm")).rejects.toThrow(
+      'Nothing of "fo2tweaks" is recorded for this install.',
+    );
+    expect(platform.opened).toEqual([]);
   });
 });
 

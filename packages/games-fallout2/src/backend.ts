@@ -557,6 +557,9 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       } catch {
         // An unreadable snapshot narrows what may be opened; it does not widen anything.
       }
+      // The second condition is defence in depth and stays uncovered for that reason: both sources of
+      // `allowed` are already bounded the same way - the record reader drops an entry naming a path the mod
+      // may not write, and the manifest parser does the same to a setting's file.
       if (!allowed.has(file) || !mayWrite(file, grantsFor(modId)))
         throw new Error(`"${file}" is not one of ${modId}'s files.`);
       return platform.process.open(platform.paths.join(install.path, ...file.split("/")));
