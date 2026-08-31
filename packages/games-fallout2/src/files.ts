@@ -1,8 +1,6 @@
 /** Config files ZAX manages, in the order they are presented. */
 export const CONFIG_FILES = ["fallout2.cfg", "f2_res.ini", "ddraw.ini"] as const;
 
-export type ConfigFile = (typeof CONFIG_FILES)[number];
-
 /**
  * Config files an alternative engine keeps, which the catalog's linked settings already address. Kept apart
  * from CONFIG_FILES because reaching one needs the engine installed and, for the content config, the

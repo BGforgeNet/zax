@@ -8,7 +8,7 @@ import { identifyInstall } from "./discovery.js";
 import type { Install, Theme } from "./install.js";
 import { EMPTY_ZAX_FILE, formatZaxFile, parseZaxFile, type StoredInstall } from "./zax-file.js";
 
-export const ZAX_FILE_NAME = "zax.yml";
+const ZAX_FILE_NAME = "zax.yml";
 
 export interface AppState {
   /** Installs that are on the list and readable now, with the type read from the directory. */
@@ -23,7 +23,7 @@ export interface AppState {
   autosave: boolean;
 }
 
-export const EMPTY_STATE: AppState = { installs: [], unavailable: [], theme: "system", autosave: true };
+const EMPTY_STATE: AppState = { installs: [], unavailable: [], theme: "system", autosave: true };
 
 export interface LoadedState {
   state: AppState;

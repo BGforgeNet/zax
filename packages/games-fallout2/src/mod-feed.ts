@@ -70,7 +70,7 @@ export interface ModLine {
 }
 
 /** Whether a version belongs to a line: its own numbering, or the counter the line inherited. */
-export const heldByLine = (line: ModLine, version: string): boolean =>
+const heldByLine = (line: ModLine, version: string): boolean =>
   version.startsWith(line.prefix) || (line.counter === true && /^\d+$/.test(version));
 
 /**
@@ -858,7 +858,7 @@ export interface ModOffer {
 }
 
 /** Everything the interface needs to draw a choice it cannot compute: the renderer reads no manifest. */
-export interface ChoiceOffer extends CarriedSelection {
+interface ChoiceOffer extends CarriedSelection {
   /** Which of the two is being chosen - the words the dialog uses, and nothing else, turn on this. */
   what: "parts" | "components";
   /** The groups this release can deliver, in the order the manifest declares them. */

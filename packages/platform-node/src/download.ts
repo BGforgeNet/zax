@@ -55,14 +55,14 @@ export interface AttemptNote {
  * implements, and the stall and retry paths cannot be exercised in a test at production patience - a suite
  * that waits twenty seconds to prove a timeout works is a suite nobody runs.
  */
-export interface DownloadPolicy {
+interface DownloadPolicy {
   idleTimeoutMs: number;
   responseTimeoutMs: number;
   attempts: number;
   backoffMs: readonly number[];
 }
 
-export const DEFAULT_POLICY: DownloadPolicy = {
+const DEFAULT_POLICY: DownloadPolicy = {
   idleTimeoutMs: IDLE_TIMEOUT_MS,
   responseTimeoutMs: RESPONSE_TIMEOUT_MS,
   attempts: ATTEMPTS,

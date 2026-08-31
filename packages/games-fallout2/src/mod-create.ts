@@ -23,7 +23,7 @@ import type { ArchiveEntryInfo, Platform } from "@zax/platform";
 import { CONFIG_FILES } from "./files.js";
 import { preflightArchive } from "./archive-preflight.js";
 import { datReadError, extractFromDat, type ReadyDatTool } from "./dat-tool.js";
-import type { ModCreates, ModInput, ModManifest } from "./manifest.js";
+import type { ModCreates, ModManifest } from "./manifest.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import { createdInstallPath, noUpgradeHere } from "./mod-created.js";
 import type { ModRelease, ReleaseAsset } from "./mod-feed.js";
@@ -438,6 +438,3 @@ function withMod(record: InstallRecord, mod: InstalledMod): InstallRecord {
   // Spread, so the entries this version could not read survive an install of something else entirely.
   return { ...record, mods: [...record.mods.filter((held) => held.id !== mod.id), mod] };
 }
-
-/** What the interface asks for before it can offer this install at all. */
-export type { ModInput };

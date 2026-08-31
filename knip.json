@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  // What knip reports that nothing else in the gate can see: an export nobody imports, a file nothing reaches,
+  // a dependency no source names. It infers entry points from the workspace manifests, which covers the six
+  // packages; what it cannot infer is named below.
+  "workspaces": {
+    ".": {
+      // Run by hand in the order scripts/gen/README.md gives, rather than imported or wired to a script.
+      "entry": ["scripts/gen/*.mjs"]
+    },
+    "packages/app": {
+      // The preload is loaded by Electron by path, named in main.ts as a string rather than imported - it runs
+      // in its own process and must not pull the domain layer in behind it.
+      "entry": ["src/main.ts", "src/preload.ts"],
+      // Declared here, and production rather than dev, so electron-builder ships it: `electron-builder.yml`
+      // unpacks `**/node_modules/7z-wasm/**` from the archive because the module loads its `.wasm` from beside
+      // itself, and `build.mjs` marks it external for the same reason. No source in this package imports it.
+      "ignoreDependencies": ["7z-wasm"]
+    },
+    "packages/ui": {
+      // The root `check` script reaches it through `pnpm --filter @zax/ui exec`, which is not an import.
+      "ignoreDependencies": ["svelte-check"]
+    }
+  }
+}

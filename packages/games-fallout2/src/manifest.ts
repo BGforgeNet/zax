@@ -82,7 +82,7 @@ export interface DroppedSetting {
   why: string;
 }
 
-export interface RefuseRule {
+interface RefuseRule {
   /** Fires when every `present` path exists and every `absent` path does not. At least one list is non-empty. */
   present: readonly string[];
   absent: readonly string[];
@@ -133,7 +133,7 @@ export interface ModComponent {
   required?: boolean;
 }
 
-export interface ModComponentGroup {
+interface ModComponentGroup {
   label: string;
   pick: "one" | "any";
   options: readonly ModComponent[];
@@ -144,7 +144,7 @@ export interface ModComponentGroup {
  * the same install: the Windows one is an installer program that takes the game directory as an argument,
  * while the other is a payload extracted over the game with a script inside it that finishes the job.
  */
-export interface ModInstaller {
+interface ModInstaller {
   windows?: {
     asset: string;
     /** The convention ZAX invokes it by. `inno` is the only one this version knows. */
@@ -182,7 +182,7 @@ export interface ModInput {
  * directory, so the response file that is used is the one the payload shipped and the extraction cannot aim
  * anywhere else.
  */
-export interface ModExtractDat {
+interface ModExtractDat {
   /** The input whose `holds` file is unpacked. */
   from: string;
   /** The file naming what to lift out of it, one path per line. */

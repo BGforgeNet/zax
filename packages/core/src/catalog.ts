@@ -4,7 +4,7 @@
  * `id` joins the catalog to layout, actions and search. Its first address mints it; later targets keep it.
  */
 
-export interface ChoiceOption {
+interface ChoiceOption {
   value: string;
   label: string;
   help?: string;

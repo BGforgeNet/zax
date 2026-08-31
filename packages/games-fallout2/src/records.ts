@@ -68,7 +68,7 @@ export interface InstalledMod {
 }
 
 /** An entry this version could not validate, kept whole so a rewrite from here does not erase it. */
-export interface OpaqueMod {
+interface OpaqueMod {
   /** The id it states, where that much is readable - enough to refuse to install over what it describes. */
   id?: string;
   /** The entry exactly as it was read. */

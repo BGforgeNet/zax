@@ -23,7 +23,7 @@ export const MODS_ORDER_FILE = "mods_order.txt";
 export const MODS_ORDER_PATH = `${MODS_DIRECTORY}/${MODS_ORDER_FILE}`;
 
 /** What is on disk under a mod's name. `missing` is an entry whose file or folder is no longer there. */
-export type ModKind = "dat" | "folder" | "file" | "missing";
+type ModKind = "dat" | "folder" | "file" | "missing";
 
 export interface Mod {
   /** The entry as the file writes it, relative to `mods\`. */
@@ -42,7 +42,7 @@ export interface ModOwner {
 }
 
 /** Something in the mods folder that the engine could load. */
-export interface ModsDirEntry {
+interface ModsDirEntry {
   name: string;
   kind: Exclude<ModKind, "missing">;
 }

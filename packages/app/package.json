@@ -13,7 +13,6 @@
   "devDependencies": {
     "@zax/core": "workspace:*",
     "@zax/fallout2": "workspace:*",
-    "@zax/platform": "workspace:*",
     "@zax/platform-node": "workspace:*",
     "electron": "44.0.0",
     "electron-builder": "26.15.7",

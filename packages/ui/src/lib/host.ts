@@ -9,7 +9,7 @@ import type { Backend } from "@zax/fallout2";
 import { PREVIEW_REASON, type BusySink, type ProgressSource } from "./host-contract.js";
 
 export { PREVIEW_REASON };
-export type HostKind = "desktop" | "preview";
+type HostKind = "desktop" | "preview";
 
 const supplied = typeof window === "undefined" ? undefined : window.zax;
 const preview =
@@ -22,7 +22,7 @@ if (supplied !== undefined && (window.zaxProgress === undefined || window.zaxBus
   throw new Error("The desktop backend bridge is incomplete.");
 }
 
-export const hostKind: HostKind = supplied === undefined ? "preview" : "desktop";
+const hostKind: HostKind = supplied === undefined ? "preview" : "desktop";
 export const backend: Backend = supplied ?? preview!.backend;
 export const progressSource: ProgressSource = supplied === undefined ? preview!.progressSource : window.zaxProgress!;
 export const busySink: BusySink = supplied === undefined ? preview!.busySink : window.zaxBusy!;

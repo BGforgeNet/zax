@@ -46,7 +46,7 @@ import { modWorkDirectory, readTransaction, writeTransaction, type ModTransactio
 import { isArchiveName, type ModRelease, type ReleaseAsset } from "./mod-feed.js";
 import { chosenParts } from "./mod-parts.js";
 
-export interface PlannedFile {
+interface PlannedFile {
   /** Relative to the install, under `mods/`. */
   path: string;
   size: number;

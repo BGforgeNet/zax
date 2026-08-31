@@ -25,7 +25,7 @@ import { preflightArchive } from "./archive-preflight.js";
 import { installedLibraryVersion } from "./pe-version.js";
 
 /** sfall is a DirectDraw wrapper: it ships as this DLL, and its version is the DLL's own. */
-export const SFALL_LIBRARY = "ddraw.dll";
+const SFALL_LIBRARY = "ddraw.dll";
 
 const RELEASE_INFO = "https://sourceforge.net/projects/sfall/best_release.json";
 

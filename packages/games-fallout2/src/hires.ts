@@ -11,7 +11,7 @@ import type { Platform } from "@zax/platform";
 import { installedLibraryVersion } from "./pe-version.js";
 
 /** The patch is this library; `fallout2.exe` is patched to load it, and `f2_res.ini` is what configures it. */
-export const HIRES_LIBRARY = "f2_res.dll";
+const HIRES_LIBRARY = "f2_res.dll";
 
 /** The installed version, or null when the install does not have the patch. */
 export async function installedHiresVersion(platform: Platform, install: Install): Promise<string | null> {

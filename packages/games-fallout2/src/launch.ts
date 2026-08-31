@@ -8,7 +8,7 @@ import { compareVersions } from "@zax/core";
 import type { Install } from "@zax/core";
 import type { OperatingSystem } from "@zax/platform";
 
-export const EXECUTABLE = "fallout2.exe";
+const EXECUTABLE = "fallout2.exe";
 
 /**
  * Where Wine's own output is kept. Beside the game's `debug.log` because that is where a user looks for one,

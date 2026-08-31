@@ -24,7 +24,7 @@ const TRANSACTION_FORMAT = 3;
 const JOURNAL = "transaction.json";
 
 /** Where one payload came from, kept verbatim so a retry fetches what the first attempt did. */
-export interface PinnedAsset {
+interface PinnedAsset {
   name: string;
   url: string;
   digest: string;

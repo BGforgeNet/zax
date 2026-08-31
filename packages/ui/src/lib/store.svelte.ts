@@ -73,7 +73,7 @@ import {
   type Place,
   type SfallRelease,
 } from "@zax/fallout2";
-import { backend as host, busySink, isPreview, progressSource } from "./host.js";
+import { backend as host, busySink, progressSource } from "./host.js";
 
 /**
  * Every argument is unwrapped before it leaves the interface. The store holds its state in reactive proxies,
@@ -297,16 +297,16 @@ interface InstallRead {
  * Troubleshooting's own tab. A fix is one click and a report is a sequence you work through, so they are
  * separated rather than stacked on one screen where neither reads as the whole of it.
  */
-export type TroubleTab = "report" | "fixes";
+type TroubleTab = "report" | "fixes";
 
 /** Which sub-tab of Settings: a group of the layout's, or one of the tabs that belongs to no config file. */
-export type SettingsTab = string;
+type SettingsTab = string;
 
 /** The tabs the layout does not supply, which stay whatever the install holds. */
 const FIXED_SETTINGS_TABS = new Set(["all", "install", "trouble"]);
 
 /** A group of settings tabs to offer, and the reason its rows will not take input, where there is one. */
-export interface SettingsGroup {
+interface SettingsGroup {
   group: LayoutFile;
   refusal: string | null;
 }
@@ -315,33 +315,33 @@ export interface SettingsGroup {
  * The sidebar's own tab. Separate from `view` because the column stays put while the main pane changes - the
  * install you are editing is context for every view rather than a destination of its own.
  */
-export type Panel = "games" | "zax";
+type Panel = "games" | "zax";
 
 /**
  * What the main pane shows. The two are different subjects rather than two tabs of one - settings are keys in
  * config files, mods are what the engine loads - so the switch between them sits above the tab strips both
  * carry, not inside either.
  */
-export type View = "settings" | "mods" | "engines";
+type View = "settings" | "mods" | "engines";
 
 /** The Mods view's own tabs: getting mods, ordering them, and configuring them are three different jobs. */
-export type ModsTab = "installation" | "order" | "settings";
+type ModsTab = "installation" | "order" | "settings";
 
 /** Which of a mod row's controls started what is running - one label each, and the button says it. */
-export type ModAction = "prepare" | "install" | "remove" | "restore";
+type ModAction = "prepare" | "install" | "remove" | "restore";
 
 /**
  * Something that happened and the user needs told: a save, a refusal, a failure. `note` is the third case -
  * ZAX did something the user did not ask for and would want to know about, which is neither a completed
  * action nor a fault, and reads as neither.
  */
-export interface Notice {
+interface Notice {
   kind: "done" | "problem" | "note";
   text: string;
 }
 
 /** A disagreement this load put in front of the user, and everything undoing the answer needs to know. */
-export interface Reconciled {
+interface Reconciled {
   /**
    * The file the value was carried from - what the row says, so a change ZAX made unasked names its source.
    * Absent where the user picked between two that had both moved: they know where their own answer came
@@ -2213,4 +2213,3 @@ class Store {
 }
 
 export const store = new Store();
-export { SETTINGS, isPreview };
