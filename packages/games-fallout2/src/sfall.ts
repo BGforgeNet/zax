@@ -69,7 +69,7 @@ export async function listSfallVersions(platform: Platform): Promise<readonly st
 }
 
 /** The installed version, or null when the install has no sfall. */
-export function installedSfallVersion(platform: Platform, install: Install): Promise<string | null> {
+export async function installedSfallVersion(platform: Platform, install: Install): Promise<string | null> {
   return installedLibraryVersion(platform, install, SFALL_LIBRARY);
 }
 

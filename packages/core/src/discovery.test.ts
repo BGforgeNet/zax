@@ -19,7 +19,7 @@ function fo1in2(root: string): Record<string, string> {
 /** The clock is an argument to the scan, so the lines it logs are the same on every run. */
 const AT = new Date("2026-01-01T00:00:00.000Z");
 
-const scan = (platform: MemoryPlatform, known: Parameters<typeof scanForInstalls>[1] = []) =>
+const scan = async (platform: MemoryPlatform, known: Parameters<typeof scanForInstalls>[1] = []) =>
   scanForInstalls(platform, known, AT);
 
 const paths = async (platform: MemoryPlatform) => (await scan(platform)).map((one) => one.path);

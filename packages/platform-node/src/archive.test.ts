@@ -9,7 +9,7 @@ import { nodePlatform } from "./index.js";
 const scratch = await mkdtemp(join(tmpdir(), "zax-archive-"));
 const platform = nodePlatform();
 
-afterAll(() => rm(scratch, { recursive: true, force: true }));
+afterAll(async () => rm(scratch, { recursive: true, force: true }));
 
 /**
  * One ustar header block. Written by hand because nothing in the toolchain writes tar, and the alternative -

@@ -14,6 +14,6 @@ import { installedLibraryVersion } from "./pe-version.js";
 export const HIRES_LIBRARY = "f2_res.dll";
 
 /** The installed version, or null when the install does not have the patch. */
-export function installedHiresVersion(platform: Platform, install: Install): Promise<string | null> {
+export async function installedHiresVersion(platform: Platform, install: Install): Promise<string | null> {
   return installedLibraryVersion(platform, install, HIRES_LIBRARY);
 }

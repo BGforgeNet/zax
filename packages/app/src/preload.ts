@@ -14,11 +14,15 @@ import type { OperationProgress } from "@zax/fallout2";
 import { BUSY_CHANNEL, BUSY_GLOBAL, CHANNEL, GLOBAL, PROGRESS_CHANNEL, PROGRESS_GLOBAL } from "./channel.js";
 import { unwrapped } from "./ipc-error.js";
 
-const backend = fromMethods(
-  (method) =>
-    (...args: unknown[]) =>
-      ipcRenderer.invoke(CHANNEL, method, args).catch((error: unknown) => Promise.reject(unwrapped(error))),
-);
+const backend = fromMethods((method) => async (...args: unknown[]): Promise<unknown> => {
+  try {
+    // Electron types `invoke` as `Promise<any>`. The annotation is what stops that `any` spreading inward.
+    const answer: unknown = await ipcRenderer.invoke(CHANNEL, method, args);
+    return answer;
+  } catch (error) {
+    throw unwrapped(error);
+  }
+});
 
 contextBridge.exposeInMainWorld(GLOBAL, backend);
 

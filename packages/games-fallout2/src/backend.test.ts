@@ -320,7 +320,7 @@ describe("installing a mod", () => {
       ...feed,
       fs: {
         ...platform.fs,
-        write: (path: string, bytes: Uint8Array) => {
+        write: async (path: string, bytes: Uint8Array) => {
           if (path.endsWith("mods_order.txt")) throw new Error("locked file");
           return platform.fs.write(path, bytes);
         },
@@ -455,8 +455,8 @@ describe("engines across the boundary", () => {
     const backend = await fetched(platform);
 
     // The requests the release took are already spent; another would be this path asking the network.
-    platform.net.fetchText = () => Promise.reject(new Error("the first run asked the network"));
-    platform.net.download = () => Promise.reject(new Error("the first run downloaded again"));
+    platform.net.fetchText = async () => Promise.reject(new Error("the first run asked the network"));
+    platform.net.download = async () => Promise.reject(new Error("the first run downloaded again"));
 
     await backend.launch(SECOND, null, "fallout2-ce", null);
     expect(platform.launched.at(-1)?.program).toBe("./fallout2-ce");

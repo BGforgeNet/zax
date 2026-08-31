@@ -54,7 +54,7 @@ describe("saving config files", () => {
   // would have passed that too. Asserted over every file the machine holds, since a copy taken anywhere counts.
   it("copies nothing aside, however many times the same file is written", async () => {
     const platform = game();
-    const write = (original: string, value: string) =>
+    const write = async (original: string, value: string) =>
       saveConfigFiles(platform, {
         installPath: GAME,
         original: { "fallout2.cfg": original },

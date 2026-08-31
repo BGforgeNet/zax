@@ -364,7 +364,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
    * and the second waits on the first. Assigned before it is awaited, which is what makes that true.
    */
   let feeds: Promise<{ listing: ModFeedListing; releases: readonly ModRelease[] }> | null = null;
-  const feedsHeld = () => (feeds ??= readModFeeds(platform));
+  const feedsHeld = async () => (feeds ??= readModFeeds(platform));
 
   /**
    * The same, for the two callers that are asking after the feeds themselves rather than needing a release
@@ -454,7 +454,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
   };
 
   return {
-    chooseFolder: (holding) => shell.chooseFolder(holding),
+    chooseFolder: async (holding) => shell.chooseFolder(holding),
 
     describe: async () => ({
       os: platform.os,
@@ -464,8 +464,8 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       logFile: logFile(platform),
     }),
 
-    loadState: () => loadState(platform),
-    saveState: (state) => saveState(platform, state),
+    loadState: async () => loadState(platform),
+    saveState: async (state) => saveState(platform, state),
     loadConfigFiles: async (installPath) => {
       // The installed mods' settings files load through the same lossless path the engine's files do, so the
       // interface's guard-and-backup behaviour is one mechanism, not two.
@@ -485,13 +485,13 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       return outcome;
     },
     settingsBase: async (installPath) => (await loadRecord(platform, installPath)).written ?? {},
-    acceptSettingsBase: (installPath, at) =>
+    acceptSettingsBase: async (installPath, at) =>
       moveBase(
         installPath,
         at.map((one) => ({ ...one.target, value: one.value })),
       ),
-    loadMods: (install) => readMods(platform, install),
-    saveMods: (request) => saveMods(platform, request),
+    loadMods: async (install) => readMods(platform, install),
+    saveMods: async (request) => saveMods(platform, request),
 
     publishedMods: async (refresh = false) => (await feedsAsked(refresh)).listing,
     modInstallState: async (install) => {
@@ -541,9 +541,9 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
       if (above === undefined) return versions;
       return versions.filter((version) => compareInLine(feed.line, version, above) > 0);
     },
-    restoreMod: (install, modId) => restoreModInstall(platform, install, modId, new Date()),
-    removeMod: (install, modId) => uninstallMod(platform, install, modId, new Date()),
-    modSettings: (install) => installedModSettings(install.path),
+    restoreMod: async (install, modId) => restoreModInstall(platform, install, modId, new Date()),
+    removeMod: async (install, modId) => uninstallMod(platform, install, modId, new Date()),
+    modSettings: async (install) => installedModSettings(install.path),
     openModFile: async (install, modId, file) => {
       const mod = (await loadRecord(platform, install.path)).mods.find((held) => held.id === modId);
       if (!mod) throw new Error(`Nothing of "${modId}" is recorded for this install.`);
@@ -561,14 +561,14 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
         throw new Error(`"${file}" is not one of ${modId}'s files.`);
       return platform.process.open(platform.paths.join(install.path, ...file.split("/")));
     },
-    identifyInstall: (path) => identifyInstall(platform, path),
-    scanForInstalls: (known) => scanForInstalls(platform, known, new Date()),
+    identifyInstall: async (path) => identifyInstall(platform, path),
+    scanForInstalls: async (known) => scanForInstalls(platform, known, new Date()),
 
-    installedSfallVersion: (install) => installedSfallVersion(platform, install),
-    latestSfall: () => latestSfall(platform),
-    updateSfall: (install, version) => updateSfall(platform, install, version, new Date(), reporting()),
-    listSfallVersions: () => listSfallVersions(platform),
-    machineEngines: () =>
+    installedSfallVersion: async (install) => installedSfallVersion(platform, install),
+    latestSfall: async () => latestSfall(platform),
+    updateSfall: async (install, version) => updateSfall(platform, install, version, new Date(), reporting()),
+    listSfallVersions: async () => listSfallVersions(platform),
+    machineEngines: async () =>
       Promise.all(
         ENGINES.map(async (engine) => {
           const build = buildFor(engine, platform.os, platform.arch);
@@ -591,15 +591,15 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
           };
         }),
       ),
-    deployedEngines: (install) => installedEngines(platform, install),
-    engineReleases: (engineId) => engineReleases(platform, engineId),
-    fetchEngine: (engineId, published) => fetchEngineBuild(platform, engineId, published, reporting()),
-    forgetEngine: (engineId, published) => forgetEngine(platform, engineById(engineId), published),
-    installedHiresVersion: (install) => installedHiresVersion(platform, install),
-    latestZax: () => latestZax(platform),
+    deployedEngines: async (install) => installedEngines(platform, install),
+    engineReleases: async (engineId) => engineReleases(platform, engineId),
+    fetchEngine: async (engineId, published) => fetchEngineBuild(platform, engineId, published, reporting()),
+    forgetEngine: async (engineId, published) => forgetEngine(platform, engineById(engineId), published),
+    installedHiresVersion: async (install) => installedHiresVersion(platform, install),
+    latestZax: async () => latestZax(platform),
 
-    listSaves: (install) => listSaves(platform, install),
-    createDebugPackage: (install, saves) => createDebugPackage(platform, install, saves),
+    listSaves: async (install) => listSaves(platform, install),
+    createDebugPackage: async (install, saves) => createDebugPackage(platform, install, saves),
 
     // The program comes from the record and the catalog, never from the renderer - a caller that could name
     // the program would be naming a program for the machine to start.

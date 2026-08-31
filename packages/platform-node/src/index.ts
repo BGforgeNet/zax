@@ -93,7 +93,7 @@ function kindOf(entry: { isFile(): boolean; isDirectory(): boolean }): FileKind 
 
 // Streamed rather than read whole: the largest thing this hashes is a downloaded mod archive, and RPU's runs
 // to a gigabyte.
-function streamHash(path: string, algorithm: "sha256" | "md5"): Promise<string> {
+async function streamHash(path: string, algorithm: "sha256" | "md5"): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const digest = createHash(algorithm);
     createReadStream(path)
@@ -228,7 +228,7 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
     paths: { config, cache, home, separator: os === "win32" ? "\\" : "/", join, dirname, basename },
 
     fs: {
-      read: (path) => readFile(path),
+      read: async (path) => readFile(path),
       write: async (path, bytes) => {
         await mkdir(dirname(path), { recursive: true });
         // Written beside the target and renamed over it: a crash mid-write must not leave a truncated file,
@@ -259,7 +259,7 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
         await mkdir(dirname(to), { recursive: true });
         await copyFile(from, to);
       },
-      remove: (path) => rm(path, { recursive: true, force: true }),
+      remove: async (path) => rm(path, { recursive: true, force: true }),
       rename: async (from, to) => {
         await mkdir(dirname(to), { recursive: true });
         await rename(from, to);
@@ -410,7 +410,7 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
         }
         return response.text();
       },
-      download: (url, destination, options) => downloadFile(url, destination, { ...options, note: noteDownload }),
+      download: async (url, destination, options) => downloadFile(url, destination, { ...options, note: noteDownload }),
     },
 
     archive: {
@@ -453,8 +453,8 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
     },
 
     hash: {
-      sha256: (path) => streamHash(path, "sha256"),
-      md5: (path) => streamHash(path, "md5"),
+      sha256: async (path) => streamHash(path, "sha256"),
+      md5: async (path) => streamHash(path, "md5"),
     },
   };
 }

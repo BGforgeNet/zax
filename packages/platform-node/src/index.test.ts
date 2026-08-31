@@ -11,7 +11,7 @@ import { nodePlatform } from "./index.js";
  */
 const platform = nodePlatform();
 const scratch = await mkdtemp(join(tmpdir(), "zax-platform-"));
-afterAll(() => rm(scratch, { recursive: true, force: true }));
+afterAll(async () => rm(scratch, { recursive: true, force: true }));
 
 const at = (...parts: string[]) => join(scratch, ...parts);
 const utf8 = new TextDecoder();

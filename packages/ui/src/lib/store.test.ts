@@ -820,7 +820,7 @@ describe("crossing the process boundary", () => {
     const recorder = Object.fromEntries(
       BACKEND_METHODS.map((name) => [
         name,
-        (...args: unknown[]) => {
+        async (...args: unknown[]) => {
           seen.push(args);
           return Promise.resolve(undefined);
         },
@@ -918,7 +918,7 @@ describe("the unsaved marks", () => {
 */
 describe("autosave", () => {
   const MUSIC = "game.sound.music";
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 900));
+  const settle = async () => new Promise((resolve) => setTimeout(resolve, 900));
 
   test("writes an edit without a save, once the run of edits stops", async () => {
     const before = store.baselineOf(MUSIC);
@@ -987,7 +987,7 @@ describe("a long operation", () => {
     const heldScan = () => {
       let finish = () => {};
       vi.spyOn(hostBackend, "scanForInstalls").mockImplementation(
-        () =>
+        async () =>
           new Promise((resolve) => {
             finish = () => resolve([]);
           }),
@@ -1043,7 +1043,7 @@ describe("a long operation", () => {
     const held = () => {
       let settle: (error?: Error) => void = () => {};
       vi.spyOn(hostBackend, "scanForInstalls").mockImplementation(
-        () =>
+        async () =>
           new Promise((resolve, reject) => {
             settle = (error) => (error ? reject(error) : resolve([]));
           }),
@@ -2019,7 +2019,9 @@ describe("the feeds against a change of game", () => {
     });
     const asked = vi
       .spyOn(hostBackend, "modInstallState")
-      .mockImplementation((install) => (install.path === other.path ? held : Promise.resolve(standingOf("mine"))));
+      .mockImplementation(async (install) =>
+        install.path === other.path ? held : Promise.resolve(standingOf("mine")),
+      );
     store.installs = [...store.installs, other];
     await store.loadModOffers();
     expect(store.modListing?.offers).toEqual(offersFor("mine"));
@@ -2045,7 +2047,9 @@ describe("the feeds against a change of game", () => {
     });
     const asked = vi
       .spyOn(hostBackend, "modInstallState")
-      .mockImplementation((install) => (install.path === other.path ? held : Promise.resolve(standingOf("mine"))));
+      .mockImplementation(async (install) =>
+        install.path === other.path ? held : Promise.resolve(standingOf("mine")),
+      );
     const planned = vi.spyOn(hostBackend, "planMod");
     store.installs = [...store.installs, other];
     await store.loadModOffers();
@@ -2095,7 +2099,7 @@ describe("the feeds against a change of game", () => {
       release = () => resolve(standingOf("overtaken"));
     });
     let outstanding = true;
-    const asked = vi.spyOn(hostBackend, "modInstallState").mockImplementation((install) => {
+    const asked = vi.spyOn(hostBackend, "modInstallState").mockImplementation(async (install) => {
       if (install.path !== other.path) return Promise.resolve(standingOf("mine"));
       if (outstanding) {
         outstanding = false;
@@ -2126,7 +2130,7 @@ describe("the feeds against a change of game", () => {
     const held = new Promise<ModInstallState>((resolve) => {
       release = () => resolve(standingOf("stale"));
     });
-    vi.spyOn(hostBackend, "modInstallState").mockImplementation((install) =>
+    vi.spyOn(hostBackend, "modInstallState").mockImplementation(async (install) =>
       install.path === other.path ? held : Promise.resolve(standingOf("mine")),
     );
     store.installs = [...store.installs, other];
@@ -2195,7 +2199,7 @@ describe("one reading of an install, published whole", () => {
     });
     const asked = vi
       .spyOn(hostBackend, "deployedEngines")
-      .mockImplementation((install) => (install.path === other.path ? held : Promise.resolve([])));
+      .mockImplementation(async (install) => (install.path === other.path ? held : Promise.resolve([])));
 
     const switching = store.selectInstall(other.path);
     await vi.waitFor(() => expect(asked).toHaveBeenCalled());

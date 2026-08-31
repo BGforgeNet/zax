@@ -717,7 +717,7 @@ class Store {
       // Only the ones this machine could actually install, which is the condition the Check button carries.
       ...this.engines
         .filter((engine) => engine.build !== null)
-        .map((engine) =>
+        .map(async (engine) =>
           quietly(async () => {
             const [newest] = await backend.engineReleases(engine.id);
             if (newest) this.engineLatest = { ...this.engineLatest, [engine.id]: newest };
@@ -752,7 +752,7 @@ class Store {
       `readingOffers` is what keeps a second one off the first while it is still out.
     */
     if (install && this.modFeeds === null && !this.readingOffers) {
-      void quietly(() => this.readModListing(install, false));
+      void quietly(async () => this.readModListing(install, false));
     }
     // A held plan is dropped whichever install this is: it is how the flow that just ran closes its dialog.
     this.modPlan = null;
@@ -1950,7 +1950,7 @@ class Store {
 
   /** Adds a directory the user pointed at, refusing one that does not hold a game. */
   async addInstall(path: string): Promise<void> {
-    await this.run("Adding the install", () => this.registerInstall(path));
+    await this.run("Adding the install", async () => this.registerInstall(path));
   }
 
   /**

@@ -9,10 +9,10 @@ const listing = (entries: readonly ArchiveEntryInfo[]) =>
 const file = (name: string, size = 1): ArchiveEntryInfo => ({ name, size, kind: "file" });
 
 /** Takes the list rather than spreading it: the ceiling cases run to tens of thousands, past the call stack. */
-const judgeAll = (entries: readonly ArchiveEntryInfo[]) =>
+const judgeAll = async (entries: readonly ArchiveEntryInfo[]) =>
   preflightArchive(listing(entries), "payload", "a mod release");
 
-const judge = (...entries: readonly ArchiveEntryInfo[]) => judgeAll(entries);
+const judge = async (...entries: readonly ArchiveEntryInfo[]) => judgeAll(entries);
 
 describe("preflightArchive", () => {
   it("returns the directory it read, so the caller plans from the same listing", async () => {

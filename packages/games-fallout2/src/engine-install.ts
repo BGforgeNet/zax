@@ -99,7 +99,7 @@ async function deployEngine(
 
   try {
     // Judged before it is opened: this is a third-party archive about to be unpacked over a game folder.
-    const entries: readonly ArchiveEntryInfo[] = await orDiscard(platform, archive, () =>
+    const entries: readonly ArchiveEntryInfo[] = await orDiscard(platform, archive, async () =>
       preflightArchive(platform, archive, `${engine.name} ${release.release}`),
     );
 
@@ -122,7 +122,7 @@ async function deployEngine(
     await refuseIfShort(install.path);
 
     options?.onStep?.(`Unpacking ${engine.name}`);
-    await orDiscard(platform, archive, () => platform.archive.extract(archive, work));
+    await orDiscard(platform, archive, async () => platform.archive.extract(archive, work));
 
     options?.onStep?.(`Installing ${engine.name}`);
     const backup = join(backupDirectory(platform), at);

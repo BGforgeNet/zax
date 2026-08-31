@@ -190,7 +190,7 @@ interface FeedRead {
 function feedRead(platform: Platform): FeedRead {
   let active = 0;
   const waiting: Array<() => void> = [];
-  const enter = (): Promise<void> => {
+  const enter = async (): Promise<void> => {
     if (active < FEED_REQUEST_CONCURRENCY) {
       active += 1;
       return Promise.resolve();
@@ -343,7 +343,12 @@ async function readRepositoryReleases(
 }
 
 /** Shares a repository listing between rows, including while its first request is still in flight. */
-function fetchReleases(platform: Platform, repository: string, now: Date, read: FeedRead): Promise<FeedRelease[]> {
+async function fetchReleases(
+  platform: Platform,
+  repository: string,
+  now: Date,
+  read: FeedRead,
+): Promise<FeedRelease[]> {
   const held = read.releases.get(repository);
   if (held) return held;
   const pending = readRepositoryReleases(platform, repository, now, read);

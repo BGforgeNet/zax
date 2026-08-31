@@ -45,8 +45,8 @@ const seeded = (files: Record<string, string> = {}) =>
  * What fetching a build and then running it does, in the two steps the application takes: the release into the
  * machine's cache, then the cache into this folder. Every deployment test drives both rather than a stand-in.
  */
-const fetchAndDeploy = (platform: Platform, install: Install, now: Date = NOW) =>
-  fetchEngineBuild(platform, "fallout2-ce", null).then(() =>
+const fetchAndDeploy = async (platform: Platform, install: Install, now: Date = NOW) =>
+  fetchEngineBuild(platform, "fallout2-ce", null).then(async () =>
     installCachedEngine(platform, install, "fallout2-ce", { published: null, pin: false }, now),
   );
 
@@ -179,7 +179,7 @@ describe("installing an engine", () => {
 
   it("leaves the record incomplete when the deployment fails part-way", async () => {
     const platform = seeded();
-    const broken = { ...platform, fs: { ...platform.fs, makeExecutable: () => Promise.reject(new Error("no")) } };
+    const broken = { ...platform, fs: { ...platform.fs, makeExecutable: async () => Promise.reject(new Error("no")) } };
     await expect(fetchAndDeploy(broken, INSTALL, NOW)).rejects.toThrow();
     const record = await loadRecord(platform, INSTALL.path);
     expect(record.engines?.[0]?.complete).toBe(false);
@@ -217,7 +217,7 @@ describe("discarding a bad cached archive", () => {
       ...platform,
       archive: {
         ...platform.archive,
-        extract: () => Promise.reject(new Error("disk error")),
+        extract: async () => Promise.reject(new Error("disk error")),
       },
     };
     await expect(fetchAndDeploy(broken, INSTALL, NOW)).rejects.toThrow(/disk error/);
@@ -329,8 +329,8 @@ describe("installing from what the machine already holds", () => {
 
   const offline = (platform: MemoryPlatform): MemoryPlatform => {
     // Any request at all is the defect this path exists to avoid, so make one fail the test rather than work.
-    platform.net.fetchText = () => Promise.reject(new Error("the cached install asked the network"));
-    platform.net.download = () => Promise.reject(new Error("the cached install downloaded again"));
+    platform.net.fetchText = async () => Promise.reject(new Error("the cached install asked the network"));
+    platform.net.download = async () => Promise.reject(new Error("the cached install downloaded again"));
     return platform;
   };
 

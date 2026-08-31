@@ -30,7 +30,7 @@ const OWN_CONTENT = DEV_SERVER || pathToFileURL(RENDERER).href;
 const platform = nodePlatform({ log: (level, line) => void logLine(level, line) });
 
 /** One line per event, in the file the interface's "open log" button points at. */
-function logLine(level: LogLevel, text: string): Promise<void> {
+async function logLine(level: LogLevel, text: string): Promise<void> {
   return appendLog(platform, level, text, new Date());
 }
 
@@ -52,7 +52,7 @@ function register(backend: Backend): void {
   // Every line this sink is handed is an operation that failed; the renderer's notice carries the message and
   // the log carries the stack.
   const dispatch = createDispatch(backend, (line) => void logLine("error", line));
-  ipcMain.handle(CHANNEL, (event, method: string, args: unknown[]) => {
+  ipcMain.handle(CHANNEL, async (event, method: string, args: unknown[]) => {
     if (!isTrustedIpcSender(event.senderFrame, event.sender.mainFrame, OWN_CONTENT)) {
       void logLine("warn", "refused a backend request from outside the application");
       throw new Error("The backend request did not come from the application.");

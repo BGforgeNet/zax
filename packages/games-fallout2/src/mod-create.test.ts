@@ -63,7 +63,7 @@ const releaseOf = async (manifest: string): Promise<ModRelease> => ({
   archive: { name: "Fallout1in2.zip", url: ZIP_URL, digest: `sha256:${await sha(PAYLOAD)}`, size: PAYLOAD.length },
 });
 
-const release = () => releaseOf(MANIFEST);
+const release = async () => releaseOf(MANIFEST);
 
 const createPlatform = (options: MemoryOptions = {}) =>
   new MemoryPlatform({

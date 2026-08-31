@@ -105,7 +105,7 @@ const CAPTURED_FEEDS: Readonly<Record<string, string>> = {
   "BGforgeNet/FO2tweaks": fo2tweaksFeed,
 };
 
-function fetchCaptured(url: string): Promise<string> {
+async function fetchCaptured(url: string): Promise<string> {
   const captured = Object.entries(CAPTURED_FEEDS).find(([repository]) => url.includes(`/repos/${repository}/releases`));
   // A manifest URL reaches here too, and still refuses - though nothing asks, since every one of these
   // repositories publishes no manifest and the cache below already records that.

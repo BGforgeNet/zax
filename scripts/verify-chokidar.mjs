@@ -91,7 +91,7 @@ child.on("error", (error) => {
  * Resolves once `target` checks have reported, and rejects if the watcher dies or the wait runs out.
  * @returns {Promise<void>}
  */
-function waitForChecks(target, ms, what) {
+async function waitForChecks(target, ms, what) {
   return new Promise((resolve, reject) => {
     const settle = () => {
       if (completed >= target) {

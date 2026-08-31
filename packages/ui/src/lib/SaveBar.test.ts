@@ -20,7 +20,7 @@ afterEach(() => {
 const SETTING = "sfall.Misc.UseFileSystemOverride";
 
 /** Autosave ships on, so a test of the Save button and its count turns it off the way the ZAX panel does. */
-const byHand = () => store.setAutosave(false);
+const byHand = async () => store.setAutosave(false);
 
 describe("the Save button", () => {
   test("is off with nothing changed, and says so in the chip beside it", async () => {

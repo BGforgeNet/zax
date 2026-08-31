@@ -81,7 +81,7 @@ const breakingDeploy = (platform: MemoryPlatform): Platform =>
   wrapping(platform, {
     archive: {
       ...platform.archive,
-      extract: (archive, destination, options) => {
+      extract: async (archive, destination, options) => {
         if (destination === GAME) throw new Error("locked file");
         return platform.archive.extract(archive, destination, options);
       },
@@ -95,7 +95,7 @@ const breakingDeploy = (platform: MemoryPlatform): Platform =>
 const breakingWrite = (platform: MemoryPlatform, when: (path: string) => boolean): Platform => {
   const fs: FileSystem = {
     ...platform.fs,
-    write: (path, bytes) => {
+    write: async (path, bytes) => {
       if (when(path)) throw new Error("locked file");
       return platform.fs.write(path, bytes);
     },

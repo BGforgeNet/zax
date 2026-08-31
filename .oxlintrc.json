@@ -30,6 +30,7 @@
     "typescript/prefer-as-const": "error",
     "unicorn/prefer-set-has": "error",
     "unicorn/no-array-sort": "error",
+    "typescript/promise-function-async": "error",
     "eslint/no-empty": "error",
 
     // Every site is a destructure of plain functions off an object or a module (`platform.paths`, `node:path`).
