@@ -1,0 +1,60 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended"],
+
+  // Nothing here is on a release schedule, and a bump landing while someone is mid-branch costs more than it
+  // saves. One batch a week.
+  schedule: ["before 6am on monday"],
+
+  // The same cooldown a dependency added by hand gets: a version published hours ago has had no exposure, and a
+  // release pulled for a packaging mistake - the common case - is usually gone within a few days.
+  minimumReleaseAge: "7 days",
+
+  // The lockfile is the audit surface, read by `pnpm audit` and by pnpm's own supply-chain policy. Refreshing
+  // it on a schedule is what keeps transitive packages moving, since nothing else in the repo names them.
+  lockFileMaintenance: { enabled: true },
+
+  packageRules: [
+    {
+      // These two decide what a distributable is built by and what it ships, and a packaging break surfaces
+      // only in the `build` job on three runners. Worth a person reading the release notes first.
+      matchPackageNames: ["electron", "electron-builder"],
+      dependencyDashboardApproval: true,
+    },
+    {
+      // The oxc tools ship rules, not just fixes: a minor can turn on a check the repo has never run, which is
+      // triage rather than a merge. Grouped so it is one triage instead of three.
+      matchPackageNames: ["oxlint", "oxfmt", "oxlint-tsgolint"],
+      groupName: "oxc toolchain",
+    },
+    {
+      // Parked on the dashboard rather than opened as PRs, because a bump here is only half a change: the
+      // digests below each version in that script have to be taken from the project's own release page, and
+      // zizmor's URL has to be taken with them - PyPI addresses a file by its own hash rather than by version.
+      // A PR carrying the version alone would fail `sha256sum -c`, which is the right failure but a useless
+      // one to open on a schedule.
+      matchManagers: ["custom.regex"],
+      dependencyDashboardApproval: true,
+    },
+  ],
+
+  // `.github/scripts/lint-workflows.sh` fetches both tools by version and checks each against a recorded
+  // digest. Nothing else in the repo declares them, so without these they are the two pins that never move.
+  customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: [".github/scripts/lint-workflows.sh"],
+      matchStrings: ["ACTIONLINT_VERSION=(?<currentValue>\\S+)"],
+      depNameTemplate: "rhysd/actionlint",
+      datasourceTemplate: "github-releases",
+      extractVersionTemplate: "^v(?<version>.*)$",
+    },
+    {
+      customType: "regex",
+      managerFilePatterns: [".github/scripts/lint-workflows.sh"],
+      matchStrings: ["ZIZMOR_VERSION=(?<currentValue>\\S+)"],
+      depNameTemplate: "zizmor",
+      datasourceTemplate: "pypi",
+    },
+  ],
+}
