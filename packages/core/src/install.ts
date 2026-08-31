@@ -142,7 +142,7 @@ export function addInstall(installs: readonly Install[], candidate: Install): Ad
   if (installs.some((g) => g.path === candidate.path)) {
     return { ok: false, reason: "That install is already on the list." };
   }
-  return { ok: true, installs: [...installs, candidate].sort(byPath) };
+  return { ok: true, installs: [...installs, candidate].toSorted(byPath) };
 }
 
 export function removeInstall(installs: readonly Install[], path: string): readonly Install[] {

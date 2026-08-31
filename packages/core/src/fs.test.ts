@@ -7,7 +7,7 @@ describe("walking a directory", () => {
     const platform = new MemoryPlatform({
       files: { "/src/ddraw.dll": "MZ", "/src/mods/sfall-mods.ini": "[a]", "/src/translations/french.ini": "[b]" },
     });
-    expect((await listFilesRecursively(platform, "/src")).sort()).toEqual([
+    expect((await listFilesRecursively(platform, "/src")).toSorted()).toEqual([
       "ddraw.dll",
       "mods/sfall-mods.ini",
       "translations/french.ini",
@@ -22,7 +22,7 @@ describe("walking a directory", () => {
 describe("copying a tree", () => {
   it("puts every file at the same relative place under the destination", async () => {
     const platform = new MemoryPlatform({ files: { "/src/ddraw.dll": "new", "/src/mods/one.ini": "[a]" } });
-    expect((await copyTree(platform, "/src", "/games/one")).sort()).toEqual(["ddraw.dll", "mods/one.ini"]);
+    expect((await copyTree(platform, "/src", "/games/one")).toSorted()).toEqual(["ddraw.dll", "mods/one.ini"]);
     expect(platform.textAt("/games/one/ddraw.dll")).toBe("new");
     expect(platform.textAt("/games/one/mods/one.ini")).toBe("[a]");
   });

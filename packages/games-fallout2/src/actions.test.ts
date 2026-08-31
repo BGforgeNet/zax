@@ -57,7 +57,7 @@ describe("actions reference real settings", () => {
     // An action that cannot be undone strands the user in a state they cannot leave from the same screen.
     const enable = ACTIONS.find((a) => a.id === "debug.enable")!;
     const disable = ACTIONS.find((a) => a.id === "debug.disable")!;
-    expect(Object.keys(enable.targets).sort()).toEqual(Object.keys(disable.targets).sort());
+    expect(Object.keys(enable.targets).toSorted()).toEqual(Object.keys(disable.targets).toSorted());
   });
 
   it("takes WINEDEBUG the opposite way in each direction", () => {

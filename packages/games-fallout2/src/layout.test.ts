@@ -157,7 +157,7 @@ describe("layout", () => {
     // Still placed and still in the catalog, so the key round-trips - just not offered as a choice. Asserted
     // by name: a check that merely counted hidden settings would pass on the wrong three.
     const hidden = placed.flatMap((n) => (n.kind === "setting" && n.hidden ? [n.id] : []));
-    expect(hidden.sort()).toEqual([
+    expect(hidden.toSorted()).toEqual([
       "game.preferences.text_line_delay", // the previous interface hid it
       "game.system.free_space", // fallout2-ce reads it and never uses it
       "hires.MAIN.UAC_AWARE", // the previous interface hid it; ZAX pins the value

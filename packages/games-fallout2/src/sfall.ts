@@ -65,7 +65,7 @@ export async function listSfallVersions(platform: Platform): Promise<readonly st
   for (const match of feed.matchAll(/sfall_(\d[^< "]*?)\.7z/g)) {
     if (match[1] && VERSION_SHAPE.test(match[1])) seen.add(match[1]);
   }
-  return [...seen].sort((a, b) => compareVersions(b, a));
+  return [...seen].toSorted((a, b) => compareVersions(b, a));
 }
 
 /** The installed version, or null when the install has no sfall. */

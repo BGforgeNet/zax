@@ -139,7 +139,7 @@ describe("install", () => {
     const release = await releaseFor("14.7");
 
     const plan = await planModInstall(platform, install, release);
-    expect(plan.files.map((file) => file.path).sort()).toEqual(["mods/fo2tweaks.dat", "mods/fo2tweaks.ini"]);
+    expect(plan.files.map((file) => file.path).toSorted()).toEqual(["mods/fo2tweaks.dat", "mods/fo2tweaks.ini"]);
     expect(plan.files.every((file) => !file.overwrites)).toBe(true);
     expect(plan.orderLines).toEqual(["fo2tweaks.dat"]);
     expect(plan.removes).toEqual([]);
@@ -559,7 +559,7 @@ describe("uninstall", () => {
 
     const when = new Date(2026, 7, 12, 13, 0, 0);
     const removal = await uninstallMod(platform, install, "fo2tweaks", when);
-    expect([...removal.files].sort()).toEqual(["mods/fo2tweaks.dat", "mods/fo2tweaks.ini"]);
+    expect([...removal.files].toSorted()).toEqual(["mods/fo2tweaks.dat", "mods/fo2tweaks.ini"]);
 
     expect(platform.textAt(`${GAME}/mods/fo2tweaks.dat`)).toBeUndefined();
     expect(platform.textAt(`${GAME}/mods/fo2tweaks.ini`)).toBeUndefined();
@@ -582,7 +582,7 @@ describe("uninstall", () => {
       },
     });
     const removal = await uninstallMod(platform, install, "fo2tweaks");
-    expect([...removal.files].sort()).toEqual(["mods/FO2tweaks.dat", "mods/fo2tweaks.ini"]);
+    expect([...removal.files].toSorted()).toEqual(["mods/FO2tweaks.dat", "mods/fo2tweaks.ini"]);
     expect(platform.textAt(`${GAME}/mods/FO2tweaks.dat`)).toBeUndefined();
     expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).not.toMatch(/fo2tweaks/i);
   });

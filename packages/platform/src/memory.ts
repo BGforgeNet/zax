@@ -341,7 +341,7 @@ export class MemoryPlatform implements Platform {
 
   /** Every file present, by path, for asserting that a write touched nothing else. */
   allFiles(): string[] {
-    return [...this.files.keys()].sort();
+    return [...this.files.keys()].toSorted();
   }
 
   /** An archive's canned contents, by its path or by the text sitting at that path. */
@@ -391,7 +391,7 @@ export class MemoryPlatform implements Platform {
       if (!key.startsWith(prefix) || key === path) continue;
       names.set(key.slice(prefix.length).split("/")[0]!, "dir");
     }
-    return [...names].map(([name, kind]) => ({ name, kind })).sort((a, b) => a.name.localeCompare(b.name));
+    return [...names].map(([name, kind]) => ({ name, kind })).toSorted((a, b) => a.name.localeCompare(b.name));
   }
 
   /** Moves a file, or a directory with everything under it - one pass over the keys, as a real rename is. */

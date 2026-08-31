@@ -117,7 +117,7 @@ describe("updating", () => {
     expect(platform.textAt(`${BACKUP}/ddraw.dll`)).toBe("old sfall");
     expect(platform.textAt(`${BACKUP}/ddraw.ini`)).toBe("[Main]\r\nSpeedMultiInitial=200\r\n");
     expect(platform.textAt(`${BACKUP}/mods/sfall-mods.ini`)).toBeUndefined();
-    expect([...result.replaced].sort()).toEqual(["ddraw.dll", "ddraw.ini"]);
+    expect([...result.replaced].toSorted()).toEqual(["ddraw.dll", "ddraw.ini"]);
     expect(result.backup).toBe(BACKUP);
   });
 

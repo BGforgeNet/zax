@@ -53,8 +53,8 @@ describe("the operation list", () => {
     // The desktop build registers a channel per name and the preload builds a caller per name; a method the
     // list forgot exists on the interface, typechecks everywhere, and is simply missing at runtime.
     const backend = createBackend(new MemoryPlatform(), noShell);
-    const declared = Object.keys(backend).sort();
-    expect([...BACKEND_METHODS].sort()).toEqual(declared);
+    const declared = Object.keys(backend).toSorted();
+    expect([...BACKEND_METHODS].toSorted()).toEqual(declared);
   });
 
   it("names only real methods", () => {

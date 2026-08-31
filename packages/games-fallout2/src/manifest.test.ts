@@ -246,7 +246,7 @@ describe("parseManifest refusals", () => {
     // A control gated on one that is not there would render live and never take effect, which is the failure
     // gates exist to prevent - so the whole chain goes and the ungated sibling stays.
     expect(manifest.settings.map((s) => s.id)).toEqual(["fo2tweaks.main.d"]);
-    expect(manifest.dropped.map((d) => d.address).sort()).toEqual(["main.a", "main.b", "main.c"]);
+    expect(manifest.dropped.map((d) => d.address).toSorted()).toEqual(["main.a", "main.b", "main.c"]);
   });
 
   it("refuses gates that test both ways or neither", () => {

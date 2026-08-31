@@ -304,7 +304,7 @@ export async function readMods(platform: Platform, install: Install): Promise<Mo
   const record = await loadRecord(platform, install.path);
   return {
     text,
-    present: [...present.values()].sort((a, b) => fold(a.name).localeCompare(fold(b.name))),
+    present: [...present.values()].toSorted((a, b) => fold(a.name).localeCompare(fold(b.name))),
     owners: record.mods.map((mod) => ({ name: modName(mod), files: mod.files })),
   };
 }

@@ -38,7 +38,7 @@ export async function listSaves(platform: Platform, install: Install): Promise<s
   return entries
     .filter((entry) => entry.kind === "dir" && entry.name.toUpperCase().startsWith("SLOT"))
     .map((entry) => entry.name)
-    .sort();
+    .toSorted();
 }
 
 export interface DebugPackage {
@@ -67,7 +67,7 @@ export async function createDebugPackage(
 
   const listing = async (directory: string, name: string): Promise<void> => {
     if ((await platform.fs.stat(directory))?.kind !== "dir") return;
-    const names = (await platform.fs.list(directory)).map((entry) => entry.name).sort();
+    const names = (await platform.fs.list(directory)).map((entry) => entry.name).toSorted();
     const path = join(scratch, name);
     await platform.fs.write(path, new TextEncoder().encode(names.join("\n")));
     entries.push({ source: path, name });

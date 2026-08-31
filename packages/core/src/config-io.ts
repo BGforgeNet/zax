@@ -70,7 +70,7 @@ export interface SaveRequest {
 /** Writes the changed keys back, one line each, leaving every other line of the file exactly as it was. */
 export async function saveConfigFiles(platform: Platform, request: SaveRequest): Promise<SaveOutcome> {
   const { installPath, original, changes, paths = {} } = request;
-  const files = [...new Set(changes.map((change) => change.file))].sort();
+  const files = [...new Set(changes.map((change) => change.file))].toSorted();
   if (files.length === 0) return { ok: true, files: [] };
 
   const current: Record<string, string | undefined> = {};

@@ -1974,7 +1974,7 @@ class Store {
     await this.run("Scanning", async () => {
       const found = await backend.scanForInstalls(this.installs);
       if (found.length === 0) return { kind: "done", text: "Nothing found in the usual places." };
-      this.installs = [...this.installs, ...found].sort((a, b) => a.path.localeCompare(b.path));
+      this.installs = [...this.installs, ...found].toSorted((a, b) => a.path.localeCompare(b.path));
       await this.persist();
       if (this.selectedInstall === "") await this.selectInstall(found[0]!.path);
       return { kind: "done", text: `Found ${found.length === 1 ? "one install" : `${found.length} installs`}.` };

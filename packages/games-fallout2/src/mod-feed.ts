@@ -566,7 +566,7 @@ export async function listModVersions(
     if (feed.line && !heldByLine(feed.line, tagged)) continue;
     seen.add(tagged);
   }
-  return [...seen].sort((a, b) => compareInLine(feed.line, b, a));
+  return [...seen].toSorted((a, b) => compareInLine(feed.line, b, a));
 }
 
 /**

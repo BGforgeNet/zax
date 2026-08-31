@@ -247,7 +247,7 @@ export async function cachedEngines(
     held.push({ release: { ...note, asset: null }, archive });
   }
   // The instants are ISO 8601, so lexical order is chronological - the comparison the note write already relies on.
-  return held.sort((a, b) => b.release.published.localeCompare(a.release.published));
+  return held.toSorted((a, b) => b.release.published.localeCompare(a.release.published));
 }
 
 /** The newest of those, or null where nothing the cache holds can be installed here. */

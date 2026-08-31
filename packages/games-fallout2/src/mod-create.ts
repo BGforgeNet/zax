@@ -303,7 +303,7 @@ export async function planCreateInstall(
         archive.digest ?? "",
         creates.directory,
         ...Object.entries(chosen)
-          .sort(([a], [b]) => a.localeCompare(b))
+          .toSorted(([a], [b]) => a.localeCompare(b))
           .map(([id, folder]) => `${id}=${folder}`),
         String(unpacked),
         String(list?.entries ?? 0),

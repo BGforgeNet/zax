@@ -24,7 +24,7 @@ interface Pinned {
 
 const specimens = readdirSync(CORPUS)
   .filter((name) => name.endsWith(".yml"))
-  .sort();
+  .toSorted();
 
 describe("the manifest corpus", () => {
   it("covers every publishing shape the format has", () => {

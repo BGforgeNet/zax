@@ -23,7 +23,7 @@ function installed(files: Record<string, string> = {}) {
 }
 
 const packaged = async (platform: MemoryPlatform, saves: string[] = []) =>
-  [...(await createDebugPackage(platform, INSTALL, saves, AT)).contents].sort();
+  [...(await createDebugPackage(platform, INSTALL, saves, AT)).contents].toSorted();
 
 describe("choosing what to attach", () => {
   it("finds the save directory whichever way the installer spelled it", async () => {
