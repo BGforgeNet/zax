@@ -308,14 +308,30 @@ describe("renaming and free space", () => {
   });
 });
 
+// Split by host rather than branched inside one test: the seam promises a runnable file where there is an
+// execute bit and a no-op where there is none, and those are two different claims to check.
 describe("making a file runnable", () => {
-  it("adds the owner's execute bit, which a script out of an archive may arrive without", async () => {
+  const shellScript = async () => {
     const script = at("exec", "install.sh");
     await platform.fs.write(script, new TextEncoder().encode("#!/bin/sh\nexit 0\n"));
-    await platform.fs.makeExecutable(script);
-    // Run it, which is the only thing the bit is for - and the check that does not depend on a mode constant.
-    const done = await platform.process.run(script, []);
-    expect(done.code).toBe(0);
+    return script;
+  };
+
+  it.runIf(process.platform !== "win32")(
+    "adds the owner's execute bit, which a script out of an archive may arrive without",
+    async () => {
+      const script = await shellScript();
+      await platform.fs.makeExecutable(script);
+      // Run it, which is the only thing the bit is for - and the check that does not depend on a mode constant.
+      const done = await platform.process.run(script, []);
+      expect(done.code).toBe(0);
+    },
+  );
+
+  it.runIf(process.platform === "win32")("does nothing on a host with no execute bit", async () => {
+    // Windows cannot run a .sh at all, so there is no bit to observe; what the caller relies on is that an
+    // installer that needs no marking still resolves rather than failing the install.
+    await expect(platform.fs.makeExecutable(await shellScript())).resolves.toBeUndefined();
   });
 });
 
