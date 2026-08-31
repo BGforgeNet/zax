@@ -31,6 +31,7 @@
     "unicorn/prefer-set-has": "error",
     "unicorn/no-array-sort": "error",
     "typescript/promise-function-async": "error",
+    "typescript/no-unsafe-type-assertion": "error",
     "eslint/no-empty": "error",
 
     // Every site is a destructure of plain functions off an object or a module (`platform.paths`, `node:path`).
@@ -55,7 +56,12 @@
     "eslint/no-shadow": "off",
     // Helpers declared beside the code that uses them, which is where they read best; hoisting them to module
     // scope for the rule's sake would put the definition further from its one caller.
-    "unicorn/consistent-function-scoping": "off"
+    "unicorn/consistent-function-scoping": "off",
+    // In direct tension with `noUncheckedIndexedAccess`, which this project keeps: an index the surrounding
+    // code has already bounded still types as possibly-undefined, and the assertion is how that is said. The
+    // ones that were avoidable are gone - the helpers they sat in take an out-of-range lookup as an answer
+    // now - and what remains is provable at its site, which is a review question rather than a lint one.
+    "typescript/no-non-null-assertion": "off"
   },
   "overrides": [
     {
@@ -73,8 +79,27 @@
     {
       // A test double is built by spreading a platform and replacing one capability. Nothing the doubles call
       // lives on the prototype the rule protects, and production code stays covered.
+      // The assertions are how a fixture states the shape it just built; the code they exercise stays covered.
       "files": ["**/*.test.ts"],
-      "rules": { "typescript/no-misused-spread": "off" }
+      "rules": {
+        "typescript/no-misused-spread": "off",
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      // The two halves of the process boundary. `BACKEND_METHODS` is a list of names with no types behind it by
+      // design - the preload must carry the names without the domain layer - so the bridge that turns that list
+      // into callers, and the dispatcher that looks one up by name, are untypeable at exactly one line each.
+      // `backend.test.ts` is what holds the list to the interface.
+      "files": ["packages/app/src/dispatch.ts", "packages/games-fallout2/src/backend-methods.ts"],
+      "rules": { "typescript/no-unsafe-type-assertion": "off" }
+    },
+    {
+      // Reading a field off a caught `unknown` - `error.code`, `error.cause.code`, `error.name`. The narrowing
+      // predicate that would replace these lives in `@zax/core`, which this package deliberately does not
+      // depend on: it implements the platform seam and sits outside the domain layer.
+      "files": ["packages/platform-node/src/*.ts"],
+      "rules": { "typescript/no-unsafe-type-assertion": "off" }
     }
   ]
 }

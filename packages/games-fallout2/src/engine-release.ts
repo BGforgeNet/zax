@@ -3,7 +3,7 @@
  * once per install.
  */
 
-import { compareVersions, packageDirectory } from "@zax/core";
+import { compareVersions, isRecord, packageDirectory } from "@zax/core";
 import type { DownloadOptions, Platform } from "@zax/platform";
 import { buildFor, engineById, type EngineBuild, type EngineDefinition } from "./engines.js";
 import type { InstalledEngine } from "./records.js";
@@ -59,37 +59,26 @@ const tagUrl = (repo: string, tag: string): string =>
 async function tagCommit(platform: Platform, repo: string, tag: string): Promise<string | null> {
   try {
     const body: unknown = JSON.parse(await platform.net.fetchText(tagUrl(repo, tag)));
-    const object = (body as { object?: unknown } | null)?.object as { sha?: unknown; type?: unknown } | undefined;
-    return object?.type === "commit" && typeof object.sha === "string" ? object.sha : null;
+    const object = isRecord(body) ? body["object"] : undefined;
+    if (!isRecord(object)) return null;
+    const sha = object["sha"];
+    return object["type"] === "commit" && typeof sha === "string" ? sha : null;
   } catch {
     return null;
   }
 }
 
-interface PublishedAsset {
-  name?: unknown;
-  size?: unknown;
-  browser_download_url?: unknown;
-}
-
-interface PublishedRelease {
-  tag_name?: unknown;
-  published_at?: unknown;
-  assets?: unknown;
-}
-
 /** The asset for this machine, or null where the project publishes no build it can run or shipped none. */
-function assetIn(entry: PublishedRelease, build: EngineBuild | null): EngineAsset | null {
+function assetIn(entry: Record<string, unknown>, build: EngineBuild | null): EngineAsset | null {
   if (build === null) return null;
-  const declared: unknown = entry.assets;
-  const assets = Array.isArray(declared) ? (declared as PublishedAsset[]) : [];
-  const wanted = assets.find((asset) => asset.name === build.asset);
-  if (!wanted || typeof wanted.browser_download_url !== "string") return null;
-  return {
-    name: build.asset,
-    url: wanted.browser_download_url,
-    size: typeof wanted.size === "number" ? wanted.size : 0,
-  };
+  const declared = entry["assets"];
+  const assets: unknown[] = Array.isArray(declared) ? declared : [];
+  const wanted = assets.find((asset) => isRecord(asset) && asset["name"] === build.asset);
+  if (!isRecord(wanted)) return null;
+  const url = wanted["browser_download_url"];
+  const size = wanted["size"];
+  if (typeof url !== "string") return null;
+  return { name: build.asset, url, size: typeof size === "number" ? size : 0 };
 }
 
 /**
@@ -102,13 +91,16 @@ function assetIn(entry: PublishedRelease, build: EngineBuild | null): EngineAsse
 export async function engineReleases(platform: Platform, engineId: string): Promise<readonly EngineRelease[]> {
   const engine = engineById(engineId);
   const body: unknown = JSON.parse(await platform.net.fetchText(releasesUrl(engine.repo)));
-  const published = (Array.isArray(body) ? body : []) as PublishedRelease[];
+  const published: unknown[] = Array.isArray(body) ? body : [];
   const build = buildFor(engine, platform.os, platform.arch);
 
   const releases: EngineRelease[] = [];
   for (const entry of published) {
-    const release = typeof entry.tag_name === "string" ? entry.tag_name : "";
-    const at = typeof entry.published_at === "string" ? entry.published_at : "";
+    if (!isRecord(entry)) continue;
+    const tag = entry["tag_name"];
+    const published_at = entry["published_at"];
+    const release = typeof tag === "string" ? tag : "";
+    const at = typeof published_at === "string" ? published_at : "";
     if (release === "" || at === "") continue;
     const commit = engine.releases === "rolling" ? await tagCommit(platform, engine.repo, release) : null;
     releases.push({ release, published: at, commit, asset: assetIn(entry, build) });
@@ -306,8 +298,9 @@ async function readNote(
     // A note ZAX cannot parse is one it did not finish writing. The archive beside it is fetched again.
     return null;
   }
-  const fields = body as { release?: unknown; published?: unknown; commit?: unknown };
-  if (typeof fields.release !== "string" || typeof fields.published !== "string") return null;
+  if (!isRecord(body)) return null;
+  const fields = body;
+  if (typeof fields["release"] !== "string" || typeof fields["published"] !== "string") return null;
   return {
     release: fields.release,
     published: fields.published,

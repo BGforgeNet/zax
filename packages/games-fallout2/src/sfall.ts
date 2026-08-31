@@ -11,6 +11,7 @@ import {
   backupDirectory,
   compareVersions,
   copyTree,
+  isRecord,
   listFilesRecursively,
   mergeIni,
   packageDirectory,
@@ -79,9 +80,10 @@ export async function installedSfallVersion(platform: Platform, install: Install
  */
 export async function latestSfall(platform: Platform): Promise<SfallRelease> {
   const body: unknown = JSON.parse(await platform.net.fetchText(RELEASE_INFO));
-  const release = (body as { release?: { filename?: unknown; url?: unknown } }).release;
-  const filename = typeof release?.filename === "string" ? release.filename : "";
-  const url = typeof release?.url === "string" ? release.url : "";
+  const release = isRecord(body) ? body["release"] : undefined;
+  const stated = isRecord(release) ? release : {};
+  const filename = typeof stated["filename"] === "string" ? stated["filename"] : "";
+  const url = typeof stated["url"] === "string" ? stated["url"] : "";
   const version =
     filename
       .split("_")

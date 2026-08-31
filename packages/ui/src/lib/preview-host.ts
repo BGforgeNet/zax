@@ -8,6 +8,7 @@
  * would be worse than refusing.
  */
 
+import { isRecord } from "@zax/core";
 import type { Platform } from "@zax/platform";
 import { MemoryPlatform } from "@zax/platform/memory";
 import {
@@ -206,11 +207,11 @@ await cachedBuild("2026-08-23T09:37:22Z");
   `f2mod.yml`, at the tag or on its default branch, so the note records the answer the network would give.
 */
 for (const [repository, body] of Object.entries(CAPTURED_FEEDS)) {
-  for (const release of JSON.parse(body) as { tag_name: string }[]) {
-    await previewPlatform.fs.write(
-      `${feedCachePath(previewPlatform, repository, release.tag_name)}.none`,
-      new Uint8Array(),
-    );
+  const parsed: unknown = JSON.parse(body);
+  for (const release of Array.isArray(parsed) ? parsed : []) {
+    const tag = isRecord(release) ? release["tag_name"] : undefined;
+    if (typeof tag !== "string") continue;
+    await previewPlatform.fs.write(`${feedCachePath(previewPlatform, repository, tag)}.none`, new Uint8Array());
   }
 }
 

@@ -27,7 +27,10 @@ function normalize(version: string): string {
  */
 export function readFileVersion(image: Uint8Array): string | null {
   try {
-    const buffer = image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength) as ArrayBuffer;
+    // Copied into an ArrayBuffer of its own rather than sliced out of the view's: a Uint8Array's buffer is
+    // typed as possibly shared, and the reader below takes only the unshared kind.
+    const buffer = new ArrayBuffer(image.byteLength);
+    new Uint8Array(buffer).set(image);
     const resources = NtExecutableResource.from(NtExecutable.from(buffer, { ignoreCert: true }));
     for (const info of Resource.VersionInfo.fromEntries(resources.entries)) {
       for (const language of info.getAllLanguagesForStringValues()) {

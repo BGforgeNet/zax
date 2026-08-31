@@ -16,7 +16,7 @@
  * manifest asset is immutable once published and is kept for good.
  */
 
-import { compareVersions, GAME_TYPES, type GameType, type Install } from "@zax/core";
+import { compareVersions, GAME_TYPES, isRecord, type GameType, type Install } from "@zax/core";
 import { NetworkError, type Platform } from "@zax/platform";
 import {
   MANIFEST_NAME,
@@ -294,21 +294,27 @@ function readReleases(body: string): FeedRelease[] {
   if (!Array.isArray(raw)) return [];
   const out: FeedRelease[] = [];
   for (const entry of raw) {
-    const release = entry as { tag_name?: unknown; assets?: unknown };
-    if (typeof release.tag_name !== "string") continue;
+    if (!isRecord(entry)) continue;
+    const tag = entry["tag_name"];
+    if (typeof tag !== "string") continue;
     const assets: ReleaseAsset[] = [];
-    for (const item of Array.isArray(release.assets) ? release.assets : []) {
-      const asset = item as { name?: unknown; browser_download_url?: unknown; digest?: unknown; size?: unknown };
-      if (typeof asset.name !== "string" || typeof asset.browser_download_url !== "string") continue;
+    const declared: unknown[] = Array.isArray(entry["assets"]) ? entry["assets"] : [];
+    for (const asset of declared) {
+      if (!isRecord(asset)) continue;
+      const name = asset["name"];
+      const url = asset["browser_download_url"];
+      if (typeof name !== "string" || typeof url !== "string") continue;
+      const digest = asset["digest"];
+      const size = asset["size"];
       assets.push({
-        name: asset.name,
-        url: asset.browser_download_url,
+        name,
+        url,
         // GitHub states `sha256:<hex>`; kept verbatim and split where it is checked.
-        ...(typeof asset.digest === "string" ? { digest: asset.digest } : {}),
-        ...(typeof asset.size === "number" ? { size: asset.size } : {}),
+        ...(typeof digest === "string" ? { digest } : {}),
+        ...(typeof size === "number" ? { size } : {}),
       });
     }
-    out.push({ tag: release.tag_name, assets });
+    out.push({ tag, assets });
   }
   return out;
 }
