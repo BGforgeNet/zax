@@ -45,7 +45,17 @@
     "eslint/no-await-in-loop": "off",
     // The in-memory platform implements an async interface synchronously, which is what a test double is for.
     // The `async` is the signature's, not a mistake in the body.
-    "typescript/require-await": "off"
+    "typescript/require-await": "off",
+    // Most of what it reports is not a per-element clone but a conditional field (`...(cond ? { k: v } : {})`)
+    // or a fresh object built in the callback, and the collections that do clone hold tens of items. Avoiding
+    // the spread means building objects imperatively, which costs more to read than the allocation costs to run.
+    "oxc/no-map-spread": "off",
+    // A shadowed name here is a narrower value of the same thing - `platform` inside a helper that took one -
+    // and renaming it to satisfy the rule makes the two harder to relate, not easier.
+    "eslint/no-shadow": "off",
+    // Helpers declared beside the code that uses them, which is where they read best; hoisting them to module
+    // scope for the rule's sake would put the definition further from its one caller.
+    "unicorn/consistent-function-scoping": "off"
   },
   "overrides": [
     {
