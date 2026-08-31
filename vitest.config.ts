@@ -36,10 +36,10 @@ export default defineConfig({
         // equals itself would be the only way to move the number.
         "packages/app/src/channel.ts",
       ],
-      // A floor that only rises, set below what the suite currently reaches so ordinary movement does not trip
-      // it. It is here to make an untested path visible, not to be aimed at: raising it to whatever the last
-      // run scored turns every unrelated change into a coverage failure.
-      thresholds: { statements: 88, branches: 82, functions: 88, lines: 90 },
+      // A floor that only rises, set a point or so below what the suite currently reaches so ordinary movement
+      // does not trip it. It is here to make an untested path visible, not to be aimed at: pinning it to
+      // whatever the last run scored turns every unrelated change into a coverage failure.
+      thresholds: { statements: 93, branches: 85, functions: 92, lines: 95 },
     },
   },
 });
