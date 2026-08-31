@@ -6,6 +6,12 @@
   // are repeated here. `import` is the one addition: it resolves the module graph, which is the only thing in
   // the toolchain that sees a cycle - `seam.test.ts` governs which packages may import which, not the shape of
   // the graph inside one.
+  //
+  // `promise` and `node` were read and left off. `always-return`'s four sites are terminal voided chains, three
+  // of them inside a callback that has to stay synchronous - an Electron `close` handler, a Svelte `$effect`
+  // whose return value is its teardown - where a `return` would state the opposite of what is true. `no-sync`
+  // reports 63 sites: generators, workers, tests, and three in `platform-node` that are synchronous by design
+  // and say so, which is every site it finds.
   "plugins": ["typescript", "unicorn", "oxc", "import"],
   "options": {
     // Reaches .ts only - a .svelte script block gets the syntactic set, as it did under eslint.
