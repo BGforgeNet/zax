@@ -12,6 +12,10 @@ export default defineConfig({
       provider: "v8",
       // Text for the run's own output, and the lcov data on its own for anything that reads it afterwards.
       // Both `lcov` and the default set also write an HTML site of their own, which nothing here looks at.
+      //
+      // The text table omits a file that is at 100% on all four metrics, so a module missing from it is fully
+      // covered rather than unmeasured - `coverage/lcov.info` lists every file either way and is what to read
+      // before concluding anything about one that is not printed.
       reporter: ["text", "lcovonly"],
       // Named rather than left to default: without it the ratio is taken over whatever the run happened to
       // load, so adding a dependency moves the number without anything about this code changing.
