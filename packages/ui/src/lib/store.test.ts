@@ -919,7 +919,19 @@ describe("the unsaved marks", () => {
 */
 describe("autosave", () => {
   const MUSIC = "game.sound.music";
-  const settle = async () => new Promise((resolve) => setTimeout(resolve, 900));
+
+  // The store's own coalescing window, named here rather than imported: exporting it would widen the store's
+  // surface for the tests' sake, and what these need is a bound to wait past, not the store's exact value.
+  const WINDOW_MS = 400;
+
+  // Where a write is expected, wait for the write rather than for a span. A poll fails on its own timeout when
+  // the write never comes, whereas a fixed sleep passes or fails on how loaded the machine is - the same code
+  // going green here and red in CI.
+  const saved = async () => expect.poll(() => store.isModified(MUSIC), { timeout: 5_000 }).toBe(false);
+
+  // The one case with nothing to wait for: it asserts a write does NOT happen, and an absence cannot be polled
+  // for. Sized off the window above rather than a round number, so it tracks the store if that changes.
+  const pastTheWindow = async () => new Promise((resolve) => setTimeout(resolve, WINDOW_MS * 3));
 
   test("writes an edit without a save, once the run of edits stops", async () => {
     const before = store.baselineOf(MUSIC);
@@ -928,7 +940,7 @@ describe("autosave", () => {
 
     store.set(MUSIC, wanted);
     expect(store.isModified(MUSIC), "still pending the moment the edit is made").toBe(true);
-    await settle();
+    await saved();
 
     // Read back through a fresh start, which is the only proof the value reached the file.
     await store.start();
@@ -938,7 +950,7 @@ describe("autosave", () => {
   test("says nothing on success, like any other save", async () => {
     await store.setAutosave(true);
     store.set(MUSIC, store.baselineOf(MUSIC) === "1" ? "0" : "1");
-    await settle();
+    await saved();
     expect(store.notice).toBeNull();
   });
 
@@ -948,7 +960,7 @@ describe("autosave", () => {
     store.set(MUSIC, before === "1" ? "0" : "1");
     // Inside the coalescing window: the user changed their mind before the write went out.
     await store.setAutosave(false);
-    await settle();
+    await pastTheWindow();
 
     expect(store.isModified(MUSIC), "the edit is still pending, waiting for Save").toBe(true);
     await store.start();
