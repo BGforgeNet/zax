@@ -70,6 +70,12 @@ generated data tables, which are one long literal each, and the component tests'
 CI runs all three on every push, installing with `--ignore-scripts`, then builds the distributables on Linux,
 Windows and macOS.
 
+The suite runs a second time on Windows, on its own. The rest of the gate reads the same bytes wherever it runs,
+but `platform-node` is where the real filesystem, process launch and registry calls are, and drive letters, a
+case-insensitive filesystem and `reg query` have no equivalent on the Linux runner. The logic around them is
+written as pure functions of the platform name and is covered on one host already; the second run is there for
+the calls themselves.
+
 The shell scripts, the workflows and the composite action are checked by `shellcheck`, `actionlint` and
 `zizmor` in a job of their own - `.github/scripts/lint-workflows.sh`, which fetches the two the runner does
 not carry. It is not part of `pnpm lint`: none of the three is a Node dependency, and requiring them on every
