@@ -1,7 +1,9 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, readdir, rm, symlink } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { NetworkError } from "@zax/platform";
 import { nodePlatform } from "./index.js";
 
 /**
@@ -314,5 +316,75 @@ describe("making a file runnable", () => {
     // Run it, which is the only thing the bit is for - and the check that does not depend on a mode constant.
     const done = await platform.process.run(script, []);
     expect(done.code).toBe(0);
+  });
+});
+
+/**
+ * Against a real server on the loopback, because what is being checked is how a failure is classified and that
+ * classification comes from `fetch` itself: a stub would be asserting the shape this file already assumed.
+ */
+describe("reading a feed", () => {
+  const server = createServer((request, response) => {
+    if (request.url === "/feed") {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.end("sfall 4.5");
+    } else {
+      response.writeHead(404, "Not Found");
+      response.end();
+    }
+  });
+
+  let origin = "";
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new Error("the test server did not take a port");
+    origin = `http://127.0.0.1:${address.port}`;
+  });
+  afterAll(
+    async () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
+  );
+
+  it("returns the body a feed answers with", async () => {
+    expect(await platform.net.fetchText(`${origin}/feed`)).toBe("sfall 4.5");
+  });
+
+  it("reports a refused answer as a status failure, naming the code the server gave", async () => {
+    const failed = await platform.net.fetchText(`${origin}/absent`).catch((error: unknown) => error);
+    expect(failed).toBeInstanceOf(NetworkError);
+    const error = failed as NetworkError;
+    expect(error.kind).toBe("status");
+    expect(error.status).toBe(404);
+    // The message is what the interface shows, so the host and the code both have to be in it.
+    expect(error.message).toBe(`127.0.0.1:${new URL(origin).port} answered with 404 Not Found.`);
+  });
+
+  it("reports a host that will not answer as offline rather than as a status", async () => {
+    // A port nothing is listening on: the one refusal that needs no waiting.
+    const closed = await new Promise<number>((resolve) => {
+      const probe = createServer();
+      probe.listen(0, "127.0.0.1", () => {
+        const address = probe.address();
+        const port = address !== null && typeof address !== "string" ? address.port : 0;
+        probe.close(() => resolve(port));
+      });
+    });
+    const failed = await platform.net.fetchText(`http://127.0.0.1:${closed}/feed`).catch((error: unknown) => error);
+    expect(failed).toBeInstanceOf(NetworkError);
+    expect((failed as NetworkError).kind).toBe("offline");
+    expect((failed as NetworkError).status).toBeUndefined();
+  });
+
+  it("falls back to the whole string when what it was given is not a URL to take a host from", async () => {
+    const failed = await platform.net.fetchText("not-a-url").catch((error: unknown) => error);
+    expect(failed).toBeInstanceOf(NetworkError);
+    expect((failed as NetworkError).message).toBe("not-a-url could not be reached - check the network connection.");
+  });
+});
+
+describe("the Windows registry", () => {
+  it("answers null off Windows, which is an answer rather than a failure to get one", async () => {
+    // What the install discovery relies on: it asks unconditionally and treats null as "not registered here".
+    expect(await platform.registry.read("HKLM\\Software\\Interplay\\Fallout2", "Path")).toBeNull();
   });
 });
