@@ -36,7 +36,15 @@
     // They have no `this` to lose, and the rule cannot tell them from class methods.
     "typescript/unbound-method": "off",
     // Each spread here snapshots a collection the loop then mutates; dropping it is the bug the spread prevents.
-    "unicorn/no-useless-spread": "off"
+    "unicorn/no-useless-spread": "off",
+    // Off after reading the sites, so that turning on the categories these belong to does not reopen them.
+    // Sequential is the point: a directory walk recurses, an install writes its files in order, and a feed read
+    // is deliberately one request at a time. What the rule proposes is unbounded concurrency against a disk and
+    // someone else's server.
+    "eslint/no-await-in-loop": "off",
+    // The in-memory platform implements an async interface synchronously, which is what a test double is for.
+    // The `async` is the signature's, not a mistake in the body.
+    "typescript/require-await": "off"
   },
   "overrides": [
     {
