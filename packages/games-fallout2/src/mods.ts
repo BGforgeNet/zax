@@ -76,12 +76,6 @@ const fold = (s: string) => s.toLowerCase();
 export const answersToId = (name: string, id: string): boolean =>
   fold(name) === fold(id) || fold(name).startsWith(`${fold(id)}.`);
 
-/** `findLastIndex` in the form this project's ES2022 target has. */
-function lastIndexWhere<T>(items: readonly T[], match: (item: T) => boolean): number {
-  for (let i = items.length - 1; i >= 0; i--) if (match(items[i]!)) return i;
-  return -1;
-}
-
 const LEADING_COMMENT = /^\s*[;#]/;
 
 /**
@@ -218,24 +212,27 @@ export function writeOrder(original: string | undefined, mods: readonly Mod[]): 
     that is actually here. An uncommented line always is - one naming a mod no longer in the list was dropped
     on purpose, and writing it back would hand it to the engine again.
   */
-  const isEntry = (line: OrderLine) => line.name !== "" && (line.enabled || named.has(fold(line.name)));
-  const isProse = (line: OrderLine) => !isEntry(line) && line.body.trim() !== "";
+  // Total in the index: a lookup past either end answers "no" rather than needing a bounds check at each
+  // call, which is every caller here walking outwards from a line it already has.
+  const isEntry = (line: OrderLine | undefined) =>
+    line !== undefined && line.name !== "" && (line.enabled || named.has(fold(line.name)));
+  const isProse = (line: OrderLine | undefined) => line !== undefined && !isEntry(line) && line.body.trim() !== "";
 
   const first = lines.findIndex(isEntry);
-  const last = lastIndexWhere(lines, isEntry);
+  const last = lines.findLastIndex(isEntry);
 
   /** The run of comment lines sitting directly above an entry, with no blank line between. */
   const preamble = (at: number): OrderLine[] => {
     let from = at;
-    while (from > 0 && isProse(lines[from - 1]!)) from--;
+    while (from > 0 && isProse(lines[from - 1])) from--;
     return lines.slice(from, at);
   };
 
   /** Whether a comment line belongs to the entry below it: everything down to that entry is comment too. */
   const attached = (at: number): boolean => {
     for (let i = at + 1; i < lines.length; i++) {
-      if (isEntry(lines[i]!)) return true;
-      if (!isProse(lines[i]!)) return false;
+      if (isEntry(lines[i])) return true;
+      if (!isProse(lines[i])) return false;
     }
     return false;
   };
@@ -251,8 +248,8 @@ export function writeOrder(original: string | undefined, mods: readonly Mod[]): 
 
   for (const line of head) keep(line);
   for (const mod of mods) {
-    const at = lastIndexWhere(lines, (line) => isEntry(line) && fold(line.name) === fold(mod.name));
-    const source = at === -1 ? undefined : lines[at]!;
+    const at = lines.findLastIndex((line) => isEntry(line) && fold(line.name) === fold(mod.name));
+    const source = at === -1 ? undefined : lines[at];
     if (source && at !== first) for (const note of preamble(at)) keep(note);
     pieces.push({
       text: source ? restate(source, mod.enabled) : mod.enabled ? mod.name : `; ${mod.name}`,
@@ -264,7 +261,7 @@ export function writeOrder(original: string | undefined, mods: readonly Mod[]): 
   // Every line but the last is terminated: one that was the file's last and now is not would otherwise run
   // into the line below it. Ending without a newline is a property of the file rather than of whichever line
   // has drifted to the bottom, so it is read off the original and applied to whatever ends up last.
-  const endsBare = lines.length > 0 && lines[lines.length - 1]!.eol === "";
+  const endsBare = lines.at(-1)?.eol === "";
   return pieces.map((piece, i) => piece.text + (endsBare && i === pieces.length - 1 ? "" : piece.eol || eol)).join("");
 }
 

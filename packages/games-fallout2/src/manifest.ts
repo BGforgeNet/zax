@@ -13,7 +13,8 @@
 
 import { parse } from "yaml";
 import {
-  GAME_TYPES,
+  isGameType,
+  isRecord,
   ownTarget,
   type GameType,
   type SettingDef,
@@ -289,8 +290,8 @@ function literal(value: unknown, where: string): string {
 }
 
 function record(value: unknown, where: string, allowed: readonly string[]): Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) refuse(`${where} must be a mapping`);
-  const fields = value as Record<string, unknown>;
+  if (!isRecord(value)) refuse(`${where} must be a mapping`);
+  const fields = value;
   for (const key of Object.keys(fields)) {
     if (!allowed.includes(key)) refuse(`${where} has an unknown field "${key}"`);
   }
@@ -400,9 +401,9 @@ function bound(value: unknown, where: string): number {
 
 function parseSentinels(value: unknown, where: string): Record<string, string> {
   // The keys here are file values - data, not schema - so this is the one mapping with no field allowlist.
-  if (value === null || typeof value !== "object" || Array.isArray(value)) refuse(`${where} must be a mapping`);
+  if (!isRecord(value)) refuse(`${where} must be a mapping`);
   const out: Record<string, string> = {};
-  for (const [raw, label] of Object.entries(value as Record<string, unknown>)) {
+  for (const [raw, label] of Object.entries(value)) {
     out[raw] = text(label, `${where}["${raw}"]`, SHORT_TEXT);
   }
   return out;
@@ -476,11 +477,11 @@ const unknownKind = (kind: string): string => `its kind "${kind}" is not one thi
  * a sibling with no transform - the same rule the catalog's generator applies to the engine's own files.
  */
 function parseSettings(value: unknown, modId: string, granted: readonly string[]): ParsedSettings {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) refuse(`"settings" must be a mapping`);
+  if (!isRecord(value)) refuse(`"settings" must be a mapping`);
   const out: ModSetting[] = [];
   const dropped: DroppedSetting[] = [];
 
-  for (const [rawAddress, entry] of Object.entries(value as Record<string, unknown>)) {
+  for (const [rawAddress, entry] of Object.entries(value)) {
     const address = text(rawAddress, `a "settings" address`, SHORT_TEXT);
     const where = `"settings" entry "${address}"`;
     const dot = address.indexOf(".");
@@ -488,8 +489,8 @@ function parseSettings(value: unknown, modId: string, granted: readonly string[]
     const section = address.slice(0, dot);
     const key = address.slice(dot + 1);
 
-    const loose = entry as Record<string, unknown>;
-    const kindName = typeof loose?.["kind"] === "string" ? loose["kind"] : "";
+    const loose = isRecord(entry) ? entry : {};
+    const kindName = typeof loose["kind"] === "string" ? loose["kind"] : "";
     if (!(kindName in KIND_FIELDS)) {
       // Dropped without checking its other fields, which is deliberate: they belong to a shape this version
       // has no rule for, and the strictness that refuses an unknown field is there to stop a misspelling
@@ -833,7 +834,7 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
   // A later spec is answered ahead of everything else, the unknown-field pass included: that spec's whole
   // effect here is fields this version has no name for, and the answer to those is to update ZAX rather than
   // to name one of them a misspelling.
-  const stated = root !== null && typeof root === "object" ? (root as Record<string, unknown>)["spec"] : undefined;
+  const stated = isRecord(root) ? root["spec"] : undefined;
   if (typeof stated === "number" && Number.isInteger(stated) && stated > MANIFEST_SPEC)
     needsNewerZax(`it is written to manifest spec ${stated}, this version reads spec ${MANIFEST_SPEC}`);
 
@@ -901,9 +902,8 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     // every real manifest. Named outright, and checked against the types this version can detect, since the
     // detected type is what every later gate reads.
     const named = text(fields["becomes"], `"becomes"`, SHORT_TEXT);
-    if (!(named in GAME_TYPES))
-      needsNewerZax(`"becomes" names the game type "${named}", which this version cannot detect`);
-    becomes = named as GameType;
+    if (!isGameType(named)) needsNewerZax(`"becomes" names the game type "${named}", which this version cannot detect`);
+    becomes = named;
   }
   // Both belong to the install a mod creates, and neither means anything without one: an installer ZAX does
   // not run cannot be handed an answer, and there is nowhere for an extraction to land.
@@ -929,9 +929,9 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     installOn = items(fields["install-on"], `"install-on"`).map((entry, at) => {
       const name = text(entry, `"install-on" entry ${at + 1}`, SHORT_TEXT);
       // A type this version has no marker for may be a future base mod's - the newer-ZAX case again.
-      if (!(name in GAME_TYPES))
+      if (!isGameType(name))
         needsNewerZax(`"install-on" names the game type "${name}", which this version cannot detect`);
-      return name as GameType;
+      return name;
     });
     if (installOn.length === 0) refuse(`"install-on" is empty, which would install nowhere`);
   }

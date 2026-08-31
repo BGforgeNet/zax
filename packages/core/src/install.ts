@@ -45,6 +45,9 @@ export const GAME_TYPES: Readonly<Record<GameType, { name: string; label: string
   },
 };
 
+/** Whether a name read out of a document is one of the types this version knows how to detect. */
+export const isGameType = (value: string): value is GameType => value in GAME_TYPES;
+
 /**
  * Wine settings are per install rather than global: one install can be a Windows build under its own prefix
  * while another is native, and a prefix that is right for one is wrong for the other.

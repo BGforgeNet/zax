@@ -9,6 +9,7 @@ export {
   addInstall,
   detectGameType,
   displayName,
+  isGameType,
   newInstall,
   removeInstall,
   setAlias,

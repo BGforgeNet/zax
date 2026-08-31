@@ -9,7 +9,7 @@
  */
 
 import { parse, stringify } from "yaml";
-import { fnv1a, identifyInstall, type GameType } from "@zax/core";
+import { fnv1a, identifyInstall, isRecord, type GameType } from "@zax/core";
 import type { Platform } from "@zax/platform";
 import {
   insideMods,
@@ -192,8 +192,8 @@ const MOD_FIELDS = new Set([
  * aiming uninstall somewhere new.
  */
 function readMod(entry: unknown): InstalledMod | null {
-  if (entry === null || typeof entry !== "object") return null;
-  const fields = entry as Record<string, unknown>;
+  if (!isRecord(entry)) return null;
+  const fields = entry;
   const id = asText(fields["id"]);
   const version = asText(fields["version"]);
   const manifest = asText(fields["manifest"]);
@@ -247,8 +247,8 @@ function readMod(entry: unknown): InstalledMod | null {
 
   const shipped: Record<string, string> = {};
   const rawShipped = fields["shipped"];
-  if (rawShipped !== null && typeof rawShipped === "object" && !Array.isArray(rawShipped)) {
-    for (const [path, content] of Object.entries(rawShipped as Record<string, unknown>)) {
+  if (isRecord(rawShipped)) {
+    for (const [path, content] of Object.entries(rawShipped)) {
       const text = asText(content);
       if (text === undefined || !writable(path)) return null;
       shipped[path] = text;
@@ -276,9 +276,9 @@ function readMod(entry: unknown): InstalledMod | null {
  * installed.
  */
 function readWritten(entry: unknown): Record<string, string> {
-  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return {};
+  if (!isRecord(entry)) return {};
   const out: Record<string, string> = {};
-  for (const [address, value] of Object.entries(entry as Record<string, unknown>)) {
+  for (const [address, value] of Object.entries(entry)) {
     const held = asText(value);
     if (held !== undefined && address.split("|").length === 3) out[address] = held;
   }
@@ -287,8 +287,8 @@ function readWritten(entry: unknown): Record<string, string> {
 
 /** One recorded engine, or null when the entry is not one this version can read. */
 function readEngine(entry: unknown): InstalledEngine | null {
-  if (entry === null || typeof entry !== "object") return null;
-  const fields = entry as Record<string, unknown>;
+  if (!isRecord(entry)) return null;
+  const fields = entry;
   const id = asText(fields["id"]);
   const release = asText(fields["release"]);
   const published = asText(fields["published"]);
@@ -329,8 +329,8 @@ export async function loadRecord(platform: Platform, installPath: string): Promi
     // A record that will not parse is a lost record, which every flow already tolerates - not a crash.
     return { path, mods: [] };
   }
-  if (raw === null || typeof raw !== "object") return { path, mods: [] };
-  const fields = raw as Record<string, unknown>;
+  if (!isRecord(raw)) return { path, mods: [] };
+  const fields = raw;
   const stated = fields["record"];
   const laterFormat = typeof stated === "number" && stated > RECORD_FORMAT ? stated : undefined;
 
@@ -344,8 +344,7 @@ export async function loadRecord(platform: Platform, installPath: string): Promi
     }
     // Kept rather than dropped: an entry this version cannot judge is not thereby wrong, and the files it
     // describes are on disk either way. The id, where it is readable, is what refuses an install over it.
-    const id =
-      entry !== null && typeof entry === "object" ? asText((entry as Record<string, unknown>)["id"]) : undefined;
+    const id = isRecord(entry) ? asText(entry["id"]) : undefined;
     opaque.push({ ...(id !== undefined && isModId(id) ? { id } : {}), raw: entry });
   }
   const engines = (Array.isArray(fields["engines"]) ? fields["engines"] : [])
