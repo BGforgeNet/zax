@@ -317,7 +317,19 @@ export interface Shell {
   report?(progress: OperationProgress): void;
 }
 
-export function createBackend(platform: Platform, shell: Shell): Backend {
+/**
+ * Seams neither host supplies, and both real ones leave at their defaults.
+ *
+ * `datTool` exists because the default is unreachable from a test: it downloads upstream's build and checks it
+ * against a digest pinned in `dat-tool.ts` to that exact file, which no fixture can produce. Everything the
+ * install of a mod that creates its own game folder does after the tool is in hand sits behind that download,
+ * so without this the whole branch is only reachable on a machine with a network.
+ */
+export interface BackendSeams {
+  datTool?(progress: ModProgress): Promise<ReadyDatTool>;
+}
+
+export function createBackend(platform: Platform, shell: Shell, seams: BackendSeams = {}): Backend {
   /**
    * The running operation's cancel. One at a time because the interface refuses to start a second while one
    * runs, and cleared as it is used so a click that arrives late cannot reach whatever started next.
@@ -408,7 +420,7 @@ export function createBackend(platform: Platform, shell: Shell): Backend {
    * WebAssembly one otherwise, so every host can carry out the step.
    */
   const extractionTool = async (progress: ModProgress): Promise<ReadyDatTool> =>
-    ensureDatTool(platform, datToolFor(platform.os, platform.arch), progress);
+    seams.datTool ? seams.datTool(progress) : ensureDatTool(platform, datToolFor(platform.os, platform.arch), progress);
 
   /** The settings schemas the install's records carry. A snapshot a newer spec wrote is skipped, not fatal. */
   const installedModSettings = async (installPath: string): Promise<ModSettingsGroup[]> => {

@@ -4,6 +4,7 @@ import { MemoryPlatform } from "@zax/platform/memory";
 import { BACKEND_METHODS } from "./backend-methods.js";
 import { RELEASES_PAGE, createBackend } from "./backend.js";
 import { saveRecord } from "./records.js";
+import type { ReadyDatTool } from "./dat-tool.js";
 import type { Backend, OperationProgress } from "./backend.js";
 
 const install = { path: "/games/one", type: "fallout2" as const };
@@ -418,6 +419,108 @@ installer:
 
     await expect(backend.installMod(install, "upu", plan.fingerprint)).resolves.toMatchObject({ version: "1.4" });
     expect(platform.textAt("/games/one/mods/upu.dat")).toBe("DAT");
+  });
+});
+
+/**
+ * The third route to the confirmation guard, and the one that needed a seam to reach: everything a mod that
+ * creates its own game folder does sits behind the extraction tool, which the default obtains by downloading
+ * upstream's build and checking it against a digest pinned to that exact file.
+ */
+describe("installing a mod that creates its own game folder", () => {
+  const REPO = "rotators/Fo1in2";
+  const RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
+  const ZIP = "https://example.test/Fallout1in2.zip";
+  const PAYLOAD = "ZIP-FO1IN2";
+  const TOOL_PATH = "/cache/tools/dat3";
+  const TOOL: ReadyDatTool = { path: TOOL_PATH, kind: "native" };
+  const FO1 = "/fallout1";
+  const LIST = "ART\\SCENERY\\CSTALAG2.FRM\r\nSOUND\\MUSIC\\01.ACM\r\n";
+
+  const MANIFEST = `spec: 1
+id: fo1in2
+name: Fallout et tu
+version: "1.16.3771"
+game: fallout2
+type: base
+becomes: fo1in2
+archive: Fallout1in2.zip
+creates:
+  directory: Fallout1in2
+inputs:
+  - id: fallout1
+    label: Your Fallout 1 folder
+    holds: master.dat
+extract-dat:
+  from: fallout1
+  list: undat_files.txt
+  into: data
+`;
+
+  const sha = async (value: string) => {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  };
+
+  const feeding = async () =>
+    new MemoryPlatform({
+      home: "/home/t",
+      files: { "/games/one/fallout2.exe": "MZ", [`${FO1}/MASTER.DAT`]: "DAT1" },
+      responses: {
+        [RELEASES]: JSON.stringify([
+          {
+            tag_name: "v1.16.3771",
+            assets: [
+              { name: "f2mod.yml", browser_download_url: "https://example.test/f2mod.yml" },
+              { name: "Fallout1in2.zip", browser_download_url: ZIP, digest: `sha256:${await sha(PAYLOAD)}` },
+            ],
+          },
+        ]),
+        "https://example.test/f2mod.yml": MANIFEST,
+      },
+      downloads: { [ZIP]: PAYLOAD },
+      archives: {
+        [PAYLOAD]: {
+          "Fallout1in2/Fallout2.exe": "EXE",
+          "Fallout1in2/undat_files.txt": LIST,
+        },
+      },
+      runs: { [TOOL_PATH]: { code: 0, output: "2 files" } },
+    });
+
+  const answers = { fallout1: FO1 };
+  const backendOn = (platform: MemoryPlatform) => createBackend(platform, noShell, { datTool: async () => TOOL });
+
+  it("refuses a create install against a fingerprint that is not the plan's", async () => {
+    const platform = await feeding();
+    const backend = backendOn(platform);
+    await backend.planMod(install, "fo1in2", undefined, answers);
+
+    await expect(backend.installMod(install, "fo1in2", "not-this-plan", undefined, answers)).rejects.toThrow(
+      /confirm again/,
+    );
+    expect(await platform.fs.stat("/games/one/Fallout1in2"), "and nothing was created").toBeNull();
+  });
+
+  it("carries out the create install the plan described", async () => {
+    const platform = await feeding();
+    const backend = backendOn(platform);
+    const plan = await backend.planMod(install, "fo1in2", undefined, answers);
+    expect(plan).toMatchObject({ kind: "creates", directory: "Fallout1in2", becomes: "fo1in2" });
+
+    await expect(backend.installMod(install, "fo1in2", plan.fingerprint, undefined, answers)).resolves.toMatchObject({
+      version: "1.16.3771",
+    });
+    expect(platform.textAt("/games/one/Fallout1in2/Fallout2.exe")).toBe("EXE");
+  });
+
+  // The default is what both real hosts run, and it is the reason this branch needed a seam at all.
+  it("falls back to the pinned upstream build when no tool is supplied", async () => {
+    const platform = await feeding();
+    // Nothing answers the tool's own download here, so reaching for it is what the failure names.
+    await expect(createBackend(platform, noShell).planMod(install, "fo1in2", undefined, answers)).rejects.toThrow(
+      /dat3/,
+    );
   });
 });
 
