@@ -15,8 +15,9 @@
 export function registryValue(output: string, wanted: string): string | null {
   for (const line of output.split(/\r?\n/)) {
     const found = /^\s+(\S+)\s+REG_\w+\s+(.*)$/.exec(line);
-    if (found && found[1]!.toLowerCase() === wanted.toLowerCase()) {
-      const data = found[2]!.trim();
+    const [, name = "", value = ""] = found ?? [];
+    if (found && name.toLowerCase() === wanted.toLowerCase()) {
+      const data = value.trim();
       // An empty value is present but says nothing; a caller wanting a path can do nothing with "".
       return data === "" ? null : data;
     }

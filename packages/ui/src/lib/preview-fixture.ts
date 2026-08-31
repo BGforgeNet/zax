@@ -101,8 +101,10 @@ export function render<P extends Record<string, unknown>>(component: Component<P
 
   const one = <E extends Element = HTMLElement>(selector: string): E => {
     const found = target.querySelectorAll<E>(selector);
-    if (found.length !== 1) throw new Error(`${found.length} elements match "${selector}", expected exactly one`);
-    return found[0]!;
+    const only = found[0];
+    if (found.length !== 1 || only === undefined)
+      throw new Error(`${found.length} elements match "${selector}", expected exactly one`);
+    return only;
   };
 
   return {
@@ -121,10 +123,11 @@ export function render<P extends Record<string, unknown>>(component: Component<P
           element.closest("dialog:not([open])") === null &&
           (element.getAttribute("aria-label") ?? element.textContent ?? "").trim() === name,
       );
-      if (candidates.length !== 1) {
+      const only = candidates[0];
+      if (candidates.length !== 1 || only === undefined) {
         throw new Error(`${candidates.length} controls are named "${name}", expected exactly one`);
       }
-      return candidates[0]!;
+      return only;
     },
     text: () => (target.textContent ?? "").replace(/\s+/g, " ").trim(),
   };
@@ -132,5 +135,5 @@ export function render<P extends Record<string, unknown>>(component: Component<P
 
 /** Unmounts everything this file mounted. Symmetric with `render`, and called from an `afterEach`. */
 export function unmountAll(): void {
-  while (mounted.length > 0) mounted.pop()!();
+  for (const unmount of mounted.splice(0)) unmount();
 }

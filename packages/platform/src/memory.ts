@@ -384,12 +384,13 @@ export class MemoryPlatform implements Platform {
     for (const key of this.files.keys()) {
       if (!key.startsWith(prefix)) continue;
       const rest = key.slice(prefix.length);
-      const head = rest.split("/")[0]!;
+      const head = rest.split("/")[0] ?? rest;
       names.set(head, rest.includes("/") ? "dir" : "file");
     }
     for (const key of this.dirs) {
       if (!key.startsWith(prefix) || key === path) continue;
-      names.set(key.slice(prefix.length).split("/")[0]!, "dir");
+      const rest = key.slice(prefix.length);
+      names.set(rest.split("/")[0] ?? rest, "dir");
     }
     return [...names].map(([name, kind]) => ({ name, kind })).toSorted((a, b) => a.name.localeCompare(b.name));
   }
