@@ -4,7 +4,7 @@
 // setting where they left it. What each setting IS lives in the catalog; this only says where it was shown.
 
 /** The control the previous interface drew, which its catalog kind alone does not determine. */
-type Control = "checkbox" | "slider" | "spin" | "dropdown" | "qinput" | "radio";
+export type Control = "checkbox" | "slider" | "spin" | "dropdown" | "qinput" | "radio";
 
 /** A control, a titled group of them, or one of the few widgets that is not a single setting. */
 export type LayoutNode =

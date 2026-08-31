@@ -3,6 +3,14 @@
   // What knip reports that nothing else in the gate can see: an export nobody imports, a file nothing reaches,
   // a dependency no source names. It infers entry points from the workspace manifests, which covers the six
   // packages; what it cannot infer is named below.
+
+  // The generators own what these two export, and `check-generated.sh` fails on any difference from what they
+  // emit - so an unused export here is not something to act on in the file, and acting on it breaks that gate.
+  // Reported as issues rather than ignored as files, so their own imports and dependencies stay checked.
+  "ignoreIssues": {
+    "packages/games-fallout2/src/catalog.ts": ["exports", "types", "nsExports", "nsTypes"],
+    "packages/games-fallout2/src/layout.ts": ["exports", "types", "nsExports", "nsTypes"]
+  },
   "workspaces": {
     ".": {
       // Run by hand in the order scripts/gen/README.md gives, rather than imported or wired to a script.
