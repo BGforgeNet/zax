@@ -9,6 +9,7 @@ import {
   type InstalledEngine,
   type ModFeedListing,
   type ModInstallState,
+  type SfallUpdate,
 } from "@zax/fallout2";
 import { backend as hostBackend, busySink } from "./host.js";
 import { PREVIEW_INSTALL, previewPlatform } from "./preview-host.js";
@@ -2208,5 +2209,101 @@ describe("one reading of an install, published whole", () => {
     await switching;
 
     expect(store.engineDeployed, "the game left behind may not land on top of the one selected").toEqual({});
+  });
+});
+
+describe("changing which sfall an install has", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const outcome = (over: Partial<SfallUpdate> = {}): SfallUpdate => ({
+    version: "4.5",
+    replaced: ["ddraw.dll"],
+    backup: null,
+    conflicts: [],
+    removed: [],
+    ...over,
+  });
+
+  test("names the version, and says nothing else when the update replaced nothing and merged cleanly", async () => {
+    vi.spyOn(hostBackend, "updateSfall").mockResolvedValue(outcome());
+    await store.changeSfall("4.5");
+    expect(store.notice).toEqual({ kind: "done", text: "sfall is now 4.5." });
+  });
+
+  test("says where the replaced files went, so the user can find them without being told twice", async () => {
+    vi.spyOn(hostBackend, "updateSfall").mockResolvedValue(outcome({ backup: "backup/2026-08-31" }));
+    await store.changeSfall("4.5");
+    expect(store.notice?.text).toBe("sfall is now 4.5. Replaced files are in backup/2026-08-31.");
+  });
+
+  test("names the settings the merge kept, rather than counting them", async () => {
+    vi.spyOn(hostBackend, "updateSfall").mockResolvedValue(
+      outcome({
+        conflicts: [
+          { section: "Misc", key: "DamageFormula", mine: "1", theirs: "0" },
+          { section: "Input", key: "ItemFastMoveKey", mine: "30", theirs: "0" },
+        ],
+      }),
+    );
+    await store.changeSfall("4.5");
+    expect(store.notice?.text).toBe("sfall is now 4.5. Kept your value for DamageFormula, ItemFastMoveKey.");
+  });
+
+  // The count is the plural's only input, so its two sides are the whole of what there is to get wrong.
+  test("counts dropped settings in the singular for one", async () => {
+    vi.spyOn(hostBackend, "updateSfall").mockResolvedValue(outcome({ removed: [{ section: "Misc", key: "Old" }] }));
+    await store.changeSfall("4.5");
+    expect(store.notice?.text).toBe("sfall is now 4.5. Dropped 1 setting this release does not have.");
+  });
+
+  test("and in the plural for more than one", async () => {
+    vi.spyOn(hostBackend, "updateSfall").mockResolvedValue(
+      outcome({
+        removed: [
+          { section: "Misc", key: "Old" },
+          { section: "Misc", key: "Older" },
+        ],
+      }),
+    );
+    await store.changeSfall("4.5");
+    expect(store.notice?.text).toBe("sfall is now 4.5. Dropped 2 settings this release does not have.");
+  });
+
+  test("carries the label the caller was doing, since going back is not updating", async () => {
+    const held = vi.spyOn(hostBackend, "updateSfall").mockResolvedValue(outcome({ version: "4.4" }));
+    await store.changeSfall("4.4", "Going back to sfall 4.4");
+    expect(held).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), "4.4");
+    expect(store.notice?.text).toBe("sfall is now 4.4.");
+  });
+
+  test("installs by asking what the newest release is, and records it for the row that offers it", async () => {
+    vi.spyOn(hostBackend, "latestSfall").mockResolvedValue({ version: "4.5", url: "https://example.invalid/4.5.7z" });
+    const update = vi.spyOn(hostBackend, "updateSfall").mockResolvedValue(outcome());
+    await store.installSfall();
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), "4.5");
+    expect(store.sfallLatest).toEqual({ version: "4.5", url: "https://example.invalid/4.5.7z" });
+    expect(store.notice).toEqual({ kind: "done", text: "sfall 4.5 is installed." });
+  });
+});
+
+describe("the list of sfall versions to change to", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  test("marks the list read even when the listing named none, so the dialog stops saying it is reading", async () => {
+    vi.spyOn(hostBackend, "listSfallVersions").mockResolvedValue([]);
+    await store.loadSfallVersions();
+    expect(store.sfallVersionsRead, "answered with nothing is not the same as not answered").toBe(true);
+    expect(store.notice).toEqual({
+      kind: "problem",
+      text: "The release listing named no versions. It may be worth trying again.",
+    });
+  });
+
+  test("does not ask a second time once it holds a list", async () => {
+    const asked = vi.spyOn(hostBackend, "listSfallVersions").mockResolvedValue(["4.5", "4.4"]);
+    await store.loadSfallVersions();
+    await store.loadSfallVersions();
+    expect(asked).toHaveBeenCalledTimes(1);
+    expect(store.sfallVersions).toEqual(["4.5", "4.4"]);
   });
 });
