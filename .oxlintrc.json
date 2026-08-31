@@ -2,6 +2,11 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   // oxlint reports correctness findings as warnings and still exits 0; the gate needs them to fail.
   "categories": { "correctness": "error" },
+  // Naming this field replaces the default set rather than adding to it, so the three that are on by default
+  // are repeated here. `import` is the one addition: it resolves the module graph, which is the only thing in
+  // the toolchain that sees a cycle - `seam.test.ts` governs which packages may import which, not the shape of
+  // the graph inside one.
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
   "options": {
     // Reaches .ts only - a .svelte script block gets the syntactic set, as it did under eslint.
     "typeAware": true
@@ -34,6 +39,20 @@
     "typescript/no-unsafe-type-assertion": "error",
     "eslint/no-empty": "error",
 
+    // The module graph. `no-cycle` ignores type-only edges by default, which is what makes a cycle it reports
+    // a real one: the modules genuinely evaluate each other at load time. The rest were at zero when the
+    // plugin went on and are here to keep them there.
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/no-duplicates": "error",
+    "import/no-mutable-exports": "error",
+    "import/no-absolute-path": "error",
+    "import/no-empty-named-blocks": "error",
+    "import/named": "error",
+    "import/default": "error",
+    "import/export": "error",
+    "import/namespace": "error",
+
     // Every site is a destructure of plain functions off an object or a module (`platform.paths`, `node:path`).
     // They have no `this` to lose, and the rule cannot tell them from class methods.
     "typescript/unbound-method": "off",
@@ -61,7 +80,10 @@
     // code has already bounded still types as possibly-undefined, and the assertion is how that is said. The
     // ones that were avoidable are gone - the helpers they sat in take an out-of-range lookup as an answer
     // now - and what remains is provable at its site, which is a review question rather than a lint one.
-    "typescript/no-non-null-assertion": "off"
+    "typescript/no-non-null-assertion": "off",
+    // Every site is `fc.constantFrom`, `fc.property` and the like. fast-check publishes both a namespace
+    // default and the same names individually, and the namespace is the form its own documentation uses.
+    "import/no-named-as-default-member": "off"
   },
   "overrides": [
     {
@@ -100,6 +122,12 @@
       // depend on: it implements the platform seam and sits outside the domain layer.
       "files": ["packages/platform-node/src/*.ts"],
       "rules": { "typescript/no-unsafe-type-assertion": "off" }
+    },
+    {
+      // A component that renders a tree renders itself, and Svelte 5 has no way to say that but to import the
+      // file by name. The cycle is the recursion, and it terminates on the data rather than on the graph.
+      "files": ["packages/ui/src/lib/LayoutNodes.svelte"],
+      "rules": { "import/no-cycle": "off", "import/no-self-import": "off" }
     }
   ]
 }

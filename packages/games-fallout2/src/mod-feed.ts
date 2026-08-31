@@ -25,14 +25,13 @@ import {
   partOptions,
   type ModInput,
   type ModManifest,
-  type ModPartGroup,
   type ModType,
 } from "./manifest.js";
 import { vendoredManifestFor } from "./mod-vendored.js";
 import type { ChoiceGroup } from "./mod-choice.js";
 import { installedBaseVersion, type BaseVersion } from "./base-version.js";
 import { createdInstallPath, noUpgradeHere } from "./mod-created.js";
-import { carryOver, type CarriedSelection } from "./mod-parts.js";
+import { carryOver, offeredParts, type CarriedSelection } from "./mod-parts.js";
 import type { InstallRecord } from "./records.js";
 import { MODS_DIRECTORY, answersToId } from "./mods.js";
 
@@ -153,28 +152,6 @@ export interface ModRelease {
    * install stamping another line's version is another mod rather than an older copy of this one.
    */
   line?: ModLine;
-}
-
-/**
- * The groups this release can offer: options whose asset it published, and no group left empty by that.
- *
- * The drop repeats until it settles, as the settings gates do, because a part is unselectable when what it
- * `needs` is gone - offering Cassidy's voice without its head would be offering something no install could
- * ever carry out.
- */
-export function offeredParts(release: ModRelease): readonly ModPartGroup[] {
-  const published = new Set(Object.keys(release.parts ?? {}));
-  const declared = release.manifest.parts ?? [];
-  for (;;) {
-    const gone = partOptions(release.manifest).filter(
-      (part) => published.has(part.id) && part.needs !== undefined && !published.has(part.needs),
-    );
-    if (gone.length === 0) break;
-    for (const part of gone) published.delete(part.id);
-  }
-  return declared
-    .map((group) => ({ ...group, options: group.options.filter((part) => published.has(part.id)) }))
-    .filter((group) => group.options.length > 0);
 }
 
 const FEED_CACHE_MS = 30 * 60 * 1000;

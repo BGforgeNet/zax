@@ -7,9 +7,33 @@
  * chose from those words and not from ids.
  */
 
-import { partOptions, type ModPart } from "./manifest.js";
+import { partOptions, type ModPart, type ModPartGroup } from "./manifest.js";
 import { chooseFrom } from "./mod-choice.js";
-import { offeredParts, type ModRelease } from "./mod-feed.js";
+// Type-only, and it has to stay that way: `mod-feed` imports the functions below, so a value import here would
+// close a runtime cycle between the two.
+import type { ModRelease } from "./mod-feed.js";
+
+/**
+ * The groups this release can offer: options whose asset it published, and no group left empty by that.
+ *
+ * The drop repeats until it settles, as the settings gates do, because a part is unselectable when what it
+ * `needs` is gone - offering Cassidy's voice without its head would be offering something no install could
+ * ever carry out.
+ */
+export function offeredParts(release: ModRelease): readonly ModPartGroup[] {
+  const published = new Set(Object.keys(release.parts ?? {}));
+  const declared = release.manifest.parts ?? [];
+  for (;;) {
+    const gone = partOptions(release.manifest).filter(
+      (part) => published.has(part.id) && part.needs !== undefined && !published.has(part.needs),
+    );
+    if (gone.length === 0) break;
+    for (const part of gone) published.delete(part.id);
+  }
+  return declared
+    .map((group) => ({ ...group, options: group.options.filter((part) => published.has(part.id)) }))
+    .filter((group) => group.options.length > 0);
+}
 
 /**
  * The parts a selection names, in the order the manifest declares them, or a refusal saying why the selection

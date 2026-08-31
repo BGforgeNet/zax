@@ -11,13 +11,13 @@ import {
   listingFrom,
   readModFeeds,
   readModInstallState,
-  offeredParts,
   presentInMods,
   type FeedSource,
   type ModContext,
   type ModLine,
   type ModRelease,
 } from "./mod-feed.js";
+import { offeredParts } from "./mod-parts.js";
 import { MOD_GRANTS } from "./mod-grants.js";
 import { parseManifest } from "./manifest.js";
 import type { InstallRecord } from "./records.js";

@@ -17,9 +17,9 @@ import {
   packageDirectory,
   stamp,
   temporaryDirectory,
+  type Install,
   type MergeConflict,
 } from "@zax/core";
-import type { Install } from "@zax/core";
 import type { DownloadOptions, Platform } from "@zax/platform";
 import { preflightArchive } from "./archive-preflight.js";
 import { installedLibraryVersion } from "./pe-version.js";
