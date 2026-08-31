@@ -14,6 +14,7 @@
 
 import type { DirEntry, Platform } from "@zax/platform";
 import { appendLog } from "./log.js";
+import { isRecord } from "./record.js";
 import {
   EPIC_MANIFEST_DIRECTORY,
   FO1IN2_DIRECTORY,
@@ -255,8 +256,8 @@ async function fromEpic(scan: Scan, roots: readonly string[]): Promise<Candidate
 function installLocation(text: string): string | null {
   try {
     const parsed: unknown = JSON.parse(text);
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const where = (parsed as Record<string, unknown>)["InstallLocation"];
+    if (!isRecord(parsed)) return null;
+    const where = parsed["InstallLocation"];
     return typeof where === "string" && where !== "" ? where : null;
   } catch {
     return null;

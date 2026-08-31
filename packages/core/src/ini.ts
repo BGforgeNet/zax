@@ -152,13 +152,12 @@ export class IniDocument {
    */
   entries(): Array<{ section: string; key: string; value: string; comment?: string }> {
     const out: Array<{ section: string; key: string; value: string; comment?: string }> = [];
-    for (let i = 0; i < this.nodes.length; i++) {
-      const n = this.nodes[i]!;
+    for (const [i, n] of this.nodes.entries()) {
       if (n.kind !== "entry") continue;
       const comment: string[] = [];
       for (let j = i - 1; j >= 0; j--) {
-        const prev = this.nodes[j]!;
-        if (prev.kind !== "comment") break;
+        const prev = this.nodes[j];
+        if (prev?.kind !== "comment") break;
         const text = prev.raw.replace(/^\s*[;#]\s?/, "").trimEnd();
         // A run of X characters is sfall's section divider, not documentation.
         if (/^X{6,}$/.test(text.trim())) break;
@@ -237,8 +236,7 @@ export class IniDocument {
   private endOfSection(section: string): number {
     let inSection = false;
     let last = -1;
-    for (let i = 0; i < this.nodes.length; i++) {
-      const n = this.nodes[i]!;
+    for (const [i, n] of this.nodes.entries()) {
       if (n.kind === "section") {
         if (inSection) break;
         inSection = fold(n.name) === fold(section);

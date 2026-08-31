@@ -8,6 +8,7 @@
  */
 
 import { parse, stringify } from "yaml";
+import { isRecord } from "./record.js";
 import type { Theme, WineConfig } from "./install.js";
 
 export interface StoredInstall {
@@ -24,7 +25,11 @@ export interface ZaxFile {
   autosave: boolean;
 }
 
-const THEMES: ReadonlySet<string> = new Set(["light", "dark", "system"]);
+// Typed on construction and read as `unknown`, so a value out of the file is narrowed by the check rather
+// than asserted after it.
+const THEMES: ReadonlySet<unknown> = new Set<Theme>(["light", "dark", "system"]);
+
+const isTheme = (value: unknown): value is Theme => THEMES.has(value);
 
 /** The empty state, which is also what a first run has. */
 export const EMPTY_ZAX_FILE: ZaxFile = { installs: [], theme: "system", autosave: true };
@@ -44,13 +49,13 @@ function trimmed(value: unknown): string | undefined {
  */
 export function parseZaxFile(text: string): ZaxFile {
   const raw: unknown = parse(text);
-  if (raw === null || typeof raw !== "object") return EMPTY_ZAX_FILE;
-  const record = raw as Record<string, unknown>;
+  if (!isRecord(raw)) return EMPTY_ZAX_FILE;
+  const record = raw;
 
   const installs: StoredInstall[] = [];
   for (const entry of Array.isArray(record["games"]) ? record["games"] : []) {
-    if (entry === null || typeof entry !== "object") continue;
-    const fields = entry as Record<string, unknown>;
+    if (!isRecord(entry)) continue;
+    const fields = entry;
     const path = trimmed(fields["path"]);
     if (path === undefined) continue;
     const alias = trimmed(fields["alias"]);
@@ -63,7 +68,7 @@ export function parseZaxFile(text: string): ZaxFile {
   const theme = record["theme"];
   return {
     installs,
-    theme: typeof theme === "string" && THEMES.has(theme) ? (theme as Theme) : "system",
+    theme: isTheme(theme) ? theme : "system",
     // Only an explicit false turns it off, so a file written before ZAX had the setting - the previous
     // implementation's, or a hand-edited one - reads as the default rather than as a choice to save by hand.
     autosave: record["autosave"] !== false,

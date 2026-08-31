@@ -5,6 +5,7 @@
  */
 
 import type { Platform } from "@zax/platform";
+import { isRecord } from "./record.js";
 
 const LATEST_RELEASE = "https://api.github.com/repos/BGforgeNet/zax/releases/latest";
 
@@ -14,22 +15,17 @@ export interface ZaxRelease {
   url: string;
 }
 
-interface GithubRelease {
-  tag_name?: unknown;
-  html_url?: unknown;
-  assets?: unknown;
-}
-
 export async function latestZax(platform: Platform): Promise<ZaxRelease> {
-  const body = JSON.parse(await platform.net.fetchText(LATEST_RELEASE)) as GithubRelease;
-  const version = typeof body.tag_name === "string" ? body.tag_name.replace(/^v/i, "") : "";
+  const parsed: unknown = JSON.parse(await platform.net.fetchText(LATEST_RELEASE));
+  const body = isRecord(parsed) ? parsed : {};
+  const tag = body["tag_name"];
+  const version = typeof tag === "string" ? tag.replace(/^v/i, "") : "";
   if (version === "") throw new Error("The release feed did not name a version.");
 
-  const assets = Array.isArray(body.assets) ? body.assets : [];
+  const assets: unknown[] = Array.isArray(body["assets"]) ? body["assets"] : [];
   const named = assets.filter(
     (asset): asset is { name: string; browser_download_url: string } =>
-      typeof (asset as { name?: unknown }).name === "string" &&
-      typeof (asset as { browser_download_url?: unknown }).browser_download_url === "string",
+      isRecord(asset) && typeof asset["name"] === "string" && typeof asset["browser_download_url"] === "string",
   );
 
   // These are the `os` macros and preferred portable targets in electron-builder.yml. Extension alone cannot
@@ -44,7 +40,8 @@ export async function latestZax(platform: Platform): Promise<ZaxRelease> {
         }[platform.os];
   const suffix = target && `-${target.os}-${platform.arch}.${target.extension}`;
   const match = suffix === undefined ? undefined : named.find((asset) => asset.name.toLowerCase().endsWith(suffix));
-  const page = typeof body.html_url === "string" ? body.html_url : LATEST_RELEASE;
+  const html = body["html_url"];
+  const page = typeof html === "string" ? html : LATEST_RELEASE;
   return { version, url: httpsOnly(match?.browser_download_url) ?? httpsOnly(page) ?? LATEST_RELEASE };
 }
 

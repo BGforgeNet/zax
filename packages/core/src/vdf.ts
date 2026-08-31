@@ -21,7 +21,7 @@ interface Cursor {
 /** Braces are tokens of their own; anything else is a key or a value. Null at the end of the text. */
 function nextToken(text: string, cursor: Cursor): string | null {
   for (; cursor.at < text.length; cursor.at++) {
-    const ch = text[cursor.at]!;
+    const ch = text.charAt(cursor.at);
     if (ch === "/" && text[cursor.at + 1] === "/") {
       while (cursor.at < text.length && text[cursor.at] !== "\n") cursor.at++;
       continue;
@@ -30,7 +30,7 @@ function nextToken(text: string, cursor: Cursor): string | null {
   }
   if (cursor.at >= text.length) return null;
 
-  const ch = text[cursor.at]!;
+  const ch = text.charAt(cursor.at);
   if (ch === "{" || ch === "}") {
     cursor.at++;
     return ch;
@@ -38,7 +38,7 @@ function nextToken(text: string, cursor: Cursor): string | null {
   if (ch === '"') return readQuoted(text, cursor);
 
   const start = cursor.at;
-  while (cursor.at < text.length && !/[\s{}"]/.test(text[cursor.at]!)) cursor.at++;
+  while (cursor.at < text.length && !/[\s{}"]/.test(text.charAt(cursor.at))) cursor.at++;
   return text.slice(start, cursor.at);
 }
 
@@ -46,7 +46,7 @@ function readQuoted(text: string, cursor: Cursor): string {
   cursor.at++;
   let out = "";
   while (cursor.at < text.length) {
-    const ch = text[cursor.at]!;
+    const ch = text.charAt(cursor.at);
     if (ch === "\\") {
       // Valve escapes the path separator, so `C:\\Steam` is one backslash. Only the two whitespace escapes mean
       // anything else; every other pair keeps the character that followed.
