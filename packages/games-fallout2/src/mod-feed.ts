@@ -694,7 +694,7 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   if (manifest.requiresSfall !== undefined) {
     const held = context.sfall;
     if (held === null || compareVersions(held, manifest.requiresSfall) < 0) {
-      const has = held === null ? "none" : held;
+      const has = held ?? "none";
       return refuse(
         `${manifest.name} needs sfall ${manifest.requiresSfall} or newer - this install has ${has}. ZAX's sfall updater can raise it first.`,
         recorded?.version,

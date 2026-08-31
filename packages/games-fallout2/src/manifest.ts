@@ -677,7 +677,7 @@ function parseInstaller(value: unknown): ModInstaller {
   // Ahead of the unknown-field pass, the way a later spec is: a platform key this version has no name for is
   // a platform a newer ZAX runs on, and calling it a misspelling would send the reader to fix the manifest.
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    for (const key of Object.keys(value as Record<string, unknown>)) {
+    for (const key of Object.keys(value)) {
       if (!INSTALLER_PLATFORMS.includes(key))
         needsNewerZax(`its "installer" names the platform "${key}", which this version cannot run`);
     }

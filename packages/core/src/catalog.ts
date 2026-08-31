@@ -293,6 +293,8 @@ export function displayValue(def: SettingDef, raw: string | undefined): string {
     case "int":
     case "float":
       return def.kind.unit ? `${raw} ${def.kind.unit}` : raw;
+    // Named rather than left to the default, so a kind added to the catalog has to be answered for here.
+    case "text":
     default:
       return raw;
   }

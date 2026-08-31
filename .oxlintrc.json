@@ -12,6 +12,25 @@
     "typescript/no-floating-promises": "error",
     "typescript/no-misused-promises": "error",
 
+    // Beyond the correctness set, and each already at zero across the repo - a floor, not a target. The rules
+    // still under triage are the ones the codebase currently violates; they are not listed here yet.
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/non-nullable-type-assertion-style": "error",
+    "typescript/no-unnecessary-type-conversion": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-namespace": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/prefer-as-const": "error",
+    "unicorn/prefer-set-has": "error",
+    "eslint/no-empty": "error",
+
     // Every site is a destructure of plain functions off an object or a module (`platform.paths`, `node:path`).
     // They have no `this` to lose, and the rule cannot tell them from class methods.
     "typescript/unbound-method": "off",
@@ -19,6 +38,18 @@
     "unicorn/no-useless-spread": "off"
   },
   "overrides": [
+    {
+      // The generator scripts and the workers are JavaScript, checked with `noImplicitAny` off, so every value
+      // crossing an untyped boundary is `any` by construction. Here the family reports the tsconfig, not a
+      // defect.
+      "files": ["**/*.mjs", "**/*.cjs", "**/*.js"],
+      "rules": {
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-return": "off"
+      }
+    },
     {
       // A test double is built by spreading a platform and replacing one capability. Nothing the doubles call
       // lives on the prototype the rule protects, and production code stays covered.

@@ -20,6 +20,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** Where the interface is served from: the built files beside this one, or the dev server when one is given. */
 const DEV_SERVER = process.env["ZAX_DEV_SERVER"];
 const RENDERER = join(here, "renderer", "index.html");
+// oxlint-disable-next-line typescript/prefer-nullish-coalescing -- `ZAX_DEV_SERVER=` set to empty means unset.
 const OWN_CONTENT = DEV_SERVER || pathToFileURL(RENDERER).href;
 
 // The platform reports what it did out of sight - failed and resumed downloads above all, which are the one

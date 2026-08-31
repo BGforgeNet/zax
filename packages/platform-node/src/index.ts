@@ -276,7 +276,7 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
           const info = await statfs(path);
           // Available to this user rather than free in total: the difference is the reserve only root may
           // spend, and an install that fills it is not an install that succeeded.
-          return Number(info.bsize) * Number(info.bavail);
+          return info.bsize * info.bavail;
         } catch {
           // A path that is not there says nothing about the disk, and neither does a host without statfs.
           return null;

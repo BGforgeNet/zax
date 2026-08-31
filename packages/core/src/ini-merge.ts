@@ -7,7 +7,7 @@
  * value equal to the old default was never chosen, and one the release dropped is only worth keeping if it was.
  */
 
-import { IniDocument } from "./ini.js";
+import type { IniDocument } from "./ini.js";
 
 /** A key both sides changed. The user's value is kept; the caller decides whether to say so. */
 export interface MergeConflict {

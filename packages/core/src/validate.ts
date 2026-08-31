@@ -37,6 +37,12 @@ export function validate(def: SettingDef, raw: string | undefined): Validation {
       if (!Number.isFinite(n) || n < 0 || n > kind.max) return { ok: false, reason: "Outside the supported range" };
       return OK;
     }
+    // Nothing a value can be wrong about: a bool is one of its own two spellings, a key is a scancode the
+    // editor produces, and text is free-form. Named rather than left to the default, so a kind added to the
+    // catalog has to be answered for here.
+    case "bool":
+    case "key":
+    case "text":
     default:
       return OK;
   }

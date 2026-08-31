@@ -24,7 +24,7 @@ export interface ZaxFile {
   autosave: boolean;
 }
 
-const THEMES: readonly string[] = ["light", "dark", "system"];
+const THEMES: ReadonlySet<string> = new Set(["light", "dark", "system"]);
 
 /** The empty state, which is also what a first run has. */
 export const EMPTY_ZAX_FILE: ZaxFile = { installs: [], theme: "system", autosave: true };
@@ -63,7 +63,7 @@ export function parseZaxFile(text: string): ZaxFile {
   const theme = record["theme"];
   return {
     installs,
-    theme: typeof theme === "string" && THEMES.includes(theme) ? (theme as Theme) : "system",
+    theme: typeof theme === "string" && THEMES.has(theme) ? (theme as Theme) : "system",
     // Only an explicit false turns it off, so a file written before ZAX had the setting - the previous
     // implementation's, or a hand-edited one - reads as the default rather than as a choice to save by hand.
     autosave: record["autosave"] !== false,

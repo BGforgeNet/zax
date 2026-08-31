@@ -172,7 +172,18 @@ function recordPath(platform: Platform, installPath: string): string {
 const asText = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
 /** What this version writes per mod - everything else in an entry is carried rather than understood. */
-const MOD_FIELDS = ["id", "version", "type", "reason", "complete", "files", "entries", "parts", "manifest", "shipped"];
+const MOD_FIELDS = new Set([
+  "id",
+  "version",
+  "type",
+  "reason",
+  "complete",
+  "files",
+  "entries",
+  "parts",
+  "manifest",
+  "shipped",
+]);
 
 /**
  * One recorded mod, or null when the entry cannot be trusted. Entries are judged one at a time rather than
@@ -192,8 +203,7 @@ function readMod(entry: unknown): InstalledMod | null {
   if (!isModId(id) || !isModVersion(version)) return null;
 
   const declared = asText(fields["type"]);
-  const type =
-    declared === "pluggable" || declared === "permanent" || declared === "base" ? (declared as ModType) : undefined;
+  const type = declared === "pluggable" || declared === "permanent" || declared === "base" ? declared : undefined;
   const reason = asText(fields["reason"]);
 
   // Judged against what ZAX grants this id, not against what the entry claims: a record is the one route
@@ -233,7 +243,7 @@ function readMod(entry: unknown): InstalledMod | null {
 
   // Anything this version has no rule for rides along untouched rather than being lost on the next write.
   const carried: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(fields)) if (!MOD_FIELDS.includes(key)) carried[key] = value;
+  for (const [key, value] of Object.entries(fields)) if (!MOD_FIELDS.has(key)) carried[key] = value;
 
   const shipped: Record<string, string> = {};
   const rawShipped = fields["shipped"];
