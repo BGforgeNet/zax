@@ -7,6 +7,8 @@
  */
 
 import type { Architecture, OperatingSystem } from "@zax/platform";
+import { FISSION_CAUTION } from "./fission.js";
+import type { OrderFormat } from "./mods.js";
 
 /**
  * How a project publishes. `rolling` republishes one release in place and carries no version number, so its
@@ -48,6 +50,17 @@ export interface EngineDefinition {
    * file, which every install already has, so its mark is a section vanilla does not carry.
    */
   settingsMark: { file: string; section?: string };
+  /**
+   * What has to be said before this engine is run or its mods are listed, where running it is not the same
+   * proposition as running the others. Declared here rather than decided by the views, so the surfaces that
+   * show it do not each test for one engine by name.
+   */
+  caution?: string;
+  /**
+   * The mod order format this engine reads, where it is not sfall's. The two are mutually unreadable and each
+   * rewrites the whole file, so the slot is swapped to this before the engine is launched.
+   */
+  orderFormat?: OrderFormat;
 }
 
 export const ENGINES: readonly EngineDefinition[] = [
@@ -125,6 +138,8 @@ export const ENGINES: readonly EngineDefinition[] = [
     releases: "tagged",
     // Its own file, which nothing else in an install creates.
     settingsMark: { file: "fission.cfg" },
+    caution: FISSION_CAUTION,
+    orderFormat: "fission",
     // The 32-bit and armhf builds this project also publishes have no `Architecture` to match, and the shell
     // ZAX itself ships in has no build for such a host either. Every archive here is flat, with no wrapper
     // directory to name in a member.

@@ -42,6 +42,8 @@ import {
   listMods,
   listingFrom,
   liveTargets,
+  fissionMounts,
+  FISSION_ID,
   reconcileSettings,
   placesById,
   recommendationFor,
@@ -57,6 +59,8 @@ import {
   type LayoutFile,
   type MachineDescription,
   type Mod,
+  type OrderFormat,
+  type OrderSwap,
   type BaseInstallPlan,
   type CreateInstallPlan,
   type ModInstallPlan,
@@ -325,7 +329,7 @@ type Panel = "games" | "zax";
 type View = "settings" | "mods" | "engines";
 
 /** The Mods view's own tabs: getting mods, ordering them, and configuring them are three different jobs. */
-type ModsTab = "installation" | "order" | "settings";
+type ModsTab = "installation" | "order" | "settings" | "fission";
 
 /** Which of a mod row's controls started what is running - one label each, and the button says it. */
 type ModAction = "prepare" | "install" | "remove" | "restore";
@@ -385,6 +389,9 @@ class Store {
   /** Whether an edit is written as it is made. On by default: a save rewrites only the keys that changed, and
    * an edit left waiting on a second click is one the user can walk away from. */
   autosave = $state(true);
+
+  /** Engines whose caution has been dismissed. Read from the state file, written back when one is accepted. */
+  acceptedCautions = $state<readonly string[]>([]);
   overrides = $state<Record<string, string>>({});
 
   /** Contents of the selected install's config files, exactly as they were read. */
@@ -488,6 +495,23 @@ class Store {
 
   /** The install's mods, in load order, with whatever the user has changed about it since it was read. */
   mods = $state<readonly Mod[]>([]);
+
+  /**
+   * Which engine's format the order file is in. Not sfall's means the list on screen is not the one the folder
+   * holds, so the whole Mods tab stands down rather than offering edits against a file it cannot write.
+   */
+  modsFormat = $state<OrderFormat>("sfall");
+
+  /**
+   * Why the Mods tab is closed, or null when it is open. One sentence, on the tab itself, naming the way out -
+   * a disabled control with no reason is a defect rather than a state.
+   */
+  readonly modsClosed = $derived(
+    this.modsFormat === "sfall"
+      ? null
+      : "This folder's mod order is in Fission's format, which ZAX cannot edit. Run the game or another " +
+          "engine and ZAX puts the sfall list back, and this opens again.",
+  );
   /** The same list as it was read, which is what makes "changed" a comparison rather than a flag to maintain. */
   private modsBaseline = $state<readonly Mod[]>([]);
   /** The order file as it was read, so a save can refuse one that changed underneath. */
@@ -605,8 +629,34 @@ class Store {
    * it there is what used to take a Run in X button off the bar for the length of the reads.
    */
   engines = $state<readonly EngineListing[]>([]);
+
+  /** The mods folder split by whether Fission would find each entry - see `fissionMounts` for the rule. */
+  readonly fissionMods = $derived(this.mods.filter((mod) => fissionMounts(mod.name)));
+
+  /**
+   * The rest: present, possibly enabled, and invisible to Fission. Named rather than merely left out, since a
+   * list quietly missing half a mods folder is the failure this sub-tab exists to make visible.
+   *
+   * An entry whose file is gone is not among them. It is not in the folder, so saying it will not load under
+   * Fission would be true of it and of nothing else here - the order list is where a dead entry is dealt with.
+   */
+  readonly fissionMissed = $derived(this.mods.filter((mod) => mod.kind !== "missing" && !fissionMounts(mod.name)));
   /** What is deployed in the selected folder, by engine id. Read with the install. */
   engineDeployed = $state<Record<string, InstalledEngine>>({});
+
+  /**
+   * Fission, when it is deployed in the selected folder. What the Mods tab's Fission sub-tab is drawn from and
+   * what decides whether that sub-tab is there at all.
+   *
+   * Deployment rather than what the machine's cache holds: one download serves every game folder, so the cache
+   * says nothing about this folder. A tab about how one engine will read this mods folder, in a folder that
+   * engine has never run in, is a question nobody asked - and the sidecars it is about do not exist there.
+   */
+  readonly fissionEngine = $derived(
+    this.engineDeployed[FISSION_ID] === undefined
+      ? null
+      : (this.engines.find((engine) => engine.id === FISSION_ID) ?? null),
+  );
   /**
    * What each engine has published, by id: asked for at startup, and by the Check button after that. One
    * release is published whichever folder is selected, so switching install leaves it alone.
@@ -681,6 +731,7 @@ class Store {
     this.unavailable = state.unavailable;
     this.theme = state.theme;
     this.autosave = state.autosave;
+    this.acceptedCautions = state.acceptedCautions;
     this.selectedInstall = state.installs[0]?.path ?? "";
     if (problem) this.notice = { kind: "problem", text: problem };
     // Before the install read, so the Run bar draws with its buttons rather than gaining them a moment later.
@@ -778,7 +829,7 @@ class Store {
       // No folder to stand against. Cleared here rather than on every switch, where the reading brings its own.
       this.modStanding = null;
       this.standingFor = "";
-      this.setMods({ text: undefined, present: [], owners: [] });
+      this.setMods({ text: undefined, format: "sfall", present: [], owners: [] });
       return;
     }
     const read = await this.gatherInstall(install, owed);
@@ -1017,6 +1068,10 @@ class Store {
 
   private setMods(snapshot: ModsSnapshot): void {
     this.modsText = snapshot.text;
+    this.modsFormat = snapshot.format;
+    // Off the tab if it just closed under the user - a disabled tab does not move anyone standing on it, and
+    // the pane behind it would go on offering edits nothing can write.
+    if (snapshot.format !== "sfall" && this.view === "mods") this.view = "settings";
     this.mods = listMods(snapshot);
     this.modsBaseline = this.mods;
   }
@@ -1076,6 +1131,7 @@ class Store {
       unavailable: this.unavailable,
       theme: this.theme,
       autosave: this.autosave,
+      acceptedCautions: this.acceptedCautions,
     });
   }
 
@@ -2030,17 +2086,97 @@ class Store {
   }
 
   /**
+   * The engine whose caution is standing in front of a launch, with the build that launch was for. Held rather
+   * than asked inline, because the answer arrives from a dialog and the launch has to wait for it.
+   */
+  pendingLaunch = $state<{
+    /** The engine about to run, or null for the game's own executable. Names the action, whatever held it. */
+    engine: EngineListing | null;
+    /** The caution to show, or null where the engine raises none or the user has dismissed it. */
+    caution: string | null;
+    published: string | null;
+    /** What is in the mods folder that this engine will not load, named one per line on the dialog. */
+    missed: readonly Mod[];
+    /** What the launch does to the mod order, or null where it leaves it alone. */
+    swap: OrderSwap | null;
+  } | null>(null);
+
+  /**
    * Starts the game, through an engine when one is named and the original executable otherwise. `published`
    * names the build to run, or null to follow what the folder holds and what the cache offers.
+   *
+   * An engine that declares a caution stops here rather than starting. What such an engine does to the game
+   * folder outlives the session it did it in, so it is said before the launch rather than reported after one -
+   * and it is said every time until the user says not to, since one reading is easy to forget by the next run.
    */
   async play(engineId: string | null = null, published: string | null = null): Promise<void> {
     const install = this.install;
     if (!install) return;
     const engine = engineId === null ? null : this.engines.find((one) => one.id === engineId);
+    /*
+      Two reasons to stop before starting. A caution is the engine's own and is said until dismissed; a swap is
+      about this folder and is said every time, dismissal or not - it rewrites a file the user owns, and which
+      mods load changes with it. Either one raises the same dialog, which draws whichever parts it was given.
+    */
+    const swap = await backend.orderSwap(install, engineId);
+    const cautioned = engine?.caution !== undefined && !this.acceptedCautions.includes(engine.id);
+    if (cautioned || swap !== null) {
+      // The one engine whose mount rule ZAX models. Read here rather than in the dialog so the dialog stays
+      // about a caution and a list, whichever engine raises one next.
+      const missed = engine?.id === FISSION_ID ? this.fissionMissed : [];
+      this.pendingLaunch = {
+        engine: engine ?? null,
+        caution: cautioned ? (engine?.caution ?? null) : null,
+        published,
+        missed,
+        swap,
+      };
+      this.pendingLaunchId = engineId;
+      return;
+    }
+    await this.startGame(engineId, published);
+  }
+
+  /**
+   * Goes ahead with the launch the caution stopped. `accepted` is the box on that dialog: it is recorded before
+   * the launch rather than after it, so a game that does not come back still leaves the answer written.
+   */
+  async confirmLaunch(accepted: boolean): Promise<void> {
+    const pending = this.pendingLaunch;
+    if (!pending) return;
+    const engineId = this.pendingLaunchId;
+    this.pendingLaunch = null;
+    if (accepted && pending.caution !== null && pending.engine && !this.acceptedCautions.includes(pending.engine.id)) {
+      this.acceptedCautions = [...this.acceptedCautions, pending.engine.id];
+      await this.persist();
+    }
+    await this.startGame(engineId, pending.published);
+  }
+
+  /** Which engine the held launch is for - null is the game's own executable, which `pendingLaunch` cannot say. */
+  private pendingLaunchId: string | null = null;
+
+  dismissLaunch(): void {
+    this.pendingLaunch = null;
+  }
+
+  /** The launch itself, reached both by the engines that need nothing said and by the dialog for the ones that do. */
+  private async startGame(engineId: string | null, published: string | null): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    const engine = engineId === null ? null : this.engines.find((one) => one.id === engineId);
     await this.run(engine ? `Starting the game in ${engine.short}` : "Starting the game", async () => {
       await backend.launch(install, this.sfallInstalled, engineId, published);
-      // The launch may have deployed a different build here, or moved the pin; the chooser's tick reads both.
-      if (engineId !== null) await this.readInstall();
+      /*
+        The deployed build only, not a whole reread of the install. A full read takes the mods, and reading the
+        mods swaps the order file back to sfall's format - which would race the engine now starting for the very
+        file it is about to read, and hand it either the wrong list or none. The launch cannot have moved
+        anything else here; what it did move is which build is deployed and whether it is pinned.
+      */
+      if (engineId !== null) {
+        const deployed = await backend.deployedEngines(install);
+        this.engineDeployed = Object.fromEntries(deployed.map((one) => [one.id, one]));
+      }
       return null;
     });
   }
@@ -2142,8 +2278,41 @@ class Store {
     });
   }
 
-  /** Downloads a build into the machine's cache. Nothing reaches a game folder until one runs it. */
+  /**
+   * The engine whose caution is standing in front of a first fetch. Held for the reason `pendingLaunch` is:
+   * the answer arrives from a dialog.
+   */
+  pendingFetch = $state<{ engine: EngineListing; published: string | null } | null>(null);
+
+  /**
+   * Downloads a build into the machine's cache. Nothing reaches a game folder until one runs it.
+   *
+   * An engine that declares a caution says it once here, before its first build is on the machine at all. Only
+   * the first: holding a build is what makes it not the first, so this needs nothing remembered and nothing
+   * dismissed. The launch gate is the one that repeats, because a launch is where the cost lands.
+   */
   async fetchEngine(engineId: string, published: string | null = null): Promise<void> {
+    const engine = this.engines.find((one) => one.id === engineId);
+    if (engine?.caution !== undefined && engine.versions.length === 0) {
+      this.pendingFetch = { engine, published };
+      return;
+    }
+    await this.startFetch(engineId, published);
+  }
+
+  /** Goes ahead with the fetch the caution stopped. */
+  async confirmFetch(): Promise<void> {
+    const pending = this.pendingFetch;
+    if (!pending) return;
+    this.pendingFetch = null;
+    await this.startFetch(pending.engine.id, pending.published);
+  }
+
+  dismissFetch(): void {
+    this.pendingFetch = null;
+  }
+
+  private async startFetch(engineId: string, published: string | null): Promise<void> {
     const engine = this.engines.find((one) => one.id === engineId);
     await this.run(`Fetching ${engine?.name ?? "the engine"}`, async () => {
       const release = await backend.fetchEngine(engineId, published);

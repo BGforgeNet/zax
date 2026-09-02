@@ -14,7 +14,7 @@ describe("loading application state", () => {
   it("starts empty on a machine that has never run it", async () => {
     const { state, problem } = await loadState(new MemoryPlatform({ home: "/home/t" }));
     expect(problem).toBeUndefined();
-    expect(state).toEqual({ installs: [], unavailable: [], theme: "system", autosave: true });
+    expect(state).toEqual({ installs: [], unavailable: [], theme: "system", autosave: true, acceptedCautions: [] });
   });
 
   it("reads the type from the directory rather than from the file", async () => {
@@ -61,6 +61,7 @@ describe("saving application state", () => {
       unavailable: [],
       theme: "light",
       autosave: false,
+      acceptedCautions: [],
     });
     expect(platform.textAt(`${CONFIG}/zax.yml`)).toContain("path: /games/one");
     expect(platform.textAt(`${CONFIG}/zax.yml`)).toContain("wine_prefix: /p");
@@ -73,6 +74,7 @@ describe("saving application state", () => {
       unavailable: [],
       theme: "system",
       autosave: false,
+      acceptedCautions: [],
     });
     expect(platform.textAt(`${CONFIG}/zax.yml`)).toContain("alias: My playthrough");
   });
@@ -84,6 +86,7 @@ describe("saving application state", () => {
       unavailable: [],
       theme: "system",
       autosave: false,
+      acceptedCautions: [],
     });
     expect(platform.textAt(`${CONFIG}/zax.yml`)).not.toContain("fallout2rpu");
   });

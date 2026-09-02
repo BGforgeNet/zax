@@ -15,12 +15,51 @@
 import { backupDirectory, latin1, latin1Bytes, splitLines, stamp, type Install, type SaveOutcome } from "@zax/core";
 import type { Platform } from "@zax/platform";
 import { loadRecord, modName } from "./records.js";
+import { fissionEnabled, fissionMounts } from "./fission.js";
 
 export const MODS_DIRECTORY = "mods";
 export const MODS_ORDER_FILE = "mods_order.txt";
 
 /** How the file is named to the user, in one piece rather than assembled at each site that mentions it. */
 export const MODS_ORDER_PATH = `${MODS_DIRECTORY}/${MODS_ORDER_FILE}`;
+
+/**
+ * Which of the two mutually unreadable formats a mod order file is in. sfall names a path per line; Fission
+ * writes pipe-separated records and skips every line without a pipe, so neither reader tolerates the other's
+ * file and each rewrites the whole thing into its own.
+ */
+export type OrderFormat = "sfall" | "fission";
+
+/**
+ * Where a format's list lives while another engine has the slot. Named beside the file they belong to, and
+ * invisible to all three readers of that folder: Fission scans for `mod_*.dat`, sfall loads only what the order
+ * file names, and `readMods` takes directories and `*.dat` from the listing.
+ */
+export const sidecarFile = (format: OrderFormat): string => `mods_order.${format}.txt`;
+
+/**
+ * The header Fission writes above its own list. Its second line carries a pipe inside a comment, which is why
+ * the sniff below looks at comments for this marker rather than for pipes generally.
+ */
+const FISSION_HEADER = /^[ \t]*#[ \t]*FISSION mods_order\.txt/m;
+
+/**
+ * Which format a file is in, read from the file rather than from a memory of who ran last. Stored state would
+ * be wrong in exactly the cases that matter - a crash, a hand edit, a launch that went around ZAX, an install
+ * never seen before - and nothing would be left to notice it.
+ *
+ * An empty or comment-only file reads as sfall, which is the safe way round: sfall's format is what ZAX writes,
+ * and Fission truncates and rebuilds whatever it finds anyway.
+ */
+export function orderFormatOf(text: string): OrderFormat {
+  if (FISSION_HEADER.test(text)) return "fission";
+  for (const line of splitLines(text)) {
+    const body = line.body.trim();
+    if (body === "" || body.startsWith(";") || body.startsWith("#")) continue;
+    if (body.includes("|")) return "fission";
+  }
+  return "sfall";
+}
 
 /** What is on disk under a mod's name. `missing` is an entry whose file or folder is no longer there. */
 type ModKind = "dat" | "folder" | "file" | "missing";
@@ -50,6 +89,15 @@ interface ModsDirEntry {
 export interface ModsSnapshot {
   /** The order file exactly as read, or undefined when the install has none. */
   text: string | undefined;
+  /**
+   * Which engine's format that text is in. `sfall` for a folder with no order file at all, which is what an
+   * install ZAX can edit looks like before anything has run in it.
+   *
+   * Reported rather than corrected: the file is the user's, and rewriting it because they opened a tab is a
+   * write they did not ask for - it also races an engine ZAX has just started for the file it is reading. The
+   * surfaces that cannot act on a foreign format say so instead.
+   */
+  format: OrderFormat;
   /** Every name that resolves: what the folder holds, plus anything the file names that exists. */
   present: readonly ModsDirEntry[];
   /**
@@ -271,7 +319,13 @@ function restate(line: OrderLine, enabled: boolean): string {
   return enabled ? line.body.replace(/^(\s*)[;#][ \t]?/, "$1") : `; ${line.body}`;
 }
 
-/** Reads the order file and the folder beside it. Neither existing is an ordinary answer, not a failure. */
+/**
+ * Reads the order file and the folder beside it. Neither existing is an ordinary answer, not a failure.
+ *
+ * Reads only. The slot is swapped where an engine is about to read it, which is the launch, and nowhere else:
+ * a read that rewrites the file races whatever ZAX has just started, and rewrites the user's mod order because
+ * they opened a tab. What comes back says which format it found, and the surfaces decide from that.
+ */
 export async function readMods(platform: Platform, install: Install): Promise<ModsSnapshot> {
   const directory = platform.paths.join(install.path, MODS_DIRECTORY);
   const orderPath = platform.paths.join(directory, MODS_ORDER_FILE);
@@ -301,6 +355,7 @@ export async function readMods(platform: Platform, install: Install): Promise<Mo
   const record = await loadRecord(platform, install.path);
   return {
     text,
+    format: text === undefined ? "sfall" : orderFormatOf(text),
     present: [...present.values()].toSorted((a, b) => fold(a.name).localeCompare(fold(b.name))),
     owners: record.mods.map((mod) => ({ name: modName(mod), files: mod.files })),
   };
@@ -324,6 +379,109 @@ export async function saveMods(platform: Platform, request: ModsSaveRequest): Pr
 
 const orderPath = (platform: Platform, installPath: string): string =>
   platform.paths.join(installPath, MODS_DIRECTORY, MODS_ORDER_FILE);
+
+const sidecarPath = (platform: Platform, installPath: string, format: OrderFormat): string =>
+  platform.paths.join(installPath, MODS_DIRECTORY, sidecarFile(format));
+
+/**
+ * Puts the list `wanted` reads into `mods/mods_order.txt`, filing whatever was there under the format it is in.
+ * The file stops being where a list lives and becomes the slot the next program reads; each format's durable
+ * list sits in a sidecar beside it.
+ *
+ * Runs before a read and before a launch, never after an exit. Putting a list back once the game quits would
+ * mean holding the process to know when that is, which the platform seam refuses by contract - `launch`
+ * resolves once the program has started - and the swap would be lost whenever ZAX is closed or crashes during a
+ * session, which for a game is the ordinary case rather than the exception.
+ *
+ * A sidecar is only ever written by copying the slot, so it cannot hold something the slot never held. Where the
+ * wanted sidecar does not exist the slot is cleared rather than left holding the other format's file: that is a
+ * first run for this engine, and it builds its own. Idempotent, so a repeated or interrupted swap costs nothing.
+ */
+/** What a launch would change about the mod order, when it would change anything. */
+export interface OrderSwap {
+  /** The format the file is in now, and the one the engine about to run reads. */
+  from: OrderFormat;
+  to: OrderFormat;
+  /** Loading now and not after, by the name each has in the mods folder. */
+  losing: readonly string[];
+  /** Loading after and not now. */
+  gaining: readonly string[];
+}
+
+/**
+ * What each format would load out of this folder, by file name.
+ *
+ * sfall loads the entries its list leaves uncommented. Fission loads the dats its own list has enabled - or,
+ * where it has no list here yet, every `mod_*.dat` in the folder, since its first run scans the folder and
+ * turns on everything it finds.
+ */
+async function wouldLoad(
+  platform: Platform,
+  installPath: string,
+  format: OrderFormat,
+  text: string | undefined,
+  present: ReadonlySet<string>,
+): Promise<readonly string[]> {
+  if (format === "sfall") {
+    const snapshot: ModsSnapshot = { text, format, present: [], owners: [] };
+    return listMods({ ...snapshot, present: [...present].map((name) => ({ name, kind: "dat" as const })) })
+      .filter((mod) => mod.enabled && mod.kind !== "missing")
+      .map((mod) => mod.name);
+  }
+  const found = text === undefined ? [] : fissionEnabled(text);
+  const enabled = text === undefined ? [...present].filter(fissionMounts) : found;
+  return enabled.filter((name) => present.has(name));
+}
+
+/**
+ * What launching an engine that reads `wanted` would do to this folder's mod order, or null where it would do
+ * nothing. Read before the launch, so the user is told what is about to change while it can still be cancelled.
+ */
+export async function previewOrderSwap(
+  platform: Platform,
+  installPath: string,
+  wanted: OrderFormat,
+): Promise<OrderSwap | null> {
+  const slot = orderPath(platform, installPath);
+  const held = (await platform.fs.stat(slot))?.kind === "file" ? latin1(await platform.fs.read(slot)) : undefined;
+  const from = held === undefined ? "sfall" : orderFormatOf(held);
+  if (from === wanted) return null;
+
+  const directory = platform.paths.join(installPath, MODS_DIRECTORY);
+  const present = new Set<string>();
+  if ((await platform.fs.stat(directory))?.kind === "dir") {
+    for (const entry of await platform.fs.list(directory)) {
+      if (entry.kind === "dir" || /\.dat$/i.test(entry.name)) present.add(entry.name);
+    }
+  }
+
+  const sidecar = platform.paths.join(directory, sidecarFile(wanted));
+  const kept = (await platform.fs.stat(sidecar))?.kind === "file" ? latin1(await platform.fs.read(sidecar)) : undefined;
+
+  const now = await wouldLoad(platform, installPath, from, held, present);
+  const next = await wouldLoad(platform, installPath, wanted, kept, present);
+  return {
+    from,
+    to: wanted,
+    losing: now.filter((name) => !next.includes(name)),
+    gaining: next.filter((name) => !now.includes(name)),
+  };
+}
+
+export async function swapOrderTo(platform: Platform, installPath: string, wanted: OrderFormat): Promise<void> {
+  const slot = orderPath(platform, installPath);
+  const held = (await platform.fs.stat(slot))?.kind === "file" ? latin1(await platform.fs.read(slot)) : undefined;
+  if (held !== undefined) {
+    const format = orderFormatOf(held);
+    if (format === wanted) return;
+    // Copied rather than rewritten from parsed lines: the file is the user's, and only a byte-for-byte copy
+    // promises to give back what a hand-edit put there.
+    await platform.fs.copy(slot, sidecarPath(platform, installPath, format));
+  }
+  const sidecar = sidecarPath(platform, installPath, wanted);
+  if ((await platform.fs.stat(sidecar))?.kind === "file") await platform.fs.copy(sidecar, slot);
+  else if (held !== undefined) await platform.fs.remove(slot);
+}
 
 /** Copies aside the file an unwind is about to overwrite. */
 async function copyOrderAside(platform: Platform, path: string, current: string | undefined, now: Date): Promise<void> {

@@ -21,9 +21,17 @@ export interface AppState {
   unavailable: readonly StoredInstall[];
   theme: Theme;
   autosave: boolean;
+  /** Engines whose caution has been dismissed - see `ZaxFile`, which is where the shape is explained. */
+  acceptedCautions: readonly string[];
 }
 
-const EMPTY_STATE: AppState = { installs: [], unavailable: [], theme: "system", autosave: true };
+const EMPTY_STATE: AppState = {
+  installs: [],
+  unavailable: [],
+  theme: "system",
+  autosave: true,
+  acceptedCautions: [],
+};
 
 export interface LoadedState {
   state: AppState;
@@ -67,7 +75,15 @@ export async function loadState(platform: Platform): Promise<LoadedState> {
     }
   }
 
-  return { state: { installs, unavailable, theme: stored.theme, autosave: stored.autosave } };
+  return {
+    state: {
+      installs,
+      unavailable,
+      theme: stored.theme,
+      autosave: stored.autosave,
+      acceptedCautions: stored.acceptedCautions,
+    },
+  };
 }
 
 export async function saveState(platform: Platform, state: AppState): Promise<void> {
@@ -79,6 +95,12 @@ export async function saveState(platform: Platform, state: AppState): Promise<vo
     })),
     ...state.unavailable,
   ];
-  const text = formatZaxFile({ ...EMPTY_ZAX_FILE, installs: stored, theme: state.theme, autosave: state.autosave });
+  const text = formatZaxFile({
+    ...EMPTY_ZAX_FILE,
+    installs: stored,
+    theme: state.theme,
+    autosave: state.autosave,
+    acceptedCautions: state.acceptedCautions,
+  });
   await platform.fs.write(zaxFilePath(platform), new TextEncoder().encode(text));
 }

@@ -75,7 +75,16 @@ import { chooseBuild } from "./engine-choice.js";
 import { ENGINES, buildFor, engineById, type ReleaseModel } from "./engines.js";
 import { loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
 import { readTransaction, releaseOf } from "./mod-transaction.js";
-import { readMods, saveMods, type ModsSaveRequest, type ModsSnapshot } from "./mods.js";
+import {
+  previewOrderSwap,
+  readMods,
+  saveMods,
+  swapOrderTo,
+  type ModsSaveRequest,
+  type ModsSnapshot,
+  type OrderFormat,
+  type OrderSwap,
+} from "./mods.js";
 import { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
 import { installedHiresVersion } from "./hires.js";
 import { planLaunch } from "./launch.js";
@@ -155,6 +164,8 @@ export interface EngineListing {
   /** What would be installed here, or null with `why` saying there is nothing. */
   build: { asset: string; program: string } | null;
   why?: string;
+  /** What has to be said before running this engine, from the catalog. Absent for one that needs nothing said. */
+  caution?: string;
   /** What this machine holds, newest first. Empty is an engine nothing has fetched yet. */
   versions: readonly CachedBuild[];
 }
@@ -262,6 +273,11 @@ export interface Backend {
   latestZax(): Promise<ZaxRelease>;
   listSaves(install: Install): Promise<readonly string[]>;
   createDebugPackage(install: Install, saves: readonly string[]): Promise<DebugPackage>;
+  /**
+   * What launching `engineId` would do to this folder's mod order, or null where it would do nothing. Asked
+   * before the launch, so what is about to change can still be refused.
+   */
+  orderSwap(install: Install, engineId: string | null): Promise<OrderSwap | null>;
   /**
    * `engineId` names an alternative engine, or null for the game's own executable. `published` names the build
    * to run, or null to follow what the folder holds and what the cache offers - see `engine-choice.ts`.
@@ -595,6 +611,7 @@ export function createBackend(platform: Platform, shell: Shell, seams: BackendSe
             releases: engine.releases,
             build: build === null ? null : { asset: build.asset, program: build.program },
             ...(build === null ? { why: `${engine.name} publishes no build for this machine.` } : {}),
+            ...(engine.caution === undefined ? {} : { caution: engine.caution }),
             versions:
               build === null
                 ? []
@@ -616,12 +633,21 @@ export function createBackend(platform: Platform, shell: Shell, seams: BackendSe
     listSaves: async (install) => listSaves(platform, install),
     createDebugPackage: async (install, saves) => createDebugPackage(platform, install, saves),
 
+    orderSwap: async (install, engineId) =>
+      previewOrderSwap(
+        platform,
+        install.path,
+        engineId === null ? "sfall" : (engineById(engineId).orderFormat ?? "sfall"),
+      ),
+
     // The program comes from the record and the catalog, never from the renderer - a caller that could name
     // the program would be naming a program for the machine to start.
     launch: async (install, sfallVersion, engineId, published) => {
       let program: string | null = null;
+      let wanted: OrderFormat = "sfall";
       if (engineId !== null) {
         const engine = engineById(engineId);
+        wanted = engine.orderFormat ?? "sfall";
         const build = buildFor(engine, platform.os, platform.arch);
         if (!build) throw new Error(`${engine.name} publishes no build ZAX can run on this machine.`);
         const deployed = (await installedEngines(platform, install)).find((one) => one.id === engineId);
@@ -639,6 +665,9 @@ export function createBackend(platform: Platform, shell: Shell, seams: BackendSe
         }
         program = build.program;
       }
+      // Before the program starts, never after it exits: the seam's `launch` resolves once the game is up, and
+      // a swap owed to a session ZAX did not see the end of is a swap that never happens.
+      await swapOrderTo(platform, install.path, wanted);
       const plan = planLaunch(platform.os, install, sfallVersion, program);
       await platform.process.launch(plan.program, plan.args, {
         cwd: plan.cwd,

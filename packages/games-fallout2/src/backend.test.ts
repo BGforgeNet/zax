@@ -654,6 +654,18 @@ describe("engines across the boundary", () => {
     expect(listed[0]!.build?.asset).toBe("fallout2-ce-linux-x64.tar.gz");
   });
 
+  /*
+    The caution travels with the listing rather than being restated by whichever view happens to draw it. It has
+    to cross the process boundary to reach the interface at all, which is what this holds.
+  */
+  it("carries the caution the catalog declares, and none for an engine that declares none", async () => {
+    const backend = createBackend(enginePlatform(), { chooseFolder: async () => null });
+    const listed = await backend.machineEngines();
+    const fission = listed.find((one) => one.id === "fission");
+    expect(fission?.caution).toMatch(/mod_<name>\.dat/);
+    expect(listed.find((one) => one.id === "fallout2-ce")?.caution).toBeUndefined();
+  });
+
   it("says why there is nothing to install where the machine has no build", async () => {
     const platform = enginePlatform({ os: "windows", arch: "arm64" });
     const backend = createBackend(platform, { chooseFolder: async () => null });
@@ -681,6 +693,28 @@ describe("engines across the boundary", () => {
     const platform = enginePlatform();
     const backend = await fetched(platform);
     await backend.launch(install, null, "fallout2-ce", null);
+    expect(platform.launched.at(-1)?.program).toBe("./fallout2-ce");
+  });
+
+  /*
+    The launch is the one place the slot has to be right, and the seam gives no moment after it: `launch`
+    resolves once the program is up, so a list put back "when the game quits" is a list never put back. The
+    engine here reads sfall's format, so the swap is the way home from a folder Fission last wrote.
+  */
+  it("swaps the order file to the format the engine it starts can read", async () => {
+    const platform = enginePlatform({
+      files: {
+        "/games/one/fallout2.exe": "",
+        "/games/one/mods/mods_order.txt": "# FISSION mods_order.txt (pipe-separated)\n1|foo|foo|Foo| | | |0\n",
+        "/games/one/mods/mods_order.sfall.txt": "rpu.dat\n",
+      },
+    });
+    const backend = await fetched(platform);
+    await backend.launch(install, null, "fallout2-ce", null);
+
+    const read = async (path: string) => new TextDecoder("latin1").decode(await platform.fs.read(path));
+    expect(await read("/games/one/mods/mods_order.txt")).toBe("rpu.dat\n");
+    expect(await read("/games/one/mods/mods_order.fission.txt"), "and Fission's own was kept").toContain("1|foo|");
     expect(platform.launched.at(-1)?.program).toBe("./fallout2-ce");
   });
 

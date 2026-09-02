@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatZaxFile, parseZaxFile } from "./zax-file.js";
+import { EMPTY_ZAX_FILE, formatZaxFile, parseZaxFile } from "./zax-file.js";
 
 /** What the previous implementation wrote, so the compatibility claim is tested rather than asserted. */
 const PREVIOUS = `games:
@@ -19,12 +19,18 @@ describe("reading zax.yml", () => {
       ],
       theme: "dark",
       autosave: true,
+      acceptedCautions: [],
     });
   });
 
   it("treats an empty or absent games list as no installs rather than failing", () => {
-    expect(parseZaxFile("theme: light")).toEqual({ installs: [], theme: "light", autosave: true });
-    expect(parseZaxFile("")).toEqual({ installs: [], theme: "system", autosave: true });
+    expect(parseZaxFile("theme: light")).toEqual({
+      installs: [],
+      theme: "light",
+      autosave: true,
+      acceptedCautions: [],
+    });
+    expect(parseZaxFile("")).toEqual({ installs: [], theme: "system", autosave: true, acceptedCautions: [] });
   });
 
   /*
@@ -41,8 +47,31 @@ describe("reading zax.yml", () => {
   });
 
   it("round-trips autosave through a write and a read", () => {
-    const written = formatZaxFile({ installs: [{ path: "/a" }], theme: "system", autosave: true });
+    const written = formatZaxFile({
+      installs: [{ path: "/a" }],
+      theme: "system",
+      autosave: true,
+      acceptedCautions: [],
+    });
     expect(parseZaxFile(written).autosave).toBe(true);
+  });
+
+  /*
+    Ids rather than one flag, so dismissing one engine's warning does not silence the next engine's. Entries are
+    checked one at a time the way the installs are: a hand-edited line costs that id, not the list.
+  */
+  it("reads the dismissed cautions, dropping entries that are not names", () => {
+    expect(parseZaxFile("accepted_cautions:\n- fission\n- '  '\n- 7\n").acceptedCautions).toEqual(["fission"]);
+    expect(parseZaxFile("accepted_cautions: not-a-list").acceptedCautions).toEqual([]);
+    expect(parseZaxFile("games: []").acceptedCautions).toEqual([]);
+  });
+
+  it("round-trips a dismissal, and writes no key while there is none", () => {
+    const written = formatZaxFile({ ...EMPTY_ZAX_FILE, acceptedCautions: ["fission"] });
+    expect(written).toContain("accepted_cautions:");
+    expect(parseZaxFile(written).acceptedCautions).toEqual(["fission"]);
+    // A file from before the key existed stays as it was until something is actually dismissed.
+    expect(formatZaxFile(EMPTY_ZAX_FILE)).not.toContain("accepted_cautions");
   });
 
   it("falls back to the system theme when the file names one that no longer exists", () => {
@@ -75,6 +104,7 @@ describe("writing zax.yml", () => {
       installs: [{ path: "/a", wine: { prefix: "/p", debug: "-all" } }],
       theme: "light",
       autosave: false,
+      acceptedCautions: [],
     });
     expect(text).toContain("wine_prefix: /p");
     expect(text).toContain("wine_debug: -all");
@@ -82,7 +112,9 @@ describe("writing zax.yml", () => {
   });
 
   it("omits Wine keys an install does not have, rather than writing them blank", () => {
-    expect(formatZaxFile({ installs: [{ path: "/a" }], theme: "system", autosave: false })).not.toContain("wine_");
+    expect(
+      formatZaxFile({ installs: [{ path: "/a" }], theme: "system", autosave: false, acceptedCautions: [] }),
+    ).not.toContain("wine_");
   });
 
   it("keeps an alias the user chose across a round trip", () => {
@@ -90,18 +122,26 @@ describe("writing zax.yml", () => {
       installs: [{ path: "/a", alias: "My playthrough" }],
       theme: "system",
       autosave: false,
+      acceptedCautions: [],
     });
     expect(text).toContain("alias: My playthrough");
     expect(parseZaxFile(text).installs).toEqual([{ path: "/a", alias: "My playthrough" }]);
   });
 
   it("writes no alias for an install left at its type's name, so it follows the type", () => {
-    expect(formatZaxFile({ installs: [{ path: "/a" }], theme: "system", autosave: false })).not.toContain("alias:");
+    expect(
+      formatZaxFile({ installs: [{ path: "/a" }], theme: "system", autosave: false, acceptedCautions: [] }),
+    ).not.toContain("alias:");
     expect(parseZaxFile("games:\n- path: /a\n  alias: '   '\n").installs).toEqual([{ path: "/a" }]);
   });
 
   it("sorts by path, so the file does not reorder itself between saves", () => {
-    const text = formatZaxFile({ installs: [{ path: "/b" }, { path: "/a" }], theme: "system", autosave: false });
+    const text = formatZaxFile({
+      installs: [{ path: "/b" }, { path: "/a" }],
+      theme: "system",
+      autosave: false,
+      acceptedCautions: [],
+    });
     expect(text.indexOf("/a")).toBeLessThan(text.indexOf("/b"));
   });
 });
@@ -110,13 +150,15 @@ describe("long paths", () => {
   const long = "/home/tester/some/deeply/nested/place/for/games/GOG Games/Fallout 2 with the restoration project";
 
   it("keeps an install path on one line, since people hand-edit this file", () => {
-    const text = formatZaxFile({ installs: [{ path: long }], theme: "system", autosave: false });
+    const text = formatZaxFile({ installs: [{ path: long }], theme: "system", autosave: false, acceptedCautions: [] });
     expect(text).toContain(`- path: ${long}\n`);
   });
 
   it("reads back what it wrote", () => {
     expect(
-      parseZaxFile(formatZaxFile({ installs: [{ path: long }], theme: "system", autosave: false })).installs,
+      parseZaxFile(
+        formatZaxFile({ installs: [{ path: long }], theme: "system", autosave: false, acceptedCautions: [] }),
+      ).installs,
     ).toEqual([{ path: long }]);
   });
 });

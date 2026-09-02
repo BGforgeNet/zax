@@ -23,6 +23,11 @@ export interface ZaxFile {
   theme: Theme;
   /** Whether an edit is written as it is made, rather than waiting for the Save button. On unless turned off. */
   autosave: boolean;
+  /**
+   * Engines whose caution the user has said not to show again. Ids rather than one flag: the warnings say
+   * different things, so dismissing one must not silence the next engine that needs something said.
+   */
+  acceptedCautions: readonly string[];
 }
 
 // Typed on construction and read as `unknown`, so a value out of the file is narrowed by the check rather
@@ -32,7 +37,7 @@ const THEMES: ReadonlySet<unknown> = new Set<Theme>(["light", "dark", "system"])
 const isTheme = (value: unknown): value is Theme => THEMES.has(value);
 
 /** The empty state, which is also what a first run has. */
-export const EMPTY_ZAX_FILE: ZaxFile = { installs: [], theme: "system", autosave: true };
+export const EMPTY_ZAX_FILE: ZaxFile = { installs: [], theme: "system", autosave: true, acceptedCautions: [] };
 
 function trimmed(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -66,8 +71,12 @@ export function parseZaxFile(text: string): ZaxFile {
   }
 
   const theme = record["theme"];
+  // Each entry checked rather than the list taken whole: one hand-edited line loses that id, not the rest,
+  // which is how the installs above are read.
+  const accepted = Array.isArray(record["accepted_cautions"]) ? record["accepted_cautions"] : [];
   return {
     installs,
+    acceptedCautions: accepted.map(trimmed).filter((id): id is string => id !== undefined),
     theme: isTheme(theme) ? theme : "system",
     // Only an explicit false turns it off, so a file written before ZAX had the setting - the previous
     // implementation's, or a hand-edited one - reads as the default rather than as a choice to save by hand.
@@ -90,5 +99,15 @@ export function formatZaxFile(state: ZaxFile): string {
     }));
   // Unwrapped: the emitter folds a long scalar across lines by default, which is lossless but splits an install
   // path over two lines in a file people hand-edit.
-  return stringify({ games, theme: state.theme, autosave: state.autosave }, { lineWidth: 0 });
+  return stringify(
+    {
+      games,
+      theme: state.theme,
+      autosave: state.autosave,
+      // Omitted while empty rather than written as `[]`, so a file from before ZAX had the key stays as it was
+      // until something is actually dismissed.
+      ...(state.acceptedCautions.length > 0 ? { accepted_cautions: [...state.acceptedCautions].toSorted() } : {}),
+    },
+    { lineWidth: 0 },
+  );
 }

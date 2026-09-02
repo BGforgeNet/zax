@@ -71,7 +71,19 @@
               title={store.settingsChanged ? "Settings have unsaved changes" : null}
             ></span>
           </button>
-          <button role="tab" class="tab" aria-selected={store.view === "mods"} onclick={() => (store.view = "mods")}>
+          <!--
+            Closed while the order file is in another engine's format: everything under it edits that file, and
+            an Install or a reorder written against a list the folder does not hold is an edit thrown away. The
+            reason rides on the tab, since a control refused without one reads as broken.
+          -->
+          <button
+            role="tab"
+            class="tab"
+            aria-selected={store.view === "mods"}
+            disabled={store.modsClosed !== null}
+            title={store.modsClosed}
+            onclick={() => (store.view = "mods")}
+          >
             Mods
             <span
               class="dot"

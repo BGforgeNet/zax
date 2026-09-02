@@ -46,7 +46,7 @@ const view = () => render(EnginesView as never, {} as never);
 describe("each engine's heading", () => {
   test("names the project and links to where it is published", () => {
     const v = view();
-    expect(v.one("h2").textContent).toBe(TAGGED.name);
+    expect(v.one(".engine h2").textContent).toBe(TAGGED.name);
     expect(v.one<HTMLAnchorElement>("a").getAttribute("href")).toBe(TAGGED.page);
   });
 

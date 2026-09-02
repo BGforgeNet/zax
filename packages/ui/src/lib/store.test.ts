@@ -601,6 +601,46 @@ describe("saving", () => {
   });
 });
 
+describe("a mod order in another engine's format", () => {
+  const fissionSlot = async () => {
+    await previewPlatform.fs.write(
+      ORDER_FILE,
+      new TextEncoder().encode("# FISSION mods_order.txt (pipe-separated)\n1|combat_speed|combat_speed|C| | | |0\n"),
+    );
+    await store.selectInstall("fixtures/f2");
+    await store.selectInstall(PREVIEW_INSTALL);
+  };
+
+  afterEach(async () => {
+    await reseedPreview();
+    store.view = "settings";
+  });
+
+  /*
+    Everything under the Mods tab edits this file. An install or a reorder written against a list the folder does
+    not hold is an edit thrown away, so the tab stands down rather than offering them.
+  */
+  test("closes the Mods tab, naming the reason and the way out", async () => {
+    await fissionSlot();
+    expect(store.modsFormat).toBe("fission");
+    expect(store.modsClosed).toMatch(/Fission's format/);
+    expect(store.modsClosed, "and how to get it back").toMatch(/Run the game or another engine/);
+  });
+
+  test("moves off the tab when it closes under the user", async () => {
+    store.view = "mods";
+    await fissionSlot();
+    expect(store.view).toBe("settings");
+  });
+
+  test("opens again once the file is sfall's", async () => {
+    await fissionSlot();
+    await reseedPreview();
+    expect(store.modsFormat).toBe("sfall");
+    expect(store.modsClosed).toBeNull();
+  });
+});
+
 describe("mods", () => {
   const order = async () => new TextDecoder("latin1").decode(await previewPlatform.fs.read(ORDER_FILE));
   const shown = () => store.mods.map((mod) => `${mod.enabled ? "+" : "-"}${mod.name}`);
@@ -614,6 +654,8 @@ describe("mods", () => {
       "+old_music.dat",
       "+InventoryFilter.dat",
       "+fo2tweaks.dat",
+      "+mod_combat_speed.dat",
+      "-mod_dialog_fix.dat",
       "-barter_prices.dat",
     ]);
     // The kinds are what makes a row's badge honest: a folder is not an archive, and an entry pointing at
@@ -624,6 +666,8 @@ describe("mods", () => {
       "folder",
       "missing",
       "missing",
+      "dat",
+      "dat",
       "dat",
       "dat",
       "dat",
@@ -642,6 +686,8 @@ describe("mods", () => {
       undefined,
       "FO2tweaks",
       undefined,
+      undefined,
+      undefined,
     ]);
   });
 
@@ -658,6 +704,8 @@ describe("mods", () => {
       "+old_music.dat",
       "+fo2tweaks.dat",
       "+InventoryFilter.dat",
+      "+mod_combat_speed.dat",
+      "-mod_dialog_fix.dat",
       "-barter_prices.dat",
     ]);
     expect(store.againstRecommendation, "and there is nothing left to say").toEqual([]);
@@ -698,7 +746,8 @@ describe("mods", () => {
     expect(await order()).toBe(
       "; Loaded in this order - a mod further down overrides one above it.\n" +
         "weapon_sounds.dat\nextra_music.dat\nhero_appearance\nold_patch.dat\nold_music.dat\n" +
-        "InventoryFilter.dat\nfo2tweaks.dat\n; barter_prices.dat\n",
+        "InventoryFilter.dat\nfo2tweaks.dat\nmod_combat_speed.dat\n; mod_dialog_fix.dat\n" +
+        "; barter_prices.dat\n",
     );
   });
 
@@ -766,6 +815,8 @@ describe("mods", () => {
       "+old_music.dat",
       "+InventoryFilter.dat",
       "+fo2tweaks.dat",
+      "+mod_combat_speed.dat",
+      "-mod_dialog_fix.dat",
       "-barter_prices.dat",
     ]);
   });
@@ -1598,7 +1649,13 @@ describe("what an installed base mod does to the list of games", () => {
 });
 
 describe("engines", () => {
-  afterEach(() => vi.restoreAllMocks());
+  // The store is one object across this file, so a test that leaves a dialog held hands it to the next one.
+  afterEach(() => {
+    store.pendingLaunch = null;
+    store.pendingFetch = null;
+    store.acceptedCautions = [];
+    vi.restoreAllMocks();
+  });
 
   const launching = () => vi.spyOn(hostBackend, "launch").mockResolvedValue(undefined as never);
 
@@ -1623,6 +1680,149 @@ describe("engines", () => {
       "fallout2-ce",
       "2026-07-01T00:00:00Z",
     );
+  });
+
+  /*
+    An engine that declares a caution does not start on the first click. What Fission does to the mods folder
+    outlives the session, so the sentence goes in front of the launch rather than into a notice after it.
+  */
+  const withFission = () => {
+    const fission = {
+      id: "fission",
+      name: "Fallout Fission",
+      short: "Fission",
+      page: "https://example.invalid/fission",
+      releases: "tagged" as const,
+      build: { asset: "fallout-fission-linux-x64.zip", program: "fallout-fission-linux-x64" },
+      caution: "Fission does not read the sfall load order.",
+      versions: [{ release: "0.9.6.8", published: "2026-08-01T00:00:00Z", commit: null }],
+    };
+    store.engines = [...store.engines.filter((one) => one.id !== "fission"), fission];
+    return fission;
+  };
+
+  test("holds a launch behind the engine's caution rather than starting it", async () => {
+    withFission();
+    const launch = launching();
+    await store.play("fission");
+    expect(launch).not.toHaveBeenCalled();
+    expect(store.pendingLaunch?.caution, "held by the caution").not.toBeNull();
+  });
+
+  test("cancelling the caution starts nothing and records nothing", async () => {
+    withFission();
+    const launch = launching();
+    await store.play("fission");
+    store.dismissLaunch();
+    expect(store.pendingLaunch).toBeNull();
+    expect(launch).not.toHaveBeenCalled();
+    expect(store.acceptedCautions).toEqual([]);
+  });
+
+  test("running anyway launches the build the held launch was for", async () => {
+    withFission();
+    const launch = launching();
+    await store.play("fission", "2026-08-01T00:00:00Z");
+    // Asserted before confirming, or the test passes just as well with no gate at all: `play` alone would
+    // launch with these same arguments.
+    expect(launch).not.toHaveBeenCalled();
+    await store.confirmLaunch(false);
+    expect(launch).toHaveBeenCalledWith(
+      expect.objectContaining({ path: PREVIEW_INSTALL }),
+      null,
+      "fission",
+      "2026-08-01T00:00:00Z",
+    );
+  });
+
+  // Unticked is the default and has to stay one: the next run asks again.
+  test("asks again on the next run when the box was left unticked", async () => {
+    withFission();
+    launching();
+    await store.play("fission");
+    await store.confirmLaunch(false);
+    expect(store.acceptedCautions).toEqual([]);
+
+    await store.play("fission");
+    expect(store.pendingLaunch?.caution, "held by the caution").not.toBeNull();
+  });
+
+  /*
+    The box silences the caution and only the caution. The swap is about this folder rather than about the
+    engine, it rewrites a file the user owns, and which mods load changes with it - so it is said every time.
+  */
+  test("ticking the box records the engine and stops raising its caution", async () => {
+    withFission();
+    launching();
+    const saved = vi.spyOn(hostBackend, "saveState");
+    await store.play("fission");
+    expect(store.pendingLaunch?.caution, "the caution is what held it").not.toBeNull();
+    await store.confirmLaunch(true);
+    expect(store.acceptedCautions).toEqual(["fission"]);
+    expect(saved).toHaveBeenCalledWith(expect.objectContaining({ acceptedCautions: ["fission"] }));
+
+    await store.play("fission");
+    expect(store.pendingLaunch, "still held, by the swap").not.toBeNull();
+    expect(store.pendingLaunch?.caution, "but with no caution on it now").toBeNull();
+    expect(store.pendingLaunch?.swap?.to).toBe("fission");
+  });
+
+  /* The preview folder is sfall's, so launching the game's own executable moves nothing and asks nothing. */
+  test("does not hold a launch that leaves the mod order alone", async () => {
+    const launch = launching();
+    await store.play();
+    expect(store.pendingLaunch).toBeNull();
+    expect(launch).toHaveBeenCalled();
+  });
+
+  /*
+    Said once more, before the engine's first build reaches the machine at all. Holding a build is what makes
+    the next fetch not the first, so this needs nothing remembered - unlike the launch gate, which repeats until
+    the user says otherwise.
+  */
+  test("holds the first fetch of an engine that declares a caution", async () => {
+    const fission = withFission();
+    store.engines = [...store.engines.filter((one) => one.id !== "fission"), { ...fission, versions: [] }] as never;
+    const fetched = vi.spyOn(hostBackend, "fetchEngine");
+    await store.fetchEngine("fission");
+    expect(fetched).not.toHaveBeenCalled();
+    expect(store.pendingFetch?.engine.id).toBe("fission");
+  });
+
+  test("does not hold a fetch once a build of it is already here", async () => {
+    withFission();
+    const fetched = vi.spyOn(hostBackend, "fetchEngine").mockRejectedValue(new Error("preview"));
+    await store.fetchEngine("fission");
+    expect(store.pendingFetch).toBeNull();
+    expect(fetched).toHaveBeenCalled();
+  });
+
+  test("cancelling the fetch caution downloads nothing", async () => {
+    const fission = withFission();
+    store.engines = [...store.engines.filter((one) => one.id !== "fission"), { ...fission, versions: [] }] as never;
+    const fetched = vi.spyOn(hostBackend, "fetchEngine");
+    await store.fetchEngine("fission");
+    store.dismissFetch();
+    expect(store.pendingFetch).toBeNull();
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  test("fetching anyway goes on to download it", async () => {
+    const fission = withFission();
+    store.engines = [...store.engines.filter((one) => one.id !== "fission"), { ...fission, versions: [] }] as never;
+    const fetched = vi.spyOn(hostBackend, "fetchEngine").mockRejectedValue(new Error("preview"));
+    await store.fetchEngine("fission");
+    await store.confirmFetch();
+    expect(fetched).toHaveBeenCalledWith("fission", null);
+  });
+
+  // The gate is the engine's declaration, not the engine's name: CE declares nothing and must not be held.
+  test("does not hold an engine that declares no caution", async () => {
+    withFission();
+    const launch = launching();
+    await store.play("fallout2-ce");
+    expect(store.pendingLaunch).toBeNull();
+    expect(launch).toHaveBeenCalled();
   });
 
   test("keeps a check across installs, and re-reads what is deployed in the one arrived at", async () => {

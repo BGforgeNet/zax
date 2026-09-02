@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { EngineListing } from "@zax/fallout2";
+  import Dialog from "./Dialog.svelte";
+  import EngineCaution from "./EngineCaution.svelte";
   import { isPreview } from "./host.js";
   import { ENGINE_ICON } from "./icons.js";
   import { store } from "./store.svelte.js";
@@ -45,6 +47,10 @@
               </p>
             </div>
           </div>
+
+          {#if engine.caution}
+            <EngineCaution text={engine.caution} />
+          {/if}
 
           {#if engine.build}
             <p class="line">This machine gets <strong>{engine.build.asset}</strong></p>
@@ -124,7 +130,37 @@
   </main>
 </div>
 
+<!--
+  Said once, before this engine's first build is on the machine at all. Only the first fetch raises it: holding
+  a build is what makes the next one not the first, so nothing has to be remembered and nothing dismissed. The
+  gate before a launch is the one that repeats, because a launch is where what this describes actually happens.
+-->
+<Dialog
+  open={store.pendingFetch !== null}
+  title="Fetch {store.pendingFetch?.engine.name ?? ''}"
+  dismiss={() => store.dismissFetch()}
+>
+  {#if store.pendingFetch}
+    <EngineCaution
+      text={store.pendingFetch.engine.caution ?? ""}
+      title="{store.pendingFetch.engine.name} handles mods its own way"
+    />
+  {/if}
+  {#snippet footer()}
+    <button onclick={() => store.dismissFetch()}>Cancel</button>
+    <button class="primary" onclick={() => void store.confirmFetch()}>Fetch anyway</button>
+  {/snippet}
+</Dialog>
+
 <style>
+  /* The committing action's clothes, as the save bar and the mods view dress theirs. */
+  .primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 550;
+  }
+
   .panel {
     padding: 10px var(--gutter);
   }

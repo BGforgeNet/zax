@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Dialog from "./Dialog.svelte";
+  import EngineCaution from "./EngineCaution.svelte";
   import { isPreview } from "./host.js";
   import { store } from "./store.svelte.js";
 
@@ -6,6 +8,22 @@
 
   /** Which engine's chooser is open, by id. One at a time: they sit side by side on one bar. */
   let choosing = $state<string | null>(null);
+
+  /**
+   * The box on the caution dialog. Reset as the dialog opens rather than as it closes: a ticked box left behind
+   * by a cancelled launch would silence the next one without the user having agreed to anything.
+   */
+  let understood = $state(false);
+
+  /** What each format is called to a user, who knows the engines by name and has never heard of a slot. */
+  const FORMAT_NAME = { sfall: "sfall", fission: "Fission" } as const;
+
+  /** Titled after the action, which is what the user just asked for, whichever of the two things held it. */
+  const launchTitle = (): string => {
+    const held = store.pendingLaunch;
+    if (!held) return "";
+    return held.engine ? `Run in ${held.engine.short}` : "Run the game";
+  };
 
   const day = (instant: string) => {
     const at = Date.parse(instant);
@@ -18,6 +36,7 @@
 
   function run(engineId: string, published: string | null): void {
     choosing = null;
+    understood = false;
     void store.play(engineId, published);
   }
 
@@ -131,7 +150,165 @@
   </button>
 </div>
 
+<!--
+  Two things can hold a launch, and this draws whichever were given. The caution is the engine's own and stops
+  once dismissed; the swap is about this folder and is said every time, because it rewrites a file the user owns
+  and changes which mods load. Neither is reported after the fact: the seam's launch resolves once the game is
+  up, so afterwards is too late to refuse.
+-->
+<Dialog open={store.pendingLaunch !== null} title={launchTitle()} dismiss={() => store.dismissLaunch()}>
+  {#if store.pendingLaunch}
+    {@const held = store.pendingLaunch}
+    {#if held.caution}
+      <EngineCaution text={held.caution} title="{held.engine?.name ?? 'This engine'} handles mods its own way" />
+    {/if}
+
+    {#if held.swap}
+      {@const swap = held.swap}
+      <!-- The engine names the action and the format names the file: "running sfall" confuses the two, sfall
+           being a patch the game loads rather than anything a user runs. -->
+      <p class="swap-lead">
+        This game was last set up for <strong>{FORMAT_NAME[swap.from]}</strong>. Running
+        {held.engine?.short ?? "the game"} swaps the mod order over - ZAX files the {FORMAT_NAME[swap.from]} list beside it
+        and puts {FORMAT_NAME[swap.to]}'s back, so neither is lost.
+      </p>
+      {#if swap.losing.length === 0 && swap.gaining.length === 0}
+        <p class="swap-lead">The same mods load either way.</p>
+      {:else}
+        <!-- One per line and split by direction, so the two answers a user wants - what goes, what arrives -
+             are read down rather than picked out of a sentence. -->
+        <div class="swap-cols">
+          {#if swap.losing.length > 0}
+            <div>
+              <p class="swap-head">No longer loads</p>
+              <ul class="missed-list">
+                {#each swap.losing as name (name)}
+                  <li><span class="missed-name off">{name}</span></li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+          {#if swap.gaining.length > 0}
+            <div>
+              <p class="swap-head">Starts loading</p>
+              <ul class="missed-list">
+                {#each swap.gaining as name (name)}
+                  <li><span class="missed-name">{name}</span></li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+        </div>
+      {/if}
+    {/if}
+
+    <!--
+      Named one per line rather than run together in a sentence: this is a list to read down and check against
+      what the user believes is installed, and a comma-separated run of eight names is not read at all.
+    -->
+    {#if held.missed.length > 0}
+      <p class="missed-lead">
+        {held.missed.length === 1 ? "One entry in" : `${held.missed.length} entries in`}
+        the mods folder will not load at all:
+      </p>
+      <ul class="missed-list">
+        {#each held.missed as mod (mod.name)}
+          <li>
+            <span class="missed-name">{mod.name}</span>
+            <span class="missed-kind">{mod.kind}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  {/if}
+  {#snippet footer()}
+    <!-- In the footer rather than under the lists: the body scrolls once a folder has more than a few mods, and
+         the one control that stops this dialog coming back must not be the part that falls below the fold. -->
+    {#if store.pendingLaunch?.caution}
+      <label class="understood">
+        <input type="checkbox" bind:checked={understood} />
+        <span>I understand, do not show again</span>
+      </label>
+    {/if}
+    <button onclick={() => store.dismissLaunch()}>Cancel</button>
+    <button class="primary" onclick={() => void store.confirmLaunch(understood)}>Run anyway</button>
+  {/snippet}
+</Dialog>
+
 <style>
+  .swap-lead {
+    margin: 10px 0 4px;
+    font-size: 12.5px;
+  }
+
+  /* Side by side, so what goes and what arrives are one comparison rather than two lists to hold in mind. */
+  .swap-cols {
+    display: flex;
+    gap: 22px;
+    margin-top: 6px;
+  }
+
+  .swap-head {
+    margin: 0 0 2px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* Struck through as the order list draws an entry the engine will not load, and for the same reason: the
+     column heading says which side this is, and the rule says it again without relying on position. */
+  .missed-name.off {
+    text-decoration: line-through;
+    color: var(--text-dim);
+  }
+
+  .missed-lead {
+    margin: 10px 0 4px;
+    font-size: 12.5px;
+  }
+
+  /* One per line, and scrolling rather than growing without bound: a folder can hold a great many of these. */
+  .missed-list {
+    margin: 0;
+    padding-left: 18px;
+    max-height: 11rem;
+    overflow-y: auto;
+  }
+
+  .missed-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .missed-name {
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+
+  .missed-kind {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 3px;
+    padding: 0 4px;
+  }
+
+  /*
+    The whole line is the target, as the mod rows make their name part of the checkbox's label. It takes the
+    footer's free space so the two buttons stay at the edge they sit at in every other dialog.
+  */
+  .understood {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-right: auto;
+    font-size: 12.5px;
+  }
+
   .footer {
     display: flex;
     align-items: center;
@@ -152,12 +329,18 @@
 
   /* Floored at the width of "Saving...", the wider of the two labels: unfloored the button grew by 31px the
      moment a save began and pulled the chip beside it left, which is the shift the button is placed to avoid. */
-  .footer .primary {
-    min-width: 104px;
+  /* The committing action's clothes, worn by the bar's Save and by the caution dialog's Run alike - the same
+     kind of action reads the same in both, as it does in the mods view. */
+  .primary {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
     font-weight: 550;
+  }
+
+  /* Only the bar's: the width is what stops the chip beside it moving when the label becomes "Saving...". */
+  .footer .primary {
+    min-width: 104px;
   }
 
   .footer button:disabled {

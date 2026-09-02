@@ -61,11 +61,11 @@ afterEach(() => {
 const view = () => render(ModsView as never, {} as never);
 
 describe("the tab strip", () => {
-  test("offers the three tabs and marks one", () => {
+  // Four in the preview, which holds a build of the engine the fourth is for; three where none is held.
+  test("offers a tab per subject, in the order they are read in", () => {
     const v = view();
     const tabs = v.all(".tabbar [role=tab]").map((tab) => (tab.textContent ?? "").trim());
-    expect(tabs).toHaveLength(3);
-    expect(tabs[0]).toContain("Installation");
+    expect(tabs).toEqual(["Installation", "Load order", "Fission load order", "Settings"]);
   });
 
   /* Held in the markup shown or not, like the top strip's: a dot appearing must not resize its tab. */
@@ -82,12 +82,14 @@ describe("the tab strip", () => {
     expect(store.modsTab).toBe("order");
   });
 
-  // Each tab is its own handler, so a strip where one of the three does not switch is a live possibility.
+  // Each tab is its own handler, so a strip where one of them does not switch is a live possibility.
   test("every tab in the strip reaches its own pane", () => {
     const v = view();
     const strip = v.all(".tabbar [role=tab]");
     for (const [at, expected] of [
-      [2, "settings"],
+      [3, "settings"],
+      [2, "fission"],
+      [1, "order"],
       [0, "installation"],
     ] as const) {
       strip[at]!.click();
@@ -443,6 +445,128 @@ describe("a feed that could not be read", () => {
   test("says no feeds are known when there is neither an offer nor a failure", () => {
     nothingPublished();
     expect(view().one("p.empty").textContent).toContain("No mod feeds are known");
+  });
+});
+
+describe("the Fission sub-tab", () => {
+  /*
+    The engine has to be one this machine holds a build of, or the tab is not there at all - which is the
+    default and what the strip tests above rely on.
+  */
+  const withFission = () => {
+    // Deployed in this folder, which is what the sub-tab follows - a build in the machine's cache says nothing
+    // about whether this install has ever run it.
+    store.engineDeployed = {
+      fission: { id: "fission", release: "0.9.6.8", published: "2026-08-01T00:00:00Z", complete: true, files: [] },
+    } as never;
+    store.engines = [
+      ...store.engines.filter((one) => one.id !== "fission"),
+      {
+        id: "fission",
+        name: "Fallout Fission",
+        short: "Fission",
+        page: "https://example.invalid/fission",
+        releases: "tagged",
+        build: { asset: "fallout-fission-linux-x64.zip", program: "fallout-fission-linux-x64" },
+        caution: "Fission does not read the sfall load order.",
+        versions: [{ release: "0.9.6.8", published: "2026-08-01T00:00:00Z", commit: null }],
+      },
+    ] as never;
+  };
+
+  /* One of each shape the rule separates, so both halves of the tab have something to draw. */
+  const folderOf = () => {
+    store.mods = [
+      { name: "mod_rpu.dat", enabled: true, kind: "dat" },
+      { name: "fo2tweaks.dat", enabled: true, kind: "dat" },
+      { name: "restoration", enabled: false, kind: "folder" },
+      // Gone from the folder, so it belongs to neither list here - the load order is where it is dealt with.
+      { name: "old_patch.dat", enabled: true, kind: "missing" },
+    ] as never;
+  };
+
+  test("is absent in a folder Fission has never run in", () => {
+    store.engineDeployed = {};
+    const tabs = view()
+      .all(".tabbar [role=tab]")
+      .map((tab) => (tab.textContent ?? "").trim());
+    expect(tabs).not.toContain("Fission load order");
+  });
+
+  test("appears once it is deployed there", () => {
+    withFission();
+    const tabs = view()
+      .all(".tabbar [role=tab]")
+      .map((tab) => (tab.textContent ?? "").trim());
+    expect(tabs).toContain("Fission load order");
+  });
+
+  test("lists only what Fission would load", () => {
+    withFission();
+    folderOf();
+    store.modsTab = "fission";
+    const v = view();
+    const listed = v.all(".mod:not(.skipped) .name").map((one) => one.textContent);
+    expect(listed).toEqual(["mod_rpu.dat"]);
+  });
+
+  /*
+    The load order's tick is a comment marker in a file Fission does not read, so a mod switched off there is
+    still one its folder scan finds. Reporting it as off here would attribute an sfall fact to Fission.
+  */
+  test("draws no enabled state, which belongs to a file this engine ignores", () => {
+    withFission();
+    store.mods = [
+      { name: "mod_rpu.dat", enabled: true, kind: "dat" },
+      { name: "mod_bgs.dat", enabled: false, kind: "dat" },
+    ] as never;
+    store.modsTab = "fission";
+    const v = view();
+    expect(v.all(".mod:not(.skipped) .name").map((one) => one.textContent)).toEqual(["mod_rpu.dat", "mod_bgs.dat"]);
+    expect(v.all(".mod.off")).toHaveLength(0);
+  });
+
+  /*
+    The half that matters most: a list quietly missing two of the three entries reads as a folder holding one
+    mod, which is the wrong thing to conclude and the reason this tab exists.
+  */
+  test("names what it left out rather than dropping it silently", () => {
+    withFission();
+    folderOf();
+    store.modsTab = "fission";
+    const v = view();
+    const skipped = v.all(".mod.skipped .name").map((one) => one.textContent);
+    expect(skipped).toEqual(["fo2tweaks.dat", "restoration"]);
+    expect(v.one(".missed-head").textContent).toContain("2 entries");
+  });
+
+  /*
+    The heading says these are in the mods folder. An entry whose file is gone is not, so listing it there would
+    make that sentence false for it - and the folder scan Fission runs would not have seen it either.
+  */
+  test("leaves out an entry whose file is gone, which is not in the folder to begin with", () => {
+    withFission();
+    folderOf();
+    store.modsTab = "fission";
+    const v = view();
+    expect(v.all(".mod .name").map((one) => one.textContent)).not.toContain("old_patch.dat");
+  });
+
+  test("says so where nothing in the folder is named the way Fission needs", () => {
+    withFission();
+    store.mods = [{ name: "fo2tweaks.dat", enabled: true, kind: "dat" }] as never;
+    store.modsTab = "fission";
+    const v = view();
+    expect(v.all(".mod:not(.skipped)")).toHaveLength(0);
+    expect(v.one(".empty").textContent).toContain("named the way Fission needs");
+  });
+
+  /* The same sentence the engines list and the launch dialog carry - one text, read off the listing. */
+  test("carries the engine's caution over the list it is about", () => {
+    withFission();
+    folderOf();
+    store.modsTab = "fission";
+    expect(view().one(".caution-slot").textContent).toContain("does not read the sfall load order");
   });
 });
 

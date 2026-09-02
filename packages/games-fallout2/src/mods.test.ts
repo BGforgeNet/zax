@@ -5,8 +5,11 @@ import type { Install } from "@zax/core";
 import {
   entryName,
   listMods,
+  orderFormatOf,
+  previewOrderSwap,
   readMods,
   saveMods,
+  swapOrderTo,
   writeOrder,
   type Mod,
   type ModOwner,
@@ -18,6 +21,7 @@ const install: Install = { path: "game", type: "fallout2" };
 
 const snapshot = (text: string | undefined, present: string[] = [], owners: ModOwner[] = []): ModsSnapshot => ({
   text,
+  format: text === undefined ? "sfall" : orderFormatOf(text),
   present: present.map((name) => ({ name, kind: name.includes(".") ? "dat" : "folder" })),
   owners,
 });
@@ -216,9 +220,224 @@ describe("writeOrder", () => {
   });
 });
 
+/*
+  A real Fission file: the two-line header it writes, then one record per mod. Both matter to the sniff - an
+  empty Fission list is nothing but that header, and its second line carries a pipe inside a comment.
+*/
+const FISSION_ORDER =
+  "# FISSION mods_order.txt (pipe-separated)\n" +
+  "# Format: enabled|datName|internalName|displayName|author|description|dependencies|iconIndex\n" +
+  "1|combat_speed|combat_speed|Combat Speed|Some Author|Does a thing| |7\n";
+
+const SFALL_ORDER = "; Loaded in this order\nrpu.dat\n; extra.dat\n";
+
+describe("orderFormatOf", () => {
+  it("reads a path-per-line file as sfall's", () => {
+    expect(orderFormatOf(SFALL_ORDER)).toBe("sfall");
+  });
+
+  it("reads a pipe record as Fission's", () => {
+    expect(orderFormatOf(FISSION_ORDER)).toBe("fission");
+  });
+
+  /* An empty Fission list is header and nothing else, and the pipe in it sits inside a comment. */
+  it("reads Fission's header alone as Fission's, with no records under it", () => {
+    expect(orderFormatOf(FISSION_ORDER.split("\n").slice(0, 2).join("\n") + "\n")).toBe("fission");
+  });
+
+  /*
+    Ambiguous, and sfall is the safe way round: sfall's is what ZAX writes, and Fission truncates and rebuilds
+    whatever it finds anyway, so guessing sfall costs a rebuild where guessing Fission would file an sfall list
+    under the wrong name.
+  */
+  it("reads an empty or comment-only file as sfall's", () => {
+    expect(orderFormatOf("")).toBe("sfall");
+    expect(orderFormatOf("; nothing here\n\n")).toBe("sfall");
+  });
+});
+
+describe("swapOrderTo", () => {
+  const platform = (files: Record<string, string>) =>
+    new MemoryPlatform({ home: "h", config: "h/c", cache: "h/cache", files });
+
+  const at = async (p: MemoryPlatform, path: string) =>
+    (await p.fs.stat(path)) === null ? null : new TextDecoder("latin1").decode(await p.fs.read(path));
+
+  const SLOT = "game/mods/mods_order.txt";
+  const SFALL_SIDE = "game/mods/mods_order.sfall.txt";
+  const FISSION_SIDE = "game/mods/mods_order.fission.txt";
+
+  it("files the sfall list aside and clears the slot for an engine that has none yet", async () => {
+    const p = platform({ [SLOT]: SFALL_ORDER });
+    await swapOrderTo(p, "game", "fission");
+    expect(await at(p, SFALL_SIDE)).toBe(SFALL_ORDER);
+    expect(await at(p, SLOT), "left for Fission to write its own").toBeNull();
+  });
+
+  it("puts a kept list back when there is one", async () => {
+    const p = platform({ [SLOT]: SFALL_ORDER, [FISSION_SIDE]: FISSION_ORDER });
+    await swapOrderTo(p, "game", "fission");
+    expect(await at(p, SLOT)).toBe(FISSION_ORDER);
+    expect(await at(p, SFALL_SIDE)).toBe(SFALL_ORDER);
+  });
+
+  /* The way back, which is the half that decides whether anything was actually kept. */
+  it("swaps back, so a round trip through Fission returns the sfall list byte for byte", async () => {
+    const p = platform({ [SLOT]: SFALL_ORDER });
+    await swapOrderTo(p, "game", "fission");
+    await p.fs.write(SLOT, new TextEncoder().encode(FISSION_ORDER));
+    await swapOrderTo(p, "game", "sfall");
+    expect(await at(p, SLOT)).toBe(SFALL_ORDER);
+    expect(await at(p, FISSION_SIDE), "and Fission's own list was kept on the way out").toBe(FISSION_ORDER);
+  });
+
+  it("does nothing when the slot already holds the format wanted", async () => {
+    const p = platform({ [SLOT]: SFALL_ORDER });
+    await swapOrderTo(p, "game", "sfall");
+    expect(await at(p, SLOT)).toBe(SFALL_ORDER);
+    expect(await at(p, SFALL_SIDE), "no sidecar is written until a swap actually moves the slot").toBeNull();
+  });
+
+  /* Keyed on the file rather than on a memory of who ran last, so a repeat is free and an interrupted one heals. */
+  it("is idempotent", async () => {
+    const p = platform({ [SLOT]: SFALL_ORDER, [FISSION_SIDE]: FISSION_ORDER });
+    await swapOrderTo(p, "game", "fission");
+    await swapOrderTo(p, "game", "fission");
+    await swapOrderTo(p, "game", "fission");
+    expect(await at(p, SLOT)).toBe(FISSION_ORDER);
+    expect(await at(p, SFALL_SIDE)).toBe(SFALL_ORDER);
+  });
+
+  it("restores a kept list into a folder whose slot is gone", async () => {
+    const p = platform({ [FISSION_SIDE]: FISSION_ORDER, "game/mods/mod_combat_speed.dat": "" });
+    await swapOrderTo(p, "game", "fission");
+    expect(await at(p, SLOT)).toBe(FISSION_ORDER);
+  });
+
+  it("leaves an install with neither a slot nor a sidecar alone", async () => {
+    const p = platform({ "game/fallout2.exe": "" });
+    await swapOrderTo(p, "game", "fission");
+    expect(await at(p, SLOT)).toBeNull();
+    expect(await at(p, FISSION_SIDE)).toBeNull();
+  });
+});
+
+describe("previewOrderSwap", () => {
+  const platform = (files: Record<string, string>) =>
+    new MemoryPlatform({ home: "h", config: "h/c", cache: "h/cache", files });
+
+  const FOLDER = {
+    "game/mods/rpu.dat": "",
+    "game/mods/hero_appearance/art/x.frm": "",
+    "game/mods/mod_combat_speed.dat": "",
+  };
+
+  it("answers with nothing where the engine reads what is already there", async () => {
+    const p = platform({ ...FOLDER, "game/mods/mods_order.txt": SFALL_ORDER });
+    expect(await previewOrderSwap(p, "game", "sfall")).toBeNull();
+  });
+
+  /*
+    No list of its own yet, so its first run scans the folder and turns on everything it finds - which for
+    Fission is the `mod_` dats and nothing else. That is the honest answer to "what will load", and it is the
+    run where a user is most likely to be surprised.
+  */
+  it("says what a first Fission run would load, from its folder scan", async () => {
+    const p = platform({ ...FOLDER, "game/mods/mods_order.txt": "rpu.dat\nhero_appearance\n" });
+    const swap = await previewOrderSwap(p, "game", "fission");
+    expect(swap?.from).toBe("sfall");
+    expect(swap?.to).toBe("fission");
+    expect(swap?.losing, "in the order the file loads them").toEqual(["rpu.dat", "hero_appearance"]);
+    expect(swap?.gaining).toEqual(["mod_combat_speed.dat"]);
+  });
+
+  it("reads a kept Fission list rather than assuming its scan, where one is filed here", async () => {
+    const p = platform({
+      ...FOLDER,
+      "game/mods/mods_order.txt": "rpu.dat\n",
+      "game/mods/mods_order.fission.txt":
+        "# FISSION mods_order.txt (pipe-separated)\n0|combat_speed|combat_speed|Combat Speed| | | |0\n",
+    });
+    const swap = await previewOrderSwap(p, "game", "fission");
+    expect(swap?.losing).toEqual(["rpu.dat"]);
+    expect(swap?.gaining, "the kept list has it switched off").toEqual([]);
+  });
+
+  /* The direction the user sees on the way back, and the one that only exists because the read stopped swapping. */
+  it("says what switching back to sfall restores", async () => {
+    const p = platform({
+      ...FOLDER,
+      "game/mods/mods_order.txt": FISSION_ORDER,
+      "game/mods/mods_order.sfall.txt": "rpu.dat\nhero_appearance\n",
+    });
+    const swap = await previewOrderSwap(p, "game", "sfall");
+    expect(swap?.from).toBe("fission");
+    expect(swap?.to).toBe("sfall");
+    expect(swap?.losing).toEqual(["mod_combat_speed.dat"]);
+    expect(swap?.gaining).toEqual(["rpu.dat", "hero_appearance"]);
+  });
+
+  /* Named only if it is actually there: a list may name a mod whose file has since gone. */
+  it("names nothing the folder does not hold", async () => {
+    const p = platform({ "game/mods/mods_order.txt": "gone.dat\n", "game/mods/mod_combat_speed.dat": "" });
+    const swap = await previewOrderSwap(p, "game", "fission");
+    expect(swap?.losing).toEqual([]);
+    expect(swap?.gaining).toEqual(["mod_combat_speed.dat"]);
+  });
+});
+
 describe("readMods", () => {
   const platform = (files: Record<string, string>) =>
     new MemoryPlatform({ home: "h", config: "h/c", cache: "h/cache", files });
+
+  /*
+    Reports the format and touches nothing. A read that rewrote the file would race an engine ZAX had just
+    started for the very file it is reading, and would rewrite the user's mod order because they opened a tab.
+  */
+  it("says which format it found and leaves the file exactly as it was", async () => {
+    const p = platform({
+      "game/mods/mods_order.txt": FISSION_ORDER,
+      "game/mods/mods_order.sfall.txt": SFALL_ORDER,
+      "game/mods/rpu.dat": "",
+    });
+    const snap = await readMods(p, install);
+    expect(snap.format).toBe("fission");
+    expect(snap.text).toBe(FISSION_ORDER);
+    const after = new TextDecoder("latin1").decode(await p.fs.read("game/mods/mods_order.txt"));
+    expect(after, "untouched").toBe(FISSION_ORDER);
+  });
+
+  it("calls a folder with no order file at all sfall's, which is what ZAX can edit", async () => {
+    const snap = await readMods(platform({ "game/mods/rpu.dat": "" }), install);
+    expect(snap.format).toBe("sfall");
+  });
+
+  /*
+    An install that never meets Fission never grows one of these. The swap writes a sidecar only when it moves
+    the slot, and the slot only moves when the format wanted differs from the format there - so reading, saving
+    and launching an sfall-only folder leaves the folder exactly as it was.
+  */
+  it("puts no sidecar in a folder that has only ever been sfall's", async () => {
+    const p = platform({ "game/mods/mods_order.txt": SFALL_ORDER, "game/mods/rpu.dat": "" });
+    await readMods(p, install);
+    await readMods(p, install);
+    const listed = (await p.fs.list("game/mods")).map((entry) => entry.name).toSorted();
+    expect(listed).toEqual(["mods_order.txt", "rpu.dat"]);
+  });
+
+  /* The sidecars sit in the folder it lists, and must not be offered as mods to load. */
+  it("does not take a sidecar for a mod", async () => {
+    const snap = await readMods(
+      platform({
+        "game/mods/mods_order.txt": SFALL_ORDER,
+        "game/mods/mods_order.sfall.txt": SFALL_ORDER,
+        "game/mods/mods_order.fission.txt": FISSION_ORDER,
+        "game/mods/rpu.dat": "",
+      }),
+      install,
+    );
+    expect(snap.present.map((e) => e.name)).toEqual(["rpu.dat"]);
+  });
 
   it("reads the file and the folder beside it", async () => {
     const snap = await readMods(
@@ -235,7 +454,7 @@ describe("readMods", () => {
 
   it("answers with nothing for an install that has no mods folder", async () => {
     const snap = await readMods(platform({ "game/fallout2.exe": "" }), install);
-    expect(snap).toEqual({ text: undefined, present: [], owners: [] });
+    expect(snap).toEqual({ text: undefined, format: "sfall", present: [], owners: [] });
   });
 
   it("ignores the order file and loose clutter when listing what could load", async () => {

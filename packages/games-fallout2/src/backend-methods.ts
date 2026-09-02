@@ -47,6 +47,7 @@ export const BACKEND_METHODS = [
   "latestZax",
   "listSaves",
   "createDebugPackage",
+  "orderSwap",
   "launch",
   "open",
   "wipe",

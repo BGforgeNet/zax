@@ -2,6 +2,7 @@
   import { GAME_TYPES, ownTarget, type GameType } from "@zax/core";
   import { createsInPlace, type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
+  import EngineCaution from "./EngineCaution.svelte";
   import SettingRow from "./SettingRow.svelte";
   import { isPreview } from "./host.js";
   import { MOD_ICON } from "./icons.js";
@@ -246,6 +247,18 @@
           title={store.modsChanged ? "The mod order has unsaved changes" : null}
         ></span>
       </button>
+      <!-- Only where the machine can actually run it: an install nothing holds a Fission build for has no
+         question to answer here, and a tab that is always present would be four tabs for three subjects. -->
+      {#if store.fissionEngine}
+        <button
+          role="tab"
+          class="tab"
+          aria-selected={store.modsTab === "fission"}
+          onclick={() => (store.modsTab = "fission")}
+        >
+          Fission load order
+        </button>
+      {/if}
       <button
         role="tab"
         class="tab"
@@ -398,6 +411,57 @@
           {#if store.modListing.offers.length === 0 && store.modListing.failures.length === 0}
             <p class="empty">No mod feeds are known for this game yet.</p>
           {/if}
+        {/if}
+      {:else if store.modsTab === "fission"}
+        <!-- The same caution the engine list and the launch carry, over the list it is about: this tab is the
+           one place the consequence is visible as a list rather than as a sentence. -->
+        {#if store.fissionEngine?.caution}
+          <div class="caution-slot">
+            <EngineCaution text={store.fissionEngine.caution} title="What Fission will load" />
+          </div>
+        {/if}
+        <div class="list">
+          {#each store.fissionMods as mod (mod.name)}
+            <!-- Read-only: the order file this reflects is sfall's, and Fission rewrites its own from a folder
+               scan at every start, so a tick here would promise something no file could keep. The Load order
+               tab is where the list is edited. -->
+            <!-- No enabled state on these rows, unlike the load order's: the tick there is a comment marker in
+               a file Fission does not read, and its folder scan finds a commented-out dat exactly as it finds
+               any other. Dimming one here would report an sfall fact as a Fission one. -->
+            <div class="mod">
+              <span class="name">{mod.name}</span>
+              <span class="badge">{KIND_LABEL[mod.kind]}</span>
+              {#if mod.owner}
+                <span class="owner">{mod.owner}</span>
+              {/if}
+            </div>
+          {:else}
+            <p class="empty">
+              Nothing in this install's <code>mods</code> folder is named the way Fission needs. It would start with no mods
+              loaded.
+            </p>
+          {/each}
+        </div>
+        <!-- What Fission cannot see, named rather than left out. A list quietly missing half the folder reads as
+           the folder being half empty, which is the wrong conclusion to lead someone to. -->
+        {#if store.fissionMissed.length > 0}
+          <div class="missed">
+            <p class="missed-head">
+              {store.fissionMissed.length === 1 ? "One entry is" : `${store.fissionMissed.length} entries are`} in the mods
+              folder and will not load under Fission:
+            </p>
+            <div class="list">
+              {#each store.fissionMissed as mod (mod.name)}
+                <div class="mod skipped">
+                  <span class="name">{mod.name}</span>
+                  <span class="badge">{KIND_LABEL[mod.kind]}</span>
+                  {#if mod.owner}
+                    <span class="owner">{mod.owner}</span>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </div>
         {/if}
       {:else if store.modsTab === "order"}
         <!-- The strip is absent only where there is no list to act on. The sort is disabled rather than
@@ -810,6 +874,33 @@
 
   .mod:hover {
     background: var(--panel-alt);
+  }
+
+  /* The gutter the rows carry, so the block lines up with the names under it rather than with the pane edge. */
+  .caution-slot {
+    padding: 8px var(--gutter) 0;
+  }
+
+  .missed {
+    margin-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .missed-head {
+    margin: 0;
+    padding: 10px var(--gutter) 4px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  /*
+    Struck through as a missing entry is, and for the same reason: the row names something the engine will not
+    load. Not the invalid red - nothing here is broken, these mods work under sfall - and the rule carries the
+    state where colour alone would not.
+  */
+  .skipped .name {
+    text-decoration: line-through;
+    color: var(--text-dim);
   }
 
   /* Above the list rather than in it - these act on the order as a whole - and drawn where the Installation

@@ -130,17 +130,43 @@ export const previewPlatform: Platform = (() => {
         shipped recommendation ranks, seeded the wrong way round, which is what the load-order advice has to
         say something about. None of these names is a marker `detectGameType` reads, or seeding them would
         relabel the preview install as a different game.
+
+        The two `mod_` names are here for the Fission sub-tab, which splits this folder by what that engine's
+        own folder scan would find. Without one of them that tab could only draw its empty half, and the split
+        it exists to show - most of a working mods folder invisible to one engine - would never appear. One of
+        the two is commented out, which that tab lists all the same: the marker is sfall's and the folder scan
+        Fission runs does not read it.
       */
       [`${PREVIEW_INSTALL}/mods/mods_order.txt`]:
         "; Loaded in this order - a mod further down overrides one above it.\n" +
         "weapon_sounds.dat\n; extra_music.dat\nhero_appearance\nold_patch.dat\nold_music.dat\n" +
-        "InventoryFilter.dat\nfo2tweaks.dat\n",
+        "InventoryFilter.dat\nfo2tweaks.dat\nmod_combat_speed.dat\n; mod_dialog_fix.dat\n",
       [`${PREVIEW_INSTALL}/mods/InventoryFilter.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/fo2tweaks.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/weapon_sounds.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/extra_music.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/barter_prices.dat`]: "",
+      [`${PREVIEW_INSTALL}/mods/mod_combat_speed.dat`]: "",
+      [`${PREVIEW_INSTALL}/mods/mod_dialog_fix.dat`]: "",
       [`${PREVIEW_INSTALL}/mods/hero_appearance/art/critters/hmjmps.frm`]: "",
+      // What the engine record above claims is deployed here. Present, or reconciliation reads it as removed.
+      [`${PREVIEW_INSTALL}/fallout-fission-linux-x64`]: "",
+      [`${PREVIEW_INSTALL}/fission.dat`]: "",
+
+      /*
+        A second folder, left as Fission last wrote it. The Mods tab stands down over an order file in a format
+        ZAX cannot edit, and that state is only reachable by having one - the preview refuses a launch, which is
+        the only thing that would otherwise put a folder into it.
+      */
+      "fixtures/f2rpu/mods/mods_order.txt":
+        "# FISSION mods_order.txt (pipe-separated)\n" +
+        "# Format: enabled|datName|internalName|displayName|author|description|dependencies|iconIndex\n" +
+        "1|combat_speed|combat_speed|Combat Speed|Some Author|Faster combat| |7\n" +
+        "0|dialog_fix|dialog_fix|Dialog Fix|Some Author|Fixes dialog| |3\n",
+      "fixtures/f2rpu/mods/mods_order.sfall.txt": "rpu.dat\nbarter_prices.dat\n",
+      "fixtures/f2rpu/mods/mod_combat_speed.dat": "",
+      "fixtures/f2rpu/mods/mod_dialog_fix.dat": "",
+      "fixtures/f2rpu/mods/barter_prices.dat": "",
       [`${PREVIEW_INSTALL}/mods/fo2tweaks.ini`]: fo2tweaksIni,
       "preview/config/zax.yml": PREVIEW_STATE_YML,
     },
@@ -182,24 +208,41 @@ await saveRecord(previewPlatform, {
       shipped: { "mods/fo2tweaks.ini": fo2tweaksIni },
     },
   ],
+  /*
+    Fission deployed in this folder, which is what the Mods tab's Fission sub-tab follows: the machine's cache
+    says one could be run here, the record says one has been. The files below are what the deployment put there,
+    and `reconcileRecord` checks they are still present, so seeding the record alone would read as removed.
+  */
+  engines: [
+    {
+      id: "fission",
+      release: "beta-0.9.6.8",
+      published: "2026-06-14T00:00:00Z",
+      complete: true,
+      files: ["fallout-fission-linux-x64", "fission.dat"],
+    },
+  ],
 });
 
 /*
-  Two builds of one engine, so the Run button's chooser has something to choose between and the Engines tab has
-  rows. Written the way the cache writes them - the archive, and the note naming what it is - rather than through
-  a download the preview refuses. `MemoryPlatform` is linux/x64, which is the asset `buildFor` picks.
+  Builds of both engines, so the Run button's chooser has something to choose between, the Engines tab has rows,
+  and the surfaces that only exist for an engine the machine can run - Fission's caution before a launch, and the
+  Mods tab's Fission list - are reachable here rather than only in the desktop build. Written the way the cache
+  writes them - the archive, and the note naming what it is - rather than through a download the preview refuses.
+  `MemoryPlatform` is linux/x64, which is the asset `buildFor` picks for each.
 */
-const cachedBuild = async (published: string) => {
-  const at = `preview/cache/packages/engines/fallout2-ce/${published.replace(/[^0-9]/g, "")}`;
-  await previewPlatform.fs.write(`${at}/fallout2-ce-linux-x64.tar.gz`, new TextEncoder().encode("preview"));
+const cachedBuild = async (engine: string, asset: string, release: string, published: string) => {
+  const at = `preview/cache/packages/engines/${engine}/${published.replace(/[^0-9]/g, "")}`;
+  await previewPlatform.fs.write(`${at}/${asset}`, new TextEncoder().encode("preview"));
   await previewPlatform.fs.write(
     `${at}/release.json`,
-    new TextEncoder().encode(JSON.stringify({ release: "continious", published, commit: null })),
+    new TextEncoder().encode(JSON.stringify({ release, published, commit: null })),
   );
 };
 
-await cachedBuild("2026-07-01T00:00:00Z");
-await cachedBuild("2026-08-23T09:37:22Z");
+await cachedBuild("fallout2-ce", "fallout2-ce-linux-x64.tar.gz", "continious", "2026-07-01T00:00:00Z");
+await cachedBuild("fallout2-ce", "fallout2-ce-linux-x64.tar.gz", "continious", "2026-08-23T09:37:22Z");
+await cachedBuild("fission", "fallout-fission-linux-x64.zip", "beta-0.9.6.8", "2026-06-14T00:00:00Z");
 
 /*
   Per release, the note that its author publishes no manifest of their own - which is what sends the base mods

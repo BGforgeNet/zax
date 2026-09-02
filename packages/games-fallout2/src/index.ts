@@ -10,6 +10,8 @@ export { planLaunch } from "./launch.js";
 export { installedSfallVersion, latestSfall, updateSfall, type SfallRelease, type SfallUpdate } from "./sfall.js";
 export { installedHiresVersion } from "./hires.js";
 export { ENGINES, buildFor, engineById } from "./engines.js";
+export { FISSION_CAUTION, FISSION_ID, fissionMounts } from "./fission.js";
+export { orderFormatOf, previewOrderSwap, sidecarFile, swapOrderTo, type OrderFormat, type OrderSwap } from "./mods.js";
 export { engineOutdated, engineReleases, forgetEngine, latestEngine, type EngineRelease } from "./engine-release.js";
 export { installedEngines, type EngineInstallOutcome } from "./engine-install.js";
 export {
