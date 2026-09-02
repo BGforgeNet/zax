@@ -74,8 +74,9 @@
   .frame {
     display: flex;
     flex-direction: column;
-    /* Bounded here rather than on the body, so a long list scrolls inside the dialog and the footer stays put. */
-    max-height: min(70vh, 560px);
+    /* Bounded here rather than on the body, so a long list scrolls inside the dialog and the footer stays put.
+       Most of the viewport, since this is the only scroll region: the lists inside do not cap themselves. */
+    max-height: min(86vh, 760px);
   }
 
   .head {

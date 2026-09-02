@@ -269,12 +269,11 @@
     font-size: 12.5px;
   }
 
-  /* One per line, and scrolling rather than growing without bound: a folder can hold a great many of these. */
+  /* One per line, and uncapped: three of these can be on screen at once, and a cap on each turns one dialog
+     scrollbar into three nested ones. The dialog frame bounds the lot. */
   .missed-list {
     margin: 0;
     padding-left: 18px;
-    max-height: 11rem;
-    overflow-y: auto;
   }
 
   .missed-list li {
