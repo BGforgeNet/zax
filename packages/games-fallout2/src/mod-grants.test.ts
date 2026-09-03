@@ -42,7 +42,6 @@ const releaseFor = async (id: string): Promise<ModRelease> => {
   return {
     manifest: parseManifest(new TextEncoder().encode(text)),
     manifestText: text,
-    manifestFromAsset: true,
     archive: { name: "hqmusic.zip", url: URL, digest: `sha256:${await sha(PAYLOAD)}` },
   };
 };
@@ -64,16 +63,22 @@ const gamePlatform = (files: Record<string, string> = {}) =>
 
 describe("a mod's grant", () => {
   it("lets its manifest name a path the grant covers, and refuses the same path to a mod without one", () => {
-    const granted = parseManifest(new TextEncoder().encode(manifestFor("hqmusic", `state:\n  - ${MUSIC}/list.ini\n`)));
-    expect(granted.state).toEqual([`${MUSIC}/list.ini`]);
-    expect(() =>
-      parseManifest(new TextEncoder().encode(manifestFor("fo2tweaks", `state:\n  - ${MUSIC}/list.ini\n`))),
-    ).toThrow(/outside what ZAX grants fo2tweaks/);
+    const named = (id: string) =>
+      manifestFor(id, `settings:\n  main.volume: { kind: bool, label: Volume, file: ${MUSIC}/list.ini }\n`);
+    const granted = parseManifest(new TextEncoder().encode(named("hqmusic")));
+    expect(granted.settings[0]?.targets).toEqual([{ file: `${MUSIC}/list.ini`, section: "main", key: "volume" }]);
+    expect(() => parseManifest(new TextEncoder().encode(named("fo2tweaks")))).toThrow(
+      /outside what ZAX grants fo2tweaks/,
+    );
   });
 
   it("does not stretch to a sibling of the granted directory", () => {
     expect(() =>
-      parseManifest(new TextEncoder().encode(manifestFor("hqmusic", "state:\n  - data/sound/sfx/list.ini\n"))),
+      parseManifest(
+        new TextEncoder().encode(
+          manifestFor("hqmusic", "settings:\n  main.a: { kind: bool, label: A, file: data/sound/sfx/list.ini }\n"),
+        ),
+      ),
     ).toThrow(/outside what ZAX grants hqmusic/);
   });
 

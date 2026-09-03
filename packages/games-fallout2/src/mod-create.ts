@@ -27,7 +27,7 @@ import type { ModCreates, ModManifest } from "./manifest.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import { createdInstallPath, noUpgradeHere } from "./mod-created.js";
 import type { ModRelease, ReleaseAsset } from "./mod-feed.js";
-import { refusalFor } from "./mod-install.js";
+import { conflictFor } from "./mod-install.js";
 import { holdUserFiles, mergeUserFiles, restoreUserFiles } from "./mod-state.js";
 import { modWorkDirectory } from "./mod-transaction.js";
 import { MODS_ORDER_PATH } from "./mods.js";
@@ -187,18 +187,13 @@ async function confinedEntries(
  * Case-insensitively unique: the manifest spells the directory its own way and the archive spells its entries
  * theirs, so `ddraw.ini` arrives from both sides and holding one file twice would back it up twice.
  */
-function userSettings(
-  manifest: ModManifest,
-  creates: ModCreates,
-  entries: readonly ArchiveEntryInfo[],
-): readonly string[] {
-  // A declared path is read inside the install this makes, as `extract-dat`'s are: the manifest describes the
-  // game it installs, and the folder that game sits in is ZAX's to know rather than the author's to repeat.
-  const declared =
-    manifest.state?.map((name) => `${creates.directory}/${name}`) ??
-    CONFIG_FILES.map((name) => `${creates.directory}/${name}`).concat(
-      entries.filter((entry) => entry.kind === "file" && /\.ini$/i.test(entry.name)).map((entry) => entry.name),
-    );
+function userSettings(creates: ModCreates, entries: readonly ArchiveEntryInfo[]): readonly string[] {
+  // The game's own config files inside the install this makes, plus every ini the payload carries - derived
+  // rather than declared, since a mod that installs a game ships a directory of settings and a listed copy
+  // would go stale against the release that adds one.
+  const declared = CONFIG_FILES.map((name) => `${creates.directory}/${name}`).concat(
+    entries.filter((entry) => entry.kind === "file" && /\.ini$/i.test(entry.name)).map((entry) => entry.name),
+  );
   const seen = new Set<string>();
   return declared.filter((path) => (seen.has(path.toLowerCase()) ? false : seen.add(path.toLowerCase())));
 }
@@ -249,7 +244,7 @@ export async function planCreateInstall(
   const resuming = record.mods.some((mod) => mod.id === manifest.id && !mod.complete);
   if (!resuming) {
     if ((await platform.fs.stat(created)) !== null) throw new Error(alreadyThere(manifest, install));
-    const refusal = await refusalFor(platform, install, release);
+    const refusal = await conflictFor(platform, install, release);
     if (refusal !== null) throw new Error(refusal);
   }
 
@@ -351,7 +346,7 @@ export async function applyCreateInstall(
   const resuming = record.mods.some((mod) => mod.id === manifest.id && !mod.complete);
   if (!resuming) {
     if ((await platform.fs.stat(created)) !== null) throw new Error(alreadyThere(manifest, install));
-    const refusal = await refusalFor(platform, install, release);
+    const refusal = await conflictFor(platform, install, release);
     if (refusal !== null) throw new Error(refusal);
   }
 
@@ -392,7 +387,7 @@ export async function applyCreateInstall(
   // ships that game's order file, while an installer that adds a mod to this game rewrites the order to put
   // its own dat in - and putting the user's copy back over that would take the mod they just installed out.
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
-  const stateFiles = userSettings(manifest, creates, entries);
+  const stateFiles = userSettings(creates, entries);
   const mine = await holdUserFiles(platform, install.path, stateFiles, backup);
   const ordering = [`${creates.directory}/${MODS_ORDER_PATH}`];
   const order = await holdUserFiles(platform, install.path, ordering, backup);

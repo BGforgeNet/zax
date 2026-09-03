@@ -21,7 +21,7 @@ describe("parseManifest", () => {
       name: "FO2tweaks",
       version: "14.7",
       type: "pluggable",
-      refuse: [],
+      conflicts: [],
       settings: [],
       dropped: [],
     });
@@ -40,11 +40,10 @@ game: fallout2
 type: permanent
 reason: EcCo's changes live in the save; removing it breaks every save made while it was in.
 archive: ecco_v1-0-0.zip
-install-on: [fallout2rpu]
-requires:
-  sfall: ">=4.4.5"
-state: [mods/ecco/combat.ini]
-refuse:
+needs:
+  game: [fallout2rpu]
+  sfall: "4.4.5"
+conflicts:
   - when: { present: [mods/other.dat], absent: [mods/ecco.dat] }
     reason: Not with Other installed.
 settings:
@@ -78,8 +77,7 @@ settings:
     expect(manifest.archive).toBe("ecco_v1-0-0.zip");
     expect(manifest.installOn).toEqual(["fallout2rpu"]);
     expect(manifest.requiresSfall).toBe("4.4.5");
-    expect(manifest.state).toEqual(["mods/ecco/combat.ini"]);
-    expect(manifest.refuse).toEqual([
+    expect(manifest.conflicts).toEqual([
       { present: ["mods/other.dat"], absent: ["mods/ecco.dat"], reason: "Not with Other installed." },
     ]);
     const [enabled, level, mode] = manifest.settings;
@@ -110,12 +108,10 @@ settings:
   });
 
   it("normalizes backslashes in paths", () => {
-    const manifest = parsed(`${FO2TWEAKS}state: ["mods\\\\fo2tweaks.ini"]\n`);
-    expect(manifest.state).toEqual(["mods/fo2tweaks.ini"]);
-  });
-
-  it("ignores the extra block, the one place leniency lives", () => {
-    expect(parsed(`${FO2TWEAKS}extra:\n  anything: { nested: [1, 2] }\n`).id).toBe("fo2tweaks");
+    const manifest = parsed(
+      `${FO2TWEAKS}settings:\n  main.a: { kind: bool, label: A, file: "mods\\\\fo2tweaks.ini" }\n`,
+    );
+    expect(manifest.settings[0]?.targets).toEqual([{ file: "mods/fo2tweaks.ini", section: "main", key: "a" }]);
   });
 });
 
@@ -134,12 +130,12 @@ describe("parseManifest refusals", () => {
   const refuses = (text: string, cause: RegExp | string) => expect(() => parsed(text)).toThrow(cause);
 
   it("refuses bytes past the cap before parsing", () => {
-    const padded = FO2TWEAKS + `extra: "${"x".repeat(MANIFEST_BYTE_CAP)}"\n`;
+    const padded = FO2TWEAKS + `# ${"x".repeat(MANIFEST_BYTE_CAP)}\n`;
     refuses(padded, /byte cap/);
   });
 
   it("refuses an alias flood", () => {
-    const flood = `${FO2TWEAKS}extra:\n  a: &a [x, x, x]\n  b: [${Array(100).fill("*a").join(", ")}]\n`;
+    const flood = `${FO2TWEAKS}conflicts:\n  a: &a [x, x, x]\n  b: [${Array(100).fill("*a").join(", ")}]\n`;
     refuses(flood, /does not parse/);
   });
 
@@ -197,14 +193,21 @@ describe("parseManifest refusals", () => {
   });
 
   it("refuses every path shape that could leave the game directory", () => {
-    refuses(`${FO2TWEAKS}state: ["mods/../fallout2.exe"]\n`, /leaves the game directory/);
-    refuses(`${FO2TWEAKS}state: ["/etc/passwd"]\n`, /leaves the game directory/);
-    refuses(`${FO2TWEAKS}state: ["C:\\\\game\\\\mods\\\\a.ini"]\n`, /leaves the game directory/);
-    refuses(`${FO2TWEAKS}refuse:\n  - when: { present: ["../marker"] }\n    reason: no\n`, /leaves the game directory/);
+    const setting = (file: string) => `${FO2TWEAKS}settings:\n  main.a: { kind: bool, label: A, file: "${file}" }\n`;
+    refuses(setting("mods/../fallout2.exe"), /leaves the game directory/);
+    refuses(setting("/etc/passwd"), /leaves the game directory/);
+    refuses(setting("C:\\\\game\\\\mods\\\\a.ini"), /leaves the game directory/);
+    refuses(
+      `${FO2TWEAKS}conflicts:\n  - when: { present: ["../marker"] }\n    reason: no\n`,
+      /leaves the game directory/,
+    );
   });
 
   it("confines a stacking mod's files to mods/, naming the grant as ZAX's rather than the mod's fault", () => {
-    refuses(`${FO2TWEAKS}state: [data/scripts/gl_a.int]\n`, /outside what ZAX grants fo2tweaks/);
+    refuses(
+      `${FO2TWEAKS}settings:\n  main.a: { kind: bool, label: A, file: data/scripts/gl_a.int }\n`,
+      /outside what ZAX grants fo2tweaks/,
+    );
     const outside = `${FO2TWEAKS}settings:\n  main.a:\n    { file: ddraw.ini, kind: key, label: A }\n`;
     refuses(outside, /outside what ZAX grants fo2tweaks/);
     // Where to ask matters as much as the refusal: the list is ZAX's, so a mod that needs a path it does not
@@ -288,17 +291,18 @@ describe("parseManifest refusals", () => {
     refuses(FO2TWEAKS.replace("name: FO2tweaks", 'name: "FO2\\u0007tweaks"'), /control characters/);
   });
 
-  it("refuses a requires bound that is not >=", () => {
-    refuses(`${FO2TWEAKS}requires:\n  sfall: "4.1.3"\n`, /not a ">=version" bound/);
+  it("refuses an sfall floor that is not a version", () => {
+    // The bare version is the whole vocabulary: an operator would promise a comparison nothing implements.
+    refuses(`${FO2TWEAKS}needs:\n  sfall: ">=4.1.3"\n`, /not a version/);
   });
 
-  it("refuses install-on naming an unknown game type, or nothing", () => {
-    refuses(`${FO2TWEAKS}install-on: [fallout3]\n`, /newer version of ZAX/);
-    refuses(`${FO2TWEAKS}install-on: []\n`, /install nowhere/);
+  it("refuses a needed game type it cannot detect, or none at all", () => {
+    refuses(`${FO2TWEAKS}needs:\n  game: [fallout3]\n`, /newer version of ZAX/);
+    refuses(`${FO2TWEAKS}needs:\n  game: []\n`, /install nowhere/);
   });
 
-  it("refuses a refuse rule that tests nothing", () => {
-    refuses(`${FO2TWEAKS}refuse:\n  - when: {}\n    reason: no\n`, /tests nothing/);
+  it("refuses a conflict rule that tests nothing", () => {
+    refuses(`${FO2TWEAKS}conflicts:\n  - when: {}\n    reason: no\n`, /tests nothing/);
   });
 
   it("refuses an archive name that is not a bare file name", () => {
@@ -482,7 +486,7 @@ version: "2.4.34"
 game: fallout2
 type: base
 becomes: fallout2rpu
-refuse:
+conflicts:
   - when: { present: [up-changelog.txt], absent: [rp-changelog.txt] }
     reason: RPU cannot be installed over killap's Unofficial Patch.
 installer:

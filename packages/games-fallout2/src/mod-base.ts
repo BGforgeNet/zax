@@ -21,7 +21,7 @@ import { caseSensitiveAt, lowercaseTree, mixedCasePaths } from "./case-lowering.
 import type { ModComponent, ModManifest } from "./manifest.js";
 import { chooseFrom } from "./mod-choice.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
-import { refusalFor } from "./mod-install.js";
+import { conflictFor } from "./mod-install.js";
 import { modWorkDirectory } from "./mod-transaction.js";
 import type { ModRelease } from "./mod-feed.js";
 import { assertUsable, loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
@@ -109,7 +109,7 @@ export async function planBaseInstall(
   // every release after the first.
   const upgrading = isSameInstall(record, install, manifest);
   if (!upgrading) {
-    const refusal = await refusalFor(platform, install, release);
+    const refusal = await conflictFor(platform, install, release);
     if (refusal !== null) throw new Error(refusal);
   }
 
@@ -250,7 +250,7 @@ export async function applyBaseInstall(
   const previous = record.mods.find((mod) => mod.id === manifest.id && mod.complete);
   const upgrading = isSameInstall(record, install, manifest);
   if (!upgrading) {
-    const refusal = await refusalFor(platform, install, release);
+    const refusal = await conflictFor(platform, install, release);
     if (refusal !== null) throw new Error(refusal);
   }
 
@@ -258,8 +258,7 @@ export async function applyBaseInstall(
   // does, and held in memory because the installer is about to write over them. A base mod deploys its own
   // sfall and hi-res patch, so without this an install would reset two of ZAX's settings tabs.
   const backup = platform.paths.join(backupDirectory(platform), stamp(now));
-  const stateFiles = manifest.state ?? [...CONFIG_FILES];
-  const mine = await holdUserFiles(platform, install.path, stateFiles, backup);
+  const mine = await holdUserFiles(platform, install.path, CONFIG_FILES, backup);
 
   // Before the payload lands, and on a first install only: what arrives with the mod is spelled the way the
   // mod spells it, and `mods/AmmoGlovz.ini` is upstream's file rather than something to rename.
@@ -320,7 +319,7 @@ export async function applyBaseInstall(
 
   // After the installer rather than before it, which is the one thing that differs from a stacking mod: the
   // installer owns writing these files, so the user's values go back in once it has written them.
-  const { shipped, conflicts } = await mergeUserFiles(platform, install.path, stateFiles, mine, previous?.shipped);
+  const { shipped, conflicts } = await mergeUserFiles(platform, install.path, CONFIG_FILES, mine, previous?.shipped);
 
   await saveRecord(
     platform,

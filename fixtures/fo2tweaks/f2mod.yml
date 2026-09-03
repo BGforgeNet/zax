@@ -11,10 +11,10 @@ id: fo2tweaks
 name: FO2tweaks
 game: fallout2
 
-requires:
+needs:
   # The lowest version the mod works with, as the readme states it - not the 4.5 the payload bundles,
   # which ZAX ignores in favour of its own sfall updater.
-  sfall: ">=4.1.3"
+  sfall: "4.1.3"
 
 settings:
   # ----- Components -------------------------------------------------------------------------------------

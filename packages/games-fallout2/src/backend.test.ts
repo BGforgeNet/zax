@@ -262,7 +262,6 @@ describe("installing a mod", () => {
         versions.map(async (version) => ({
           tag_name: `v${version}`,
           assets: [
-            { name: "f2mod.yml", browser_download_url: `https://example.test/${version}/f2mod.yml` },
             {
               name: "fo2tweaks.zip",
               browser_download_url: `https://example.test/${version}/fo2tweaks.zip`,
@@ -279,7 +278,9 @@ describe("installing a mod", () => {
       files: { "/games/one/fallout2.exe": "MZ" },
       responses: {
         [RELEASES]: await listing(versions),
-        ...Object.fromEntries(versions.map((v) => [`https://example.test/${v}/f2mod.yml`, manifest(v)])),
+        ...Object.fromEntries(
+          versions.map((v) => [`https://raw.githubusercontent.com/${REPO}/v${v}/f2mod.yml`, manifest(v)]),
+        ),
       },
       downloads: Object.fromEntries(versions.map((v) => [`https://example.test/${v}/fo2tweaks.zip`, payload(v)])),
       archives: Object.fromEntries(
@@ -383,13 +384,10 @@ installer:
         [RELEASES]: JSON.stringify([
           {
             tag_name: "v1.4",
-            assets: [
-              { name: "f2mod.yml", browser_download_url: "https://example.test/f2mod.yml" },
-              { name: "upu.zip", browser_download_url: ZIP, digest: `sha256:${await sha(PAYLOAD)}` },
-            ],
+            assets: [{ name: "upu.zip", browser_download_url: ZIP, digest: `sha256:${await sha(PAYLOAD)}` }],
           },
         ]),
-        "https://example.test/f2mod.yml": MANIFEST,
+        [`https://raw.githubusercontent.com/${REPO}/v1.4/f2mod.yml`]: MANIFEST,
       },
       downloads: { [ZIP]: PAYLOAD },
       archives: { [PAYLOAD]: { "upu-install.sh": "#!/bin/sh\n", "mods/upu.dat": "DAT" } },
@@ -470,13 +468,10 @@ extract-dat:
         [RELEASES]: JSON.stringify([
           {
             tag_name: "v1.16.3771",
-            assets: [
-              { name: "f2mod.yml", browser_download_url: "https://example.test/f2mod.yml" },
-              { name: "Fallout1in2.zip", browser_download_url: ZIP, digest: `sha256:${await sha(PAYLOAD)}` },
-            ],
+            assets: [{ name: "Fallout1in2.zip", browser_download_url: ZIP, digest: `sha256:${await sha(PAYLOAD)}` }],
           },
         ]),
-        "https://example.test/f2mod.yml": MANIFEST,
+        [`https://raw.githubusercontent.com/${REPO}/v1.16.3771/f2mod.yml`]: MANIFEST,
       },
       downloads: { [ZIP]: PAYLOAD },
       archives: {

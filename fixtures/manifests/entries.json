@@ -8,7 +8,7 @@
       "InventoryFilter.dat",
       "patches/extra.dat"
     ],
-    "refuse": [],
+    "conflicts": [],
     "settings": [],
     "dropped": []
   }

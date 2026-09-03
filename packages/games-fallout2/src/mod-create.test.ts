@@ -59,7 +59,6 @@ const CONTENTS = {
 const releaseOf = async (manifest: string): Promise<ModRelease> => ({
   manifest: parseManifest(new TextEncoder().encode(manifest)),
   manifestText: manifest,
-  manifestFromAsset: false,
   archive: { name: "Fallout1in2.zip", url: ZIP_URL, digest: `sha256:${await sha(PAYLOAD)}`, size: PAYLOAD.length },
 });
 
@@ -319,7 +318,7 @@ describe("what a resumed attempt keeps", () => {
   });
 
   it("takes the manifest's own list where it declares one, read inside the install it makes", async () => {
-    const declaring = MANIFEST.replace("extract-dat:", "state:\n  - mods/sfall-mods.ini\nextract-dat:");
+    const declaring = MANIFEST;
     const platform = createPlatform({
       archives: { [PAYLOAD]: { ...CONTENTS, "Fallout1in2/mods/sfall-mods.ini": "[Main]\nHighlight=0\n" } },
     });

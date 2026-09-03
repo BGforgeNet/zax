@@ -16,7 +16,7 @@
       }
     ],
     "extractDat": { "from": "fallout1", "list": "undat_files.txt", "into": "data" },
-    "refuse": [],
+    "conflicts": [],
     "settings": [],
     "dropped": []
   }

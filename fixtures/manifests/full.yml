@@ -6,15 +6,11 @@ game: fallout2
 type: permanent
 reason: EcCo's changes live in the save; removing it breaks every save made while it was in.
 archive: ecco_v1-0-0.zip
-install-on: [fallout2upu, fallout2rpu]
-requires:
-  sfall: ">=4.4.5"
-state:
-  - mods/ecco.ini
+needs:
+  game: [fallout2upu, fallout2rpu]
+  sfall: "4.4.5"
 entries:
   - ecco.dat
-refuse:
+conflicts:
   - when: { present: [mods/other.dat], absent: [mods/compat.ini] }
     reason: Not alongside Other without its compatibility patch.
-extra:
-  whatever: an author's own data, ignored by contract

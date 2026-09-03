@@ -5,7 +5,7 @@ version: "2.4.34"
 game: fallout2
 type: base
 becomes: fallout2rpu
-refuse:
+conflicts:
   - when: { present: [up-changelog.txt], absent: [rp-changelog.txt] }
     reason: RPU cannot be installed over killap's Unofficial Patch.
 installer:

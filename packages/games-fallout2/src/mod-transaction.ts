@@ -48,12 +48,11 @@ export interface ModTransaction {
   selection?: readonly string[];
   manifestText: string;
   /**
-   * The version this install resolved to, and whether the release published the manifest. Both are part of
-   * the pin rather than re-derivable: a manifest read from the repository states no version, so the tag it
-   * came from is the only thing that knows which release a retry is finishing.
+   * The version this install resolved to, part of the pin rather than re-derivable: a manifest read from the
+   * repository states no version, so the tag it came from is the only thing that knows which release a retry
+   * is finishing.
    */
   version: string;
-  manifestFromAsset: boolean;
   /** The record entry this install replaces, or null when it replaces nothing. The restore's target. */
   previous: InstalledMod | null;
   /** `mods_order.txt` exactly as it stood, or null when the install had none - the other half of that target. */
@@ -94,7 +93,7 @@ export async function readTransaction(
   // A journal written to a format this version does not know is not a journal it can resume from safely.
   if (journal.transaction !== TRANSACTION_FORMAT) return null;
   if (typeof journal.id !== "string" || typeof journal.manifestText !== "string") return null;
-  if (typeof journal.version !== "string" || typeof journal.manifestFromAsset !== "boolean") return null;
+  if (typeof journal.version !== "string") return null;
   // One or the other: a parts release has no single payload, and a journal with neither pins nothing.
   if (journal.archive === undefined && journal.parts === undefined) return null;
   return {
@@ -104,7 +103,6 @@ export async function readTransaction(
     ...(journal.selection !== undefined ? { selection: journal.selection } : {}),
     manifestText: journal.manifestText,
     version: journal.version,
-    manifestFromAsset: journal.manifestFromAsset,
     previous: journal.previous ?? null,
     order: journal.order ?? null,
     preexisting: Array.isArray(journal.preexisting) ? journal.preexisting : [],
@@ -132,7 +130,6 @@ export function releaseOf(transaction: ModTransaction): ModRelease {
       ...(transaction.archive ? { archive: transaction.archive.name } : {}),
     }),
     manifestText: transaction.manifestText,
-    manifestFromAsset: transaction.manifestFromAsset,
     ...(transaction.archive ? { archive: transaction.archive } : {}),
     ...(transaction.parts ? { parts: transaction.parts } : {}),
   };

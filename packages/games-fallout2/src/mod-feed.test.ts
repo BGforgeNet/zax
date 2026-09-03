@@ -44,10 +44,9 @@ const wholeListing = async (
 const manifestText = (id: string, version: string, rest = "") =>
   `spec: 1\nid: ${id}\nname: ${id}\nversion: "${version}"\ngame: fallout2\narchive: ${id}.zip\n${rest}`;
 
-const release = (tag: string, withManifest: boolean, extraAssets: object[] = []) => ({
+const release = (tag: string, extraAssets: object[] = []) => ({
   tag_name: tag,
   assets: [
-    ...(withManifest ? [{ name: "f2mod.yml", browser_download_url: `https://example.test/${tag}/f2mod.yml` }] : []),
     {
       name: "fo2tweaks.zip",
       browser_download_url: `https://example.test/${tag}/fo2tweaks.zip`,
@@ -94,9 +93,9 @@ describe("fetchFeed", () => {
   it("takes the newest release that carries the followed id, skipping ones without a manifest", async () => {
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v15", false), release("v14.7", true)]),
+        [RELEASES_URL]: JSON.stringify([release("v15"), release("v14.7")]),
         [atTag("v15")]: 404,
-        "https://example.test/v14.7/f2mod.yml": manifestText("fo2tweaks", "14.7"),
+        [atTag("v14.7")]: manifestText("fo2tweaks", "14.7"),
       },
     });
     const found = await fetchFeed(platform, FEED);
@@ -113,9 +112,9 @@ describe("fetchFeed", () => {
     // GitHub lists releases newest-first, so a 14.8 hotfix published after 15 comes first in the feed.
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v14.8", true), release("v15", true)]),
-        "https://example.test/v14.8/f2mod.yml": manifestText("fo2tweaks", "14.8"),
-        "https://example.test/v15/f2mod.yml": manifestText("fo2tweaks", "15"),
+        [RELEASES_URL]: JSON.stringify([release("v14.8"), release("v15")]),
+        [atTag("v14.8")]: manifestText("fo2tweaks", "14.8"),
+        [atTag("v15")]: manifestText("fo2tweaks", "15"),
       },
     });
     expect((await fetchFeed(platform, FEED)).manifest.version).toBe("15");
@@ -124,9 +123,9 @@ describe("fetchFeed", () => {
   it("walks past a manifest carrying another id - two feeds may share one repository", async () => {
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v2.4", true), release("v2.3", true)]),
-        "https://example.test/v2.4/f2mod.yml": manifestText("other-line", "2.4"),
-        "https://example.test/v2.3/f2mod.yml": manifestText("fo2tweaks", "2.3"),
+        [RELEASES_URL]: JSON.stringify([release("v2.4"), release("v2.3")]),
+        [atTag("v2.4")]: manifestText("other-line", "2.4"),
+        [atTag("v2.3")]: manifestText("fo2tweaks", "2.3"),
       },
     });
     expect((await fetchFeed(platform, FEED)).manifest.version).toBe("2.3");
@@ -134,8 +133,8 @@ describe("fetchFeed", () => {
 
   it("caches the release listing, and answers from a stale cache when the network refuses", async () => {
     const responses = {
-      [RELEASES_URL]: JSON.stringify([release("v14.7", true)]),
-      "https://example.test/v14.7/f2mod.yml": manifestText("fo2tweaks", "14.7"),
+      [RELEASES_URL]: JSON.stringify([release("v14.7")]),
+      [atTag("v14.7")]: manifestText("fo2tweaks", "14.7"),
     };
     const platform = feedPlatform({ responses });
     // Just after the memory platform's own fake clock, which stamps the cache file's modification time.
@@ -156,8 +155,8 @@ describe("fetchFeed", () => {
   it("surfaces a manifest refusal rather than reporting nothing found", async () => {
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v99", true)]),
-        "https://example.test/v99/f2mod.yml": manifestText("fo2tweaks", "99").replace("spec: 1", "spec: 2"),
+        [RELEASES_URL]: JSON.stringify([release("v99")]),
+        [atTag("v99")]: manifestText("fo2tweaks", "99").replace("spec: 1", "spec: 2"),
       },
     });
     await expect(fetchFeed(platform, FEED)).rejects.toThrow(/newer version of ZAX/);
@@ -166,7 +165,7 @@ describe("fetchFeed", () => {
   it("says when no release ships a manifest yet, which is the state before upstream adoption", async () => {
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v15", false), release("v14", false)]),
+        [RELEASES_URL]: JSON.stringify([release("v15"), release("v14")]),
         [atTag("v15")]: 404,
         [atTag("v14")]: 404,
       },
@@ -175,7 +174,7 @@ describe("fetchFeed", () => {
   });
 
   it("checks cold manifests concurrently without opening more than six requests", async () => {
-    const releases = Array.from({ length: 12 }, (_, index) => release(`v${index + 1}`, false));
+    const releases = Array.from({ length: 12 }, (_, index) => release(`v${index + 1}`));
     const base = feedPlatform({
       responses: {
         [RELEASES_URL]: JSON.stringify(releases),
@@ -192,7 +191,7 @@ describe("fetchFeed", () => {
   it("takes the version from the tag and the payload from the sole archive, when the release states neither", async () => {
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v14.7", false)]),
+        [RELEASES_URL]: JSON.stringify([release("v14.7")]),
         [atTag("v14.7")]: committed("fo2tweaks"),
       },
     });
@@ -200,13 +199,12 @@ describe("fetchFeed", () => {
     expect(found.manifest.version).toBe("14.7");
     expect(found.manifest.archive).toBe("fo2tweaks.zip");
     expect(found.archive?.url).toBe("https://example.test/v14.7/fo2tweaks.zip");
-    expect(found.manifestFromAsset).toBe(false);
   });
 
   it("keeps a stated version over the tag's, the manifest being the more specific claim", async () => {
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v99", false)]),
+        [RELEASES_URL]: JSON.stringify([release("v99")]),
         [atTag("v99")]: committed("fo2tweaks", 'version: "14.7"\n'),
       },
     });
@@ -216,7 +214,7 @@ describe("fetchFeed", () => {
   it("refuses a tag that names no version rather than inventing one", async () => {
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("nightly", false)]),
+        [RELEASES_URL]: JSON.stringify([release("nightly")]),
         [atTag("nightly")]: committed("fo2tweaks"),
       },
     });
@@ -227,7 +225,7 @@ describe("fetchFeed", () => {
     const other = { name: "fo2tweaks-nomusic.zip", browser_download_url: "https://example.test/v14.7/nomusic.zip" };
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v14.7", false, [other])]),
+        [RELEASES_URL]: JSON.stringify([release("v14.7", [other])]),
         [atTag("v14.7")]: committed("fo2tweaks"),
       },
     });
@@ -240,7 +238,7 @@ describe("fetchFeed", () => {
     const sums = { name: "checksums.txt", browser_download_url: "https://example.test/v14.7/checksums.txt" };
     const platform = feedPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([release("v14.7", false, [sums])]),
+        [RELEASES_URL]: JSON.stringify([release("v14.7", [sums])]),
         [atTag("v14.7")]: committed("fo2tweaks"),
       },
     });
@@ -249,7 +247,7 @@ describe("fetchFeed", () => {
 
   it("asks the repository once per tag, remembering which tags carry no manifest", async () => {
     const platform = feedPlatform({
-      responses: { [RELEASES_URL]: JSON.stringify([release("v15", false)]), [atTag("v15")]: 404 },
+      responses: { [RELEASES_URL]: JSON.stringify([release("v15")]), [atTag("v15")]: 404 },
     });
     await expect(fetchFeed(platform, FEED)).rejects.toThrow(/ships a zax manifest yet/i);
     await expect(fetchFeed(platform, FEED)).rejects.toThrow(/ships a zax manifest yet/i);
@@ -257,7 +255,7 @@ describe("fetchFeed", () => {
   });
 
   it("reports a repository that cannot be reached rather than reading it as a tag without a manifest", async () => {
-    const platform = feedPlatform({ responses: { [RELEASES_URL]: JSON.stringify([release("v15", false)]) } });
+    const platform = feedPlatform({ responses: { [RELEASES_URL]: JSON.stringify([release("v15")]) } });
     await expect(fetchFeed(platform, FEED)).rejects.toThrow(/No canned response/);
   });
 });
@@ -294,13 +292,12 @@ describe("reading every feed", () => {
 describe("availability", () => {
   const install: Install = { path: "/games/fallout2", type: "fallout2" };
   const parsed = (text: string): ModRelease => ({
-    manifestFromAsset: true,
     manifest: {
       id: "fo2tweaks",
       name: "FO2tweaks",
       version: "14.7",
       type: "pluggable",
-      refuse: [],
+      conflicts: [],
       settings: [],
       dropped: [],
       archive: "fo2tweaks.zip",
@@ -383,7 +380,7 @@ describe("availability", () => {
   });
 
   it("blocks every offer to download when the release never names its payload", () => {
-    const bare: ModRelease = { manifest: parsed("").manifest, manifestText: "", manifestFromAsset: true };
+    const bare: ModRelease = { manifest: parsed("").manifest, manifestText: "" };
     expect(availability(bare, context())).toMatchObject({ kind: "blocked" });
     expect(availability(bare, context({ record: recorded("14.7") }))).toEqual({ kind: "installed" });
   });
@@ -578,7 +575,7 @@ describe("the grants list", () => {
 describe("a release with several payloads", () => {
   const install: Install = { path: "/games/fallout2", type: "fallout2" };
 
-  /** Cassidy as it publishes: a manifest asset, and one `.dat` per part. */
+  /** Cassidy as it publishes: a committed manifest, and one `.dat` asset per part. */
   const CASSIDY = `spec: 1
 id: cassidy
 name: Cassidy Restoration
@@ -609,6 +606,7 @@ parts:
 
   const CASSIDY_FEED = { repository: "someone/cassidy", id: "cassidy" };
   const CASSIDY_RELEASES = "https://api.github.com/repos/someone/cassidy/releases?per_page=100";
+  const cassidyAtTag = "https://raw.githubusercontent.com/someone/cassidy/v1.2/f2mod.yml";
   const asset = (name: string) => ({
     name,
     browser_download_url: `https://example.test/v1.2/${name}`,
@@ -617,13 +615,13 @@ parts:
   });
   const cassidyRelease = (names: readonly string[]) => ({
     tag_name: "v1.2",
-    assets: [asset("f2mod.yml"), ...names.map(asset)],
+    assets: names.map(asset),
   });
   const cassidyPlatform = (names: readonly string[]) =>
     new MemoryPlatform({
       responses: {
         [CASSIDY_RELEASES]: JSON.stringify([cassidyRelease(names)]),
-        "https://example.test/v1.2/f2mod.yml": CASSIDY,
+        [cassidyAtTag]: CASSIDY,
       },
     });
   const ALL = ["cassidy_head.dat", "cassidy_voice_joey.dat", "cassidy_voice_tom.dat"];
@@ -676,8 +674,8 @@ parts:
     const manifest = CASSIDY.replace("id: cassidy", "id: fo2tweaks");
     const platform = new MemoryPlatform({
       responses: {
-        [RELEASES_URL]: JSON.stringify([{ tag_name: "v1.2", assets: [asset("f2mod.yml"), ...ALL.map(asset)] }]),
-        "https://example.test/v1.2/f2mod.yml": manifest,
+        [RELEASES_URL]: JSON.stringify([{ tag_name: "v1.2", assets: ALL.map(asset) }]),
+        [atTag("v1.2")]: manifest,
       },
     });
     const record = {
@@ -733,8 +731,8 @@ installer:
     new MemoryPlatform({
       os,
       responses: {
-        [RELEASES_URL]: JSON.stringify([{ tag_name: "v2.4.34", assets: [asset("f2mod.yml"), ...names.map(asset)] }]),
-        "https://example.test/v2.4.34/f2mod.yml": RPU,
+        [RELEASES_URL]: JSON.stringify([{ tag_name: "v2.4.34", assets: names.map(asset) }]),
+        [atTag("v2.4.34")]: RPU,
       },
     });
 
@@ -817,7 +815,6 @@ installer:
   const found = (line?: ModLine): ModRelease => ({
     manifest: parseManifest(new TextEncoder().encode(BASE)),
     manifestText: BASE,
-    manifestFromAsset: true,
     installer: { route: "other", asset: { name: "rpu.zip", url: "https://example.test/rpu.zip" } },
     ...(line ? { line } : {}),
   });
@@ -859,7 +856,6 @@ installer:
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(RPU23)),
       manifestText: RPU23,
-      manifestFromAsset: true,
       installer: { route: "other", asset: { name: "rpu.zip", url: "https://example.test/rpu.zip" } },
       line: OLDER,
     };
@@ -899,7 +895,6 @@ installer:
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(UPU)),
       manifestText: UPU,
-      manifestFromAsset: true,
       installer: { route: "other", asset: { name: "upu.zip", url: "https://example.test/upu.zip" } },
     };
     const state = availability(release, {
@@ -929,7 +924,6 @@ installer:
     const nightlyRelease: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(manifestText)),
       manifestText,
-      manifestFromAsset: true,
       installer: { route: "other", asset: { name: "upu.zip", url: "https://example.test/upu.zip" } },
     };
     const state = availability(nightlyRelease, {
@@ -960,7 +954,6 @@ installer:
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(BASE)),
       manifestText: BASE,
-      manifestFromAsset: true,
       installer: { route: "other", asset: { name: "rpu.zip", url: "https://example.test/rpu.zip" } },
     };
     const onPatched: Install = { path: "/games/fallout2", type: "fallout2up" };
@@ -999,7 +992,6 @@ extract-dat:
   const release: ModRelease = {
     manifest: parseManifest(new TextEncoder().encode(CREATES)),
     manifestText: CREATES,
-    manifestFromAsset: true,
     archive: { name: "Fallout1in2.zip", url: "https://example.test/Fallout1in2.zip" },
   };
 
@@ -1079,7 +1071,6 @@ extract-dat:
           {
             tag_name: "v1.16.3771",
             assets: [
-              { name: "f2mod.yml", browser_download_url: "https://example.test/f2mod.yml" },
               {
                 name: "Fallout1in2.zip",
                 browser_download_url: "https://example.test/Fallout1in2.zip",
@@ -1089,7 +1080,7 @@ extract-dat:
             ],
           },
         ]),
-        "https://example.test/f2mod.yml": CREATES,
+        ["https://raw.githubusercontent.com/rotators/Fo1in2/v1.16.3771/f2mod.yml"]: CREATES,
       },
     });
     const found = await fetchFeed(platform, { repository: "rotators/Fo1in2", id: "fo1in2" });
@@ -1115,7 +1106,6 @@ creates:
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(CREATES)),
       manifestText: CREATES,
-      manifestFromAsset: true,
       archive: { name: "Fallout1in2.zip", url: "https://example.test/Fallout1in2.zip" },
     };
     const install: Install = { path: "/games/fallout2", type: "fallout2" };
@@ -1166,8 +1156,6 @@ describe("fetchFeed with a manifest ZAX carries", () => {
       name: "Restoration Project Updated 2.4",
       version: "2.4.34",
     });
-    // Not from an asset, so the payload is never expected to carry a copy of it.
-    expect(found.manifestFromAsset).toBe(false);
     // This host is not Windows, so the route resolved is the script one, and it names the release's own zip.
     expect(found.installer).toEqual({
       route: "other",
@@ -1199,18 +1187,19 @@ describe("fetchFeed with a manifest ZAX carries", () => {
     expect(platform.fetched.filter((url) => url === rpuAtTag("v2.4.34"))).toHaveLength(1);
   });
 
-  it("gives way to a manifest the release publishes as an asset", async () => {
+  it("reads no manifest from a release's assets, the repository at the tag being the only route", async () => {
+    // An `f2mod.yml` attached to a release is an ordinary asset here: the tag's tree is what describes the
+    // release, so a repository that ships none is still a repository ZAX's own copy answers for.
     const asset = { name: "f2mod.yml", browser_download_url: "https://example.test/v2.4.34/f2mod.yml" };
     const platform = feedPlatform({
       responses: {
         [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34", [asset])]),
-        "https://example.test/v2.4.34/f2mod.yml":
-          "spec: 1\nid: rpu24\nname: RPU as its author describes it\ngame: fallout2\narchive: rpu.zip\n",
+        [rpuAtTag("v2.4.34")]: 404,
       },
     });
     const found = await fetchFeed(platform, RPU_FEED);
-    expect(found.manifest.name).toBe("RPU as its author describes it");
-    expect(found.manifestFromAsset).toBe(true);
+    expect(found.manifest.name).toBe("Restoration Project Updated 2.4");
+    expect(platform.fetched).not.toContain("https://example.test/v2.4.34/f2mod.yml");
   });
 
   it("passes over a release whose tag names no version, rather than describing it", async () => {
@@ -1274,23 +1263,6 @@ describe("fetchFeed with a manifest ZAX carries", () => {
     expect(platform.fetched).toEqual([RPU_RELEASES, rpuAtTag("v2.3.34")]);
   });
 
-  it("still asks about a release that publishes its own manifest, whatever its tag names", async () => {
-    // The listing already carries the asset's name, so honouring an author's own document costs nothing -
-    // and its version is the document's to state, which no tag can rule out in advance.
-    const asset = { name: "f2mod.yml", browser_download_url: "https://example.test/old/f2mod.yml" };
-    const platform = feedPlatform({
-      responses: {
-        [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34"), rpuRelease("v2.3.34", [asset])]),
-        [rpuAtTag("v2.4.34")]: 404,
-        "https://example.test/old/f2mod.yml":
-          'spec: 1\nid: rpu24\nname: RPU as its author describes it\nversion: "2.4.99"\ngame: fallout2\n',
-      },
-    });
-    const found = await fetchFeed(platform, RPU_FEED);
-    expect(found.manifest).toMatchObject({ name: "RPU as its author describes it", version: "2.4.99" });
-    expect(found.manifestFromAsset).toBe(true);
-  });
-
   it("lists a line's versions newest first, and only that line's", async () => {
     const platform = feedPlatform({
       responses: {
@@ -1334,8 +1306,7 @@ describe("fetchFeed with a manifest ZAX carries", () => {
       responses: {
         [RPU_RELEASES]: JSON.stringify([rpuRelease("v2.4.34"), rpuRelease("v2.3.34", [asset])]),
         [rpuAtTag("v2.4.34")]: 404,
-        "https://example.test/odd/f2mod.yml":
-          'spec: 1\nid: rpu24\nname: RPU as its author describes it\nversion: "9.9"\ngame: fallout2\n',
+        [atTag("odd")]: 'spec: 1\nid: rpu24\nname: RPU as its author describes it\nversion: "9.9"\ngame: fallout2\n',
       },
     });
     expect((await fetchFeed(platform, RPU_FEED)).manifest.version).toBe("2.4.34");

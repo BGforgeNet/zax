@@ -30,7 +30,6 @@ const releaseFor = async (version: string, extra = ""): Promise<ModRelease> => {
   return {
     manifest: parseManifest(new TextEncoder().encode(text)),
     manifestText: text,
-    manifestFromAsset: true,
     archive: { name: "fo2tweaks.zip", url: zipUrl(version), digest: `sha256:${await sha(payload(version))}` },
   };
 };
@@ -163,15 +162,13 @@ describe("install", () => {
   });
 
   it("refuses when a manifest condition fires, matching case-insensitively, before anything is written", async () => {
-    const refuse = `refuse:\n  - when: { present: [rp-marker.txt] }\n    reason: Not over this.\n`;
-    const text = manifestFor("14.7", refuse);
+    const clash = `conflicts:\n  - when: { present: [rp-marker.txt] }\n    reason: Not over this.\n`;
+    const text = manifestFor("14.7", clash);
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(text)),
       manifestText: text,
-      manifestFromAsset: true,
       archive: { name: "fo2tweaks.zip", url: zipUrl("14.7"), digest: `sha256:${await sha(payload("14.7"))}` },
     };
-    // The plan compares the embedded manifest byte-for-byte, so the canned archive must carry this variant.
     const platform = new MemoryPlatform({
       files: { [`${GAME}/fallout2.exe`]: "", [`${GAME}/RP-MARKER.TXT`]: "" },
       downloads: { [zipUrl("14.7")]: payload("14.7") },
@@ -240,35 +237,14 @@ describe("install", () => {
     expect(platform.textAt(`${WORK}/overwritten/mods/fo2tweaks.dat`)).toBeUndefined();
   });
 
-  it("refuses an archive whose embedded manifest is not the one the release published", async () => {
-    const platform = new MemoryPlatform({
-      files: { [`${GAME}/fallout2.exe`]: "" },
-      downloads: { [zipUrl("14.7")]: payload("14.7") },
-      archives: { [payload("14.7")]: { ...CONTENTS["14.7"]!, "f2mod.yml": manifestFor("14.7") + "# altered\n" } },
-    });
-    await expect(planModInstall(platform, install, await releaseFor("14.7"))).rejects.toThrow(
-      /not the one its release published/,
-    );
-  });
-
-  it("refuses a payload carrying no manifest when the release published one", async () => {
+  it("installs a payload that carries no copy of the manifest, which no release owes", async () => {
     const bare = Object.fromEntries(Object.entries(CONTENTS["14.7"]!).filter(([name]) => name !== "f2mod.yml"));
     const platform = new MemoryPlatform({
       files: { [`${GAME}/fallout2.exe`]: "" },
       downloads: { [zipUrl("14.7")]: payload("14.7") },
       archives: { [payload("14.7")]: bare },
     });
-    await expect(planModInstall(platform, install, await releaseFor("14.7"))).rejects.toThrow(/carries no f2mod\.yml/);
-  });
-
-  it("installs a payload carrying no manifest when the manifest came from the repository at the tag", async () => {
-    const bare = Object.fromEntries(Object.entries(CONTENTS["14.7"]!).filter(([name]) => name !== "f2mod.yml"));
-    const platform = new MemoryPlatform({
-      files: { [`${GAME}/fallout2.exe`]: "" },
-      downloads: { [zipUrl("14.7")]: payload("14.7") },
-      archives: { [payload("14.7")]: bare },
-    });
-    const release = { ...(await releaseFor("14.7")), manifestFromAsset: false };
+    const release = await releaseFor("14.7");
     const plan = await planModInstall(platform, install, release);
     await applyModInstall(platform, install, release, plan);
     expect(platform.textAt(`${GAME}/mods/fo2tweaks.dat`)).toBe("DAT-14.7");
@@ -674,7 +650,6 @@ describe("a mod that declares its entries", () => {
   const folderRelease = async (): Promise<ModRelease> => ({
     manifest: parseManifest(new TextEncoder().encode(FOLDER_MANIFEST)),
     manifestText: FOLDER_MANIFEST,
-    manifestFromAsset: true,
     archive: {
       name: "filter.zip",
       url: "https://example.test/filter.zip",
@@ -716,7 +691,6 @@ describe("a mod that declares its entries", () => {
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(text)),
       manifestText: text,
-      manifestFromAsset: true,
       archive: {
         name: "filter.zip",
         url: "https://example.test/filter.zip",
@@ -749,7 +723,6 @@ describe("a mod that declares its entries", () => {
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(text)),
       manifestText: text,
-      manifestFromAsset: true,
       archive: {
         name: "filter.zip",
         url: "https://example.test/filter.zip",
@@ -820,7 +793,6 @@ describe("a payload that is not an archive", () => {
       manifestText: text,
       // Published as an asset, which for an archive would demand an embedded copy - there is nowhere to put
       // one in a single file, so the check does not apply rather than failing.
-      manifestFromAsset: true,
       archive: { name: "cassidy_head.dat", url: DAT_URL, digest: `sha256:${await sha(DAT)}`, size: DAT.length },
     };
   };
@@ -909,7 +881,6 @@ parts:
     return {
       manifest: parseManifest(new TextEncoder().encode(text)),
       manifestText: text,
-      manifestFromAsset: true,
       parts: {
         head: await asset("cassidy_head.zip", headZip(version)),
         joey: await asset("cassidy_voice_joey.dat", voice("joey", version)),
@@ -1017,7 +988,6 @@ parts:
     const single: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(text)),
       manifestText: text,
-      manifestFromAsset: true,
       archive: {
         name: "cassidy.dat",
         url: "https://example.test/cassidy/2/cassidy.dat",

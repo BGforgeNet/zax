@@ -31,7 +31,7 @@
       },
       "other": { "asset": "rpu_v2.4.34.zip", "run": "rpu-install.sh" }
     },
-    "refuse": [
+    "conflicts": [
       {
         "present": ["up-changelog.txt"],
         "absent": ["rp-changelog.txt"],

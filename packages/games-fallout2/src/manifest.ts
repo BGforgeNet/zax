@@ -1,14 +1,14 @@
 /**
- * `f2mod.yml`: the manifest a mod's release carries and this application interprets. It reaches ZAX two ways
- * - published as a release asset beside the payload, or read from the repository at the release's tag - so
- * `version` and `archive` may be absent from the file and supplied by the release instead.
+ * `f2mod.yml`: the manifest a mod's release carries and this application interprets. It is read from the
+ * repository at the release's tag, so `version` and `archive` may be absent from the file and supplied by the
+ * release instead.
  *
  * Parsing is strict and every refusal names its cause. A manifest is downloaded data even from a trusted
  * publisher, so it gets a boundary of its own: a size cap before parsing, a YAML alias cap, length-capped
  * plain-text strings, and confinement for every path-shaped field. An unknown field refuses rather than
- * passes, so a misspelling cannot silently drop a safety check; the one place leniency lives is the `extra`
- * block, ignored by contract. Anything the format defines that this version does not implement - a base
- * mod's install procedure, a later spec - refuses as "needs a newer ZAX" rather than half-installing.
+ * passes, so a misspelling cannot silently drop a safety check. Anything the format defines that this version
+ * does not implement - a base mod's install procedure, a later spec - refuses as "needs a newer ZAX" rather
+ * than half-installing.
  */
 
 import { parse } from "yaml";
@@ -26,9 +26,8 @@ import { SETTINGS } from "./catalog.js";
 import { grantsFor } from "./mod-grants.js";
 
 /**
- * The file's name wherever it sits - repository root, archive root, release asset - the same on purpose. The
- * name is not manager-branded: the manifest declares its own `game`, and a second manager reading this format
- * should not have to ship a file named after this application.
+ * The file's name at the repository root. It is not manager-branded: the manifest declares its own `game`,
+ * and a second manager reading this format should not have to ship a file named after this application.
  */
 export const MANIFEST_NAME = "f2mod.yml";
 
@@ -82,7 +81,7 @@ export interface DroppedSetting {
   why: string;
 }
 
-interface RefuseRule {
+interface ConflictRule {
   /** Fires when every `present` path exists and every `absent` path does not. At least one list is non-empty. */
   present: readonly string[];
   absent: readonly string[];
@@ -197,9 +196,9 @@ export interface ModManifest {
   type: ModType;
   /** Why the mod can never be uninstalled. Present exactly when the type is permanent. */
   reason?: string;
-  /** The release asset carrying the payload, stamped by CI. An authored file has none; installing needs it. */
+  /** The release asset carrying the payload. Absent where the release's sole archive supplied it. */
   archive?: string;
-  /** Game types the mod installs on. Absent means any - the stacking default; a base mod's is vanilla alone. */
+  /** `needs.game`: the types it installs on. Absent means any - a base mod's default is vanilla alone. */
   installOn?: readonly GameType[];
   /** The game type the install reports afterwards. Base mods only, where it is required. */
   becomes?: GameType;
@@ -211,10 +210,8 @@ export interface ModManifest {
   inputs?: readonly ModInput[];
   /** The archive out of one of those inputs that is unpacked into the created install. */
   extractDat?: ModExtractDat;
-  /** The lowest sfall version the mod works with, answered by the updater rather than a refusal. */
+  /** `needs.sfall`: the lowest version it works with, answered by the updater rather than a refusal. */
   requiresSfall?: string;
-  /** Files that belong to the user and survive upgrades by merging. Absent means every payload `.ini`. */
-  state?: readonly string[];
   /**
    * What the mod puts in the mods folder, spelled as the loader names it - relative to `mods\`, so these
    * become its order lines verbatim. Absent means the payload decides, which is the top-level `mods/*.dat`
@@ -230,7 +227,8 @@ export interface ModManifest {
    * states no top-level `archive`: each part names the asset it deploys.
    */
   parts?: readonly ModPartGroup[];
-  refuse: readonly RefuseRule[];
+  /** Installs ZAX refuses because the author declared the clash. A file collision is caught without one. */
+  conflicts: readonly ConflictRule[];
   settings: readonly ModSetting[];
   /** Entries the schema declares that this version cannot draw. The mod installs; these controls do not. */
   dropped: readonly DroppedSetting[];
@@ -772,9 +770,9 @@ function parseExtractDat(value: unknown, inputs: readonly ModInput[]): ModExtrac
   };
 }
 
-function parseRefuse(value: unknown): readonly RefuseRule[] {
-  return items(value, `"refuse"`).map((rule, at) => {
-    const where = `"refuse" entry ${at + 1}`;
+function parseConflicts(value: unknown): readonly ConflictRule[] {
+  return items(value, `"conflicts"`).map((rule, at) => {
+    const where = `"conflicts" entry ${at + 1}`;
     const fields = record(rule, where, ["when", "reason"]);
     const when = record(fields["when"], `${where}'s when`, ["present", "absent"]);
     const paths = (key: string) =>
@@ -804,9 +802,7 @@ const MANIFEST_FIELDS = [
   "type",
   "reason",
   "archive",
-  "install-on",
-  "requires",
-  "state",
+  "needs",
   "entries",
   "parts",
   "becomes",
@@ -814,10 +810,9 @@ const MANIFEST_FIELDS = [
   "creates",
   "inputs",
   "extract-dat",
-  "refuse",
+  "conflicts",
   "settings",
   "install",
-  "extra",
 ];
 
 export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}): ModManifest {
@@ -855,8 +850,8 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     refuse(`"id" ("${id}") is inside the catalog's "${id.split(".")[0]}" namespace`);
   // Read once, off the id: every path this manifest declares is judged against what ZAX grants that name.
   const granted = grantsFor(id);
-  // Stated wins over supplied: a manifest published as an asset is the more specific claim, and the archive's
-  // embedded copy is checked against it.
+  // Stated wins over supplied: what the file says is the author's own claim, where the tag and the release's
+  // assets are ZAX reading the release for one.
   const version = fields["version"] === undefined ? defaults.version : literal(fields["version"], `"version"`);
   if (version === undefined) refuse(`it states no "version", and its release supplies none`);
   if (!VERSION_SHAPE.test(version)) refuse(`"version" ("${version}") is not a version`);
@@ -912,28 +907,31 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
       refuse(`"${field}" belongs to a mod that creates an install`);
   }
 
-  let requiresSfall: string | undefined;
-  if (fields["requires"] !== undefined) {
-    const requires = record(fields["requires"], `"requires"`, ["sfall"]);
-    const range = text(requires["sfall"], `"requires" sfall`, SHORT_TEXT);
-    const match = /^>=\s*(\d[\d.a-z]*)$/i.exec(range);
-    if (!match?.[1]) refuse(`"requires" sfall ("${range}") is not a ">=version" bound`);
-    requiresSfall = match[1];
-  }
-
   // Vanilla alone for a delegated base mod that says nothing - the direction both upstream scripts enforce
   // themselves, and the opposite of a stacking mod's silence, which means anywhere. A creating mod goes back
   // to anywhere: it writes only inside the directory it makes, so what the host already is does not reach it.
   let installOn: readonly GameType[] | undefined = installer !== undefined ? ["fallout2"] : undefined;
-  if (fields["install-on"] !== undefined) {
-    installOn = items(fields["install-on"], `"install-on"`).map((entry, at) => {
-      const name = text(entry, `"install-on" entry ${at + 1}`, SHORT_TEXT);
-      // A type this version has no marker for may be a future base mod's - the newer-ZAX case again.
-      if (!isGameType(name))
-        needsNewerZax(`"install-on" names the game type "${name}", which this version cannot detect`);
-      return name;
-    });
-    if (installOn.length === 0) refuse(`"install-on" is empty, which would install nowhere`);
+  let requiresSfall: string | undefined;
+  // One field rather than the two this began as: the game under the mod and the sfall beside it are the same
+  // question asked of the same install, and answered at the same gate before anything is offered.
+  if (fields["needs"] !== undefined) {
+    const needs = record(fields["needs"], `"needs"`, ["game", "sfall"]);
+    if (needs["game"] !== undefined) {
+      installOn = items(needs["game"], `"needs" game`).map((entry, at) => {
+        const name = text(entry, `"needs" game ${at + 1}`, SHORT_TEXT);
+        // A type this version has no marker for may be a future base mod's - the newer-ZAX case again.
+        if (!isGameType(name)) needsNewerZax(`"needs" game names the type "${name}", which this version cannot detect`);
+        return name;
+      });
+      if (installOn.length === 0) refuse(`"needs" game is empty, which would install nowhere`);
+    }
+    if (needs["sfall"] !== undefined) {
+      // A bare version, read as "this or newer", because that is the only bound ZAX acts on: an operator here
+      // would promise comparisons - a ceiling, an exact pin - that nothing downstream implements.
+      const stated = text(needs["sfall"], `"needs" sfall`, SHORT_TEXT);
+      if (!/^\d[\d.a-z]*$/i.test(stated)) refuse(`"needs" sfall ("${stated}") is not a version`);
+      requiresSfall = stated;
+    }
   }
 
   const parts = fields["parts"] === undefined ? undefined : parseParts(fields["parts"]);
@@ -959,16 +957,9 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     ...(inputs !== undefined ? { inputs } : {}),
     ...(extractDat !== undefined ? { extractDat } : {}),
     ...(requiresSfall !== undefined ? { requiresSfall } : {}),
-    ...(fields["state"] !== undefined
-      ? {
-          state: items(fields["state"], `"state"`).map((path, at) =>
-            writablePath(path, `"state" entry ${at + 1}`, id, granted),
-          ),
-        }
-      : {}),
     ...(fields["entries"] !== undefined ? { entries: parseEntries(fields["entries"], `"entries"`) } : {}),
     ...(parts !== undefined ? { parts } : {}),
-    refuse: fields["refuse"] === undefined ? [] : parseRefuse(fields["refuse"]),
+    conflicts: fields["conflicts"] === undefined ? [] : parseConflicts(fields["conflicts"]),
     ...(fields["settings"] === undefined
       ? { settings: [], dropped: [] }
       : parseSettings(fields["settings"], id, granted)),

@@ -25,7 +25,7 @@ version: "2.4.34"
 game: fallout2
 type: base
 becomes: fallout2rpu
-refuse:
+conflicts:
   - when: { present: [mods/upu.dat] }
     reason: RPU cannot be installed over UPU.
 installer:
@@ -52,7 +52,6 @@ installer:
 const release = async (route: "windows" | "other" = "other"): Promise<ModRelease> => ({
   manifest: parseManifest(new TextEncoder().encode(MANIFEST)),
   manifestText: MANIFEST,
-  manifestFromAsset: true,
   installer: {
     route,
     asset:

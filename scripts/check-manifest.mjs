@@ -40,7 +40,7 @@ try {
         : (manifest.archive ?? 'no "archive" named - valid, but a release without one cannot offer a download');
   console.log(
     `OK: ${manifest.id} ${version} (${manifest.type}); payload: ${payload}; ` +
-      `${manifest.settings.length} setting(s), ${manifest.refuse.length} refusal rule(s)`,
+      `${manifest.settings.length} setting(s), ${manifest.conflicts.length} conflict rule(s)`,
   );
   // The components, spelled the way the installer's command line will carry them: an author checking a base
   // manifest is checking exactly this list, and a name that is wrong here installs the wrong thing silently.

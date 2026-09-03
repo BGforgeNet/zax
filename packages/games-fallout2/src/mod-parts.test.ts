@@ -41,7 +41,6 @@ const asset = (id: string): ReleaseAsset => ({ name: `${id}.dat`, url: `https://
 const release = (published: readonly string[], text = MANIFEST): ModRelease => ({
   manifest: parseManifest(new TextEncoder().encode(text)),
   manifestText: text,
-  manifestFromAsset: true,
   parts: Object.fromEntries(published.map((id) => [id, asset(id)])),
 });
 
@@ -75,7 +74,6 @@ describe("carrying a selection to the next release", () => {
     const ordinary: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(plain)),
       manifestText: plain,
-      manifestFromAsset: true,
       archive: { name: "x.zip", url: "https://example.test/x.zip" },
     };
     expect(carryOver(ordinary, ["head"])).toEqual({ selection: [], dropped: [], ask: false });

@@ -27,7 +27,7 @@ import {
 import type { ArchiveEntryInfo, DirEntry, Platform } from "@zax/platform";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import { preflightArchive } from "./archive-preflight.js";
-import { MANIFEST_NAME, mayWrite, parseManifest, type ModManifest, type ModPart, type ModType } from "./manifest.js";
+import { mayWrite, parseManifest, type ModManifest, type ModPart, type ModType } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 import {
   answersToId,
@@ -218,9 +218,13 @@ async function realCasedPath(
   return at;
 }
 
-/** The manifest's own refusal conditions, judged against the directory as it is now. */
-export async function refusalFor(platform: Platform, install: Install, release: ModRelease): Promise<string | null> {
-  for (const rule of release.manifest.refuse) {
+/**
+ * The clashes the manifest declares, judged against the directory as it is now. Only the ones ZAX cannot see
+ * for itself: two payloads landing on one path refuse without a rule, and an overwrite is shown before the
+ * install is confirmed. These are the incompatibilities with no file in common.
+ */
+export async function conflictFor(platform: Platform, install: Install, release: ModRelease): Promise<string | null> {
+  for (const rule of release.manifest.conflicts) {
     let fires = true;
     for (const path of rule.present) if ((await realCasedPath(platform, install.path, path)) === null) fires = false;
     for (const path of rule.absent) if ((await realCasedPath(platform, install.path, path)) !== null) fires = false;
@@ -270,15 +274,14 @@ export async function planModInstall(
     let entries: readonly ArchiveEntryInfo[];
     if (payload.single !== null) {
       // Every archive-shaped step is beside the point for one file: no directory to read, no entry count or
-      // unpacked total to bound, no symlink entry to refuse, and no embedded manifest to compare against. The
-      // manifest's own declaration says where it lands, which is what an archive's paths would have said.
+      // unpacked total to bound, and no symlink entry to refuse. The manifest's own declaration says where it
+      // lands, which is what an archive's paths would have said.
       entries = [
         { name: payload.single, kind: "file", size: asset.size ?? (await platform.fs.stat(archivePath))?.size ?? 0 },
       ];
     } else {
       options?.onStep?.(`Reading ${asset.name}`);
       entries = await preflightArchive(platform, archivePath, asset.name);
-      await checkEmbeddedManifest(platform, work, payload, release);
     }
 
     const mine: PlannedFile[] = [];
@@ -332,34 +335,6 @@ export async function planModInstall(
     ...(parts ? { parts } : {}),
     fingerprint: fingerprintOf(release, files, { orderLines, removes, ...(parts ? { parts } : {}) }),
   };
-}
-
-/**
- * The copy inside the archive against the one eligibility was decided on, byte for byte - a difference means
- * the archive is not the release the manifest described.
- *
- * Required only of a release that published a manifest asset, where CI writes both from one source; a
- * manifest read from the repository is tied to the tag instead, and its payload is under no obligation to
- * carry a copy. A part's archive is never required to carry one either: the manifest names each part's asset
- * outright, so there is no inference for an embedded copy to confirm, and demanding one would put a copy of
- * the whole manifest inside every part a mod publishes. One that is there is still checked.
- */
-async function checkEmbeddedManifest(
-  platform: Platform,
-  work: string,
-  payload: ModPayload,
-  release: ModRelease,
-): Promise<void> {
-  const at = platform.paths.join(work, "embedded", payload.part?.id ?? "mod");
-  await platform.archive.extract(platform.paths.join(work, payload.asset.name), at, { only: [MANIFEST_NAME] });
-  const embeddedPath = platform.paths.join(at, MANIFEST_NAME);
-  if (await fileExists(platform, embeddedPath)) {
-    const embedded = new TextDecoder().decode(await platform.fs.read(embeddedPath));
-    if (embedded !== release.manifestText)
-      throw new Error(`The manifest inside ${payload.asset.name} is not the one its release published - refused.`);
-  } else if (release.manifestFromAsset && !payload.part) {
-    throw new Error(`${payload.asset.name} carries no ${MANIFEST_NAME} at its root - refused.`);
-  }
 }
 
 /**
@@ -419,7 +394,7 @@ export async function applyModInstall(
   now: Date = new Date(),
 ): Promise<ModInstallOutcome> {
   const { manifest } = release;
-  const refusal = await refusalFor(platform, install, release);
+  const refusal = await conflictFor(platform, install, release);
   if (refusal !== null) throw new Error(refusal);
 
   const work = modWorkDirectory(platform, install, manifest.id);
@@ -464,7 +439,6 @@ export async function applyModInstall(
         : {}),
       manifestText: release.manifestText,
       version: manifest.version,
-      manifestFromAsset: release.manifestFromAsset,
       // Only a finished entry is something to go back to. An unfinished one here means an earlier
       // transaction whose working directory is gone, and nothing it replaced is recoverable either.
       previous: record.mods.find((mod) => mod.id === manifest.id && mod.complete) ?? null,
@@ -542,7 +516,7 @@ export async function applyModInstall(
   // State files: what the release shipped is recorded as the next upgrade's merge base, then the user's
   // values are merged into the shipped file - with the previous release's copy as base where a record holds
   // one, and user-wins where none does, exactly as the sfall updater treats ddraw.ini.
-  const stateFiles = manifest.state ?? plan.files.map((file) => file.path).filter((path) => /\.ini$/i.test(path));
+  const stateFiles = plan.files.map((file) => file.path).filter((path) => /\.ini$/i.test(path));
   const shipped: Record<string, string> = {};
   const conflicts: MergeConflict[] = [];
   for (const path of stateFiles) {

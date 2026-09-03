@@ -4,7 +4,7 @@
     "name": "FO2tweaks",
     "version": "14.7",
     "type": "pluggable",
-    "refuse": [],
+    "conflicts": [],
     "settings": [
       {
         "id": "fo2tweaks.main.autodoors",

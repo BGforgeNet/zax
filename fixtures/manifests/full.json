@@ -11,13 +11,10 @@
       "fallout2rpu"
     ],
     "requiresSfall": "4.4.5",
-    "state": [
-      "mods/ecco.ini"
-    ],
     "entries": [
       "ecco.dat"
     ],
-    "refuse": [
+    "conflicts": [
       {
         "present": [
           "mods/other.dat"

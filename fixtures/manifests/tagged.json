@@ -9,7 +9,7 @@
     "version": "14.7",
     "type": "pluggable",
     "archive": "fo2tweaks.zip",
-    "refuse": [],
+    "conflicts": [],
     "settings": [],
     "dropped": []
   }
