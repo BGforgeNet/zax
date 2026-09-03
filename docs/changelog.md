@@ -30,8 +30,9 @@ mods as well as settings.
 - **What a release offers is asked before it downloads.** A mod publishing variants or add-ons asks which you
   want, and carries the answer to the next upgrade.
 - **Load order.** Reorder and enable mods, see which installed mod each entry belongs to, sort to a
-  recommended order, and forget entries whose files are gone. A mod that states what it loads after and before
-  is placed by what it says, alongside the orders the Restoration Project and the Unofficial Patch publish.
+  recommended order, and forget entries whose files are gone. A mod that states what it overrides and what
+  overrides it is placed by what it says, alongside the orders the Restoration Project and the Unofficial
+  Patch publish.
 - **sfall updates.** See the installed version, update to the latest or to a version you pick, and keep your
   `ddraw.ini` settings - the release's own defaults are merged in, so new keys arrive and your choices stay.
 - **Alternative engines.** Fetch Fallout II Community Edition or Fallout Fission and run either alongside the

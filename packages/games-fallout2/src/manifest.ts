@@ -194,11 +194,13 @@ interface ModExtractDat {
  * rather than mod ids. That is the only vocabulary every line can be judged in: the folder cannot say which
  * mod put a dat there, so an id would place a mod against the ones ZAX installed and against nothing else.
  *
- * `after` is further down the file, which is where the loader gives a mod the last word.
+ * Stated as override rather than position, because position is not what the file decides: order in
+ * `mods_order.txt` has no effect except which copy of a shared file the engine sees, so what a mod overrides
+ * is the whole of what its place means - and a reader never has to know which end of the file wins.
  */
 interface ModOrder {
-  after: readonly string[];
-  before: readonly string[];
+  overrides: readonly string[];
+  overriddenBy: readonly string[];
 }
 
 export interface ModManifest {
@@ -592,24 +594,24 @@ function parseEntries(value: unknown, where: string): readonly string[] {
 }
 
 /**
- * Where the mod loads, relative to entries it names. Both lists are entries under `mods/`, spelled as the
- * order file spells them, so they are read exactly as `entries` is.
+ * What the mod's files win over, and what wins over them. Both lists are entries under `mods/`, spelled as
+ * the order file spells them, so they are read exactly as `entries` is.
  *
  * A claim naming nothing refuses: it would read as a mod stating its place while placing itself nowhere. What
  * a claim names is not required to be present - a mod may state where it goes beside something this install
  * does not have - so an absent name is what leaves the claim unsatisfied rather than what refuses it.
  */
 function parseOrder(value: unknown): ModOrder {
-  const fields = record(value, `"order"`, ["after", "before"]);
+  const fields = record(value, `"order"`, ["overrides", "overridden-by"]);
   const names = (key: string) =>
     fields[key] === undefined
       ? []
       : items(fields[key], `"order" ${key}`).map((name, at) => confinedPath(name, `"order" ${key} ${at + 1}`));
-  const after = names("after");
-  const before = names("before");
-  if (after.length === 0 && before.length === 0)
-    refuse(`"order" names nothing to load either side of, so it states no place`);
-  return { after, before };
+  const overrides = names("overrides");
+  const overriddenBy = names("overridden-by");
+  if (overrides.length === 0 && overriddenBy.length === 0)
+    refuse(`"order" names nothing to override and nothing to be overridden by, so it states no place`);
+  return { overrides, overriddenBy };
 }
 
 const GROUP_FIELDS = ["label", "pick", "options"];

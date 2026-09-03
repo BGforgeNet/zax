@@ -124,7 +124,7 @@ describe("install", () => {
   it("puts a new line where the mod's own manifest says it goes", async () => {
     // Nothing ZAX ships places weapon_sounds.dat, so without the claim the line would land at the end - which
     // is also what happens if the claim never reaches the placement, so this is what proves it does.
-    const text = `spec: 1\nid: weaponsounds\nname: Weapon Sounds\nversion: "1.0"\ngame: fallout2\narchive: ws.zip\norder:\n  before: [InventoryFilter.dat]\n`;
+    const text = `spec: 1\nid: weaponsounds\nname: Weapon Sounds\nversion: "1.0"\ngame: fallout2\narchive: ws.zip\norder:\n  overridden-by: [InventoryFilter.dat]\n`;
     const url = "https://example.test/ws.zip";
     const platform = new MemoryPlatform({
       files: {

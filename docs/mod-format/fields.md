@@ -18,7 +18,7 @@ Every field a manifest may carry. [The landing page](../mod-format.md) has the f
 | `archive`     | unless sole      | The asset carrying the payload. Needed unless the release has one archive and no more. |
 | `needs`       | no               | What the mod needs of the install it lands on; see below.                              |
 | `entries`     | no               | What the mod puts in `mods/`, as the loader names them; see below. Default: derived.   |
-| `order`       | no               | What it loads after and before, as entries rather than ids; see below.                 |
+| `order`       | no               | What its files override and are overridden by, as entries rather than ids; see below.  |
 | `parts`       | no               | Choices the release offers, each naming its own asset. Excludes `archive`.             |
 | `becomes`     | with `base`      | The game type the install reports afterwards, e.g. `fallout2rpu`.                      |
 | `installer`   | one of the two   | The installer to run, per platform.                                                    |
@@ -89,20 +89,22 @@ An entry the payload does not carry refuses the install, rather than writing a l
 payload that is not an archive declares exactly one: a single file has no paths of its own, so this is the only
 thing that can say what it installs as.
 
-## Where the mod loads
+## What the mod overrides
 
 ```yaml
 order:
-  after:
+  overrides:
     - rpu.dat
-  before:
+  overridden-by:
     - InventoryFilter.dat
 ```
 
-A mod further down `mods_order.txt` overrides one above it, so `after` is where your files win over the ones
-you name and `before` is where you give way. Both lists name entries in `mods/`, spelled as the order file
-spells them, rather than mod ids: the folder cannot say which mod put a dat there, so an id would place you
-against the mods ZAX installed and against nothing else.
+`overrides` names entries your files win over; `overridden-by` names entries that win over yours. A place in
+`mods_order.txt` decides nothing else - the order picks which copy of a shared file the engine sees, and
+overriding is the whole of what it means - so a claim states that rather than a position, and you never have
+to know which end of the file wins. Both lists name entries in `mods/`, spelled as the order file spells them,
+rather than mod ids: the folder cannot say which mod put a dat there, so an id would place you against the
+mods ZAX installed and against nothing else.
 
 ZAX ships the orders the Restoration Project and the Unofficial Patch state for themselves, and those win
 where they already name your entry - an install that is one of those projects is where that project's own file

@@ -30,10 +30,10 @@ describe("rankOf", () => {
 });
 
 describe("orderWith", () => {
-  const claim = (entry: string, after: string[] = [], before: string[] = []) => ({
+  const claim = (entry: string, overrides: string[] = [], overriddenBy: string[] = []) => ({
     entries: [entry],
-    after,
-    before,
+    overrides,
+    overriddenBy,
   });
 
   it("puts an entry where its own claim says, as late as the claim allows", () => {
@@ -52,7 +52,7 @@ describe("orderWith", () => {
   });
 
   it("places every entry a mod deploys", () => {
-    expect(orderWith(ORDER, [{ entries: ["a.dat", "b.dat"], after: [], before: ["rpu.dat"] }])).toEqual([
+    expect(orderWith(ORDER, [{ entries: ["a.dat", "b.dat"], overrides: [], overriddenBy: ["rpu.dat"] }])).toEqual([
       "a.dat",
       "b.dat",
       "rpu.dat",

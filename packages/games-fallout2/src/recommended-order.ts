@@ -116,18 +116,18 @@ export function rankOf(name: string, order: readonly string[]): number | null {
  *
  * As late as the claim allows, for the reason `placeFor` puts a new line as late as the order allows: the
  * entries either side of it are the whole of what has been stated, and the space between them is not
- * something to have an opinion about. A claim whose two sides cross - after something the order puts below
- * what it must precede - states a place that does not exist, and goes back to having no place rather than
- * being resolved in one side's favour.
+ * something to have an opinion about. A claim whose two sides cross - overriding something the order already
+ * puts below what overrides it - states a place that does not exist, and goes back to having no place rather
+ * than being resolved in one side's favour.
  */
 function placementIn(order: readonly string[], claim: OrderClaim): number | null {
   const ranks = (names: readonly string[]) =>
     names.map((name) => rankOf(name, order)).filter((rank): rank is number => rank !== null);
-  const below = ranks(claim.after);
-  const above = ranks(claim.before);
-  if (below.length === 0 && above.length === 0) return null;
-  const earliest = below.length === 0 ? 0 : Math.max(...below) + 1;
-  const latest = above.length === 0 ? order.length : Math.min(...above);
+  const overridden = ranks(claim.overrides);
+  const overriding = ranks(claim.overriddenBy);
+  if (overridden.length === 0 && overriding.length === 0) return null;
+  const earliest = overridden.length === 0 ? 0 : Math.max(...overridden) + 1;
+  const latest = overriding.length === 0 ? order.length : Math.min(...overriding);
   return earliest <= latest ? latest : null;
 }
 

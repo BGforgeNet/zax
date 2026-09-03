@@ -511,14 +511,14 @@ describe("readMods", () => {
           complete: true,
           files: ["mods/fo2tweaks.dat", "mods/fo2tweaks.ini"],
           manifest:
-            'spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "14.7"\ngame: fallout2\norder:\n  after: [rpu.dat]\n',
+            'spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "14.7"\ngame: fallout2\norder:\n  overrides: [rpu.dat]\n',
           shipped: {},
         },
       ],
     });
     const snap = await readMods(held, install);
     // The record declared no entries, so the claim is placed against the dats it deployed - the ini is not one.
-    expect(snap.claims).toEqual([{ entries: ["fo2tweaks.dat"], after: ["rpu.dat"], before: [] }]);
+    expect(snap.claims).toEqual([{ entries: ["fo2tweaks.dat"], overrides: ["rpu.dat"], overriddenBy: [] }]);
   });
 });
 

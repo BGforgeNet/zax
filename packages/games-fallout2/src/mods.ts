@@ -87,9 +87,9 @@ export interface ModOwner {
 export interface OrderClaim {
   /** The entries the claim places, spelled as the order file names them. */
   entries: readonly string[];
-  /** Entries it loads below, so its own files win over theirs, and entries it loads above. */
-  after: readonly string[];
-  before: readonly string[];
+  /** Entries its own files win over, and entries that win over its own. */
+  overrides: readonly string[];
+  overriddenBy: readonly string[];
 }
 
 /** The top-level dats among a set of deployed paths, which is what an entry defaults to where none is declared. */

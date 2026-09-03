@@ -704,7 +704,7 @@ describe("mods", () => {
     const real = hostBackend.loadMods.bind(hostBackend);
     vi.spyOn(hostBackend, "loadMods").mockImplementation(async (install) => ({
       ...(await real(install)),
-      claims: [{ entries: ["weapon_sounds.dat"], after: ["fo2tweaks.dat"], before: [] }],
+      claims: [{ entries: ["weapon_sounds.dat"], overrides: ["fo2tweaks.dat"], overriddenBy: [] }],
     }));
     // Any read of the folder will do; a save is the one the interface performs after every edit.
     await store.save();

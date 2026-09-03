@@ -345,26 +345,32 @@ describe("what a release says about itself", () => {
 describe("the place a mod states", () => {
   it("reads both sides, as entries rather than ids", () => {
     const manifest = parsed(
-      `${FO2TWEAKS}order:\n  after: [rpu.dat, party_orders.dat]\n  before: [InventoryFilter.dat]\n`,
+      `${FO2TWEAKS}order:\n  overrides: [rpu.dat, party_orders.dat]\n  overridden-by: [InventoryFilter.dat]\n`,
     );
-    expect(manifest.order).toEqual({ after: ["rpu.dat", "party_orders.dat"], before: ["InventoryFilter.dat"] });
+    expect(manifest.order).toEqual({
+      overrides: ["rpu.dat", "party_orders.dat"],
+      overriddenBy: ["InventoryFilter.dat"],
+    });
   });
 
   it("reads one side alone", () => {
-    expect(parsed(`${FO2TWEAKS}order:\n  after: [rpu.dat]\n`).order).toEqual({ after: ["rpu.dat"], before: [] });
+    expect(parsed(`${FO2TWEAKS}order:\n  overrides: [rpu.dat]\n`).order).toEqual({
+      overrides: ["rpu.dat"],
+      overriddenBy: [],
+    });
   });
 
   it("states no place by default", () => {
     expect(parsed(FO2TWEAKS).order).toBeUndefined();
   });
 
-  it("refuses a claim that names nothing to load either side of", () => {
+  it("refuses a claim that names nothing to override and nothing to be overridden by", () => {
     expect(() => parsed(`${FO2TWEAKS}order: {}\n`)).toThrow(/"order" names nothing/);
-    expect(() => parsed(`${FO2TWEAKS}order:\n  after: []\n`)).toThrow(/"order" names nothing/);
+    expect(() => parsed(`${FO2TWEAKS}order:\n  overrides: []\n`)).toThrow(/"order" names nothing/);
   });
 
   it("refuses a name that could leave the mods folder", () => {
-    expect(() => parsed(`${FO2TWEAKS}order:\n  after: ["../rpu.dat"]\n`)).toThrow(/leaves the game directory/);
+    expect(() => parsed(`${FO2TWEAKS}order:\n  overrides: ["../rpu.dat"]\n`)).toThrow(/leaves the game directory/);
   });
 
   it("refuses a side this version has no rule for, since the order it writes is on disk", () => {
