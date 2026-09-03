@@ -99,22 +99,21 @@ order:
     - InventoryFilter.dat
 ```
 
-`overrides` names entries your files win over; `overridden-by` names entries that win over yours. A place in
-`mods_order.txt` decides nothing else - the order picks which copy of a shared file the engine sees, and
-overriding is the whole of what it means - so a claim states that rather than a position, and you never have
-to know which end of the file wins. Both lists name entries in `mods/`, spelled as the order file spells them,
-rather than mod ids: the folder cannot say which mod put a dat there, so an id would place you against the
-mods ZAX installed and against nothing else.
+`overrides` names entries your files win over; `overridden-by` names entries that win over yours. That is all a
+place in `mods_order.txt` decides - which copy of a shared file the engine sees - so a claim states the
+override rather than a position. Both lists name entries in `mods/`, spelled as the order file spells them,
+rather than mod ids: the folder cannot say which mod put a dat there, so an id would place you against the mods
+ZAX installed and against nothing else.
 
-ZAX ships the orders the Restoration Project and the Unofficial Patch state for themselves, and those win
-where they already name your entry - an install that is one of those projects is where that project's own file
-is the better statement. Everything else is placed by what it claims, as late as the claim allows, and against
-entries other mods have claimed their way to as well. A claim naming nothing the install knows about, or one
-whose two sides cross, leaves the mod unranked - which is what every mod nobody has spoken for already gets,
-and means the order file keeps it where it is.
+ZAX ships the orders the Restoration Project and the Unofficial Patch state for themselves, and those win where
+they already name your entry: on one of those installs, that project's own file is the better statement.
+Everything else is placed by what it claims, as late as the claim allows, and against entries other mods have
+claimed their way to as well. A claim is satisfied by whichever of its names the install has, so it may name
+something only some installs carry; one naming nothing here, or one whose two sides cross, leaves the mod
+unranked, which leaves the order file holding it where it is.
 
 Nothing here moves a line on its own. It decides where a first install puts one, and what the Mods tab's
-recommendation and its sort button are working from.
+recommendation and its sort button work from.
 
 ## Conflicts
 

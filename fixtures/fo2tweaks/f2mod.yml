@@ -21,6 +21,15 @@ needs:
   # which ZAX ignores in favour of its own sfall updater.
   sfall: "4.1.3"
 
+order:
+  # Where both patches' own orders put fo2tweaks.dat. Only one of the two is ever installed, and the name
+  # that is missing costs the claim nothing.
+  overrides:
+    - rpu.dat
+    - upu.dat
+  overridden-by:
+    - InventoryFilter.dat
+
 settings:
   # ----- Components -------------------------------------------------------------------------------------
 
