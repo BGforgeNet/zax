@@ -809,6 +809,11 @@ export interface ModOffer {
   name: string;
   version: string;
   type: ModType;
+  /** What the release says about itself. The pages are flags: the interface asks for one by name. */
+  author?: string;
+  description?: string;
+  forum?: true;
+  homepage?: true;
   /** A permanent mod's declared reason, standing where the Remove control would be. */
   reason?: string;
   /** What a base mod turns this install into, which is the thing worth knowing before installing one. */
@@ -858,6 +863,12 @@ export interface PublishedMod {
   name: string;
   version: string;
   type: ModType;
+  /** What the release says about itself, for the row offering it. Absent where the manifest says nothing. */
+  author?: string;
+  description?: string;
+  /** Whether the mod publishes each page, rather than where: the address is the backend's to resolve. */
+  forum?: true;
+  homepage?: true;
   reason?: string;
   becomes?: GameType;
   creates?: string;
@@ -888,6 +899,10 @@ function publishedFrom(release: ModRelease, components: readonly ChoiceGroup[] |
     name: release.manifest.name,
     version: release.manifest.version,
     type: release.manifest.type,
+    ...(release.manifest.author !== undefined ? { author: release.manifest.author } : {}),
+    ...(release.manifest.description !== undefined ? { description: release.manifest.description } : {}),
+    ...(release.manifest.forum !== undefined ? { forum: true as const } : {}),
+    ...(release.manifest.homepage !== undefined ? { homepage: true as const } : {}),
     ...(release.manifest.reason !== undefined ? { reason: release.manifest.reason } : {}),
     ...(release.manifest.becomes !== undefined ? { becomes: release.manifest.becomes } : {}),
     ...(release.manifest.creates ? { creates: release.manifest.creates.directory } : {}),
@@ -1031,6 +1046,10 @@ export async function readModInstallState(
       version: mod.version,
       type: manifest?.type ?? "pluggable",
       noFeed: true,
+      // What the snapshot says about the mod, but no page flag whatever it names: the address is resolved
+      // from a held release, and the whole of what makes this row unfollowed is that no feed holds one.
+      ...(manifest?.author !== undefined ? { author: manifest.author } : {}),
+      ...(manifest?.description !== undefined ? { description: manifest.description } : {}),
       ...(manifest?.reason !== undefined ? { reason: manifest.reason } : {}),
       availability: mod.complete ? { kind: "unfollowed" } : { kind: "retry", version: mod.version },
     });

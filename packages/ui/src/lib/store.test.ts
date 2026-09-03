@@ -645,6 +645,10 @@ describe("mods", () => {
   const order = async () => new TextDecoder("latin1").decode(await previewPlatform.fs.read(ORDER_FILE));
   const shown = () => store.mods.map((mod) => `${mod.enabled ? "+" : "-"}${mod.name}`);
 
+  // The reseed each case starts with reads the folder again, so a stand-in left in place would answer for the
+  // rest of the file rather than for the one case that installed it.
+  afterEach(() => vi.restoreAllMocks());
+
   test("lists what the order file names, then what the folder holds and it does not", () => {
     expect(shown()).toEqual([
       "+weapon_sounds.dat",
@@ -675,10 +679,10 @@ describe("mods", () => {
   });
 
   test("names the mod behind an entry the record claims, and nothing behind the rest", () => {
-    // The one entry the preview's record lists. Everything else in that folder arrived by hand, which is
+    // The two entries the preview's record lists. Everything else in that folder arrived by hand, which is
     // what an unnamed row means.
     expect(store.mods.map((mod) => mod.owner)).toEqual([
-      undefined,
+      "Weapon Sounds",
       undefined,
       undefined,
       undefined,
@@ -689,6 +693,27 @@ describe("mods", () => {
       undefined,
       undefined,
     ]);
+  });
+
+  /*
+    The recommendation the tab judges by is the shipped order with the installed mods' own claims folded in, so
+    a mod nothing ships an opinion about is still placed where it says it goes. Driven through a read of the
+    folder rather than by reaching into the store: the claims arrive with the same snapshot the rows do.
+  */
+  test("takes the place an installed mod states for itself into the recommendation", async () => {
+    const real = hostBackend.loadMods.bind(hostBackend);
+    vi.spyOn(hostBackend, "loadMods").mockImplementation(async (install) => ({
+      ...(await real(install)),
+      claims: [{ entries: ["weapon_sounds.dat"], after: ["fo2tweaks.dat"], before: [] }],
+    }));
+    // Any read of the folder will do; a save is the one the interface performs after every edit.
+    await store.save();
+
+    // Unranked before the claim, so nothing said it was out of place; now it belongs below fo2tweaks.dat.
+    expect(store.againstRecommendation).toContain("weapon_sounds.dat");
+    store.sortMods();
+    const sorted = shown();
+    expect(sorted.indexOf("+weapon_sounds.dat")).toBeGreaterThan(sorted.indexOf("+fo2tweaks.dat"));
   });
 
   test("names the mods loading against the recommendation, and sorting puts just those right", async () => {

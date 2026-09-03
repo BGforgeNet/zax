@@ -14,7 +14,7 @@
 
 import { backupDirectory, latin1, latin1Bytes, splitLines, stamp, type Install, type SaveOutcome } from "@zax/core";
 import type { Platform } from "@zax/platform";
-import { loadRecord, modName } from "./records.js";
+import { loadRecord, manifestOf, modName } from "./records.js";
 import { fissionEnabled, fissionMounts } from "./fission.js";
 
 export const MODS_DIRECTORY = "mods";
@@ -80,6 +80,23 @@ export interface ModOwner {
   files: readonly string[];
 }
 
+/**
+ * Where an installed mod says its own entries load, as its manifest declares it. One claim per mod rather
+ * than per entry: a mod that deploys several states one place for all of them.
+ */
+export interface OrderClaim {
+  /** The entries the claim places, spelled as the order file names them. */
+  entries: readonly string[];
+  /** Entries it loads below, so its own files win over theirs, and entries it loads above. */
+  after: readonly string[];
+  before: readonly string[];
+}
+
+/** The top-level dats among a set of deployed paths, which is what an entry defaults to where none is declared. */
+const ORDER_DAT = /^mods\/([^/]+\.dat)$/i;
+export const orderDats = (paths: readonly string[]): string[] =>
+  paths.map((path) => ORDER_DAT.exec(path)?.[1]).filter((name): name is string => !!name);
+
 /** Something in the mods folder that the engine could load. */
 interface ModsDirEntry {
   name: string;
@@ -105,6 +122,11 @@ export interface ModsSnapshot {
    * tell one a mod deployed from one the user dropped in by hand.
    */
   owners: readonly ModOwner[];
+  /**
+   * What the installed mods say about where they load. Read here rather than at each surface that judges the
+   * order, so the advice, the sort and a new install's placement are all working from the same claims.
+   */
+  claims: readonly OrderClaim[];
 }
 
 export interface ModsSaveRequest {
@@ -358,6 +380,12 @@ export async function readMods(platform: Platform, install: Install): Promise<Mo
     format: text === undefined ? "sfall" : orderFormatOf(text),
     present: [...present.values()].toSorted((a, b) => fold(a.name).localeCompare(fold(b.name))),
     owners: record.mods.map((mod) => ({ name: modName(mod), files: mod.files })),
+    // A mod that declared no place contributes nothing, and one whose entries were never declared is placed
+    // by the dats it deployed - the same derivation that gave it its order lines in the first place.
+    claims: record.mods.flatMap((mod) => {
+      const order = manifestOf(mod)?.order;
+      return order ? [{ entries: mod.entries ?? orderDats(mod.files), ...order }] : [];
+    }),
   };
 }
 
@@ -423,7 +451,7 @@ async function wouldLoad(
   present: ReadonlySet<string>,
 ): Promise<readonly string[]> {
   if (format === "sfall") {
-    const snapshot: ModsSnapshot = { text, format, present: [], owners: [] };
+    const snapshot: ModsSnapshot = { text, format, present: [], owners: [], claims: [] };
     return listMods({ ...snapshot, present: [...present].map((name) => ({ name, kind: "dat" as const })) })
       .filter((mod) => mod.enabled && mod.kind !== "missing")
       .map((mod) => mod.name);

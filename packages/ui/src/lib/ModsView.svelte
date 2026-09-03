@@ -136,6 +136,10 @@
     // What is installed decides, not what is offered: a mod that turns permanent in its next release is
     // still the removable one on disk until that release is installed.
     if ((state.kind === "convert" ? state.was : offer.type) !== "pluggable") return false;
+    // A refused release says nothing about what is already there. The sfall gate answers before the version
+    // comparison, so a blocked row naming an installed version is the ordinary state of a mod that raised its
+    // floor in a later release - removable, like every other install, and not updatable until the gate passes.
+    if (state.kind === "blocked") return state.from !== undefined;
     return ["installed", "upgrade", "downgrade", "install-over", "unfollowed", "convert"].includes(state.kind);
   }
 
@@ -325,6 +329,34 @@
                 <span class="cell current">{currentOf(offer)}</span>
                 <span class="cell offered">{availableOf(offer)}</span>
                 <div class="notes">
+                  <!-- What the release says about itself, above the lines ZAX says about it: a row that had
+                   only a name left the question of what the mod is to somewhere outside the application. -->
+                  {#if offer.description !== undefined}
+                    <p class="status">{offer.description}</p>
+                  {/if}
+                  {#if offer.author !== undefined || offer.forum || offer.homepage}
+                    <p class="status by">
+                      {#if offer.author !== undefined}<span>By {offer.author}</span>{/if}
+                      <!-- The page is asked for by name: nothing here holds the address, which is what keeps a
+                       manifest from naming what the machine opens. -->
+                      {#if offer.forum}
+                        <button
+                          class="link"
+                          disabled={store.busy !== null}
+                          title={store.busyReason}
+                          onclick={() => void store.open({ mod: offer.id, page: "forum" })}>Forum</button
+                        >
+                      {/if}
+                      {#if offer.homepage}
+                        <button
+                          class="link"
+                          disabled={store.busy !== null}
+                          title={store.busyReason}
+                          onclick={() => void store.open({ mod: offer.id, page: "homepage" })}>Homepage</button
+                        >
+                      {/if}
+                    </p>
+                  {/if}
                   {#if status !== null}
                     <p class="status" class:warn={offer.availability.kind === "downgrade"}>{status}</p>
                   {/if}
@@ -1256,6 +1288,14 @@
 
   .status.warn {
     color: var(--invalid);
+  }
+
+  /* The author and the mod's own pages on one line, which is one fact about the release rather than three. */
+  .by {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
   }
 
   /*

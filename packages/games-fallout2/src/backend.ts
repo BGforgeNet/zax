@@ -122,8 +122,12 @@ export type OwnDirectory = "backup" | "debug" | "packages";
 /** Something of ZAX's own the user can empty. The log is a file rather than a directory, hence its own arm. */
 export type WipeTarget = OwnDirectory | "log";
 
-/** Somewhere the desktop's own handler is asked to open. Named for the same reason. */
-export type OpenTarget = OwnDirectory | "log" | "download";
+/**
+ * Somewhere the desktop's own handler is asked to open. Named for the same reason: a mod's page is asked for
+ * by naming which page of which mod, never by handing over the address, so what is opened is always something
+ * ZAX itself read rather than something a caller supplied.
+ */
+export type OpenTarget = OwnDirectory | "log" | "download" | { mod: string; page: "forum" | "homepage" };
 
 export const RELEASES_PAGE = "https://github.com/BGforgeNet/zax/releases/latest";
 
@@ -677,6 +681,14 @@ export function createBackend(platform: Platform, shell: Shell, seams: BackendSe
     },
 
     open: async (target) => {
+      if (typeof target === "object") {
+        // The address is taken from the release ZAX read, exactly as the download page below is resolved here
+        // rather than named by the caller. A held feed answers it: the row offering the page came from one.
+        const release = (await feedsHeld()).releases.find((held) => held.manifest.id === target.mod);
+        const url = target.page === "forum" ? release?.manifest.forum : release?.manifest.homepage;
+        if (url === undefined) throw new Error(`No ${target.page} is published for ${target.mod}.`);
+        return platform.process.open(url);
+      }
       if (target === "download") {
         // Resolved here rather than named by the interface: a renderer that could give the address would be
         // handing an argument to the system's own opener. The page when the feed cannot be reached - a user who

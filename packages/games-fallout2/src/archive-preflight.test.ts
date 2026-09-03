@@ -1,7 +1,7 @@
 import { MemoryPlatform } from "@zax/platform/memory";
 import type { ArchiveEntryInfo } from "@zax/platform";
 import { describe, expect, it } from "vitest";
-import { preflightArchive } from "./archive-preflight.js";
+import { isArchivingClutter, preflightArchive } from "./archive-preflight.js";
 
 const listing = (entries: readonly ArchiveEntryInfo[]) =>
   new MemoryPlatform({ os: "linux", arch: "x64", config: "cfg", cache: "cache", listings: { payload: entries } });
@@ -83,5 +83,49 @@ describe("preflightArchive", () => {
     await expect(judge(file("mods/bomb.dat", 8 * 1024 ** 3 + 1))).rejects.toThrow(
       `a mod release declares ${8 * 1024 ** 3 + 1} bytes unpacked, past what any release needs - refused.`,
     );
+  });
+
+  it("refuses a character Windows cannot put in a name, naming the segment", async () => {
+    await expect(judge(file("mods/read:me.dat"))).rejects.toThrow(
+      'a mod release names "read:me.dat" (in mods/read:me.dat), which Windows cannot create',
+    );
+    await expect(judge(file("mods/what?.dat"))).rejects.toThrow("which Windows cannot create");
+  });
+
+  it("refuses a control character in a name", async () => {
+    // Written as a code unit: a literal one in the source would be invisible to whoever reads this next.
+    await expect(judge(file(`mods/one${String.fromCharCode(1)}.dat`))).rejects.toThrow("which Windows cannot create");
+  });
+
+  it("refuses a device name Windows reserves, at any level and with any extension", async () => {
+    await expect(judge(file("mods/aux.dat"))).rejects.toThrow("which Windows cannot create");
+    await expect(judge(file("mods/nul/one.dat"))).rejects.toThrow("which Windows cannot create");
+    await expect(judge(file("mods/com1"))).rejects.toThrow("which Windows cannot create");
+  });
+
+  it("refuses a segment ending in a dot or a space, which Windows silently drops", async () => {
+    await expect(judge(file("mods/one.dat "))).rejects.toThrow("which Windows cannot create");
+    await expect(judge(file("mods/patches./one.dat"))).rejects.toThrow("which Windows cannot create");
+  });
+
+  it("allows the names those rules are shaped to let through", async () => {
+    // The false positives that would matter: a space inside a name is ordinary in this corpus, and a device
+    // name is reserved as a whole segment rather than as a prefix.
+    const entries = [file("mods/party orders.dat"), file("mods/console.dat"), file("mods/auxiliary/one.dat")];
+    await expect(judge(...entries)).resolves.toEqual(entries);
+  });
+});
+
+describe("isArchivingClutter", () => {
+  it("names what the archiving machine wrote", () => {
+    expect(isArchivingClutter("__MACOSX/mods/._one.dat")).toBe(true);
+    expect(isArchivingClutter("mods/.DS_Store")).toBe(true);
+    expect(isArchivingClutter("mods/patches/Thumbs.db")).toBe(true);
+  });
+
+  it("leaves everything an author could have written", () => {
+    expect(isArchivingClutter("mods/one.dat")).toBe(false);
+    expect(isArchivingClutter("mods/.keep")).toBe(false);
+    expect(isArchivingClutter("mods/macosx.dat")).toBe(false);
   });
 });

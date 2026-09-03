@@ -46,6 +46,7 @@ import {
   FISSION_ID,
   reconcileSettings,
   placesById,
+  orderWith,
   recommendationFor,
   recommendedOrder,
   wrapMethods,
@@ -53,6 +54,7 @@ import {
   type Divergence,
   type CachedBuild,
   type EngineListing,
+  type OrderClaim,
   type EngineRelease,
   type InstalledEngine,
   type HeldTarget,
@@ -516,6 +518,8 @@ class Store {
   private modsBaseline = $state<readonly Mod[]>([]);
   /** The order file as it was read, so a save can refuse one that changed underneath. */
   private modsText: string | undefined = undefined;
+  /** What the installed mods said about where they load, as the same read reported it. */
+  private modsClaims: readonly OrderClaim[] = [];
   /** False until the first read of the state file and the selected install's config files has finished. */
   loaded = $state(false);
   /** The operation in progress, for disabling the controls that would start a second one. */
@@ -829,7 +833,7 @@ class Store {
       // No folder to stand against. Cleared here rather than on every switch, where the reading brings its own.
       this.modStanding = null;
       this.standingFor = "";
-      this.setMods({ text: undefined, format: "sfall", present: [], owners: [] });
+      this.setMods({ text: undefined, format: "sfall", present: [], owners: [], claims: [] });
       return;
     }
     const read = await this.gatherInstall(install, owed);
@@ -1069,6 +1073,7 @@ class Store {
   private setMods(snapshot: ModsSnapshot): void {
     this.modsText = snapshot.text;
     this.modsFormat = snapshot.format;
+    this.modsClaims = snapshot.claims;
     // Off the tab if it just closed under the user - a disabled tab does not move anyone standing on it, and
     // the pane behind it would go on offering edits nothing can write.
     if (snapshot.format !== "sfall" && this.view === "mods") this.view = "settings";
@@ -1382,9 +1387,13 @@ class Store {
     this.scheduleAutosave();
   }
 
-  /** The order this install is judged against - the one its own project states, or the shared fallback. */
+  /**
+   * The order this install is judged against: the one its own project states, or the shared fallback, with
+   * the mods that declared their own place put into it. The same order a new install is placed against, so
+   * the sort does not immediately disagree with where ZAX just put a line.
+   */
   private get recommendation(): readonly string[] {
-    return this.install ? recommendationFor(this.install.type) : [];
+    return this.install ? orderWith(recommendationFor(this.install.type), this.modsClaims) : [];
   }
 
   /** The entries loading against ZAX's recommendation, which is both the warning and what a sort moves. */

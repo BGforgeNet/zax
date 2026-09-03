@@ -416,6 +416,45 @@ describe("the two halves of a listing, composed the way the backend composes the
     expect(offer?.availability).toEqual({ kind: "unfollowed" });
   });
 
+  it("carries what a release says about itself, the pages as flags rather than addresses", async () => {
+    const platform = feedPlatform({
+      responses: {
+        [RELEASES_URL]: JSON.stringify([release("v14.7")]),
+        [atTag("v14.7")]: committed(
+          "fo2tweaks",
+          "author: Lexx\ndescription: Small fixes and options.\nforum: https://example.test/thread\n",
+        ),
+      },
+    });
+    const listing = await wholeListing(platform, install, { path: install.path, mods: [] }, null);
+    const offer = listing.offers.find((one) => one.id === "fo2tweaks");
+    expect(offer).toMatchObject({ author: "Lexx", description: "Small fixes and options.", forum: true });
+    // No homepage was published, so the row has no page to offer and says so by carrying nothing.
+    expect(offer?.homepage).toBeUndefined();
+  });
+
+  it("gives an unfollowed row its description but no page, nothing holding the release to resolve one", async () => {
+    const platform = new MemoryPlatform();
+    const record = {
+      path: install.path,
+      mods: [
+        {
+          id: "oldmod",
+          version: "3",
+          complete: true,
+          files: ["mods/oldmod.dat"],
+          manifest:
+            'spec: 1\nid: oldmod\nname: Old Mod\nversion: "3"\ngame: fallout2\ndescription: An old one.\nforum: https://example.test/thread\n',
+          shipped: {},
+        },
+      ],
+    };
+    const listing = await wholeListing(platform, install, record, null);
+    const offer = listing.offers.find((one) => one.id === "oldmod");
+    expect(offer).toMatchObject({ description: "An old one." });
+    expect(offer?.forum, "the snapshot names one, and there is no release to resolve it from").toBeUndefined();
+  });
+
   it("lists a recorded mod no feed follows, so Remove stays reachable after an id is retired", async () => {
     const platform = new MemoryPlatform();
     const record = {

@@ -12,7 +12,7 @@
  */
 
 import type { GameType } from "@zax/core";
-import type { Mod } from "./mods.js";
+import type { Mod, OrderClaim } from "./mods.js";
 
 /**
  * The Restoration Project Updated's own shipped order (`release/mods_order.txt` in
@@ -109,6 +109,54 @@ export function recommendationFor(type: GameType): readonly string[] {
 export function rankOf(name: string, order: readonly string[]): number | null {
   const at = order.findIndex((named) => fold(named) === fold(name));
   return at === -1 ? null : at;
+}
+
+/**
+ * Where a claim's entry belongs in an order, or null while the order names nothing it hangs off.
+ *
+ * As late as the claim allows, for the reason `placeFor` puts a new line as late as the order allows: the
+ * entries either side of it are the whole of what has been stated, and the space between them is not
+ * something to have an opinion about. A claim whose two sides cross - after something the order puts below
+ * what it must precede - states a place that does not exist, and goes back to having no place rather than
+ * being resolved in one side's favour.
+ */
+function placementIn(order: readonly string[], claim: OrderClaim): number | null {
+  const ranks = (names: readonly string[]) =>
+    names.map((name) => rankOf(name, order)).filter((rank): rank is number => rank !== null);
+  const below = ranks(claim.after);
+  const above = ranks(claim.before);
+  if (below.length === 0 && above.length === 0) return null;
+  const earliest = below.length === 0 ? 0 : Math.max(...below) + 1;
+  const latest = above.length === 0 ? order.length : Math.min(...above);
+  return earliest <= latest ? latest : null;
+}
+
+/**
+ * The order with the mods that state their own place put into it - what the recommendation becomes for an
+ * install whose mods describe themselves.
+ *
+ * The shipped order wins where it names the entry already: RPU's own file is a statement about an RPU
+ * install, made by the project the install is, and a third party's claim about where it sits does not
+ * override that. Everything else is placed against what the order names, repeatedly, so a mod may state its
+ * place beside another mod that stated its own - and a claim that never resolves, because what it names is
+ * absent or because two of them wait on each other, leaves its entry unranked, which is what every entry
+ * nobody has spoken for already gets.
+ */
+export function orderWith(base: readonly string[], claims: readonly OrderClaim[]): readonly string[] {
+  const out = [...base];
+  let pending = claims.flatMap((claim) => claim.entries.map((entry) => ({ ...claim, entry })));
+  while (pending.length > 0) {
+    const unresolved: typeof pending = [];
+    for (const claim of pending) {
+      if (rankOf(claim.entry, out) !== null) continue;
+      const at = placementIn(out, claim);
+      if (at === null) unresolved.push(claim);
+      else out.splice(at, 0, claim.entry);
+    }
+    if (unresolved.length === pending.length) break;
+    pending = unresolved;
+  }
+  return out;
 }
 
 /**

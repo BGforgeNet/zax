@@ -5,6 +5,7 @@ import {
   SHARED_ORDER,
   UPU_ORDER,
   againstRecommendation,
+  orderWith,
   placeFor,
   rankOf,
   recommendationFor,
@@ -25,6 +26,66 @@ describe("rankOf", () => {
 
   it("answers with nothing for an entry the recommendation does not name", () => {
     expect(rankOf("weapon_sounds.dat", ORDER)).toBeNull();
+  });
+});
+
+describe("orderWith", () => {
+  const claim = (entry: string, after: string[] = [], before: string[] = []) => ({
+    entries: [entry],
+    after,
+    before,
+  });
+
+  it("puts an entry where its own claim says, as late as the claim allows", () => {
+    expect(orderWith(ORDER, [claim("weapon_sounds.dat", ["rpu.dat"])])).toEqual([
+      "rpu.dat",
+      "big_content",
+      "fo2tweaks.dat",
+      "weapon_sounds.dat",
+    ]);
+    expect(orderWith(ORDER, [claim("weapon_sounds.dat", ["rpu.dat"], ["fo2tweaks.dat"])])).toEqual([
+      "rpu.dat",
+      "big_content",
+      "weapon_sounds.dat",
+      "fo2tweaks.dat",
+    ]);
+  });
+
+  it("places every entry a mod deploys", () => {
+    expect(orderWith(ORDER, [{ entries: ["a.dat", "b.dat"], after: [], before: ["rpu.dat"] }])).toEqual([
+      "a.dat",
+      "b.dat",
+      "rpu.dat",
+      "big_content",
+      "fo2tweaks.dat",
+    ]);
+  });
+
+  it("lets a claim hang off an entry another claim placed", () => {
+    const claims = [claim("late.dat", ["early.dat"]), claim("early.dat", ["fo2tweaks.dat"])];
+    expect(orderWith(ORDER, claims)).toEqual([...ORDER, "early.dat", "late.dat"]);
+  });
+
+  it("keeps the shipped order's own placement over a claim about the same entry", () => {
+    // RPU's file is that project's statement about an RPU install; a mod's claim does not overrule it.
+    expect(orderWith(ORDER, [claim("fo2tweaks.dat", [], ["rpu.dat"])])).toEqual(ORDER);
+  });
+
+  it("leaves an entry unranked when nothing it names is in the order", () => {
+    expect(orderWith(ORDER, [claim("weapon_sounds.dat", ["never_heard_of.dat"])])).toEqual(ORDER);
+  });
+
+  it("leaves an entry unranked when its two sides cross", () => {
+    expect(orderWith(ORDER, [claim("weapon_sounds.dat", ["fo2tweaks.dat"], ["rpu.dat"])])).toEqual(ORDER);
+  });
+
+  it("leaves entries unranked when their claims wait on each other", () => {
+    const claims = [claim("one.dat", ["two.dat"]), claim("two.dat", ["one.dat"])];
+    expect(orderWith(ORDER, claims)).toEqual(ORDER);
+  });
+
+  it("says nothing new when no mod claims anything", () => {
+    expect(orderWith(ORDER, [])).toEqual(ORDER);
   });
 });
 

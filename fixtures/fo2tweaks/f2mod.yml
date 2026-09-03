@@ -11,6 +11,11 @@ id: fo2tweaks
 name: FO2tweaks
 game: fallout2
 
+author: BGforge
+description: A collection of convenience tweaks, common-sense changes, and cheats for Fallout 2.
+forum: https://forums.bgforge.net/viewforum.php?f=26
+homepage: https://bgforge.net/docs/fallout/fo2tweaks/
+
 needs:
   # The lowest version the mod works with, as the readme states it - not the 4.5 the payload bundles,
   # which ZAX ignores in favour of its own sfall updater.

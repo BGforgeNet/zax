@@ -24,6 +24,7 @@ const snapshot = (text: string | undefined, present: string[] = [], owners: ModO
   format: text === undefined ? "sfall" : orderFormatOf(text),
   present: present.map((name) => ({ name, kind: name.includes(".") ? "dat" : "folder" })),
   owners,
+  claims: [],
 });
 
 const shown = (mods: readonly Mod[]) => mods.map((m) => `${m.enabled ? "+" : "-"}${m.name}`);
@@ -454,7 +455,7 @@ describe("readMods", () => {
 
   it("answers with nothing for an install that has no mods folder", async () => {
     const snap = await readMods(platform({ "game/fallout2.exe": "" }), install);
-    expect(snap).toEqual({ text: undefined, format: "sfall", present: [], owners: [] });
+    expect(snap).toEqual({ text: undefined, format: "sfall", present: [], owners: [], claims: [] });
   });
 
   it("ignores the order file and loose clutter when listing what could load", async () => {
@@ -495,6 +496,29 @@ describe("readMods", () => {
     });
     const snap = await readMods(held, install);
     expect(snap.owners).toEqual([{ name: "FO2tweaks", files: ["mods/fo2tweaks.dat"] }]);
+    // Nothing was claimed, so there is nothing to report about where anything loads.
+    expect(snap.claims).toEqual([]);
+  });
+
+  it("carries the place a recorded mod stated, against the entries it deployed", async () => {
+    const held = platform({ "game/mods/fo2tweaks.dat": "" });
+    await saveRecord(held, {
+      path: "game",
+      mods: [
+        {
+          id: "fo2tweaks",
+          version: "14.7",
+          complete: true,
+          files: ["mods/fo2tweaks.dat", "mods/fo2tweaks.ini"],
+          manifest:
+            'spec: 1\nid: fo2tweaks\nname: FO2tweaks\nversion: "14.7"\ngame: fallout2\norder:\n  after: [rpu.dat]\n',
+          shipped: {},
+        },
+      ],
+    });
+    const snap = await readMods(held, install);
+    // The record declared no entries, so the claim is placed against the dats it deployed - the ini is not one.
+    expect(snap.claims).toEqual([{ entries: ["fo2tweaks.dat"], after: ["rpu.dat"], before: [] }]);
   });
 });
 

@@ -29,6 +29,15 @@ if [ ! -d mods ] || [ -z "$(find mods -type f -print -quit)" ]; then
   exit 1
 fi
 
+# The names ZAX refuses at install: characters Windows has no way to write, the device names it reserves at
+# every level, and a segment ending in a dot or a space. Packing on Linux hides all three until a Windows user
+# is half way through an install. A match is the failure, so the search is the condition.
+if unwritable=$(find mods -print | grep -Ei '(^|/)(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|/|$)|[<>:"|?*]|[. ](/|$)'); then
+  echo "These paths name something Windows cannot create, and ZAX refuses a payload carrying one:" >&2
+  echo "$unwritable" >&2
+  exit 1
+fi
+
 # `<name>_<tag>.zip`, the tag whole rather than the version - the naming Fallout 2 mod releases already use,
 # and what a person scanning a releases page expects to see.
 name="${NAME:-${GITHUB_REPOSITORY##*/}}"

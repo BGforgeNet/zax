@@ -106,12 +106,24 @@ const CAPTURED_FEEDS: Readonly<Record<string, string>> = {
   "BGforgeNet/FO2tweaks": fo2tweaksFeed,
 };
 
+/*
+  The manifest each of those repositories would serve at a tag, for the ones this repository holds a copy of.
+  FO2tweaks does not publish an `f2mod.yml` yet; the fixture is the document it would publish, and the same
+  one the seeded record carries, so what the preview shows of a described mod is what a real read would give
+  once it does. The three base mods stay on the note below, which is the answer their tags really give.
+*/
+const CAPTURED_MANIFESTS: Readonly<Record<string, string>> = {
+  "BGforgeNet/FO2tweaks": fo2tweaksManifest,
+};
+
 async function fetchCaptured(url: string): Promise<string> {
-  const captured = Object.entries(CAPTURED_FEEDS).find(([repository]) => url.includes(`/repos/${repository}/releases`));
-  // A manifest URL reaches here too, and still refuses - though nothing asks, since every one of these
-  // repositories publishes no manifest and the cache below already records that.
-  if (captured === undefined) refuses();
-  return Promise.resolve(captured[1]);
+  const listing = Object.entries(CAPTURED_FEEDS).find(([repository]) => url.includes(`/repos/${repository}/releases`));
+  if (listing !== undefined) return Promise.resolve(listing[1]);
+  // Answered for any tag of the repository: the listings above hold two, the manifest is committed rather
+  // than stamped per release, and which tag was asked for decides the version rather than the document.
+  const manifest = Object.entries(CAPTURED_MANIFESTS).find(([repository]) => url.includes(`/${repository}/`));
+  if (manifest === undefined) refuses();
+  return Promise.resolve(manifest[1]);
 }
 
 /** The in-memory disk the preview edits. Exported so tests can reseed it between cases. */
@@ -207,6 +219,34 @@ await saveRecord(previewPlatform, {
       manifest: fo2tweaksManifest,
       shipped: { "mods/fo2tweaks.ini": fo2tweaksIni },
     },
+    /*
+      A mod ZAX installed that no feed follows any more - an id retired from the list, or renamed upstream.
+      Its row is drawn from this record alone, which is the state that keeps Remove reachable for a mod the
+      tab would otherwise have no line for at all.
+
+      The manifest names a forum, and the row still offers no button for it: the address is resolved from a
+      held release, and having none is the whole of what makes the row unfollowed.
+    */
+    {
+      id: "weapon-sounds",
+      version: "2.1",
+      type: "pluggable",
+      complete: true,
+      files: ["mods/weapon_sounds.dat"],
+      // Declared rather than derived, since the id carries no underscore and the entry does.
+      entries: ["weapon_sounds.dat"],
+      manifest: [
+        "spec: 1",
+        "id: weapon-sounds",
+        "name: Weapon Sounds",
+        'version: "2.1"',
+        "game: fallout2",
+        "description: Replacement firing sounds for every weapon in the game.",
+        "forum: https://forums.bgforge.net/viewforum.php?f=26",
+        "",
+      ].join("\n"),
+      shipped: {},
+    },
   ],
   /*
     Fission deployed in this folder, which is what the Mods tab's Fission sub-tab follows: the machine's cache
@@ -246,10 +286,12 @@ await cachedBuild("fission", "fallout-fission-linux-x64.zip", "beta-0.9.6.8", "2
 
 /*
   Per release, the note that its author publishes no manifest of their own - which is what sends the base mods
-  to the documents ZAX carries for exactly that case. True of all four: none of these repositories has an
-  `f2mod.yml`, at the tag or on its default branch, so the note records the answer the network would give.
+  to the documents ZAX carries for exactly that case. True of the three: none of those repositories has an
+  `f2mod.yml`, at the tag or on its default branch, so the note records the answer the network would give. The
+  fourth is answered above instead, and a note here would stop it ever being asked for.
 */
 for (const [repository, body] of Object.entries(CAPTURED_FEEDS)) {
+  if (repository in CAPTURED_MANIFESTS) continue;
   const parsed: unknown = JSON.parse(body);
   for (const release of Array.isArray(parsed) ? parsed : []) {
     const tag = isRecord(release) ? release["tag_name"] : undefined;

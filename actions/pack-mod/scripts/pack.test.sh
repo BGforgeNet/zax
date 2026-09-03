@@ -29,4 +29,22 @@ grep -Fxq -- '-payload/option.dat' <<<"${entries}"
 grep -Fxq 'archive=test_v1.2.3.zip' output
 grep -Fxq 'version=1.2.3' output
 
+# A name Windows cannot create is refused before anything is packed: the run that produced it is the only
+# place an author hears about it, since the archive would install everywhere else and fail only there.
+mkdir -p refused/mods
+touch refused/mods/aux.dat
+if PATHS=mods \
+  DIRECTORY=refused \
+  NAME=refused \
+  GITHUB_REF_TYPE=tag \
+  GITHUB_REF_NAME=v1.2.3 \
+  GITHUB_REPOSITORY=example/test \
+  GITHUB_WORKSPACE="${scratch}" \
+  GITHUB_OUTPUT="${scratch}/output" \
+  "${ROOT}/actions/pack-mod/scripts/pack.sh" 2>refused.err; then
+  echo "pack.sh packed a payload naming a device Windows reserves." >&2
+  exit 1
+fi
+grep -Fq 'mods/aux.dat' refused.err
+
 echo "Pack path checks passed."

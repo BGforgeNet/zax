@@ -321,6 +321,57 @@ describe("entries refusals", () => {
   });
 });
 
+describe("what a release says about itself", () => {
+  it("reads the fields the interface shows", () => {
+    const manifest = parsed(
+      `${FO2TWEAKS}author: Lexx\ndescription: Small fixes and options.\nforum: https://example.test/thread\nhomepage: https://example.test/mod\n`,
+    );
+    expect(manifest).toMatchObject({
+      author: "Lexx",
+      description: "Small fixes and options.",
+      forum: "https://example.test/thread",
+      homepage: "https://example.test/mod",
+    });
+  });
+
+  it("refuses an address that is not an https page", () => {
+    // The value is handed to whatever the machine opens links with, so the scheme is the whole of the check.
+    expect(() => parsed(`${FO2TWEAKS}forum: http://example.test/thread\n`)).toThrow(/not an https address/);
+    expect(() => parsed(`${FO2TWEAKS}homepage: file:///etc/passwd\n`)).toThrow(/not an https address/);
+    expect(() => parsed(`${FO2TWEAKS}forum: "https://example.test/a b"\n`)).toThrow(/not an https address/);
+  });
+});
+
+describe("the place a mod states", () => {
+  it("reads both sides, as entries rather than ids", () => {
+    const manifest = parsed(
+      `${FO2TWEAKS}order:\n  after: [rpu.dat, party_orders.dat]\n  before: [InventoryFilter.dat]\n`,
+    );
+    expect(manifest.order).toEqual({ after: ["rpu.dat", "party_orders.dat"], before: ["InventoryFilter.dat"] });
+  });
+
+  it("reads one side alone", () => {
+    expect(parsed(`${FO2TWEAKS}order:\n  after: [rpu.dat]\n`).order).toEqual({ after: ["rpu.dat"], before: [] });
+  });
+
+  it("states no place by default", () => {
+    expect(parsed(FO2TWEAKS).order).toBeUndefined();
+  });
+
+  it("refuses a claim that names nothing to load either side of", () => {
+    expect(() => parsed(`${FO2TWEAKS}order: {}\n`)).toThrow(/"order" names nothing/);
+    expect(() => parsed(`${FO2TWEAKS}order:\n  after: []\n`)).toThrow(/"order" names nothing/);
+  });
+
+  it("refuses a name that could leave the mods folder", () => {
+    expect(() => parsed(`${FO2TWEAKS}order:\n  after: ["../rpu.dat"]\n`)).toThrow(/leaves the game directory/);
+  });
+
+  it("refuses a side this version has no rule for, since the order it writes is on disk", () => {
+    expect(() => parsed(`${FO2TWEAKS}order:\n  beside: [rpu.dat]\n`)).toThrow(/unknown field "beside"/);
+  });
+});
+
 describe("mayWrite", () => {
   it("lets any mod write under mods/ and nowhere else", () => {
     expect(mayWrite("mods/fo2tweaks.dat", [])).toBe(true);

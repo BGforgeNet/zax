@@ -23,8 +23,9 @@ export {
   type Mod,
   type ModsSaveRequest,
   type ModsSnapshot,
+  type OrderClaim,
 } from "./mods.js";
-export { againstRecommendation, recommendationFor, recommendedOrder } from "./recommended-order.js";
+export { againstRecommendation, orderWith, recommendationFor, recommendedOrder } from "./recommended-order.js";
 export { createDebugPackage, listSaves, type DebugPackage } from "./debug-package.js";
 export {
   MANIFEST_BYTE_CAP,

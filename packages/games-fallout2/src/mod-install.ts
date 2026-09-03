@@ -26,13 +26,14 @@ import {
 } from "@zax/core";
 import type { ArchiveEntryInfo, DirEntry, Platform } from "@zax/platform";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
-import { preflightArchive } from "./archive-preflight.js";
+import { isArchivingClutter, preflightArchive } from "./archive-preflight.js";
 import { mayWrite, parseManifest, type ModManifest, type ModPart, type ModType } from "./manifest.js";
 import { grantsFor } from "./mod-grants.js";
 import {
   answersToId,
   listMods,
   namedInOrder,
+  orderDats,
   readMods,
   restoreOrder,
   saveMods,
@@ -40,7 +41,7 @@ import {
   MODS_ORDER_PATH,
   type Mod,
 } from "./mods.js";
-import { placeFor, recommendationFor } from "./recommended-order.js";
+import { orderWith, placeFor, recommendationFor } from "./recommended-order.js";
 import { assertUsable, loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 import { modWorkDirectory, readTransaction, writeTransaction, type ModTransaction } from "./mod-transaction.js";
 import { isArchiveName, type ModRelease, type ReleaseAsset } from "./mod-feed.js";
@@ -91,8 +92,6 @@ const insidePath = (platform: Platform, root: string, relative: string): string 
 /** Where deployment sets aside what it overwrote, and what it removed, relative to the working directory. */
 const OVERWRITTEN = "overwritten";
 const REMOVED = "removed";
-
-const ORDER_DAT = /^mods\/([^/]+\.dat)$/i;
 
 /**
  * One payload an install deploys: a whole mod, or one chosen part of it. A part is its own asset, its own
@@ -287,6 +286,9 @@ export async function planModInstall(
     const mine: PlannedFile[] = [];
     for (const entry of entries) {
       if (entry.kind !== "file" || !mayWrite(entry.name, granted)) continue;
+      // Dropped rather than deployed: what the archiving machine added is not the mod, and installing it would
+      // put the file in the overwrite preview, in the record uninstall deletes from, and in the game folder.
+      if (isArchivingClutter(entry.name)) continue;
       const overwrites = (await realCasedPath(platform, install.path, entry.name, listings)) !== null;
       mine.push({ path: entry.name, size: entry.size, overwrites, ...(payload.part ? { part: payload.part.id } : {}) });
     }
@@ -366,19 +368,19 @@ async function updateOrderLines(
   // folder listing carries the new dat too, and a mod the file has never placed would keep the place that
   // listing gave it - the end - however the recommendation reads.
   const named = new Set(namedInOrder(snapshot.text).map((name) => name.toLowerCase()));
+  // The record is written before the first byte is deployed, so the mod being installed has already stated
+  // its own place by the time this runs, alongside every mod that stated one before it.
+  const order = orderWith(recommendationFor(install.type), snapshot.claims);
   for (const name of enable) {
     // A line the file already carries stays where the user put it; only a first placement is ZAX's to make.
     if (named.has(name.toLowerCase())) continue;
     const listed = mods.findIndex((mod) => mod.name.toLowerCase() === name.toLowerCase());
     if (listed !== -1) mods.splice(listed, 1);
-    mods.splice(placeFor(mods, name, recommendationFor(install.type)), 0, { name, enabled: true, kind: "dat" });
+    mods.splice(placeFor(mods, name, order), 0, { name, enabled: true, kind: "dat" });
   }
   const saved = await saveMods(platform, { installPath: install.path, original: snapshot.text, mods });
   if (!saved.ok) throw new Error(`${MODS_ORDER_PATH} changed underneath - retry to pick up the new file.`);
 }
-
-const orderDats = (paths: readonly string[]): string[] =>
-  paths.map((path) => ORDER_DAT.exec(path)?.[1]).filter((name): name is string => !!name);
 
 /**
  * Executes a confirmed plan. The record is written marked incomplete before the first byte lands and marked

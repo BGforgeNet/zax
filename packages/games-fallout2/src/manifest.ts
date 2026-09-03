@@ -189,10 +189,32 @@ interface ModExtractDat {
   into: string;
 }
 
+/**
+ * Where a mod says it loads, named in the vocabulary the order file itself uses - entries under `mods/`,
+ * rather than mod ids. That is the only vocabulary every line can be judged in: the folder cannot say which
+ * mod put a dat there, so an id would place a mod against the ones ZAX installed and against nothing else.
+ *
+ * `after` is further down the file, which is where the loader gives a mod the last word.
+ */
+interface ModOrder {
+  after: readonly string[];
+  before: readonly string[];
+}
+
 export interface ModManifest {
   id: string;
   name: string;
   version: string;
+  /**
+   * What the mod is and who wrote it, for the surface that offers it. None of it reaches the install: a
+   * manifest that says nothing here is a mod shown by name alone, which is what every one of them was before
+   * the fields existed.
+   */
+  author?: string;
+  description?: string;
+  /** Where the mod is discussed and where it lives, which the interface offers to open. */
+  forum?: string;
+  homepage?: string;
   type: ModType;
   /** Why the mod can never be uninstalled. Present exactly when the type is permanent. */
   reason?: string;
@@ -227,6 +249,8 @@ export interface ModManifest {
    * states no top-level `archive`: each part names the asset it deploys.
    */
   parts?: readonly ModPartGroup[];
+  /** What the mod says it loads either side of. Absent leaves its place to the shipped recommendation. */
+  order?: ModOrder;
   /** Installs ZAX refuses because the author declared the clash. A file collision is caught without one. */
   conflicts: readonly ConflictRule[];
   settings: readonly ModSetting[];
@@ -567,6 +591,27 @@ function parseEntries(value: unknown, where: string): readonly string[] {
   return entries;
 }
 
+/**
+ * Where the mod loads, relative to entries it names. Both lists are entries under `mods/`, spelled as the
+ * order file spells them, so they are read exactly as `entries` is.
+ *
+ * A claim naming nothing refuses: it would read as a mod stating its place while placing itself nowhere. What
+ * a claim names is not required to be present - a mod may state where it goes beside something this install
+ * does not have - so an absent name is what leaves the claim unsatisfied rather than what refuses it.
+ */
+function parseOrder(value: unknown): ModOrder {
+  const fields = record(value, `"order"`, ["after", "before"]);
+  const names = (key: string) =>
+    fields[key] === undefined
+      ? []
+      : items(fields[key], `"order" ${key}`).map((name, at) => confinedPath(name, `"order" ${key} ${at + 1}`));
+  const after = names("after");
+  const before = names("before");
+  if (after.length === 0 && before.length === 0)
+    refuse(`"order" names nothing to load either side of, so it states no place`);
+  return { after, before };
+}
+
 const GROUP_FIELDS = ["label", "pick", "options"];
 const PART_FIELDS = ["id", "label", "help", "archive", "entries", "needs"];
 
@@ -786,6 +831,17 @@ function parseConflicts(value: unknown): readonly ConflictRule[] {
   });
 }
 
+/**
+ * An address the interface offers to open. `https` alone, and no whitespace: the value is handed to whatever
+ * the machine opens links with, so any other scheme would be a manifest choosing what runs there rather than
+ * naming a page to read.
+ */
+function link(value: unknown, where: string): string {
+  const url = text(value, where, SHORT_TEXT);
+  if (!/^https:\/\/[^\s]+$/.test(url)) refuse(`${where} ("${url}") is not an https address`);
+  return url;
+}
+
 /** The payload asset's name becomes a filename in the working directory, so it must be one - no separators. */
 function assetName(value: unknown, where: string): string {
   const name = text(value, where, SHORT_TEXT);
@@ -798,12 +854,17 @@ const MANIFEST_FIELDS = [
   "id",
   "name",
   "version",
+  "author",
+  "description",
+  "forum",
+  "homepage",
   "game",
   "type",
   "reason",
   "archive",
   "needs",
   "entries",
+  "order",
   "parts",
   "becomes",
   "installer",
@@ -947,6 +1008,12 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     id,
     name: text(fields["name"], `"name"`, SHORT_TEXT),
     version,
+    ...(fields["author"] !== undefined ? { author: text(fields["author"], `"author"`, SHORT_TEXT) } : {}),
+    ...(fields["description"] !== undefined
+      ? { description: text(fields["description"], `"description"`, LONG_TEXT) }
+      : {}),
+    ...(fields["forum"] !== undefined ? { forum: link(fields["forum"], `"forum"`) } : {}),
+    ...(fields["homepage"] !== undefined ? { homepage: link(fields["homepage"], `"homepage"`) } : {}),
     type,
     ...(type === "permanent" ? { reason: text(fields["reason"], `"reason"`, LONG_TEXT) } : {}),
     ...(archive !== undefined ? { archive: assetName(archive, `"archive"`) } : {}),
@@ -959,6 +1026,7 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     ...(requiresSfall !== undefined ? { requiresSfall } : {}),
     ...(fields["entries"] !== undefined ? { entries: parseEntries(fields["entries"], `"entries"`) } : {}),
     ...(parts !== undefined ? { parts } : {}),
+    ...(fields["order"] !== undefined ? { order: parseOrder(fields["order"]) } : {}),
     conflicts: fields["conflicts"] === undefined ? [] : parseConflicts(fields["conflicts"]),
     ...(fields["settings"] === undefined
       ? { settings: [], dropped: [] }

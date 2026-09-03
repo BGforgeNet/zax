@@ -203,6 +203,28 @@ describe("the operations", () => {
     expect(platform.opened).toEqual(["https://example/zax"]);
   });
 
+  it("opens a mod's page from the release it read, the caller naming which page rather than the address", async () => {
+    const repository = "BGforgeNet/FO2tweaks";
+    const platform = new MemoryPlatform({
+      home: "/home/t",
+      responses: {
+        [`https://api.github.com/repos/${repository}/releases?per_page=100`]: JSON.stringify([
+          { tag_name: "v14.7", assets: [{ name: "fo2tweaks.zip", browser_download_url: "https://example/f.zip" }] },
+        ]),
+        [`https://raw.githubusercontent.com/${repository}/v14.7/f2mod.yml`]:
+          "spec: 1\nid: fo2tweaks\nname: FO2tweaks\ngame: fallout2\nforum: https://example/thread\n",
+      },
+    });
+    const backend = createBackend(platform, noShell);
+    await backend.publishedMods();
+
+    await backend.open({ mod: "fo2tweaks", page: "forum" });
+    expect(platform.opened).toEqual(["https://example/thread"]);
+    // A page the release does not publish is a refusal rather than a guess at an address.
+    await expect(backend.open({ mod: "fo2tweaks", page: "homepage" })).rejects.toThrow(/No homepage is published/);
+    expect(platform.opened).toHaveLength(1);
+  });
+
   it("falls back to the release page when the feed cannot be reached", async () => {
     // No responses seeded, so the request fails the way an offline machine's does.
     const platform = new MemoryPlatform({ home: "/home/t" });

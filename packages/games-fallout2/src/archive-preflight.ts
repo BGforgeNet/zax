@@ -32,6 +32,48 @@ function escapesDirectory(name: string): boolean {
   return name.split(/[/\\]/).includes("..");
 }
 
+/** The device names Windows reserves at every level of a path, whatever extension follows them. */
+const RESERVED_DEVICE = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i;
+
+/**
+ * What the Windows filesystem API refuses in a name, control characters included - written as the Unicode
+ * category rather than a numeric range, which is invisible to whoever reads this next. The separators are
+ * absent from it: they are what splits a name into the segments this is applied to.
+ */
+const ILLEGAL_CHARACTER = /[<>:"|?*\p{Cc}]/u;
+
+/**
+ * A segment of the name Windows cannot create, or null when every one of them can be.
+ *
+ * Judged on every host rather than only where extraction would fail. An archive packed on Linux can carry a
+ * name Windows has no way to write, and the failure that produces there lands inside the extraction, part way
+ * through a deployment - so the same refusal everywhere is what gets the author told rather than one user.
+ */
+function unwritableSegment(name: string): string | null {
+  for (const segment of name.split(/[/\\]/)) {
+    if (segment === "") continue;
+    // A trailing dot or space is dropped by the Windows API rather than refused, so what arrives is not the
+    // file the archive named - the same class of unwritable name as a reserved device or a refused character.
+    if (ILLEGAL_CHARACTER.test(segment) || RESERVED_DEVICE.test(segment) || /[. ]$/.test(segment)) return segment;
+  }
+  return null;
+}
+
+/** Names the archiving machine generates. Matched on the last segment, since that is where the file sits. */
+const CLUTTER = new Set([".ds_store", "thumbs.db", "desktop.ini"]);
+
+/**
+ * Whether an entry is the archiving machine's own clutter rather than anything the mod means to ship. A
+ * payload zipped on macOS carries `__MACOSX/`, and one zipped from Explorer carries `Thumbs.db`; deploying
+ * either puts files in the game folder no author wrote, which uninstall then has to own and the overwrite
+ * preview has to show. Only names an operating system generates are here: nothing an author could have
+ * written is dropped on their behalf.
+ */
+export function isArchivingClutter(name: string): boolean {
+  const pieces = name.split(/[/\\]/).filter((piece) => piece !== "");
+  return pieces.some((piece) => piece.toLowerCase() === "__macosx") || CLUTTER.has((pieces.at(-1) ?? "").toLowerCase());
+}
+
 /**
  * The archive's directory, once it has been judged. Returned rather than discarded because the caller needs
  * the same listing to plan from, and reading it twice would let the two disagree.
@@ -56,6 +98,11 @@ export async function preflightArchive(
       throw new Error(`${label} names a path outside the folder it unpacks into (${entry.name}) - refused.`);
     if (entry.name.split(/[/\\]/).length > MAX_PATH_DEPTH)
       throw new Error(`${label} nests paths deeper than any release does (${entry.name}) - refused.`);
+    const unwritable = unwritableSegment(entry.name);
+    if (unwritable !== null)
+      throw new Error(
+        `${label} names "${unwritable}" (in ${entry.name}), which Windows cannot create - refused, since the same payload has to install on every machine.`,
+      );
     total += entry.size;
   }
   if (total > MAX_TOTAL_BYTES)

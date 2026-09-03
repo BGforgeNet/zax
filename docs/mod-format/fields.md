@@ -8,12 +8,17 @@ Every field a manifest may carry. [The landing page](../mod-format.md) has the f
 | `id`          | yes              | Permanent identity: lowercase `a-z0-9.-`. See "The id is forever".                     |
 | `name`        | yes              | Display name.                                                                          |
 | `version`     | unless tagged    | Digit-led. Quote it - YAML reads `14.7` as a number, and the literal wins.             |
+| `author`      | no               | Who wrote it, shown beside the name.                                                   |
+| `description` | no               | A sentence or two on what the mod is, shown on its row.                                |
+| `forum`       | no               | Where the mod is discussed: an `https` address ZAX offers to open; see below.          |
+| `homepage`    | no               | The same, for the mod's own site.                                                      |
 | `game`        | yes              | `fallout2`. Anything else refuses.                                                     |
 | `type`        | no               | `pluggable` (default), `permanent` or `base`. See [Base mods](base-mods.md).           |
 | `reason`      | with `permanent` | Why it cannot be uninstalled. Shown before install as well as after.                   |
 | `archive`     | unless sole      | The asset carrying the payload. Needed unless the release has one archive and no more. |
 | `needs`       | no               | What the mod needs of the install it lands on; see below.                              |
 | `entries`     | no               | What the mod puts in `mods/`, as the loader names them; see below. Default: derived.   |
+| `order`       | no               | What it loads after and before, as entries rather than ids; see below.                 |
 | `parts`       | no               | Choices the release offers, each naming its own asset. Excludes `archive`.             |
 | `becomes`     | with `base`      | The game type the install reports afterwards, e.g. `fallout2rpu`.                      |
 | `installer`   | one of the two   | The installer to run, per platform.                                                    |
@@ -34,8 +39,16 @@ payload from the rest of what is published.
 manifest declares - Cassidy's four `.dat` assets and the walk-speed fix's one are published that way. It has to
 be named by `archive`, because inference stays archive-only.
 
-Archives are checked before extraction: symlink entries, over 10,000 entries, paths deeper than 16 segments, or
+Archives are checked before extraction: symlink entries, over 65,536 entries, paths deeper than 16 segments, or
 over 8 GiB unpacked all refuse.
+
+**A name Windows cannot create refuses too**, on every host rather than only there: a device name at any level
+(`aux`, `nul`, `com1`, with or without an extension), any of `< > : " | ? *` or a control character, or a
+segment ending in a dot or a space. Packing on Linux hides all three until a Windows user is half way through
+an install, so the same payload is refused everywhere and `actions/pack-mod` says so on the run that made it.
+
+**What the archiving machine wrote is dropped rather than installed**: `__MACOSX/`, `.DS_Store`, `Thumbs.db`,
+`desktop.ini`. Nothing an author could have written is dropped on their behalf.
 
 ## What the mod needs of the install
 
@@ -76,6 +89,31 @@ An entry the payload does not carry refuses the install, rather than writing a l
 payload that is not an archive declares exactly one: a single file has no paths of its own, so this is the only
 thing that can say what it installs as.
 
+## Where the mod loads
+
+```yaml
+order:
+  after:
+    - rpu.dat
+  before:
+    - InventoryFilter.dat
+```
+
+A mod further down `mods_order.txt` overrides one above it, so `after` is where your files win over the ones
+you name and `before` is where you give way. Both lists name entries in `mods/`, spelled as the order file
+spells them, rather than mod ids: the folder cannot say which mod put a dat there, so an id would place you
+against the mods ZAX installed and against nothing else.
+
+ZAX ships the orders the Restoration Project and the Unofficial Patch state for themselves, and those win
+where they already name your entry - an install that is one of those projects is where that project's own file
+is the better statement. Everything else is placed by what it claims, as late as the claim allows, and against
+entries other mods have claimed their way to as well. A claim naming nothing the install knows about, or one
+whose two sides cross, leaves the mod unranked - which is what every mod nobody has spoken for already gets,
+and means the order file keeps it where it is.
+
+Nothing here moves a line on its own. It decides where a first install puts one, and what the Mods tab's
+recommendation and its sort button are working from.
+
 ## Conflicts
 
 ```yaml
@@ -95,11 +133,14 @@ incompatibility with no file in common.
 ## What parsing refuses
 
 Parsing is strict: an unknown field refuses the manifest, so a misspelling cannot silently drop a safety rule.
-UTF-8, at most 256 KB; text fields cap at 200 characters, 1000 for help and reasons, and may not hold control
-characters. Path-shaped fields are confined - absolute paths, drive letters, `..`, or anything outside `mods/`
-refuse the manifest whole. A few named mods are granted one directory beyond it, where the engine reads that
-directory from the filesystem and no archive can stand in for it. The grant is ZAX's to give and not something a
-manifest can claim: declaring the path is how a mod says where it writes, never how it gets permission.
+UTF-8, at most 256 KB; text fields cap at 200 characters, 1000 for help, reasons and descriptions, and may not
+hold control characters. `forum` and `homepage` must be `https` addresses with no whitespace in them: what
+they name is handed to whatever the machine opens links with, so any other scheme would be a manifest choosing
+what runs there rather than naming a page to read. Path-shaped fields are confined - absolute paths, drive
+letters, `..`, or anything outside `mods/` refuse the manifest whole. A few named mods are granted one
+directory beyond it, where the engine reads that directory from the filesystem and no archive can stand in for
+it. The grant is ZAX's to give and not something a manifest can claim: declaring the path is how a mod says
+where it writes, never how it gets permission.
 
 ## How the format changes
 

@@ -15,7 +15,8 @@ mods as well as settings.
   setting rewrites one line.
 - **Mods.** Install, upgrade and remove mods published as releases, with their settings edited like the game's
   own. Upgrades keep the changes you made to a mod's ini rather than overwriting them, an interrupted install
-  can be resumed or put back exactly, and removal deletes only what was recorded as installed.
+  can be resumed or put back exactly, and removal deletes only what was recorded as installed. A mod's row says
+  what it is and who wrote it, and opens its forum thread or its home page where the release publishes one.
 - **Big mods too.** Restoration Project and the Unofficial Patch install through their own installers, with the
   components they offer chosen in ZAX on Windows. The Restoration Project's 2.3 and 2.4 lines are two entries
   rather than one: each updates within its own line, and only one of them installs on any game. Fallout et tu
@@ -29,7 +30,8 @@ mods as well as settings.
 - **What a release offers is asked before it downloads.** A mod publishing variants or add-ons asks which you
   want, and carries the answer to the next upgrade.
 - **Load order.** Reorder and enable mods, see which installed mod each entry belongs to, sort to a
-  recommended order, and forget entries whose files are gone.
+  recommended order, and forget entries whose files are gone. A mod that states what it loads after and before
+  is placed by what it says, alongside the orders the Restoration Project and the Unofficial Patch publish.
 - **sfall updates.** See the installed version, update to the latest or to a version you pick, and keep your
   `ddraw.ini` settings - the release's own defaults are merged in, so new keys arrive and your choices stay.
 - **Alternative engines.** Fetch Fallout II Community Edition or Fallout Fission and run either alongside the

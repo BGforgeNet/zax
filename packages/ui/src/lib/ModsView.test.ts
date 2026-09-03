@@ -278,6 +278,36 @@ describe("what an offer's status says", () => {
   });
 });
 
+describe("what a row says the mod is", () => {
+  test("shows the description and author a release publishes", () => {
+    publish({ author: "Lexx", description: "Small fixes and options." });
+    const text = view().text();
+    expect(text).toContain("Small fixes and options.");
+    expect(text).toContain("By Lexx");
+  });
+
+  test("says nothing where the manifest says nothing", () => {
+    publish();
+    expect(view().all(".offer .by")).toEqual([]);
+  });
+
+  test("offers only the pages the release publishes", () => {
+    publish({ forum: true });
+    const labels = view()
+      .all(".offer .by button")
+      .map((button) => (button.textContent ?? "").trim());
+    expect(labels).toEqual(["Forum"]);
+  });
+
+  /* The address never reaches this side: the row asks for a page of a mod by name and the backend resolves it. */
+  test("asks the backend for the page rather than for an address", () => {
+    const opened = vi.spyOn(hostBackend, "open").mockResolvedValue();
+    publish({ homepage: true });
+    view().all(".offer .by button")[0]?.click();
+    expect(opened).toHaveBeenCalledWith({ mod: "fo2tweaks", page: "homepage" });
+  });
+});
+
 describe("what a row offers to do", () => {
   const actions = (availability: Record<string, unknown>, over: Record<string, unknown> = {}) => {
     publish(over, availability);
@@ -359,6 +389,19 @@ describe("what a row offers to do", () => {
 
   test("judges removability by what is on disk, not by what the release becomes", () => {
     expect(actions({ kind: "convert", from: "14.7", was: "pluggable" }, { type: "permanent" })).toContain("Remove");
+  });
+
+  /*
+    A refused release is the ordinary state of a mod that raised its sfall floor in a later one: the gate
+    answers before the version comparison, so the row is blocked while the older release sits on disk. What is
+    installed is still installed, and the version the refusal names is how the row knows it.
+  */
+  test("offers Remove for an installed mod whose newest release is refused", () => {
+    expect(actions({ kind: "blocked", why: "needs sfall 4.1.3", from: "14.7" })).toContain("Remove");
+  });
+
+  test("offers no Remove where the refusal names no installed version, nothing being there to remove", () => {
+    expect(actions({ kind: "blocked", why: "installs on Restoration Project" })).not.toContain("Remove");
   });
 
   /*

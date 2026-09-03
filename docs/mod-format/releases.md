@@ -13,6 +13,17 @@ tag's tree does not change once pushed, so what is read for one is kept; a tag t
 remembered as carrying none, which is what keeps following a repository from costing one request per release
 every time the listing refreshes.
 
+## A published release is finished
+
+Do not edit a release once it is published: not the tag, not the assets, not a re-upload under the same name.
+What ZAX read for a tag is what it keeps, and the digest it verifies a download against is the one the release
+stated when it was read - so a payload swapped underneath a published version is a release whose bytes and
+whose record no longer agree, and which of the two a given machine has depends on when it last looked.
+
+Nothing enforces this, which is why it is worth saying. A correction is a new tag: the version is what the tag
+says, so `v14.7.1` costs nothing beyond pushing it, and it reaches every install as an upgrade rather than as
+a difference nobody can see.
+
 ## Installing, upgrading, removing
 
 - **Recorded per install**: version, deployed files, the manifest, and the ini files as shipped.

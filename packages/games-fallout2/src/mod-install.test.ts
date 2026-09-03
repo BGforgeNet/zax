@@ -121,6 +121,31 @@ describe("install", () => {
     expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).toBe("rpu.dat\nfo2tweaks.dat\nInventoryFilter.dat\n");
   });
 
+  it("puts a new line where the mod's own manifest says it goes", async () => {
+    // Nothing ZAX ships places weapon_sounds.dat, so without the claim the line would land at the end - which
+    // is also what happens if the claim never reaches the placement, so this is what proves it does.
+    const text = `spec: 1\nid: weaponsounds\nname: Weapon Sounds\nversion: "1.0"\ngame: fallout2\narchive: ws.zip\norder:\n  before: [InventoryFilter.dat]\n`;
+    const url = "https://example.test/ws.zip";
+    const platform = new MemoryPlatform({
+      files: {
+        [`${GAME}/fallout2.exe`]: "",
+        [`${GAME}/mods/rpu.dat`]: "RPU",
+        [`${GAME}/mods/InventoryFilter.dat`]: "FILTER",
+        [`${GAME}/mods/mods_order.txt`]: "rpu.dat\nInventoryFilter.dat\n",
+      },
+      downloads: { [url]: "ZIP-WS" },
+      archives: { "ZIP-WS": { "mods/weapon_sounds.dat": "DAT-WS" } },
+    });
+    const release: ModRelease = {
+      manifest: parseManifest(new TextEncoder().encode(text)),
+      manifestText: text,
+      archive: { name: "ws.zip", url, digest: `sha256:${await sha("ZIP-WS")}` },
+    };
+
+    await applyModInstall(platform, install, release, await planModInstall(platform, install, release));
+    expect(platform.textAt(`${GAME}/mods/mods_order.txt`)).toBe("rpu.dat\nweapon_sounds.dat\nInventoryFilter.dat\n");
+  });
+
   it("leaves a line the file already carries where the user put it", async () => {
     const platform = gamePlatform({
       files: {
@@ -159,6 +184,31 @@ describe("install", () => {
     expect(record.mods[0]?.shipped["mods/fo2tweaks.ini"]).toBe(INI_147);
     // The working directory is cleared when the install finishes.
     expect(await platform.fs.stat(WORK)).toBeNull();
+  });
+
+  it("installs none of the archiving machine's own files", async () => {
+    // A payload zipped on macOS carries both. Deploying them would put files in the game folder no author
+    // wrote, list them in the overwrite preview, and leave uninstall owning them.
+    const platform = new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "" },
+      downloads: { [zipUrl("14.7")]: payload("14.7") },
+      archives: {
+        [payload("14.7")]: {
+          "f2mod.yml": manifestFor("14.7"),
+          "mods/fo2tweaks.dat": "DAT-14.7",
+          "mods/.DS_Store": "FINDER",
+          "__MACOSX/mods/._fo2tweaks.dat": "APPLEDOUBLE",
+        },
+      },
+    });
+    const release = await releaseFor("14.7");
+
+    const plan = await planModInstall(platform, install, release);
+    expect(plan.files.map((file) => file.path)).toEqual(["mods/fo2tweaks.dat"]);
+
+    await applyModInstall(platform, install, release, plan);
+    expect(platform.textAt(`${GAME}/mods/.DS_Store`)).toBeUndefined();
+    expect((await loadRecord(platform, GAME)).mods[0]?.files).toEqual(["mods/fo2tweaks.dat"]);
   });
 
   it("refuses when a manifest condition fires, matching case-insensitively, before anything is written", async () => {

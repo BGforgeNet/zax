@@ -76,15 +76,24 @@ interface OpaqueMod {
 }
 
 /**
+ * The manifest a record carries, as this version reads it - null where it cannot, which a newer ZAX having
+ * written the record is enough to produce. Everything read back out of a snapshot goes through here, so a
+ * record that will not parse costs the same fallback everywhere rather than one per reader.
+ */
+export function manifestOf(mod: InstalledMod): ModManifest | null {
+  try {
+    return parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * What to call a recorded mod. The manifest snapshot carries the name the author gave it; an id is what is
  * left when that snapshot will not parse, which is the same fallback the availability list makes.
  */
 export function modName(mod: InstalledMod): string {
-  try {
-    return parseManifest(new TextEncoder().encode(mod.manifest), { version: mod.version }).name;
-  } catch {
-    return mod.id;
-  }
+  return manifestOf(mod)?.name ?? mod.id;
 }
 
 /**
