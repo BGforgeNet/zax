@@ -15,3 +15,5 @@ release/
 
 # Per-user state the application writes, when it is run from a checkout.
 zax.yml
+
+.playwright*
