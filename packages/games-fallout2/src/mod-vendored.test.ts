@@ -6,7 +6,7 @@ import { MOD_FEEDS } from "./mod-feed.js";
 const encoder = new TextEncoder();
 /** Parsed the way `fetchFeed` parses it: the document states no version, and the release's tag supplies it. */
 const parsed = (id: string, version: string) => {
-  const text = vendoredManifestFor(id)?.(version);
+  const text = vendoredManifestFor(id);
   if (text === undefined) throw new Error(`nothing vendored for ${id}`);
   return parseManifest(encoder.encode(text), { version });
 };
@@ -16,15 +16,18 @@ const componentIds = (groups: readonly { options: readonly { id: string }[] }[] 
   groups.flatMap((group) => group.options.map((option) => option.id));
 
 describe("the vendored manifests", () => {
-  it("names each release's own assets, which carry the version for both BGforge mods", () => {
-    // The names v2.4.34 and v34 really publish: `rpu_v2.4.34.exe` and `upu_v34.exe`.
-    const rpu = parsed("rpu24", "2.4.34");
-    expect(rpu.installer?.windows?.asset).toBe("rpu_v2.4.34.exe");
-    expect(rpu.installer?.other).toEqual({ asset: "rpu_v2.4.34.zip", run: "rpu-install.sh" });
-
-    const upu = parsed("upu", "34");
-    expect(upu.installer?.windows?.asset).toBe("upu_v34.exe");
-    expect(upu.installer?.other).toEqual({ asset: "upu_v34.zip", run: "upu-install.sh" });
+  it("names no installer asset, leaving each release to supply its own", () => {
+    // Both BGforge mods publish `<mod>_v<version>.exe` and `.zip`, so a name written here would be a copy of
+    // the version - and one upstream could change without ZAX being able to follow until its next release.
+    for (const [id, version] of [
+      ["rpu24", "2.4.34"],
+      ["upu", "34"],
+    ] as const) {
+      const manifest = parsed(id, version);
+      expect(manifest.installer?.windows?.asset).toBeUndefined();
+      expect(manifest.installer?.other?.asset).toBeUndefined();
+      expect(manifest.installer?.other?.run).toBe(`${id === "upu" ? "upu" : "rpu"}-install.sh`);
+    }
   });
 
   it("describes each mod as the base mod it is", () => {
@@ -83,7 +86,7 @@ describe("the vendored manifests", () => {
     expect(componentIds(older.installer?.windows?.components)).toEqual(
       componentIds(newer.installer?.windows?.components),
     );
-    expect(older.installer?.windows?.asset).toBe("rpu_v2.3.34.exe");
+    expect(older.installer?.windows?.silent).toBe(newer.installer?.windows?.silent);
   });
 
   it("gives UPU the tree it has rather than RPU's", () => {
@@ -101,7 +104,7 @@ describe("the vendored manifests", () => {
       name: "Fallout et tu",
       type: "base",
       becomes: "fo1in2",
-      // The one asset name that carries no version, so it is written out rather than interpolated.
+      // The one asset name that carries no version, so it is written out rather than left to the release.
       archive: "Fallout1in2.zip",
       creates: { directory: "Fallout1in2" },
       extractDat: { from: "fallout1", list: "undat_files.txt", into: "data" },
@@ -116,7 +119,7 @@ describe("the vendored manifests", () => {
     // place that says which documents are supposed to be here.
     expect(VENDORED_MANIFESTS.map((entry) => entry.id)).toEqual(["rpu23", "rpu24", "upu", "fo1in2"]);
     for (const entry of VENDORED_MANIFESTS) {
-      const manifest = parseManifest(encoder.encode(entry.text("1.2.3")), { version: "1.2.3" });
+      const manifest = parseManifest(encoder.encode(entry.text), { version: "1.2.3" });
       expect(manifest.id).toBe(entry.id);
     }
   });

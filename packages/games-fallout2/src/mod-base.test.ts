@@ -52,6 +52,7 @@ installer:
 const release = async (route: "windows" | "other" = "other"): Promise<ModRelease> => ({
   manifest: parseManifest(new TextEncoder().encode(MANIFEST)),
   manifestText: MANIFEST,
+  installerRoute: route,
   installer: {
     route,
     asset:
@@ -140,9 +141,11 @@ describe("planning a base install", () => {
     expect(plan.free).toBeUndefined();
   });
 
-  it("refuses a release whose installer this platform does not have", async () => {
+  it("refuses a release whose installer this platform does not have, naming the asset that is missing", async () => {
     const { installer: _resolved, ...nothing } = await release();
-    await expect(planBaseInstall(basePlatform(), install, nothing)).rejects.toThrow(/no installer for this system/);
+    await expect(planBaseInstall(basePlatform(), install, nothing)).rejects.toThrow(
+      /names "rpu_v2\.4\.34\.zip" as its installer for this system/,
+    );
   });
 
   it("keeps a verified download rather than paying for it twice", async () => {

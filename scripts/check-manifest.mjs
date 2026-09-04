@@ -31,7 +31,7 @@ try {
   const version = tagged ? "(version from the tag)" : manifest.version;
   const payload = manifest.installer
     ? Object.entries(manifest.installer)
-        .map(([platform, route]) => `${platform}: ${route.asset}`)
+        .map(([platform, route]) => `${platform}: ${route.asset ?? "(asset from the release)"}`)
         .join(", ")
     : manifest.parts
       ? `${manifest.parts.flatMap((group) => group.options).length} part(s), each naming its own asset`

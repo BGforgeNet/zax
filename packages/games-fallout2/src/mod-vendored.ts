@@ -20,9 +20,9 @@
  * record migration, were both considered and are not built: they buy a seamless handover for a case that costs
  * an already-installed user nothing but updates, and only until the next release.
  *
- * Each document is a function of the release's version because both BGforge assets carry the version in their
- * names. Interpolating rather than substituting a placeholder keeps a misspelling a compile error instead of
- * an asset name that reaches a user matching nothing.
+ * No document names an installer asset. Both BGforge assets carry the version in their names, and the release
+ * is what knows it: the Windows route resolves to the release's sole `.exe` and the other to its sole archive.
+ * That also survives an upstream rename, where a name spelled here would go on missing until ZAX shipped again.
  *
  * RPU's and UPU's component trees are upstream's own, read from `extra/inno/inno.iss` and its includes in each
  * repository. The fragments below are shared by both documents because upstream shares them: the same
@@ -33,8 +33,8 @@
 export interface VendoredManifest {
   /** The id the document declares, which is what its feed row follows. */
   id: string;
-  /** The document, for a release at this version. */
-  text: (version: string) => string;
+  /** The document, which states no version and names no asset - the release supplies both. */
+  text: string;
 }
 
 /** What the installer always selects. Inno marks it `fixed`; `required` is what passes it to `/COMPONENTS`. */
@@ -112,10 +112,7 @@ const QOL = `          - id: qol
             help: Turns on a set of sfall options - the action point bar, damage and karma readouts, party
               member details and more.`;
 
-const rpu =
-  (id: string, name: string) =>
-  (version: string): string =>
-    `spec: 1
+const rpu = (id: string, name: string): string => `spec: 1
 id: ${id}
 name: ${name}
 game: fallout2
@@ -123,7 +120,6 @@ type: base
 becomes: fallout2rpu
 installer:
   windows:
-    asset: rpu_v${version}.exe
     silent: inno
     components:
 ${CORE}
@@ -153,11 +149,10 @@ ${QOL}
           - id: alternative_explosions
             label: Alternative explosion animations (from Tactics)
   other:
-    asset: rpu_v${version}.zip
     run: rpu-install.sh
 `;
 
-const upu = (version: string): string => `spec: 1
+const upu = `spec: 1
 id: upu
 name: Unofficial Patch Updated
 game: fallout2
@@ -165,7 +160,6 @@ type: base
 becomes: fallout2upu
 installer:
   windows:
-    asset: upu_v${version}.exe
     silent: inno
     components:
 ${CORE}
@@ -178,7 +172,6 @@ ${GORIS}
         options:
 ${QOL}
   other:
-    asset: upu_v${version}.zip
     run: upu-install.sh
 `;
 
@@ -187,7 +180,7 @@ ${QOL}
  * `v1.16.3771`: one top-level `Fallout1in2/` in the payload, `undat_files.txt` inside it, and Fallout 1's
  * `master.dat` the file the folder it asks for must hold.
  */
-const fo1in2 = (): string => `spec: 1
+const fo1in2 = `spec: 1
 id: fo1in2
 name: Fallout et tu
 game: fallout2

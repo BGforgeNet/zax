@@ -9,7 +9,6 @@ type: base
 becomes: fallout2rpu
 installer:
   windows:
-    asset: rpu_v2.4.34.exe
     silent: inno
     components:
       - label: Walk speed fix
@@ -18,7 +17,6 @@ installer:
           - { id: core, label: Core, required: true }
           - { id: 'walk_speed\low_fps', label: Low FPS }
   other:
-    asset: rpu_v2.4.34.zip
     run: rpu-install.sh
 ```
 
@@ -31,6 +29,12 @@ The two routes are not the same install, which is why they are declared separate
   it knows today. ZAX passes the install directory to it, along with the components chosen.
 - **`other`** names a payload and a script inside it. ZAX extracts the payload over the game directory and runs
   `run` there, which is exactly what the manual instructions say to do by hand.
+
+Neither route states its `asset` above, because neither has to: ZAX takes the Windows route's from the release's
+sole `.exe` and the other route's from its sole archive, the same rule the payload `archive` follows. Since
+upstream's installer names carry the version, that is what keeps the manifest a file written once rather than
+one edited before every tag. Name `asset` where a release publishes two of a shape and only you can say which
+is the installer - a release ZAX cannot read it from is refused with the ambiguity named, not guessed at.
 
 **Components are the Windows route's alone**, because that is where they exist: RPU's build moves its optional
 dats out of `mods/` for the Inno installer only, and the zip ships all of them. Each component's `id` is the

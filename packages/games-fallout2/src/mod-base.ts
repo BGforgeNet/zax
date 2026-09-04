@@ -23,7 +23,7 @@ import { chooseFrom } from "./mod-choice.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import { conflictFor } from "./mod-install.js";
 import { modWorkDirectory } from "./mod-transaction.js";
-import type { ModRelease } from "./mod-feed.js";
+import { installerMiss, type ModRelease } from "./mod-feed.js";
 import { assertUsable, loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 
 /**
@@ -98,7 +98,7 @@ export async function planBaseInstall(
   assertUsable(record, manifest.id);
 
   const installer = release.installer;
-  if (!installer) throw new Error(`${manifest.name} publishes no installer for this system.`);
+  if (!installer) throw new Error(installerMiss(manifest, release.installerRoute));
 
   // The manifest's own conditions, against the directory as it is now, before a byte is spent on the
   // download. The install runs them again: this one is the cheap answer, not the last word.
@@ -243,7 +243,7 @@ export async function applyBaseInstall(
   if (manifest.type !== "base" || manifest.becomes === undefined)
     throw new Error(`${manifest.name} is not a base mod.`);
   const installer = release.installer;
-  if (!installer) throw new Error(`${manifest.name} publishes no installer for this system.`);
+  if (!installer) throw new Error(installerMiss(manifest, release.installerRoute));
 
   const record = await loadRecord(platform, install.path);
   assertUsable(record, manifest.id);

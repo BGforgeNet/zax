@@ -766,12 +766,18 @@ installer:
     digest: "sha256:cc",
     size: 800,
   });
-  const basePlatform = (names: readonly string[], os: "linux" | "windows" = "linux") =>
+  /** The same mod with neither route naming its asset, which is what leaves the choice to the release. */
+  const RPU_UNNAMED = RPU.replace("{ asset: rpu.exe, silent: inno }", "{ silent: inno }").replace(
+    "{ asset: rpu.zip, run: rpu-install.sh }",
+    "{ run: rpu-install.sh }",
+  );
+
+  const basePlatform = (names: readonly string[], os: "linux" | "windows" = "linux", manifest = RPU) =>
     new MemoryPlatform({
       os,
       responses: {
         [RELEASES_URL]: JSON.stringify([{ tag_name: "v2.4.34", assets: names.map(asset) }]),
-        [atTag("v2.4.34")]: RPU,
+        [atTag("v2.4.34")]: manifest,
       },
     });
 
@@ -791,13 +797,39 @@ installer:
     expect(onWindows.installer?.asset.name).toBe("rpu.exe");
   });
 
-  it("blocks where the release publishes no installer this platform can run", async () => {
-    // Windows-only release, Linux host: the mod exists and this machine cannot install it, which is a
-    // different thing from a release that named no payload at all.
+  it("takes the release's own asset for a route that names none", async () => {
+    // Named nothing like the manifest's own `rpu.zip`/`rpu.exe`, so a document that still carried those names
+    // would resolve to nothing here rather than pass on the coincidence of matching what it declared.
+    const both = ["payload.zip", "setup.exe"];
+    expect((await fetchFeed(basePlatform(both, "linux", RPU_UNNAMED), FEED)).installer?.asset.name).toBe("payload.zip");
+    const onWindows = await fetchFeed(basePlatform(both, "windows", RPU_UNNAMED), FEED);
+    expect(onWindows.installer?.asset.name).toBe("setup.exe");
+  });
+
+  it("takes nothing where the release leaves the choice open", async () => {
+    // Two assets of a route's shape is an ambiguity only the author can settle, which is the rule the payload
+    // archive already follows - and the reason naming the asset stays in the format.
+    const found = await fetchFeed(basePlatform(["rpu.zip", "extras.zip"], "linux", RPU_UNNAMED), FEED);
+    expect(found.installer).toBeUndefined();
+    const state = availability(found, context());
+    expect((state as { why: string }).why).toMatch(/names no asset, and this release publishes no single archive/);
+  });
+
+  it("tells a mod that does not install here from a release that left its asset out", async () => {
+    // Windows-only release, Linux host. The mod declares an "other" route, so it does install on Linux - what
+    // is missing is the asset that route named, which is the author's mistake rather than the user's system.
     const found = await fetchFeed(basePlatform(["rpu.exe"]), FEED);
     const state = availability(found, context());
     expect(state).toMatchObject({ kind: "blocked" });
-    expect((state as { why: string }).why).toMatch(/no installer for this system/);
+    expect((state as { why: string }).why).toMatch(/names "rpu.zip" as its installer for this system/);
+  });
+
+  it("says the mod does not install here when it declares no route for this platform", async () => {
+    const windowsOnly = RPU.replace("  other: { asset: rpu.zip, run: rpu-install.sh }\n", "");
+    const found = await fetchFeed(basePlatform(["rpu.exe"], "linux", windowsOnly), FEED);
+    const state = availability(found, context());
+    expect(state).toMatchObject({ kind: "blocked" });
+    expect((state as { why: string }).why).toMatch(/does not install on this system/);
   });
 
   it("offers a base mod on a vanilla install and refuses it on a patched one", async () => {
@@ -1328,7 +1360,8 @@ describe("fetchFeed with a manifest ZAX carries", () => {
     });
     const found = await fetchFeedAt(platform, RPU23_FEED, "30");
     expect(found.manifest).toMatchObject({ id: "rpu23", version: "30" });
-    // The document ZAX carries names the release's own asset, whichever release it is asked about.
+    // The document ZAX carries names no asset, so the release's own is what resolves - here the sole archive
+    // beside the installer, whichever release the feed is asked about.
     expect(found.installer?.asset.name).toBe("rpu_v30.zip");
   });
 

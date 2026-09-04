@@ -629,6 +629,19 @@ describe("a base mod's manifest", () => {
     refuses(RPU.replace("run: rpu-install.sh", "run: ../rpu-install.sh"), /leaves the game directory/);
   });
 
+  it("takes a route that names no asset, leaving the release to supply it", () => {
+    // Upstream's installer assets carry the version in their names, and the release is what knows it. A
+    // manifest that leaves the name out is written once instead of edited before every tag.
+    const unnamed = RPU.replace("    asset: rpu_v2.4.34.exe\n", "").replace("    asset: rpu_v2.4.34.zip\n", "");
+    const manifest = parsed(unnamed);
+    expect(manifest.installer?.windows).toEqual({ silent: "inno", components: expect.any(Array) });
+    expect(manifest.installer?.other).toEqual({ run: "rpu-install.sh" });
+  });
+
+  it("still holds a named asset to being a file name", () => {
+    refuses(RPU.replace("asset: rpu_v2.4.34.exe", "asset: builds/rpu.exe"), /is not a file name/);
+  });
+
   it("takes an installer with no components at all - not every one offers a choice", () => {
     const plain = `${RPU.slice(0, RPU.indexOf("    components:"))}${RPU.slice(RPU.indexOf("  other:"))}`;
     expect(parsed(plain).installer?.windows?.components).toBeUndefined();

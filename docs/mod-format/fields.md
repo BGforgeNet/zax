@@ -35,6 +35,10 @@ release's sole archive-shaped asset supplies the payload. Two archives on one re
 author can settle, so `archive` names one; a release of loose files needs it too, since nothing there tells the
 payload from the rest of what is published.
 
+A base mod's installer assets go the same way: `installer.windows.asset` is the release's sole `.exe` and
+`installer.other.asset` its sole archive unless the manifest names them. That is what lets a manifest whose
+installer names carry the version stay a file written once - see [base mods](base-mods.md).
+
 **A payload that is not an archive** is one file, deployed as it stands to the single `entries` name the
 manifest declares - Cassidy's four `.dat` assets and the walk-speed fix's one are published that way. It has to
 be named by `archive`, because inference stays archive-only.

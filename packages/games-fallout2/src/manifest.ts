@@ -145,14 +145,19 @@ interface ModComponentGroup {
  */
 interface ModInstaller {
   windows?: {
-    asset: string;
+    /**
+     * Absent where the release names it: upstream's installer assets carry the version in their names, which
+     * only the release knows, so a route that states none is matched against what the release published. The
+     * name stays in the format for a release whose assets leave the choice open.
+     */
+    asset?: string;
     /** The convention ZAX invokes it by. `inno` is the only one this version knows. */
     silent: "inno";
     /** The choices that installer offers. Windows-only, because only the Inno route has them. */
     components?: readonly ModComponentGroup[];
   };
   other?: {
-    asset: string;
+    asset?: string;
     /** What to run once the payload is extracted, relative to the install - the script the payload ships. */
     run: string;
   };
@@ -746,7 +751,7 @@ function parseInstaller(value: unknown): ModInstaller {
       named.add(component.id);
     }
     out.windows = {
-      asset: assetName(fields["asset"], `"installer" windows asset`),
+      ...(fields["asset"] !== undefined ? { asset: assetName(fields["asset"], `"installer" windows asset`) } : {}),
       silent,
       ...(components ? { components } : {}),
     };
@@ -754,7 +759,7 @@ function parseInstaller(value: unknown): ModInstaller {
   if (platforms["other"] !== undefined) {
     const fields = record(platforms["other"], `"installer" other`, ["asset", "run"]);
     out.other = {
-      asset: assetName(fields["asset"], `"installer" other asset`),
+      ...(fields["asset"] !== undefined ? { asset: assetName(fields["asset"], `"installer" other asset`) } : {}),
       // Confined like every path-shaped field: it is run from inside the game directory after the payload
       // lands there, so a path leaving it would run something the payload never shipped.
       run: confinedPath(fields["run"], `"installer" other run`),

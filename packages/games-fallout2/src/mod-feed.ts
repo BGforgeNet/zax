@@ -142,6 +142,11 @@ export interface ModRelease {
    */
   installer?: { route: "windows" | "other"; asset: ReleaseAsset };
   /**
+   * The route this host would take, kept even where its asset did not resolve. Without it a miss cannot be
+   * told from a mod that does not install here at all, and the two send the reader to different places.
+   */
+  installerRoute?: "windows" | "other";
+  /**
    * The release line this came from, carried because versions of one line compare on their own counter and an
    * install stamping another line's version is another mod rather than an older copy of this one.
    */
@@ -354,6 +359,19 @@ function soleArchive(assets: readonly ReleaseAsset[]): ReleaseAsset | undefined 
   return archives.length === 1 ? archives[0] : undefined;
 }
 
+/**
+ * The Windows installer when the manifest does not name one, under the same rule as the payload: a release's
+ * sole executable. Matched on the shape rather than on `silent`, which would be a table with one row - and an
+ * installer convention this version does not know refuses at parse, so the guess never reaches an unknown one.
+ */
+function soleExecutable(assets: readonly ReleaseAsset[]): ReleaseAsset | undefined {
+  const programs = assets.filter((asset) => asset.name.toLowerCase().endsWith(".exe"));
+  return programs.length === 1 ? programs[0] : undefined;
+}
+
+/** Which route a host takes. Both exist because upstream publishes both, and a host is on one or the other. */
+const routeFor = (platform: Platform): "windows" | "other" => (platform.os === "windows" ? "windows" : "other");
+
 /** A tag's version: `v14.7` is 14.7. A tag shaped like anything else names no version and is passed over. */
 function versionFromTag(tag: string): string | undefined {
   const version = tag.replace(/^v/i, "");
@@ -379,7 +397,7 @@ async function fetchManifestText(
   // ZAX's own copy, for a mod that describes itself nowhere. Last rather than first: wherever the author has
   // said anything, their word is the description, so adopting the format takes effect by publishing rather
   // than by ZAX noticing. A tag naming no version gets no copy, a vendored document stating none of its own.
-  const fallback = version === undefined ? undefined : vendoredManifestFor(feed.id)?.(version);
+  const fallback = version === undefined ? undefined : vendoredManifestFor(feed.id);
 
   const missing = `${base}.none`;
   if ((await platform.fs.stat(missing))?.kind === "file") return fallback ?? null;
@@ -409,17 +427,37 @@ async function fetchManifestText(
  * silently - when no release matches, the first refusal is the answer, since "this needs a newer ZAX" is
  * truer than "nothing found".
  */
-/** Which of a base manifest's routes this host takes, and the asset it names - or nothing for either miss. */
+/** Which of a base manifest's routes this host takes, and the asset it resolves to - or nothing for a miss. */
 function installerFor(
-  platform: Platform,
+  route: "windows" | "other",
   manifest: ModManifest,
   assets: readonly ReleaseAsset[],
 ): ModRelease["installer"] {
-  const route = platform.os === "windows" ? "windows" : "other";
   const declared = manifest.installer?.[route];
   if (!declared) return undefined;
-  const asset = assets.find((entry) => entry.name === declared.asset);
+  // Named wins over inferred, as the manifest's own version wins over the tag's: what the file says is the
+  // author's claim, and the shape below is ZAX reading the release for an author who made none.
+  const asset = declared.asset
+    ? assets.find((entry) => entry.name === declared.asset)
+    : route === "windows"
+      ? soleExecutable(assets)
+      : soleArchive(assets);
   return asset ? { route, asset } : undefined;
+}
+
+/**
+ * Why there is no installer to run here, told apart by what the manifest declares. A mod with no route for
+ * this platform does not install here at all; a route whose asset is missing from the release is the author's
+ * mistake, not the user's system. One message for both sends half its readers to look in the wrong place.
+ */
+export function installerMiss(manifest: ModManifest, route: "windows" | "other" | undefined): string {
+  const declared = route === undefined ? undefined : manifest.installer?.[route];
+  if (!declared) return `${manifest.name} does not install on this system.`;
+  const what = route === "windows" ? "Windows installer" : "installer for this system";
+  if (declared.asset !== undefined)
+    return `${manifest.name} names "${declared.asset}" as its ${what}, which this release does not publish.`;
+  const shape = route === "windows" ? "executable" : "archive";
+  return `${manifest.name}'s ${what} names no asset, and this release publishes no single ${shape} to take as one.`;
 }
 
 /**
@@ -501,7 +539,8 @@ async function releaseFrom(
     const asset = release.assets.find((entry) => entry.name === part.archive);
     if (asset) parts[part.id] = asset;
   }
-  const installer = installerFor(platform, manifest, release.assets);
+  const route = routeFor(platform);
+  const installer = installerFor(route, manifest, release.assets);
   return {
     manifest,
     manifestText: text,
@@ -509,6 +548,7 @@ async function releaseFrom(
     ...(archive ? { archive } : {}),
     ...(manifest.parts ? { parts } : {}),
     ...(installer ? { installer } : {}),
+    ...(manifest.installer?.[route] ? { installerRoute: route } : {}),
   };
 }
 
@@ -709,8 +749,7 @@ export function availability(release: ModRelease, context: ModContext): Availabi
   } else if (manifest.type === "base") {
     // A base mod's payload is its installer, and a release that publishes one for another system is not a
     // release that named nothing - the mod is real and this machine cannot run it, which is what it says.
-    if (!release.installer)
-      return refuse(`${manifest.name} publishes no installer for this system.`, recorded?.version);
+    if (!release.installer) return refuse(installerMiss(manifest, release.installerRoute), recorded?.version);
   } else if (!release.archive && offeredParts(release).length === 0) {
     return refuse(
       manifest.parts
