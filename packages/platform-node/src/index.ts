@@ -10,6 +10,7 @@ import {
   chmod,
   copyFile,
   mkdir,
+  open,
   readFile,
   readdir,
   rename,
@@ -18,7 +19,7 @@ import {
   statfs,
   writeFile,
 } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { Worker } from "node:worker_threads";
@@ -237,6 +238,23 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
         await writeFile(partial, bytes);
         await rename(partial, path);
       },
+      createExclusive: async (path, bytes) => {
+        // `wx` is the whole point: the kernel does the test and the create together, so two processes racing
+        // for one lock cannot both be told they made it. Anything but EEXIST is a real failure and propagates.
+        let handle;
+        try {
+          handle = await open(path, "wx");
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+          throw error;
+        }
+        try {
+          await handle.writeFile(bytes);
+        } finally {
+          await handle.close();
+        }
+        return true;
+      },
       append: async (path, bytes) => {
         await mkdir(dirname(path), { recursive: true });
         await appendFile(path, bytes);
@@ -323,6 +341,9 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
           ...(options?.cwd !== undefined ? { cwd: options.cwd } : {}),
           ...(options?.env ? { env: { ...process.env, ...options.env } } : {}),
         });
+        // On `spawn` rather than straight after the call: the id is only assigned once the system has started
+        // the program, and a spawn that failed has none to report.
+        if (options?.onStart) child.once("spawn", () => child.pid !== undefined && options.onStart?.(child.pid));
         let output = "";
         const keep = (chunk: Buffer | string) => {
           output += String(chunk);
@@ -350,6 +371,48 @@ export function nodePlatform(options: PlatformOptions = {}): Platform {
         return answer.output.length > RUN_OUTPUT_CAP
           ? { ...answer, output: answer.output.slice(-RUN_OUTPUT_CAP) }
           : answer;
+      },
+      self: { host: hostname(), pid: process.pid },
+      // Signal 0 delivers nothing and only asks whether the id could be signalled. ESRCH is nobody there;
+      // EPERM is somebody there this account does not own, which is still somebody. Anything else is unclear,
+      // and unclear reads as gone so a lock cannot outlive the machine that made it.
+      alive: async (pid) => {
+        if (!Number.isInteger(pid) || pid <= 0) return false;
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch (error) {
+          return (error as NodeJS.ErrnoException).code === "EPERM";
+        }
+      },
+      /*
+        Linux answers from `/proc`, which costs a file read rather than a process. Everything else is asked
+        through a program: `ps` on the Unixes that have no `/proc`, and PowerShell on Windows, where the
+        command line is not on the filesystem at all. Any failure - no such process, no `ps`, a host that will
+        not say - is null, which the callers read as "cannot tell" rather than as a mismatch.
+      */
+      commandOf: async (pid) => {
+        if (!Number.isInteger(pid) || pid <= 0) return null;
+        try {
+          if (process.platform === "linux") {
+            // NUL-separated, and trailing: the separators become spaces and the last one is dropped.
+            const raw = await readFile(`/proc/${pid}/cmdline`, "utf8");
+            return raw.replaceAll("\0", " ").trim() || null;
+          }
+          if (process.platform === "win32") {
+            const { stdout } = await runProgram("powershell.exe", [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command",
+              `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`,
+            ]);
+            return stdout.trim() || null;
+          }
+          const { stdout } = await runProgram("ps", ["-p", String(pid), "-o", "command="]);
+          return stdout.trim() || null;
+        } catch {
+          return null;
+        }
       },
       open: async (target) => {
         const { program, args } = openCommand(os);

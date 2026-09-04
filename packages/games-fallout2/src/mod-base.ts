@@ -24,6 +24,7 @@ import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import { conflictFor } from "./mod-install.js";
 import { modWorkDirectory } from "./mod-transaction.js";
 import { installerMiss, type ModRelease } from "./mod-feed.js";
+import { takeInstallLock, type InstallLock } from "./install-lock.js";
 import { assertUsable, loadRecord, saveRecord, type InstallRecord, type InstalledMod } from "./records.js";
 
 /**
@@ -240,10 +241,50 @@ export async function applyBaseInstall(
   now: Date = new Date(),
 ): Promise<BaseInstallOutcome> {
   const { manifest } = release;
-  if (manifest.type !== "base" || manifest.becomes === undefined)
-    throw new Error(`${manifest.name} is not a base mod.`);
+  const becomes = manifest.becomes;
+  if (manifest.type !== "base" || becomes === undefined) throw new Error(`${manifest.name} is not a base mod.`);
   const installer = release.installer;
   if (!installer) throw new Error(installerMiss(manifest, release.installerRoute));
+
+  // Claimed after those two refusals rather than before them: a directory must not be held for an operation
+  // that was never going to run. Claimed before anything is read, let alone written. An installer from a run that never finished is the
+  // one writer nothing else here can see: it is upstream's program, it outlives the ZAX that started it, and
+  // the retry this function performs would put a second one over the top of it.
+  const claim = await takeInstallLock(platform, install.path, `Installing ${manifest.name}`);
+  if ("refused" in claim) throw new Error(claim.refused);
+  try {
+    return await installUnderLock(platform, install, release, plan, becomes, claim, options, now);
+  } finally {
+    await claim.release();
+  }
+}
+
+/**
+ * The install itself, with the directory already claimed. Split out so the claim is released on every way out
+ * of it, the throws included - there are several, and each leaves the folder part way through.
+ */
+async function installUnderLock(
+  platform: Platform,
+  install: Install,
+  release: ModRelease,
+  plan: BaseInstallPlan,
+  /** Narrowed by the caller, which refuses a manifest without one before any of this is reached. */
+  becomes: GameType,
+  claim: InstallLock,
+  options: ModProgress | undefined,
+  now: Date,
+): Promise<BaseInstallOutcome> {
+  const { manifest } = release;
+  const installer = release.installer;
+  if (!installer) throw new Error(installerMiss(manifest, release.installerRoute));
+
+  // The claim passes to the installer the moment it starts, because from here the installer is the writer and
+  // it is the one that outlives ZAX. Not awaited: `run` reports the id rather than waiting on what a caller
+  // does with it, and a claim still naming ZAX is the state this improves on rather than a worse one.
+  const hold =
+    (command: string) =>
+    (pid: number): void =>
+      void claim.handOver(pid, command);
 
   const record = await loadRecord(platform, install.path);
   assertUsable(record, manifest.id);
@@ -299,11 +340,12 @@ export async function applyBaseInstall(
     // that cannot happen. Run directly rather than through a named shell: its own shebang picks the
     // interpreter, and nothing here has to guess where that interpreter lives.
     await platform.fs.makeExecutable(script);
-    outcome = await platform.process.run(script, [], { cwd: install.path });
+    outcome = await platform.process.run(script, [], { cwd: install.path, onStart: hold(script) });
   } else {
     const log = platform.paths.join(work, "installer.log");
     outcome = await platform.process.run(at, innoArguments(install.path, log, plan.components), {
       cwd: install.path,
+      onStart: hold(at),
     });
   }
 
@@ -326,7 +368,7 @@ export async function applyBaseInstall(
     withBase(await loadRecord(platform, install.path), { ...pending, complete: true, shipped }),
   );
   await platform.fs.remove(work);
-  return { version: manifest.version, becomes: manifest.becomes, renamed, conflicts, backup: installerBackup };
+  return { version: manifest.version, becomes, renamed, conflicts, backup: installerBackup };
 }
 
 function withBase(record: InstallRecord, mod: InstalledMod): InstallRecord {

@@ -40,6 +40,13 @@ export interface FileSystem {
   /** Creates parent directories as needed, so a caller never has to order the two calls. */
   write(path: string, bytes: Uint8Array): Promise<void>;
   /**
+   * Creates a file only where none is there, answering whether it did. The test and the write are one
+   * operation, which is what makes it usable as a lock: `stat` then `write` is two, and two processes can both
+   * pass the first before either reaches the second. Unlike `write` it does not create parent directories - a
+   * claim on a directory that is not there is a claim on nothing.
+   */
+  createExclusive(path: string, bytes: Uint8Array): Promise<boolean>;
+  /**
    * Adds to the end of a file, creating it and its parents when absent. Separate from `write` because the log is
    * appended to a line at a time, and rewriting it whole per line makes its cost grow with its length.
    */
@@ -98,6 +105,13 @@ export interface LaunchOptions {
    * desktop build does not have.
    */
   log?: string;
+  /**
+   * Called once the program has started, with the process id the system gave it. What it is for is outliving
+   * ZAX: an installer's id written into a lock is what a later run reads to tell an install still in progress
+   * from one whose ZAX died half way. Not a return value, because `run` answers only once the program has
+   * exited, which is exactly the window this is about.
+   */
+  onStart?: (pid: number) => void;
 }
 
 /** What a program that ran to completion left behind. */
@@ -113,6 +127,12 @@ export interface RunOutcome {
 
 export interface ProcessLauncher {
   /**
+   * Who this process is: the machine's name and ZAX's own id on it. What a claim on a directory writes down
+   * to say who holds it, and the only way a later run can tell its own machine's ids - the only ones it can
+   * ask about - from another's.
+   */
+  readonly self: { host: string; pid: number };
+  /**
    * Starts a program and resolves once it has started, not once it has exited: the game outlives the click that
    * launched it, and a manager that blocks until the user quits Fallout is not a manager.
    */
@@ -126,6 +146,26 @@ export interface ProcessLauncher {
   run(program: string, args: readonly string[], options?: LaunchOptions): Promise<RunOutcome>;
   /** Hands a file or directory to the desktop's own handler - the file manager, the text editor, the browser. */
   open(target: string): Promise<void>;
+  /**
+   * Whether a process id is one this machine is still running. Answers a lock left behind by a run that never
+   * finished: the id in it is either a program still writing or a number nobody holds. False where the host
+   * cannot tell, which reads as "not running" and so lets a lock be broken - the safe direction for a check
+   * whose other answer strands the user, and the only one a browser can give.
+   *
+   * The id may have been handed to something else since, so a true answer means "possibly still running"
+   * rather than "certainly". Both callers here refuse on true, which is the direction that cannot corrupt.
+   */
+  alive(pid: number): Promise<boolean>;
+  /**
+   * The command line a running id was started with, or null where the host cannot say. What it settles is
+   * reuse: an id that is alive may be alive as something else entirely, since the system hands numbers out
+   * again, and the only thing that tells the two apart is what the process actually is.
+   *
+   * Null is "cannot say" rather than "not the one you meant", so a caller may only act on a positive
+   * disagreement. Reading it costs a process on most hosts, so ask only once something already answered
+   * `alive`.
+   */
+  commandOf(pid: number): Promise<string | null>;
   /**
    * Runs a WebAssembly module compiled against WASI and answers as `run` does. Separate from `run` because a
    * module is not a program the operating system can start: something has to host it, and which something is

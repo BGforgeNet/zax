@@ -141,6 +141,26 @@ describe("planning a base install", () => {
     expect(plan.free).toBeUndefined();
   });
 
+  it("refuses to install over an installer a previous run left running", async () => {
+    /*
+      The case the claim exists for. A ZAX that was killed part way through a base install leaves upstream's
+      installer writing into the game folder with nothing watching it, and the retry offered on the next
+      launch would put a second one on top. The claim it left behind names the installer rather than itself,
+      so the id in it is one this machine is still running.
+    */
+    const platform = basePlatform({ livePids: [9876] });
+    const ready = await planBaseInstall(platform, install, await release());
+    // Written after the plan, so what refuses below is the claim rather than anything the plan could not do.
+    const left = { host: "memory", pid: 9876, what: "Installing RPU", taken: 1 };
+    await platform.fs.write(`${GAME}/.zax-lock`, new TextEncoder().encode(JSON.stringify(left)));
+
+    await expect(applyBaseInstall(platform, install, await release(), ready)).rejects.toThrow(
+      /Installing RPU is already running in this game folder on this machine, as process 9876/,
+    );
+    // Nothing was run: the refusal comes before the backup, the lowercasing and the installer.
+    expect(platform.ran).toEqual([]);
+  });
+
   it("refuses a release whose installer this platform does not have, naming the asset that is missing", async () => {
     const { installer: _resolved, ...nothing } = await release();
     await expect(planBaseInstall(basePlatform(), install, nothing)).rejects.toThrow(
@@ -256,8 +276,11 @@ describe("running the installer", () => {
 
     expect(done).toMatchObject({ version: "2.4.34", becomes: "fallout2rpu" });
     expect(platform.textAt(`${GAME}/mods/rpu.dat`)).toBe("DAT");
-    // Run from the game directory, because the script works in the directory it sits in.
-    expect(platform.ran).toEqual([{ program: SCRIPT, args: [], options: { cwd: GAME } }]);
+    // Run from the game directory, because the script works in the directory it sits in - and asked to report
+    // its process id, which is what the claim on the folder is handed to once the installer is the writer.
+    expect(platform.ran).toEqual([
+      { program: SCRIPT, args: [], options: { cwd: GAME, onStart: expect.any(Function) } },
+    ]);
     // And made runnable first: a script out of an archive may arrive without its mode.
     expect(platform.executable).toContain(SCRIPT);
 

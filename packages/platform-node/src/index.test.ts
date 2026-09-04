@@ -28,6 +28,59 @@ describe("node filesystem", () => {
     expect(await platform.fs.stat(at("absent"))).toBeNull();
   });
 
+  /*
+    The claim on a game directory rests entirely on this one being the kernel's test-and-create rather than
+    two calls: the in-memory platform is atomic because it is single-threaded, which proves nothing about
+    `wx` here. What it must not do is what `write` does - overwrite what is there and report success.
+  */
+  it("creates a file only where none is there, leaving the first content alone", async () => {
+    const path = at("claim.lock");
+    const bytes = (text: string) => new TextEncoder().encode(text);
+
+    expect(await platform.fs.createExclusive(path, bytes("first"))).toBe(true);
+    expect(await platform.fs.createExclusive(path, bytes("second"))).toBe(false);
+    expect(utf8.decode(await platform.fs.read(path)), "the loser wrote nothing").toBe("first");
+  });
+
+  it("rejects rather than answering false where the failure is not an existing file", async () => {
+    // A directory that is not there is not a file that is: reporting it as "already claimed" would send a
+    // caller looking for a holder nobody could find.
+    await expect(platform.fs.createExclusive(at("no", "such", "dir", "x.lock"), new Uint8Array())).rejects.toThrow();
+  });
+});
+
+describe("asking whether a process is running", () => {
+  it("says yes for this one and no for an id nothing holds", async () => {
+    expect(await platform.process.alive(process.pid)).toBe(true);
+    // Above every real id on the platforms ZAX runs on, so nothing can be holding it.
+    expect(await platform.process.alive(2 ** 30)).toBe(false);
+  });
+
+  it("says no for an id that could never be one rather than rejecting", async () => {
+    // Signal 0 against 0 or a negative means a process group on Unix, which is a different question entirely.
+    expect(await platform.process.alive(0)).toBe(false);
+    expect(await platform.process.alive(-1)).toBe(false);
+  });
+
+  it("reports this machine and this process, which is what a claim writes down", async () => {
+    expect(platform.process.self.pid).toBe(process.pid);
+    expect(platform.process.self.host.length).toBeGreaterThan(0);
+  });
+
+  it("reads back what this process is running, which is what tells a reused id apart", async () => {
+    // Against the real mechanism rather than a table: `/proc` on Linux and `ps` elsewhere, either of which
+    // could answer nothing without anything else here noticing.
+    const command = await platform.process.commandOf(process.pid);
+    expect(command, "the host had nothing to say about its own running process").not.toBeNull();
+    // Whatever the runner is invoked as, node is in it - that is what the claim's substring test matches on.
+    expect(command?.toLowerCase()).toContain("node");
+  });
+
+  it("says nothing rather than rejecting for an id that is not running", async () => {
+    expect(await platform.process.commandOf(2 ** 30)).toBeNull();
+    expect(await platform.process.commandOf(0)).toBeNull();
+  });
+
   it("classifies entries as files and directories", async () => {
     await platform.fs.write(at("game", "fallout2.exe"), new Uint8Array([0x4d, 0x5a]));
     await platform.fs.mkdir(at("game", "mods"));

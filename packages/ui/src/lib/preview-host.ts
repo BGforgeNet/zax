@@ -195,7 +195,17 @@ export const previewPlatform: Platform = (() => {
     // is what a scan does with every machine that has none of these launchers.
     registry: memory.registry,
     // Nothing here can be simulated honestly: a recorded launch and an invented release both read as success.
-    process: { launch: refuses, run: refuses, open: refuses, runWasm: refuses },
+    // `alive` answers rather than refusing, and answers false: the preview starts no programs, so no id it
+    // could be asked about is running. A refusal here would be a lock nothing could ever read past.
+    process: {
+      self: { host: "preview", pid: 1 },
+      launch: refuses,
+      run: refuses,
+      open: refuses,
+      runWasm: refuses,
+      alive: async () => false,
+      commandOf: async () => null,
+    },
     net: { fetchText: fetchCaptured, download: refuses },
   };
 })();

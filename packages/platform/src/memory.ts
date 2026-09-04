@@ -70,6 +70,10 @@ export interface MemoryOptions {
   cache?: string;
   /** Initial files, by absolute path. A string is stored as its bytes; pass a `Uint8Array` for binary content. */
   files?: Readonly<Record<string, string | Uint8Array>>;
+  /** What `commandOf` answers per id. An id with no entry answers null, which is "cannot say". */
+  commands?: Readonly<Record<number, string>>;
+  /** Process ids `alive` answers yes for - the ids a test is saying are still running somewhere. */
+  livePids?: readonly number[];
   /** Directories that exist while holding no files - an empty `mods/`, a game folder with nothing in it. */
   dirs?: readonly string[];
   /**
@@ -146,6 +150,8 @@ export class MemoryPlatform implements Platform {
   }> = [];
 
   private readonly files = new Map<string, Uint8Array>();
+  /** Handed out by `run` in order, so a test can name the id its installer was given without guessing it. */
+  private nextPid = 1000;
   private readonly dirs = new Set<string>(["/"]);
   private readonly times = new Map<string, number>();
   private readonly responses: Record<string, string | number>;
@@ -188,6 +194,14 @@ export class MemoryPlatform implements Platform {
         return found;
       },
       write: async (path, data) => this.put(normalize(path), data),
+      createExclusive: async (path, data) => {
+        // One turn of the loop, so the check and the write cannot be separated the way they can on a real
+        // filesystem - which is the property the callers want rather than an accident of this implementation.
+        const at = normalize(path);
+        if (this.files.has(at)) return false;
+        this.put(at, data);
+        return true;
+      },
       append: async (path, data) => {
         const at = normalize(path);
         const before = this.files.get(at);
@@ -227,6 +241,9 @@ export class MemoryPlatform implements Platform {
     };
 
     this.process = {
+      // Named rather than blank so a lock written here reads as this platform's, and fixed so a test can
+      // assert what a lock file holds without the answer moving under it.
+      self: { host: "memory", pid: 1 },
       launch: async (program, args, launchOptions) => {
         this.launched.push({ program, args, ...(launchOptions ? { options: launchOptions } : {}) });
       },
@@ -234,11 +251,20 @@ export class MemoryPlatform implements Platform {
         this.ran.push({ program, args, ...(launchOptions ? { options: launchOptions } : {}) });
         const canned = options.runs?.[`${program} ${args[0] ?? ""}`.trim()] ?? options.runs?.[program];
         if (canned === undefined) throw new Error(`No such program: ${program}`);
+        // Before the answer rather than after it: the id is what a caller writes down while the program is
+        // running, and a test that only ever saw it afterwards would not be exercising that at all.
+        launchOptions?.onStart?.(this.nextPid++);
         return canned;
       },
       open: async (target) => {
         this.opened.push(target);
       },
+      // Nothing here outlives a call, so no id is running unless a test says one is - which is what a lock
+      // left by an interrupted run has to be tested against.
+      alive: async (pid) => (options.livePids ?? []).includes(pid),
+      // Only what a test says. Absent means the host could not tell, which is the answer a caller must not
+      // act on - so a test that wants the reuse check exercised has to say what the id is running.
+      commandOf: async (pid) => options.commands?.[pid] ?? null,
       // Answered from the same table as `run`, keyed by the module's path: which of the two routes a tool
       // took is the host's business, and a test that stated what the tool says should not have to know.
       runWasm: async (module, args) => {
