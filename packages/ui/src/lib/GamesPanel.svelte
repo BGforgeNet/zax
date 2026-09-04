@@ -30,9 +30,12 @@
     });
   }
 
-  /** Renaming a row means selecting it first, so the field that opens belongs to the row you asked about. */
+  /**
+   * Renaming a row means selecting it first, so the field that opens belongs to the row you asked about - and
+   * only where that selection took, since a refused switch would open the field on somebody else's row.
+   */
   function rename(path: string) {
-    void store.selectInstall(path).then(() => store.renameSelected());
+    void store.selectInstall(path).then((took) => took && store.renameSelected());
   }
 </script>
 
@@ -45,11 +48,16 @@
           Right-click renames, which is what a list of named things is expected to do; F2 is handled for the
           window, so it works without the row holding focus. Neither is discoverable, so the tooltip says so.
         -->
+        <!--
+          Greyed out while an operation runs, because switching install re-reads it and a read writes. The
+          store refuses either way; this is so the list says so before the click rather than after it.
+        -->
         <button
           class="install"
           class:selected={install.path === store.selectedInstall}
           aria-pressed={install.path === store.selectedInstall}
-          title="{type.label} at {install.path}&#10;Right-click or press F2 to rename"
+          disabled={store.busy !== null && install.path !== store.selectedInstall}
+          title={store.busyReason ?? `${type.label} at ${install.path}\nRight-click or press F2 to rename`}
           onclick={() => void store.selectInstall(install.path)}
           oncontextmenu={(event) => {
             event.preventDefault();
@@ -104,7 +112,12 @@
   {:else}
     <div class="buttons">
       <button onclick={() => (adding = true)}>Add game</button>
-      <button class="remove" disabled={!current} onclick={() => (confirming = current ?? null)}>
+      <button
+        class="remove"
+        disabled={!current || store.busy !== null}
+        title={store.busyReason}
+        onclick={() => (confirming = current ?? null)}
+      >
         Remove from list
       </button>
     </div>
@@ -168,8 +181,15 @@
     min-width: 0;
   }
 
-  .install:hover {
+  /* Enabled only: a refused row that still lit up under the pointer would read as a click going unanswered. */
+  .install:enabled:hover {
     background: var(--panel-alt);
+  }
+
+  /* The row keeps its place in the list, so the grey has to be what says it cannot be switched to. */
+  .install:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
   }
 
   .install.selected {

@@ -1120,6 +1120,57 @@ describe("a long operation", () => {
     store.busy = null;
   });
 
+  /*
+    Switching install re-reads it, and a read writes: it settles ZAX's own pinned values and any carry the
+    engines disagree about. That read is off the gate on purpose - it is not an operation the user asked for -
+    which left a click on the games list free to write into a game directory an operation was already writing.
+    Refused at the store rather than only greyed out in the panel, so the keyboard and any later entry point
+    are covered by the same answer.
+  */
+  describe("switching install while an operation is running", () => {
+    afterEach(() => {
+      store.busy = null;
+      vi.restoreAllMocks();
+    });
+
+    test("refuses the switch and says so, rather than reading over the operation", async () => {
+      const reads = vi.spyOn(hostBackend, "loadConfigFiles");
+      const was = store.selectedInstall;
+      store.busy = "Updating sfall";
+
+      const took = await store.selectInstall(ADDED_INSTALL);
+
+      expect(took, "the caller is told, so a rename cannot land on the row it failed to select").toBe(false);
+      expect(store.selectedInstall, "still the install the operation belongs to").toBe(was);
+      expect(reads, "and nothing was read, so nothing was written back").not.toHaveBeenCalled();
+      expect(store.notice).toEqual({
+        kind: "problem",
+        text: "Updating sfall is still running - wait for it to finish.",
+      });
+    });
+
+    test("refuses to drop an install from the list, which would re-read whatever is left", async () => {
+      const reads = vi.spyOn(hostBackend, "loadConfigFiles");
+      store.busy = "Installing RPU";
+
+      await store.removeInstall(store.selectedInstall);
+
+      expect(
+        store.installs.map((one) => one.path),
+        "the list is untouched",
+      ).toContain(PREVIEW_INSTALL);
+      expect(reads).not.toHaveBeenCalled();
+    });
+
+    test("still switches once the gate is clear", async () => {
+      await previewPlatform.fs.write(`${ADDED_INSTALL}/fallout2.exe`, new Uint8Array([0x4d, 0x5a]));
+      await store.addInstall(ADDED_INSTALL);
+
+      expect(await store.selectInstall(ADDED_INSTALL)).toBe(true);
+      expect(store.selectedInstall).toBe(ADDED_INSTALL);
+    });
+  });
+
   describe("stopping it", () => {
     afterEach(() => {
       store.busy = null;

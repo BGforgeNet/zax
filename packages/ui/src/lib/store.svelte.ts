@@ -1092,6 +1092,18 @@ class Store {
   }
 
   /**
+   * Whether the gate is held, said rather than dropped. These operations can run for minutes on a poor
+   * connection, and a click that does nothing at all reads as the button being broken rather than as the
+   * application being busy. Shared with the reads that write - switching install settles pins and carries into
+   * the game directory, so letting one run here would put a second writer in a folder already being written.
+   */
+  private refusedWhileBusy(): boolean {
+    if (this.busy === null) return false;
+    this.notice = { kind: "problem", text: `${this.busy} is still running - wait for it to finish.` };
+    return true;
+  }
+
+  /**
    * Runs one outward-facing operation, reporting whatever it fails with rather than swallowing it. `on` names
    * the mod row it belongs to, when it has one: set here rather than by the caller so a refused click cannot
    * mark a row that never started, and cleared with `busy` so no row can be left claiming to be working.
@@ -1101,12 +1113,7 @@ class Store {
     work: () => Promise<Notice | null>,
     on?: { id: string; action: ModAction },
   ): Promise<void> {
-    if (this.busy !== null) {
-      // Said rather than dropped. These operations can run for minutes on a poor connection, and a click that
-      // does nothing at all reads as the button being broken rather than as the application being busy.
-      this.notice = { kind: "problem", text: `${this.busy} is still running - wait for it to finish.` };
-      return;
-    }
+    if (this.refusedWhileBusy()) return;
     this.setBusy(what);
     this.modOperation = on ?? null;
     this.notice = null;
@@ -1922,13 +1929,19 @@ class Store {
 
   // ---- Operations that reach the machine ----------------------------------------------------------------
 
-  async selectInstall(path: string): Promise<void> {
-    if (path === this.selectedInstall) return;
+  /** Whether the selection is now this install - false where the gate refused it, so a caller can stop. */
+  async selectInstall(path: string): Promise<boolean> {
+    if (path === this.selectedInstall) return true;
+    if (this.refusedWhileBusy()) return false;
     this.selectedInstall = path;
     await this.readInstall();
+    return true;
   }
 
   async removeInstall(path: string): Promise<void> {
+    // Removing the install an operation is working on would re-read whatever is left, which writes - and the
+    // record it drops is the one that operation is about to finish writing.
+    if (this.refusedWhileBusy()) return;
     this.installs = removeInstall(this.installs, path);
     // Dropping the selected install would leave every settings view bound to something no longer listed.
     if (this.selectedInstall === path) {

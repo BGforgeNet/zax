@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import GamesPanel from "./GamesPanel.svelte";
 import { PREVIEW_INSTALL, render, reseedPreview, unmountAll } from "./preview-fixture.js";
+import { previewPlatform } from "./preview-host.js";
 import { store } from "./store.svelte.js";
 
 /*
@@ -40,7 +41,7 @@ describe("the list", () => {
   });
 
   test("right-click selects the row and asks for the alias field", () => {
-    const select = vi.spyOn(store, "selectInstall").mockResolvedValue(undefined);
+    const select = vi.spyOn(store, "selectInstall").mockResolvedValue(true);
     const rename = vi.spyOn(store, "renameSelected").mockReturnValue(undefined);
     const view = panel();
 
@@ -50,6 +51,40 @@ describe("the list", () => {
     expect(event.defaultPrevented).toBe(true);
     expect(select).toHaveBeenCalledWith(PREVIEW_INSTALL);
     expect(rename).toHaveBeenCalledTimes(0); // resolves on the next tick; the select is what this pins
+  });
+
+  /*
+    Switching install re-reads it, and that read writes ZAX's own values into the game folder - so a switch
+    during an operation would put a second writer in a directory already being written. The store refuses it;
+    the row is greyed so the list says so before the click, and says which operation in place of the tooltip
+    that would otherwise offer a rename the row will not perform.
+  */
+  describe("while an operation is running", () => {
+    afterEach(() => (store.busy = null));
+
+    test("greys out every row but the one the operation belongs to, naming what is running", async () => {
+      await previewPlatform.fs.write("preview/other/fallout2.exe", new Uint8Array([0x4d, 0x5a]));
+      await store.addInstall("preview/other");
+      await store.selectInstall(PREVIEW_INSTALL);
+      store.busy = "Installing RPU";
+
+      const rows = panel().all<HTMLButtonElement>(".install");
+      const selected = rows.find((row) => row.getAttribute("aria-pressed") === "true");
+      const other = rows.find((row) => row.getAttribute("aria-pressed") !== "true");
+
+      expect(other?.disabled, "the row a click would switch to").toBe(true);
+      expect(other?.getAttribute("title")).toBe("Installing RPU is running.");
+      // Left alone: pressing the row already selected changes nothing, and grey would read as the whole list
+      // having gone away rather than as one switch being refused.
+      expect(selected?.disabled).toBe(false);
+    });
+
+    test("greys out Remove, which would drop the install out from under the operation", () => {
+      store.busy = "Installing RPU";
+      const remove = panel().one<HTMLButtonElement>("button.remove");
+      expect(remove.disabled).toBe(true);
+      expect(remove.getAttribute("title")).toBe("Installing RPU is running.");
+    });
   });
 
   test("says the list is empty rather than drawing nothing", () => {
