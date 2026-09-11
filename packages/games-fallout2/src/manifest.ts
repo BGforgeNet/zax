@@ -589,12 +589,13 @@ function parseEntries(value: unknown, where: string): readonly string[] {
  * a claim names is not required to be present - a mod may state where it goes beside something this install
  * does not have - so an absent name is what leaves the claim unsatisfied rather than what refuses it.
  */
-function parseOrder(value: unknown): ModOrder {
-  const fields = record(value, `"order"`, ["overrides", "overridden-by"]);
+function parseOrder(fields: Record<string, unknown>): ModOrder {
   const names = (key: string) =>
-    fields[key] === undefined
+    fields[`order.${key}`] === undefined
       ? []
-      : items(fields[key], `"order" ${key}`).map((name, at) => confinedPath(name, `"order" ${key} ${at + 1}`));
+      : items(fields[`order.${key}`], `"order.${key}"`).map((name, at) =>
+          confinedPath(name, `"order.${key}" entry ${at + 1}`),
+        );
   const overrides = names("overrides");
   const overriddenBy = names("overridden-by");
   if (overrides.length === 0 && overriddenBy.length === 0)
@@ -602,11 +603,11 @@ function parseOrder(value: unknown): ModOrder {
   return { overrides, overriddenBy };
 }
 
-const GROUP_FIELDS = ["label", "pick", "options"];
-const PART_FIELDS = ["id", "label", "help", "archive", "entries", "needs"];
+const PART_GROUP_FIELDS = ["id", "label", "pick"];
+const PART_FIELDS = ["id", "group", "label", "help", "archive", "entries", "needs"];
 
-function parsePart(value: unknown, where: string): ModPart {
-  const fields = record(value, where, PART_FIELDS);
+/** One part, from the mapping its list entry holds - already checked for fields this version has no name for. */
+function parsePart(fields: Record<string, unknown>, where: string): ModPart {
   const id = text(fields["id"], `${where}'s id`, SHORT_TEXT);
   // The same bound the mod's own id passes: a part id is recorded, and a record is a file on disk.
   if (!ID_SHAPE.test(id)) refuse(`${where}'s id ("${id}") is not an id`);
@@ -626,32 +627,53 @@ export function partOptions(manifest: ModManifest): readonly ModPart[] {
 }
 
 /**
- * The choices a release offers. Groups and options keep the order the manifest declares them in: that order
- * is the author's one lever over how the choice reads, and nothing here has a better one to impose.
+ * The choices a release offers, from the two lists that declare them: `part-groups` holds the headers and
+ * `parts` the options, each naming the group it sits in. Two flat lists rather than one nested one because a
+ * group inside a list is the nesting this format does not have - and unlike every other wrapper here, a list
+ * inside a list is not something a dotted key can spell.
+ *
+ * Both keep the order the manifest declares them in: that order is the author's one lever over how the choice
+ * reads, and nothing here has a better one to impose. Group ids are read back out by nothing - no record
+ * carries one - so renaming a group breaks no install, which is the opposite of a part id.
  */
-function parseParts(value: unknown): readonly ModPartGroup[] {
-  const groups = items(value, `"parts"`).map((raw, at): ModPartGroup => {
-    const where = `"parts" group ${at + 1}`;
-    const fields = record(raw, where, GROUP_FIELDS);
-    const pick = text(fields["pick"], `${where}'s pick`, SHORT_TEXT);
-    // On the refusing side of the ignorance rule, and the settings entries' opposite: `pick` decides what
-    // lands on disk, so reading an unknown one as `any` would install what the author never described.
-    if (pick !== "one" && pick !== "any")
-      needsNewerZax(`a "parts" group picks "${pick}", which this version does not implement`);
-    const options = items(fields["options"], `${where}'s options`).map((entry, i) =>
-      parsePart(entry, `${where} option ${i + 1}`),
-    );
-    if (options.length === 0) refuse(`${where} is empty, so it offers nothing to pick`);
-    return { label: text(fields["label"], `${where}'s label`, SHORT_TEXT), pick, options };
-  });
-  if (groups.length === 0) refuse(`"parts" is empty, so it offers nothing to pick`);
+function parseParts(groupsValue: unknown, partsValue: unknown): readonly ModPartGroup[] {
+  const declared = items(groupsValue, `"part-groups"`).map(
+    (raw, at): { id: string } & Omit<ModPartGroup, "options"> => {
+      const where = `"part-groups" entry ${at + 1}`;
+      const fields = record(raw, where, PART_GROUP_FIELDS);
+      const id = text(fields["id"], `${where}'s id`, SHORT_TEXT);
+      if (!ID_SHAPE.test(id)) refuse(`${where}'s id ("${id}") is not an id`);
+      const pick = text(fields["pick"], `${where}'s pick`, SHORT_TEXT);
+      // On the refusing side of the ignorance rule, and the settings entries' opposite: `pick` decides what
+      // lands on disk, so reading an unknown one as `any` would install what the author never described.
+      if (pick !== "one" && pick !== "any")
+        needsNewerZax(`a "part-groups" entry picks "${pick}", which this version does not implement`);
+      return { id, label: text(fields["label"], `${where}'s label`, SHORT_TEXT), pick };
+    },
+  );
+  if (declared.length === 0) refuse(`"part-groups" is empty, so it groups nothing`);
 
-  // Unique across the manifest rather than per group: the recorded selection names ids flat, and a group is
-  // no part of the address.
+  const held = new Map<string, ModPart[]>();
+  for (const group of declared) {
+    if (held.has(group.id)) refuse(`"part-groups" names "${group.id}" twice`);
+    held.set(group.id, []);
+  }
+
   const byId = new Map<string, ModPart>();
-  for (const part of groups.flatMap((group) => group.options)) {
+  for (const [at, raw] of items(partsValue, `"parts"`).entries()) {
+    const where = `"parts" entry ${at + 1}`;
+    const fields = record(raw, where, PART_FIELDS);
+    const group = text(fields["group"], `${where}'s group`, SHORT_TEXT);
+    const into = held.get(group);
+    // Resolved the way a part's own `needs`, `extract-dat.from` and a setting's `gated-by` resolve: a name
+    // that matches nothing refuses, rather than leaving an option in a group the interface cannot draw.
+    if (into === undefined) refuse(`${where} is in the group "${group}", which "part-groups" does not declare`);
+    const part = parsePart(fields, where);
+    // Unique across the manifest rather than per group: the recorded selection names ids flat, and a group is
+    // no part of the address.
     if (byId.has(part.id)) refuse(`"parts" names "${part.id}" twice`);
     byId.set(part.id, part);
+    into.push(part);
   }
   for (const part of byId.values()) {
     if (part.needs === undefined) continue;
@@ -665,47 +687,48 @@ function parseParts(value: unknown): readonly ModPartGroup[] {
       seen.add(at);
     }
   }
-  return groups;
+
+  // A group nothing joined would draw a heading over an empty box. Said against the group rather than the
+  // parts, because what is missing is a part naming it and the group is the thing the author can see.
+  for (const group of declared) {
+    if (held.get(group.id)?.length === 0) refuse(`no part is in the group "${group.id}", so it offers nothing to pick`);
+  }
+  return declared.map((group) => ({ label: group.label, pick: group.pick, options: held.get(group.id) ?? [] }));
 }
 
-const INSTALLER_PLATFORMS = ["windows", "other"];
-
 /**
- * How a base mod installs, per platform. An unknown platform key takes the newer-ZAX wording rather than the
+ * How a base mod installs, per platform. An unknown platform takes the newer-ZAX wording rather than the
  * unknown-field one, and so does an unknown `built-with`: both decide what ZAX executes, and reading either as
  * "not for me" would run the wrong thing rather than nothing.
+ *
+ * Read straight off the manifest's own keys, since the platform now sits inside the key rather than under it.
+ * That is also why the newer-ZAX check cannot wait for the unknown-field pass: `installer.haiku.run` would
+ * otherwise be reported as a misspelling, sending the reader to fix a manifest that is correct.
  */
-function parseInstaller(value: unknown): ModInstaller {
-  // Ahead of the unknown-field pass, the way a later spec is: a platform key this version has no name for is
-  // a platform a newer ZAX runs on, and calling it a misspelling would send the reader to fix the manifest.
-  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    for (const key of Object.keys(value)) {
-      if (!INSTALLER_PLATFORMS.includes(key))
-        needsNewerZax(`its "installer" names the platform "${key}", which this version cannot run`);
-    }
-  }
-  const platforms = record(value, `"installer"`, INSTALLER_PLATFORMS);
-
+function parseInstaller(fields: Record<string, unknown>): ModInstaller {
   const out: ModInstaller = {};
-  if (platforms["windows"] !== undefined) {
-    const fields = record(platforms["windows"], `"installer" windows`, ["asset", "built-with"]);
-    const builtWith = text(fields["built-with"], `"installer" windows built-with`, SHORT_TEXT);
+
+  if (fields["installer.windows.built-with"] !== undefined || fields["installer.windows.asset"] !== undefined) {
+    const builtWith = text(fields["installer.windows.built-with"], `"installer.windows.built-with"`, SHORT_TEXT);
     if (builtWith !== "inno")
       needsNewerZax(`its Windows installer was built with "${builtWith}", which this version cannot run`);
+    const asset = fields["installer.windows.asset"];
     out.windows = {
-      ...(fields["asset"] !== undefined ? { asset: assetName(fields["asset"], `"installer" windows asset`) } : {}),
+      ...(asset !== undefined ? { asset: assetName(asset, `"installer.windows.asset"`) } : {}),
       builtWith,
     };
   }
-  if (platforms["other"] !== undefined) {
-    const fields = record(platforms["other"], `"installer" other`, ["asset", "run"]);
+
+  if (fields["installer.other.run"] !== undefined || fields["installer.other.asset"] !== undefined) {
+    const asset = fields["installer.other.asset"];
     out.other = {
-      ...(fields["asset"] !== undefined ? { asset: assetName(fields["asset"], `"installer" other asset`) } : {}),
+      ...(asset !== undefined ? { asset: assetName(asset, `"installer.other.asset"`) } : {}),
       // Confined like every path-shaped field: it is run from inside the game directory after the payload
       // lands there, so a path leaving it would run something the payload never shipped.
-      run: confinedPath(fields["run"], `"installer" other run`),
+      run: confinedPath(fields["installer.other.run"], `"installer.other.run"`),
     };
   }
+
   if (out.windows === undefined && out.other === undefined)
     refuse(`"installer" names no platform, so there is nothing to run anywhere`);
   return out;
@@ -717,10 +740,9 @@ function parseInstaller(value: unknown): ModInstaller {
  * "confined to `Fallout1in2/games`" is not something a reader of the manifest would expect to have declared.
  */
 function parseCreates(value: unknown): ModCreates {
-  const fields = record(value, `"creates"`, ["directory"]);
-  const directory = confinedPath(fields["directory"], `"creates" directory`);
+  const directory = confinedPath(value, `"creates.directory"`);
   if (directory.includes("/"))
-    refuse(`"creates" directory ("${directory}") is not one folder of the install it sits in`);
+    refuse(`"creates.directory" ("${directory}") is not one folder of the install it sits in`);
   return { directory };
 }
 
@@ -751,27 +773,25 @@ function parseInputs(value: unknown): readonly ModInput[] {
   return inputs;
 }
 
-function parseExtractDat(value: unknown, inputs: readonly ModInput[]): ModExtractDat {
-  const fields = record(value, `"extract-dat"`, ["from", "list", "into"]);
-  const from = text(fields["from"], `"extract-dat" from`, SHORT_TEXT);
+function parseExtractDat(fields: Record<string, unknown>, inputs: readonly ModInput[]): ModExtractDat {
+  const from = text(fields["extract-dat.from"], `"extract-dat.from"`, SHORT_TEXT);
   if (!inputs.some((input) => input.id === from))
-    refuse(`"extract-dat" unpacks "${from}", which this mod does not ask for`);
+    refuse(`"extract-dat.from" names "${from}", which this mod does not ask for`);
   return {
     from,
-    list: confinedPath(fields["list"], `"extract-dat" list`),
-    into: confinedPath(fields["into"], `"extract-dat" into`),
+    list: confinedPath(fields["extract-dat.list"], `"extract-dat.list"`),
+    into: confinedPath(fields["extract-dat.into"], `"extract-dat.into"`),
   };
 }
 
 function parseConflicts(value: unknown): readonly ConflictRule[] {
   return items(value, `"conflicts"`).map((rule, at) => {
     const where = `"conflicts" entry ${at + 1}`;
-    const fields = record(rule, where, ["when", "reason"]);
-    const when = record(fields["when"], `${where}'s when`, ["present", "absent"]);
+    const fields = record(rule, where, ["present", "absent", "reason"]);
     const paths = (key: string) =>
-      when[key] === undefined
+      fields[key] === undefined
         ? []
-        : items(when[key], `${where}'s ${key}`).map((path, i) => confinedPath(path, `${where}'s ${key} ${i + 1}`));
+        : items(fields[key], `${where}'s ${key}`).map((path, i) => confinedPath(path, `${where}'s ${key} ${i + 1}`));
     const present = paths("present");
     const absent = paths("absent");
     if (present.length === 0 && absent.length === 0) refuse(`${where} tests nothing`);
@@ -810,19 +830,46 @@ const MANIFEST_FIELDS = [
   "type",
   "reason",
   "archive",
-  "needs",
+  "needs.game",
+  "needs.sfall",
   "entries",
-  "order",
+  "order.overrides",
+  "order.overridden-by",
+  "part-groups",
   "parts",
   "becomes",
-  "installer",
-  "creates",
+  "installer.windows.asset",
+  "installer.windows.built-with",
+  "installer.other.asset",
+  "installer.other.run",
+  "creates.directory",
   "inputs",
-  "extract-dat",
+  "extract-dat.from",
+  "extract-dat.list",
+  "extract-dat.into",
   "conflicts",
   "settings",
   "install",
 ];
+
+/**
+ * Whether the manifest states anything under a dotted prefix - `installer`, `order`, `extract-dat`. What the
+ * nested format answered with one key's presence now takes a scan, since the group it stood for is spelled
+ * across several keys and any one of them means the author declared it.
+ */
+const states = (fields: Record<string, unknown>, prefix: string): boolean =>
+  Object.keys(fields).some((key) => key.startsWith(`${prefix}.`));
+
+/** Every platform the manifest names an installer for, in the order it names them. */
+const installerPlatforms = (root: unknown): string[] => {
+  if (!isRecord(root)) return [];
+  const seen: string[] = [];
+  for (const key of Object.keys(root)) {
+    const platform = key.startsWith("installer.") ? key.split(".")[1] : undefined;
+    if (platform !== undefined && platform !== "" && !seen.includes(platform)) seen.push(platform);
+  }
+  return seen;
+};
 
 export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}): ModManifest {
   if (bytes.byteLength > MANIFEST_BYTE_CAP)
@@ -841,6 +888,13 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
   const stated = isRecord(root) ? root["spec"] : undefined;
   if (typeof stated === "number" && Number.isInteger(stated) && stated > MANIFEST_SPEC)
     needsNewerZax(`it is written to manifest spec ${stated}, this version reads spec ${MANIFEST_SPEC}`);
+
+  // Ahead of the unknown-field pass for the same reason a later spec is: a platform this version has no name
+  // for is one a newer ZAX runs on, and `installer.haiku.run` would otherwise be reported as a misspelling.
+  for (const platform of installerPlatforms(root)) {
+    if (platform !== "windows" && platform !== "other")
+      needsNewerZax(`its "installer" names the platform "${platform}", which this version cannot run`);
+  }
 
   const fields = record(root, "the manifest", MANIFEST_FIELDS);
 
@@ -878,8 +932,14 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
 
   // A base mod is the only one that names an installer or creates an install, and the only one that has to:
   // these fields are what makes the install something ZAX hands over, or performs, rather than stacks.
-  for (const field of ["becomes", "installer", "creates"]) {
-    if (type !== "base" && fields[field] !== undefined) refuse(`"${field}" belongs to a base mod alone`);
+  const hasInstaller = states(fields, "installer");
+  const hasCreates = fields["creates.directory"] !== undefined;
+  for (const [what, stated] of [
+    ["becomes", fields["becomes"] !== undefined],
+    ["installer", hasInstaller],
+    ["creates", hasCreates],
+  ] as const) {
+    if (type !== "base" && stated) refuse(`"${what}" belongs to a base mod alone`);
   }
   let becomes: GameType | undefined;
   let installer: ModInstaller | undefined;
@@ -890,16 +950,15 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     // The two shapes of base mod, and a manifest is one or the other: an installer to hand the game over to,
     // or a directory to create beside it. Both would be two installs described as one; neither installs
     // nothing at all.
-    if (fields["installer"] !== undefined && fields["creates"] !== undefined)
+    if (hasInstaller && hasCreates)
       refuse(`it names both an "installer" and what it "creates", which are the two ways of being a base mod`);
-    if (fields["installer"] === undefined && fields["creates"] === undefined)
+    if (!hasInstaller && !hasCreates)
       refuse(`a base mod names no "installer" and creates nothing, so nothing could install it`);
-    if (fields["installer"] !== undefined) installer = parseInstaller(fields["installer"]);
-    if (fields["creates"] !== undefined) {
-      creates = parseCreates(fields["creates"]);
+    if (hasInstaller) installer = parseInstaller(fields);
+    if (hasCreates) {
+      creates = parseCreates(fields["creates.directory"]);
       inputs = fields["inputs"] === undefined ? undefined : parseInputs(fields["inputs"]);
-      extractDat =
-        fields["extract-dat"] === undefined ? undefined : parseExtractDat(fields["extract-dat"], inputs ?? []);
+      extractDat = states(fields, "extract-dat") ? parseExtractDat(fields, inputs ?? []) : undefined;
     }
     // Required rather than defaulted to the id, which is what `mods.md` proposed: the two namespaces do not
     // coincide - RPU's id is "rpu" and the type it becomes is "fallout2rpu" - so that default would refuse
@@ -911,9 +970,11 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
   }
   // Both belong to the install a mod creates, and neither means anything without one: an installer ZAX does
   // not run cannot be handed an answer, and there is nowhere for an extraction to land.
-  for (const field of ["inputs", "extract-dat"]) {
-    if (creates === undefined && fields[field] !== undefined)
-      refuse(`"${field}" belongs to a mod that creates an install`);
+  for (const [what, stated] of [
+    ["inputs", fields["inputs"] !== undefined],
+    ["extract-dat", states(fields, "extract-dat")],
+  ] as const) {
+    if (creates === undefined && stated) refuse(`"${what}" belongs to a mod that creates an install`);
   }
 
   // Vanilla alone for a delegated base mod that says nothing - the direction both upstream scripts enforce
@@ -921,29 +982,31 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
   // to anywhere: it writes only inside the directory it makes, so what the host already is does not reach it.
   let installOn: readonly GameType[] | undefined = installer !== undefined ? ["fallout2"] : undefined;
   let requiresSfall: string | undefined;
-  // One field rather than the two this began as: the game under the mod and the sfall beside it are the same
-  // question asked of the same install, and answered at the same gate before anything is offered.
-  if (fields["needs"] !== undefined) {
-    const needs = record(fields["needs"], `"needs"`, ["game", "sfall"]);
-    if (needs["game"] !== undefined) {
-      installOn = items(needs["game"], `"needs" game`).map((entry, at) => {
-        const name = text(entry, `"needs" game ${at + 1}`, SHORT_TEXT);
-        // A type this version has no marker for may be a future base mod's - the newer-ZAX case again.
-        if (!isGameType(name)) needsNewerZax(`"needs" game names the type "${name}", which this version cannot detect`);
-        return name;
-      });
-      if (installOn.length === 0) refuse(`"needs" game is empty, which would install nowhere`);
-    }
-    if (needs["sfall"] !== undefined) {
-      // A bare version, read as "this or newer", because that is the only bound ZAX acts on: an operator here
-      // would promise comparisons - a ceiling, an exact pin - that nothing downstream implements.
-      const stated = text(needs["sfall"], `"needs" sfall`, SHORT_TEXT);
-      if (!/^\d[\d.a-z]*$/i.test(stated)) refuse(`"needs" sfall ("${stated}") is not a version`);
-      requiresSfall = stated;
-    }
+  // Two keys under one prefix rather than the two unrelated fields this began as: the game under the mod and
+  // the sfall beside it are the same question asked of the same install, answered at the same gate before
+  // anything is offered, and the prefix is what still says so now that the wrapper is gone.
+  if (fields["needs.game"] !== undefined) {
+    installOn = items(fields["needs.game"], `"needs.game"`).map((entry, at) => {
+      const name = text(entry, `"needs.game" entry ${at + 1}`, SHORT_TEXT);
+      // A type this version has no marker for may be a future base mod's - the newer-ZAX case again.
+      if (!isGameType(name)) needsNewerZax(`"needs.game" names the type "${name}", which this version cannot detect`);
+      return name;
+    });
+    if (installOn.length === 0) refuse(`"needs.game" is empty, which would install nowhere`);
+  }
+  if (fields["needs.sfall"] !== undefined) {
+    // A bare version, read as "this or newer", because that is the only bound ZAX acts on: an operator here
+    // would promise comparisons - a ceiling, an exact pin - that nothing downstream implements.
+    const stated = text(fields["needs.sfall"], `"needs.sfall"`, SHORT_TEXT);
+    if (!/^\d[\d.a-z]*$/i.test(stated)) refuse(`"needs.sfall" ("${stated}") is not a version`);
+    requiresSfall = stated;
   }
 
-  const parts = fields["parts"] === undefined ? undefined : parseParts(fields["parts"]);
+  // Declared together or not at all: groups with no parts head nothing, and parts with no groups sit in a
+  // group that does not exist - which the per-part check below would report one option at a time.
+  if ((fields["part-groups"] === undefined) !== (fields["parts"] === undefined))
+    refuse(`"part-groups" and "parts" are declared together - one without the other describes half a choice`);
+  const parts = fields["parts"] === undefined ? undefined : parseParts(fields["part-groups"], fields["parts"]);
   if (parts && fields["archive"] !== undefined)
     refuse(`it states both "archive" and "parts", where each part names the asset it deploys`);
   if (parts && fields["entries"] !== undefined)
@@ -974,7 +1037,7 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     ...(requiresSfall !== undefined ? { requiresSfall } : {}),
     ...(fields["entries"] !== undefined ? { entries: parseEntries(fields["entries"], `"entries"`) } : {}),
     ...(parts !== undefined ? { parts } : {}),
-    ...(fields["order"] !== undefined ? { order: parseOrder(fields["order"]) } : {}),
+    ...(states(fields, "order") ? { order: parseOrder(fields) } : {}),
     conflicts: fields["conflicts"] === undefined ? [] : parseConflicts(fields["conflicts"]),
     ...(fields["settings"] === undefined
       ? { settings: [], dropped: [] }

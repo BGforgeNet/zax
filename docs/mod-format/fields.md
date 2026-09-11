@@ -2,31 +2,43 @@
 
 Every field a manifest may carry. [The landing page](../mod-format.md) has the four that make one.
 
-| Field         | Required         | Meaning                                                                                |
-| ------------- | ---------------- | -------------------------------------------------------------------------------------- |
-| `spec`        | yes              | Format version, currently `1`. An earlier one reads; a later needs a newer ZAX.        |
-| `id`          | yes              | Permanent identity: lowercase `a-z0-9.-`. See "The id is forever".                     |
-| `name`        | yes              | Display name.                                                                          |
-| `version`     | unless tagged    | Digit-led. Quote it - YAML reads `14.7` as a number, and the literal wins.             |
-| `author`      | no               | Who wrote it, shown beside the name.                                                   |
-| `description` | no               | A sentence or two on what the mod is, shown on its row.                                |
-| `forum`       | no               | Where the mod is discussed: an `https` address ZAX offers to open; see below.          |
-| `homepage`    | no               | The same, for the mod's own site.                                                      |
-| `game`        | yes              | `fallout2`. Anything else refuses.                                                     |
-| `type`        | no               | `pluggable` (default), `permanent` or `base`. See [Base mods](base-mods.md).           |
-| `reason`      | with `permanent` | Why it cannot be uninstalled. Shown before install as well as after.                   |
-| `archive`     | unless sole      | The asset carrying the payload. Needed unless the release has one archive and no more. |
-| `needs`       | no               | What the mod needs of the install it lands on; see below.                              |
-| `entries`     | no               | What the mod puts in `mods/`, as the loader names them; see below. Default: derived.   |
-| `order`       | no               | What its files override and are overridden by, as entries rather than ids; see below.  |
-| `parts`       | no               | Choices the release offers, each naming its own asset. Excludes `archive`.             |
-| `becomes`     | with `base`      | The game type the install reports afterwards, e.g. `fallout2rpu`.                      |
-| `installer`   | one of the two   | The installer to run, per platform.                                                    |
-| `creates`     | one of the two   | The install this one makes beside the host.                                            |
-| `inputs`      | with `creates`   | What ZAX asks the user for before installing, each with the file that checks it.       |
-| `extract-dat` | with `creates`   | An archive out of one of those inputs, unpacked into the created install.              |
-| `conflicts`   | no               | When installing refuses; see below.                                                    |
-| `settings`    | no               | The settings schema; see [Settings](settings.md).                                      |
+Keys are flat. Where a field used to nest, the dot is part of the key itself: a manifest writes
+`needs.sfall: "4.4.5"` at the top level, never a `needs:` mapping with `sfall` inside it. `settings` is the one
+exception, since its nesting is the schema an author writes rather than a wrapper around two values.
+
+| Field                          | Required           | Meaning                                                                                |
+| ------------------------------ | ------------------ | -------------------------------------------------------------------------------------- |
+| `spec`                         | yes                | Format version, currently `1`. An earlier one reads; a later needs a newer ZAX.        |
+| `id`                           | yes                | Permanent identity: lowercase `a-z0-9.-`. See "The id is forever".                     |
+| `name`                         | yes                | Display name.                                                                          |
+| `version`                      | unless tagged      | Digit-led. Quote it - YAML reads `14.7` as a number, and the literal wins.             |
+| `author`                       | no                 | Who wrote it, shown beside the name.                                                   |
+| `description`                  | no                 | A sentence or two on what the mod is, shown on its row.                                |
+| `forum`                        | no                 | Where the mod is discussed: an `https` address ZAX offers to open; see below.          |
+| `homepage`                     | no                 | The same, for the mod's own site.                                                      |
+| `game`                         | yes                | `fallout2`. Anything else refuses.                                                     |
+| `type`                         | no                 | `pluggable` (default), `permanent` or `base`. See [Base mods](base-mods.md).           |
+| `reason`                       | with `permanent`   | Why it cannot be uninstalled. Shown before install as well as after.                   |
+| `archive`                      | unless sole        | The asset carrying the payload. Needed unless the release has one archive and no more. |
+| `needs.game`                   | no                 | The game types it installs on; see below. Absent means any.                            |
+| `needs.sfall`                  | no                 | The lowest sfall version it works with, read as "this or newer".                       |
+| `entries`                      | no                 | What the mod puts in `mods/`, as the loader names them; see below. Default: derived.   |
+| `order.overrides`              | no                 | Entries its files win over, as entries rather than ids; see below.                     |
+| `order.overridden-by`          | no                 | Entries that win over its files.                                                       |
+| `part-groups`                  | with `parts`       | The choices offered, each with an id, a label and a `pick`; see [Parts](parts.md).     |
+| `parts`                        | with `part-groups` | The options, each naming its `group` and its own asset. Excludes `archive`.            |
+| `becomes`                      | with `base`        | The game type the install reports afterwards, e.g. `fallout2rpu`.                      |
+| `installer.windows.built-with` | one of the two     | The toolkit that produced the Windows installer. `inno` is the only one ZAX knows.     |
+| `installer.windows.asset`      | no                 | The installer program. Absent takes the release's sole `.exe`.                         |
+| `installer.other.run`          | one of the two     | The script inside the payload, run after it is extracted.                              |
+| `installer.other.asset`        | no                 | The payload. Absent takes the release's sole archive.                                  |
+| `creates.directory`            | one of the two     | The install this one makes beside the host, as one folder name.                        |
+| `inputs`                       | with `creates`     | What ZAX asks the user for before installing, each with the file that checks it.       |
+| `extract-dat.from`             | no                 | Which input's archive is unpacked into the created install.                            |
+| `extract-dat.list`             | with `from`        | The response file naming what to lift out of it, one path per line.                    |
+| `extract-dat.into`             | with `from`        | Where those files land inside the created install.                                     |
+| `conflicts`                    | no                 | When installing refuses; see below.                                                    |
+| `settings`                     | no                 | The settings schema; see [Settings](settings.md).                                      |
 
 ## What the release supplies
 
@@ -57,13 +69,12 @@ an install, so the same payload is refused everywhere and `actions/pack-mod` say
 ## What the mod needs of the install
 
 ```yaml
-needs:
-  game: [fallout2rpu]
-  sfall: "4.4.5"
+needs.game: [fallout2rpu]
+needs.sfall: "4.4.5"
 ```
 
-`game` lists the game types the mod installs on, gating first installs; absent means any, and a base mod that
-delegates to an installer defaults to vanilla alone. `sfall` is the lowest version the mod works with, read as
+`needs.game` lists the game types the mod installs on, gating first installs; absent means any, and a base mod
+that delegates to an installer defaults to vanilla alone. `needs.sfall` is the lowest version it works with, read as
 "this or newer" - a bare version rather than a bound, since a ceiling or an exact pin is nothing ZAX acts on.
 An install below it is told so, with ZAX's own sfall updater named as the answer.
 
@@ -96,16 +107,15 @@ thing that can say what it installs as.
 ## What the mod overrides
 
 ```yaml
-order:
-  overrides:
-    - rpu.dat
-  overridden-by:
-    - InventoryFilter.dat
+order.overrides:
+  - rpu.dat
+order.overridden-by:
+  - InventoryFilter.dat
 ```
 
-`overrides` names entries your files win over; `overridden-by` names entries that win over yours. That is all a
-place in `mods_order.txt` decides - which copy of a shared file the engine sees - so a claim states the
-override rather than a position. Both lists name entries in `mods/`, spelled as the order file spells them,
+`order.overrides` names entries your files win over; `order.overridden-by` names entries that win over yours.
+That is all a place in `mods_order.txt` decides - which copy of a shared file the engine sees - so a claim
+states the override rather than a position. Both lists name entries in `mods/`, spelled as the order file spells them,
 rather than mod ids: the folder cannot say which mod put a dat there, so an id would place you against the mods
 ZAX installed and against nothing else.
 
@@ -123,7 +133,8 @@ recommendation and its sort button work from.
 
 ```yaml
 conflicts:
-  - when: { present: [mods/other.dat], absent: [mods/compat.ini] }
+  - present: [mods/other.dat]
+    absent: [mods/compat.ini]
     reason: Not alongside Other without its compatibility patch.
 ```
 
@@ -156,6 +167,6 @@ parsed and ignored for a major before it goes. So adding an operator is a new fi
 plus a retirement, and only a removal needs a new major.
 
 What ZAX does with something it does not recognise follows from what ignoring it would cost. A field that
-decides what lands on disk - `entries`, `needs`, `type`, `conflicts` - refuses the manifest, because ignoring it
+decides what lands on disk - `entries`, `needs.game`, `type`, `conflicts` - refuses the manifest, because ignoring it
 would write the wrong thing; that is why an unknown field refuses at all rather than being passed over. Inside
 `settings` the cost is a control rather than a file, so an entry ZAX cannot draw is dropped and named instead.

@@ -620,27 +620,27 @@ id: cassidy
 name: Cassidy Restoration
 version: "1.2"
 game: fallout2
+part-groups:
+  - { id: head, label: Head, pick: any }
+  - { id: voice, label: Voice, pick: one }
 parts:
-  - label: Head
-    pick: any
-    options:
-      - id: head
-        label: New head
-        archive: cassidy_head.dat
-        entries: [cassidy_head.dat]
-  - label: Voice
-    pick: one
-    options:
-      - id: voice-joey
-        label: Joey Bracken
-        archive: cassidy_voice_joey.dat
-        entries: [cassidy_voice_joey.dat]
-        needs: head
-      - id: voice-tom
-        label: Tom Regan
-        archive: cassidy_voice_tom.dat
-        entries: [cassidy_voice_tom.dat]
-        needs: head
+  - id: head
+    group: head
+    label: New head
+    archive: cassidy_head.dat
+    entries: [cassidy_head.dat]
+  - id: voice-joey
+    group: voice
+    label: Joey Bracken
+    archive: cassidy_voice_joey.dat
+    entries: [cassidy_voice_joey.dat]
+    needs: head
+  - id: voice-tom
+    group: voice
+    label: Tom Regan
+    archive: cassidy_voice_tom.dat
+    entries: [cassidy_voice_tom.dat]
+    needs: head
 `;
 
   const CASSIDY_FEED = { repository: "someone/cassidy", id: "cassidy" };
@@ -755,9 +755,10 @@ version: "2.4.34"
 game: fallout2
 type: base
 becomes: fallout2rpu
-installer:
-  windows: { asset: rpu.exe, built-with: inno }
-  other: { asset: rpu.zip, run: rpu-install.sh }
+installer.windows.asset: rpu.exe
+installer.windows.built-with: inno
+installer.other.asset: rpu.zip
+installer.other.run: rpu-install.sh
 `;
 
   const asset = (name: string) => ({
@@ -767,10 +768,7 @@ installer:
     size: 800,
   });
   /** The same mod with neither route naming its asset, which is what leaves the choice to the release. */
-  const RPU_UNNAMED = RPU.replace("{ asset: rpu.exe, built-with: inno }", "{ built-with: inno }").replace(
-    "{ asset: rpu.zip, run: rpu-install.sh }",
-    "{ run: rpu-install.sh }",
-  );
+  const RPU_UNNAMED = RPU.replace(/^installer\.\w+\.asset: .*\n/gm, "");
 
   const basePlatform = (names: readonly string[], os: "linux" | "windows" = "linux", manifest = RPU) =>
     new MemoryPlatform({
@@ -825,7 +823,7 @@ installer:
   });
 
   it("says the mod does not install here when it declares no route for this platform", async () => {
-    const windowsOnly = RPU.replace("  other: { asset: rpu.zip, run: rpu-install.sh }\n", "");
+    const windowsOnly = RPU.replace(/^installer\.other\..*\n/gm, "");
     const found = await fetchFeed(basePlatform(["rpu.exe"], "linux", windowsOnly), FEED);
     const state = availability(found, context());
     expect(state).toMatchObject({ kind: "blocked" });
@@ -880,8 +878,8 @@ version: "2.4.34"
 game: fallout2
 type: base
 becomes: fallout2rpu
-installer:
-  other: { asset: rpu.zip, run: rpu-install.sh }
+installer.other.asset: rpu.zip
+installer.other.run: rpu-install.sh
 `;
   const found = (line?: ModLine): ModRelease => ({
     manifest: parseManifest(new TextEncoder().encode(BASE)),
@@ -959,8 +957,8 @@ version: "35"
 game: fallout2
 type: base
 becomes: fallout2upu
-installer:
-  other: { asset: upu.zip, run: upu-install.sh }
+installer.other.asset: upu.zip
+installer.other.run: upu-install.sh
 `;
     const install: Install = { path: "/games/fallout2", type: "fallout2upu" };
     const release: ModRelease = {
@@ -988,8 +986,8 @@ version: "35"
 game: fallout2
 type: base
 becomes: fallout2upu
-installer:
-  other: { asset: upu.zip, run: upu-install.sh }
+installer.other.asset: upu.zip
+installer.other.run: upu-install.sh
 `;
     const at: Install = { path: "/games/fallout2", type: "fallout2upu" };
     const nightlyRelease: ModRelease = {
@@ -1019,8 +1017,8 @@ version: "2.4.34"
 game: fallout2
 type: base
 becomes: fallout2rpu
-installer:
-  other: { asset: rpu.zip, run: rpu-install.sh }
+installer.other.asset: rpu.zip
+installer.other.run: rpu-install.sh
 `;
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(BASE)),
@@ -1048,16 +1046,14 @@ game: fallout2
 type: base
 becomes: fo1in2
 archive: Fallout1in2.zip
-creates:
-  directory: Fallout1in2
+creates.directory: Fallout1in2
 inputs:
   - id: fallout1
     label: Your Fallout 1 folder
     holds: master.dat
-extract-dat:
-  from: fallout1
-  list: undat_files.txt
-  into: data
+extract-dat.from: fallout1
+extract-dat.list: undat_files.txt
+extract-dat.into: data
 `;
 
   const release: ModRelease = {
@@ -1171,8 +1167,7 @@ game: fallout2
 type: base
 becomes: fo1in2
 archive: Fallout1in2.zip
-creates:
-  directory: Fallout1in2
+creates.directory: Fallout1in2
 `;
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(CREATES)),

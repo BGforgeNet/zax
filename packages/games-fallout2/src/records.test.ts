@@ -150,7 +150,7 @@ describe("reconciling a base mod, which records no files", () => {
     manifest:
       "spec: 1\nid: upu\nname: Unofficial Patch Updated\ngame: fallout2\ntype: base\nbecomes: fallout2upu\n" +
       // Named because a base mod carries an installer or a `creates`, and one without either is refused.
-      "installer:\n  other:\n    asset: upu_v34.zip\n    run: upu-install.sh\n",
+      "installer.other.asset: upu_v34.zip\ninstaller.other.run: upu-install.sh\n",
     shipped: {},
     ...over,
   });
@@ -201,7 +201,7 @@ describe("reconciling a base mod, which records no files", () => {
     files: [],
     manifest:
       "spec: 1\nid: fo1in2\nname: Fallout et tu\ngame: fallout2\ntype: base\nbecomes: fo1in2\n" +
-      "archive: Fallout1in2.zip\ncreates:\n  directory: Fallout1in2\n",
+      "archive: Fallout1in2.zip\ncreates.directory: Fallout1in2\n",
     shipped: {},
     ...over,
   });

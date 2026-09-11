@@ -7,11 +7,8 @@ ships, and ZAX runs that.
 ```yaml
 type: base
 becomes: fallout2rpu
-installer:
-  windows:
-    built-with: inno
-  other:
-    run: rpu-install.sh
+installer.windows.built-with: inno
+installer.other.run: rpu-install.sh
 ```
 
 `becomes` names the game type the install reports afterwards and must be one ZAX can detect; it is what every
@@ -62,17 +59,15 @@ it creates instead, and ZAX performs it.
 type: base
 becomes: fo1in2
 archive: Fallout1in2.zip
-creates:
-  directory: Fallout1in2
+creates.directory: Fallout1in2
 inputs:
   - id: fallout1
     label: Your Fallout 1 folder
     help: The folder holding Fallout 1's MASTER.DAT.
     holds: master.dat
-extract-dat:
-  from: fallout1
-  list: undat_files.txt
-  into: data
+extract-dat.from: fallout1
+extract-dat.list: undat_files.txt
+extract-dat.into: data
 ```
 
 A base manifest names `installer` or `creates`, never both and never neither. With `creates`, `becomes` names

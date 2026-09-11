@@ -40,11 +40,11 @@ game: fallout2
 type: permanent
 reason: EcCo's changes live in the save; removing it breaks every save made while it was in.
 archive: ecco_v1-0-0.zip
-needs:
-  game: [fallout2rpu]
-  sfall: "4.4.5"
+needs.game: [fallout2rpu]
+needs.sfall: "4.4.5"
 conflicts:
-  - when: { present: [mods/other.dat], absent: [mods/ecco.dat] }
+  - present: [mods/other.dat]
+    absent: [mods/ecco.dat]
     reason: Not with Other installed.
 settings:
   main.enabled:
@@ -197,10 +197,7 @@ describe("parseManifest refusals", () => {
     refuses(setting("mods/../fallout2.exe"), /leaves the game directory/);
     refuses(setting("/etc/passwd"), /leaves the game directory/);
     refuses(setting("C:\\\\game\\\\mods\\\\a.ini"), /leaves the game directory/);
-    refuses(
-      `${FO2TWEAKS}conflicts:\n  - when: { present: ["../marker"] }\n    reason: no\n`,
-      /leaves the game directory/,
-    );
+    refuses(`${FO2TWEAKS}conflicts:\n  - present: ["../marker"]\n    reason: no\n`, /leaves the game directory/);
   });
 
   it("confines a stacking mod's files to mods/, naming the grant as ZAX's rather than the mod's fault", () => {
@@ -293,16 +290,16 @@ describe("parseManifest refusals", () => {
 
   it("refuses an sfall floor that is not a version", () => {
     // The bare version is the whole vocabulary: an operator would promise a comparison nothing implements.
-    refuses(`${FO2TWEAKS}needs:\n  sfall: ">=4.1.3"\n`, /not a version/);
+    refuses(`${FO2TWEAKS}needs.sfall: ">=4.1.3"\n`, /not a version/);
   });
 
   it("refuses a needed game type it cannot detect, or none at all", () => {
-    refuses(`${FO2TWEAKS}needs:\n  game: [fallout3]\n`, /newer version of ZAX/);
-    refuses(`${FO2TWEAKS}needs:\n  game: []\n`, /install nowhere/);
+    refuses(`${FO2TWEAKS}needs.game: [fallout3]\n`, /newer version of ZAX/);
+    refuses(`${FO2TWEAKS}needs.game: []\n`, /install nowhere/);
   });
 
   it("refuses a conflict rule that tests nothing", () => {
-    refuses(`${FO2TWEAKS}conflicts:\n  - when: {}\n    reason: no\n`, /tests nothing/);
+    refuses(`${FO2TWEAKS}conflicts:\n  - reason: no\n`, /tests nothing/);
   });
 
   it("refuses an archive name that is not a bare file name", () => {
@@ -345,7 +342,7 @@ describe("what a release says about itself", () => {
 describe("the place a mod states", () => {
   it("reads both sides, as entries rather than ids", () => {
     const manifest = parsed(
-      `${FO2TWEAKS}order:\n  overrides: [rpu.dat, party_orders.dat]\n  overridden-by: [InventoryFilter.dat]\n`,
+      `${FO2TWEAKS}order.overrides: [rpu.dat, party_orders.dat]\norder.overridden-by: [InventoryFilter.dat]\n`,
     );
     expect(manifest.order).toEqual({
       overrides: ["rpu.dat", "party_orders.dat"],
@@ -354,7 +351,7 @@ describe("the place a mod states", () => {
   });
 
   it("reads one side alone", () => {
-    expect(parsed(`${FO2TWEAKS}order:\n  overrides: [rpu.dat]\n`).order).toEqual({
+    expect(parsed(`${FO2TWEAKS}order.overrides: [rpu.dat]\n`).order).toEqual({
       overrides: ["rpu.dat"],
       overriddenBy: [],
     });
@@ -365,16 +362,17 @@ describe("the place a mod states", () => {
   });
 
   it("refuses a claim that names nothing to override and nothing to be overridden by", () => {
-    expect(() => parsed(`${FO2TWEAKS}order: {}\n`)).toThrow(/"order" names nothing/);
-    expect(() => parsed(`${FO2TWEAKS}order:\n  overrides: []\n`)).toThrow(/"order" names nothing/);
+    expect(() => parsed(`${FO2TWEAKS}order.overrides: []\n`)).toThrow(/"order" names nothing/);
   });
 
   it("refuses a name that could leave the mods folder", () => {
-    expect(() => parsed(`${FO2TWEAKS}order:\n  overrides: ["../rpu.dat"]\n`)).toThrow(/leaves the game directory/);
+    expect(() => parsed(`${FO2TWEAKS}order.overrides: ["../rpu.dat"]\n`)).toThrow(/leaves the game directory/);
   });
 
   it("refuses a side this version has no rule for, since the order it writes is on disk", () => {
-    expect(() => parsed(`${FO2TWEAKS}order:\n  beside: [rpu.dat]\n`)).toThrow(/unknown field "beside"/);
+    // The dotted spelling puts it through the manifest's own unknown-field pass rather than a per-wrapper
+    // one, so the wording names the whole key - which is what an author reading it has to go and fix.
+    expect(() => parsed(`${FO2TWEAKS}order.beside: [rpu.dat]\n`)).toThrow(/unknown field "order.beside"/);
   });
 });
 
@@ -414,28 +412,28 @@ id: cassidy
 name: Cassidy Restoration
 version: "1.2"
 game: fallout2
+part-groups:
+  - { id: head, label: Head, pick: any }
+  - { id: voice, label: Voice, pick: one }
 parts:
-  - label: Head
-    pick: any
-    options:
-      - id: head
-        label: Cassidy's new head
-        archive: cassidy_head.dat
-        entries: [cassidy_head.dat]
-  - label: Voice
-    pick: one
-    options:
-      - id: voice-joey
-        label: Joey Bracken
-        help: The voice from the original release.
-        archive: cassidy_voice_joey_bracken_hq.dat
-        entries: [cassidy_voice_joey_bracken_hq.dat]
-        needs: head
-      - id: voice-tom
-        label: Tom Regan
-        archive: cassidy_voice_tom_regan_hq.dat
-        entries: [cassidy_voice_tom_regan_hq.dat]
-        needs: head
+  - id: head
+    group: head
+    label: Cassidy's new head
+    archive: cassidy_head.dat
+    entries: [cassidy_head.dat]
+  - id: voice-joey
+    group: voice
+    label: Joey Bracken
+    help: The voice from the original release.
+    archive: cassidy_voice_joey_bracken_hq.dat
+    entries: [cassidy_voice_joey_bracken_hq.dat]
+    needs: head
+  - id: voice-tom
+    group: voice
+    label: Tom Regan
+    archive: cassidy_voice_tom_regan_hq.dat
+    entries: [cassidy_voice_tom_regan_hq.dat]
+    needs: head
 `;
 
 describe("parts", () => {
@@ -487,10 +485,25 @@ describe("parts", () => {
     expect(supplied.archive).toBeUndefined();
   });
 
-  it("refuses a group with nothing in it, and a parts block with no groups", () => {
-    const emptied = `${CASSIDY.slice(0, CASSIDY.indexOf("  - label: Voice"))}  - label: Voice\n    pick: one\n    options: []\n`;
-    refuses(emptied, /empty/);
-    refuses(`${FO2TWEAKS}parts: []\n`, /empty/);
+  it("refuses a group no part is in, and a pair where either list is empty", () => {
+    // A group nothing joined draws a heading over an empty box, which is the shape the nested format made
+    // unrepresentable and this one does not: the two lists are written apart and can disagree.
+    const spare = CASSIDY.replace(
+      "  - { id: voice, label: Voice, pick: one }",
+      "  - { id: voice, label: Voice, pick: one }\n  - { id: spare, label: Spare, pick: any }",
+    );
+    refuses(spare, /no part is in the group "spare"/);
+    refuses(`${FO2TWEAKS}part-groups: []\nparts: []\n`, /empty/);
+  });
+
+  it("refuses one of the two lists without the other, which describes half a choice", () => {
+    const groupsOnly = CASSIDY.slice(0, CASSIDY.indexOf("parts:\n"));
+    refuses(groupsOnly, /declared together/);
+    refuses(`${FO2TWEAKS}parts:\n  - { id: head, group: head, label: Head, archive: a.dat }\n`, /declared together/);
+  });
+
+  it("refuses a part in a group nothing declares", () => {
+    refuses(CASSIDY.replace("    group: voice\n    label: Joey", "    group: vioce\n    label: Joey"), /"vioce"/);
   });
 
   it("refuses a part id repeated anywhere in the manifest", () => {
@@ -506,11 +519,11 @@ describe("parts", () => {
   });
 
   it("refuses parts that need each other, which nothing could ever select", () => {
-    refuses(CASSIDY.replace("      - id: head", "      - id: head\n        needs: voice-joey"), /need each other/);
+    refuses(CASSIDY.replace("  - id: head\n", "  - id: head\n    needs: voice-joey\n"), /need each other/);
   });
 
   it("refuses a part that needs itself", () => {
-    refuses(CASSIDY.replace("      - id: head", "      - id: head\n        needs: head"), /needs itself/);
+    refuses(CASSIDY.replace("  - id: head\n", "  - id: head\n    needs: head\n"), /needs itself/);
   });
 
   it("asks for a newer ZAX when a group picks in a way this version does not implement", () => {
@@ -521,7 +534,7 @@ describe("parts", () => {
 
   it("refuses a part whose asset is not a bare file name, or which names none", () => {
     refuses(CASSIDY.replace("archive: cassidy_head.dat", "archive: ../cassidy_head.dat"), /not a file name/);
-    refuses(CASSIDY.replace("        archive: cassidy_head.dat\n", ""), /must be text/);
+    refuses(CASSIDY.replace("    archive: cassidy_head.dat\n", ""), /must be text/);
   });
 
   it("confines a part's entries the way the mod's own are", () => {
@@ -544,15 +557,13 @@ game: fallout2
 type: base
 becomes: fallout2rpu
 conflicts:
-  - when: { present: [up-changelog.txt], absent: [rp-changelog.txt] }
+  - present: [up-changelog.txt]
+    absent: [rp-changelog.txt]
     reason: RPU cannot be installed over killap's Unofficial Patch.
-installer:
-  windows:
-    asset: rpu_v2.4.34.exe
-    built-with: inno
-  other:
-    asset: rpu_v2.4.34.zip
-    run: rpu-install.sh
+installer.windows.asset: rpu_v2.4.34.exe
+installer.windows.built-with: inno
+installer.other.asset: rpu_v2.4.34.zip
+installer.other.run: rpu-install.sh
 `;
 
 describe("a base mod's manifest", () => {
@@ -576,8 +587,8 @@ describe("a base mod's manifest", () => {
   });
 
   it("requires an installer of a base mod, and refuses one anywhere else", () => {
-    refuses(RPU.replace(/installer:[\s\S]*$/, ""), /names no "installer"/);
-    refuses(`${FO2TWEAKS}installer:\n  other: { asset: x.zip, run: go.sh }\n`, /belongs to a base mod/);
+    refuses(RPU.replace(/installer\.[\s\S]*$/, ""), /names no "installer"/);
+    refuses(`${FO2TWEAKS}installer.other.run: go.sh\n`, /belongs to a base mod/);
   });
 
   it("requires becomes to name a game type this version can detect", () => {
@@ -592,7 +603,7 @@ describe("a base mod's manifest", () => {
     // platform key as "not mine" would run the other platform's installer, and an unknown toolkit would be
     // driven with Inno's own switches, which another one reads as file names or as nothing at all.
     refuses(RPU.replace("built-with: inno", "built-with: nsis"), /newer version of ZAX/);
-    refuses(RPU.replace("  other:", "  haiku:"), /newer version of ZAX/);
+    refuses(RPU.replace("installer.other.", "installer.haiku."), /newer version of ZAX/);
   });
 
   it("refuses an installer that runs something outside what its payload deploys", () => {
@@ -602,20 +613,23 @@ describe("a base mod's manifest", () => {
   it("takes a route that names no asset, leaving the release to supply it", () => {
     // Upstream's installer assets carry the version in their names, and the release is what knows it. A
     // manifest that leaves the name out is written once instead of edited before every tag.
-    const unnamed = RPU.replace("    asset: rpu_v2.4.34.exe\n", "").replace("    asset: rpu_v2.4.34.zip\n", "");
+    const unnamed = RPU.replace(/^installer\.\w+\.asset: .*\n/gm, "");
     const manifest = parsed(unnamed);
     expect(manifest.installer?.windows).toEqual({ builtWith: "inno" });
     expect(manifest.installer?.other).toEqual({ run: "rpu-install.sh" });
   });
 
   it("still holds a named asset to being a file name", () => {
-    refuses(RPU.replace("asset: rpu_v2.4.34.exe", "asset: builds/rpu.exe"), /is not a file name/);
+    refuses(
+      RPU.replace("installer.windows.asset: rpu_v2.4.34.exe", "installer.windows.asset: builds/rpu.exe"),
+      /is not a file name/,
+    );
   });
 
   it("refuses a Windows route that describes what its installer offers, which is the installer's to say", () => {
     // Retired from the format rather than parsed and ignored: a manifest carrying this list was written
     // expecting ZAX to act on it, and accepting it quietly would install something other than it describes.
-    refuses(RPU.replace("built-with: inno", "built-with: inno\n    components: []"), /unknown field "components"/);
+    refuses(`${RPU}installer.windows.components: []\n`, /unknown field "installer.windows.components"/);
   });
 });
 
@@ -628,17 +642,15 @@ game: fallout2
 type: base
 becomes: fo1in2
 archive: Fallout1in2.zip
-creates:
-  directory: Fallout1in2
+creates.directory: Fallout1in2
 inputs:
   - id: fallout1
     label: Your Fallout 1 folder
     help: The folder holding Fallout 1's MASTER.DAT.
     holds: master.dat
-extract-dat:
-  from: fallout1
-  list: undat_files.txt
-  into: data
+extract-dat.from: fallout1
+extract-dat.list: undat_files.txt
+extract-dat.into: data
 `;
 
 describe("a mod that creates an install", () => {
@@ -668,14 +680,14 @@ describe("a mod that creates an install", () => {
   });
 
   it("requires a base mod to name exactly one of installer and creates", () => {
-    refuses(`${FO1IN2}installer:\n  other: { asset: x.zip, run: go.sh }\n`, /both/);
-    refuses(FO1IN2.replace(/creates:[\s\S]*$/, ""), /names no "installer"/);
+    refuses(`${FO1IN2}installer.other.run: go.sh\n`, /both/);
+    refuses(FO1IN2.replace(/creates\.[\s\S]*$/, ""), /names no "installer"/);
   });
 
   it("refuses what it creates, asks for, or unpacks anywhere but a base mod", () => {
-    refuses(`${FO2TWEAKS}creates:\n  directory: Elsewhere\n`, /belongs to a base mod/);
+    refuses(`${FO2TWEAKS}creates.directory: Elsewhere\n`, /belongs to a base mod/);
     refuses(`${FO2TWEAKS}inputs:\n  - { id: a, label: A, holds: master.dat }\n`, /creates an install/);
-    refuses(`${RPU}extract-dat:\n  from: a\n  list: l.txt\n  into: data\n`, /creates an install/);
+    refuses(`${RPU}extract-dat.from: a\nextract-dat.list: l.txt\nextract-dat.into: data\n`, /creates an install/);
   });
 
   it("confines the created directory to one segment of the install it sits in", () => {
@@ -701,7 +713,10 @@ describe("a mod that creates an install", () => {
   });
 
   it("refuses one input asked for twice, which would ask the same question of two answers", () => {
-    const twice = FO1IN2.replace("extract-dat:", "  - { id: fallout1, label: Again, holds: master.dat }\nextract-dat:");
+    const twice = FO1IN2.replace(
+      "extract-dat.from:",
+      "  - { id: fallout1, label: Again, holds: master.dat }\nextract-dat.from:",
+    );
     refuses(twice, /names "fallout1" twice/);
   });
 });

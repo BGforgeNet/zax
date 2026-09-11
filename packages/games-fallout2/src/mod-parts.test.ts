@@ -8,31 +8,32 @@ id: cassidy
 name: Cassidy
 version: "1.2"
 game: fallout2
+part-groups:
+  - { id: head, label: Head, pick: any }
+  - { id: voice, label: Voice, pick: one }
 parts:
-  - label: Head
-    pick: any
-    options:
-      - id: head
-        label: New head
-        archive: cassidy_head.dat
-        entries: [cassidy_head.dat]
-      - id: portrait
-        label: New portrait
-        archive: cassidy_portrait.dat
-        entries: [cassidy_portrait.dat]
-  - label: Voice
-    pick: one
-    options:
-      - id: joey
-        label: Joey Bracken
-        archive: cassidy_voice_joey.dat
-        entries: [cassidy_voice_joey.dat]
-        needs: head
-      - id: tom
-        label: Tom Regan
-        archive: cassidy_voice_tom.dat
-        entries: [cassidy_voice_tom.dat]
-        needs: head
+  - id: head
+    group: head
+    label: New head
+    archive: cassidy_head.dat
+    entries: [cassidy_head.dat]
+  - id: portrait
+    group: head
+    label: New portrait
+    archive: cassidy_portrait.dat
+    entries: [cassidy_portrait.dat]
+  - id: joey
+    group: voice
+    label: Joey Bracken
+    archive: cassidy_voice_joey.dat
+    entries: [cassidy_voice_joey.dat]
+    needs: head
+  - id: tom
+    group: voice
+    label: Tom Regan
+    archive: cassidy_voice_tom.dat
+    entries: [cassidy_voice_tom.dat]
+    needs: head
 `;
 
 const asset = (id: string): ReleaseAsset => ({ name: `${id}.dat`, url: `https://example.test/${id}.dat` });

@@ -124,7 +124,7 @@ describe("install", () => {
   it("puts a new line where the mod's own manifest says it goes", async () => {
     // Nothing ZAX ships places weapon_sounds.dat, so without the claim the line would land at the end - which
     // is also what happens if the claim never reaches the placement, so this is what proves it does.
-    const text = `spec: 1\nid: weaponsounds\nname: Weapon Sounds\nversion: "1.0"\ngame: fallout2\narchive: ws.zip\norder:\n  overridden-by: [InventoryFilter.dat]\n`;
+    const text = `spec: 1\nid: weaponsounds\nname: Weapon Sounds\nversion: "1.0"\ngame: fallout2\narchive: ws.zip\norder.overridden-by: [InventoryFilter.dat]\n`;
     const url = "https://example.test/ws.zip";
     const platform = new MemoryPlatform({
       files: {
@@ -212,7 +212,7 @@ describe("install", () => {
   });
 
   it("refuses when a manifest condition fires, matching case-insensitively, before anything is written", async () => {
-    const clash = `conflicts:\n  - when: { present: [rp-marker.txt] }\n    reason: Not over this.\n`;
+    const clash = `conflicts:\n  - present: [rp-marker.txt]\n    reason: Not over this.\n`;
     const text = manifestFor("14.7", clash);
     const release: ModRelease = {
       manifest: parseManifest(new TextEncoder().encode(text)),
@@ -897,27 +897,27 @@ id: cassidy
 name: Cassidy
 version: "${version}"
 game: fallout2
+part-groups:
+  - { id: head, label: Head, pick: any }
+  - { id: voice, label: Voice, pick: one }
 parts:
-  - label: Head
-    pick: any
-    options:
-      - id: head
-        label: New head
-        archive: cassidy_head.zip
-        entries: [cassidy_head.dat]
-  - label: Voice
-    pick: one
-    options:
-      - id: joey
-        label: Joey Bracken
-        archive: cassidy_voice_joey.dat
-        entries: [${voices || "cassidy_voice_joey.dat"}]
-        needs: head
-      - id: tom
-        label: Tom Regan
-        archive: cassidy_voice_tom.dat
-        entries: [${voices || "cassidy_voice_tom.dat"}]
-        needs: head
+  - id: head
+    group: head
+    label: New head
+    archive: cassidy_head.zip
+    entries: [cassidy_head.dat]
+  - id: joey
+    group: voice
+    label: Joey Bracken
+    archive: cassidy_voice_joey.dat
+    entries: [${voices || "cassidy_voice_joey.dat"}]
+    needs: head
+  - id: tom
+    group: voice
+    label: Tom Regan
+    archive: cassidy_voice_tom.dat
+    entries: [${voices || "cassidy_voice_tom.dat"}]
+    needs: head
 `;
 
   const partsRelease = async (version: string, voices?: string): Promise<ModRelease> => {

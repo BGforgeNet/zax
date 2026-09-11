@@ -27,15 +27,12 @@ game: fallout2
 type: base
 becomes: fallout2rpu
 conflicts:
-  - when: { present: [mods/upu.dat] }
+  - present: [mods/upu.dat]
     reason: RPU cannot be installed over UPU.
-installer:
-  windows:
-    asset: rpu_v2.4.34.exe
-    built-with: inno
-  other:
-    asset: rpu_v2.4.34.zip
-    run: rpu-install.sh
+installer.windows.asset: rpu_v2.4.34.exe
+installer.windows.built-with: inno
+installer.other.asset: rpu_v2.4.34.zip
+installer.other.run: rpu-install.sh
 `;
 
 /** The release as the feed would have resolved it on this host: one route, one asset. */

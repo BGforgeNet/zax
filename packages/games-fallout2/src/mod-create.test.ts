@@ -29,16 +29,14 @@ game: fallout2
 type: base
 becomes: fo1in2
 archive: Fallout1in2.zip
-creates:
-  directory: Fallout1in2
+creates.directory: Fallout1in2
 inputs:
   - id: fallout1
     label: Your Fallout 1 folder
     holds: master.dat
-extract-dat:
-  from: fallout1
-  list: undat_files.txt
-  into: data
+extract-dat.from: fallout1
+extract-dat.list: undat_files.txt
+extract-dat.into: data
 `;
 
 const LIST = "ART\\SCENERY\\CSTALAG2.FRM\r\nSOUND\\MUSIC\\01.ACM\r\n";

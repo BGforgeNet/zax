@@ -3,25 +3,25 @@ id: cassidy
 name: Cassidy Restoration
 version: "1.2"
 game: fallout2
+part-groups:
+  - { id: head, label: Head, pick: any }
+  - { id: voice, label: Voice, pick: one }
 parts:
-  - label: Head
-    pick: any
-    options:
-      - id: head
-        label: Cassidy's new head
-        help: The portrait and critter art, without the voice.
-        archive: cassidy_head.dat
-        entries: [cassidy_head.dat]
-  - label: Voice
-    pick: one
-    options:
-      - id: voice-joey
-        label: Joey Bracken
-        archive: cassidy_voice_joey_bracken_hq.dat
-        entries: [cassidy_voice_joey_bracken_hq.dat]
-        needs: head
-      - id: voice-tom
-        label: Tom Regan
-        archive: cassidy_voice_tom_regan_hq.dat
-        entries: [cassidy_voice_tom_regan_hq.dat]
-        needs: head
+  - id: head
+    group: head
+    label: Cassidy's new head
+    help: The portrait and critter art, without the voice.
+    archive: cassidy_head.dat
+    entries: [cassidy_head.dat]
+  - id: voice-joey
+    group: voice
+    label: Joey Bracken
+    archive: cassidy_voice_joey_bracken_hq.dat
+    entries: [cassidy_voice_joey_bracken_hq.dat]
+    needs: head
+  - id: voice-tom
+    group: voice
+    label: Tom Regan
+    archive: cassidy_voice_tom_regan_hq.dat
+    entries: [cassidy_voice_tom_regan_hq.dat]
+    needs: head
