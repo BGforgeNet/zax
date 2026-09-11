@@ -11,18 +11,7 @@ conflicts:
 installer:
   windows:
     asset: rpu_v2.4.34.exe
-    silent: inno
-    components:
-      - label: Included
-        pick: any
-        options:
-          - { id: core, label: Core, required: true }
-          - { id: worldmap, label: Visually enhanced world map }
-      - label: Walk speed fix
-        pick: one
-        options:
-          - { id: "walk_speed\\high_fps", label: High FPS }
-          - { id: "walk_speed\\low_fps", label: Low FPS }
+    built-with: inno
   other:
     asset: rpu_v2.4.34.zip
     run: rpu-install.sh

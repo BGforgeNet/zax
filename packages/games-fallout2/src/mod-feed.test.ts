@@ -736,7 +736,7 @@ parts:
     const offer = listing.offers.find((one) => one.id === "fo2tweaks");
     expect(offer?.choices?.groups.map((group) => group.label)).toEqual(["Head", "Voice"]);
     // Carried over rather than merely reported: this is what an upgrade would install without asking.
-    expect(offer?.choices).toMatchObject({ what: "parts", selection: ["head"], dropped: [], ask: false });
+    expect(offer?.choices).toMatchObject({ selection: ["head"], dropped: [], ask: false });
   });
 
   it("sees the mod as installed when any part of it is in the mods folder", async () => {
@@ -756,7 +756,7 @@ game: fallout2
 type: base
 becomes: fallout2rpu
 installer:
-  windows: { asset: rpu.exe, silent: inno }
+  windows: { asset: rpu.exe, built-with: inno }
   other: { asset: rpu.zip, run: rpu-install.sh }
 `;
 
@@ -767,7 +767,7 @@ installer:
     size: 800,
   });
   /** The same mod with neither route naming its asset, which is what leaves the choice to the release. */
-  const RPU_UNNAMED = RPU.replace("{ asset: rpu.exe, silent: inno }", "{ silent: inno }").replace(
+  const RPU_UNNAMED = RPU.replace("{ asset: rpu.exe, built-with: inno }", "{ built-with: inno }").replace(
     "{ asset: rpu.zip, run: rpu-install.sh }",
     "{ run: rpu-install.sh }",
   );

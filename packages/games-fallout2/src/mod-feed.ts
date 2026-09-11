@@ -361,8 +361,8 @@ function soleArchive(assets: readonly ReleaseAsset[]): ReleaseAsset | undefined 
 
 /**
  * The Windows installer when the manifest does not name one, under the same rule as the payload: a release's
- * sole executable. Matched on the shape rather than on `silent`, which would be a table with one row - and an
- * installer convention this version does not know refuses at parse, so the guess never reaches an unknown one.
+ * sole executable. Matched on the shape rather than on `built-with`, which would be a table with one row - and
+ * a toolkit this version does not know refuses at parse, so the guess never reaches an unknown one.
  */
 function soleExecutable(assets: readonly ReleaseAsset[]): ReleaseAsset | undefined {
   const programs = assets.filter((asset) => asset.name.toLowerCase().endsWith(".exe"));
@@ -861,11 +861,7 @@ export interface ModOffer {
   creates?: string;
   /** What the user must be asked for before this can be installed, so the interface reads no manifest. */
   asks?: readonly ModInput[];
-  /**
-   * The choice to make before installing this release, and where this install stands in it. A stacking mod's
-   * parts and a base installer's components are the same question asked of two different manifests, so the
-   * interface gets one shape and draws one dialog.
-   */
+  /** The choice to make before installing this release, and where this install stands in it. */
   choices?: ChoiceOffer;
   /**
    * Set on a row the record alone describes, where no feed follows the mod: `version` is then what is on disk
@@ -878,8 +874,6 @@ export interface ModOffer {
 
 /** Everything the interface needs to draw a choice it cannot compute: the renderer reads no manifest. */
 interface ChoiceOffer extends CarriedSelection {
-  /** Which of the two is being chosen - the words the dialog uses, and nothing else, turn on this. */
-  what: "parts" | "components";
   /** The groups this release can deliver, in the order the manifest declares them. */
   groups: readonly ChoiceGroup[];
 }
@@ -912,8 +906,8 @@ export interface PublishedMod {
   becomes?: GameType;
   creates?: string;
   asks?: readonly ModInput[];
-  /** The choice this release offers, without an install's answer to it - `groups` and what they are. */
-  choice?: { what: "parts" | "components"; groups: readonly ChoiceGroup[] };
+  /** The choice this release offers, without an install's answer to it. */
+  choice?: { groups: readonly ChoiceGroup[] };
 }
 
 /** Every feed's current release, and the feeds that could not answer. Read once, not once per install. */
@@ -931,8 +925,8 @@ export interface ModInstallState {
 }
 
 /** The per-app half of an offer: what the release says about itself, before any folder is considered. */
-function publishedFrom(release: ModRelease, components: readonly ChoiceGroup[] | undefined): PublishedMod {
-  const groups = components ?? offeredParts(release);
+function publishedFrom(release: ModRelease): PublishedMod {
+  const groups = offeredParts(release);
   return {
     id: release.manifest.id,
     name: release.manifest.name,
@@ -946,20 +940,9 @@ function publishedFrom(release: ModRelease, components: readonly ChoiceGroup[] |
     ...(release.manifest.becomes !== undefined ? { becomes: release.manifest.becomes } : {}),
     ...(release.manifest.creates ? { creates: release.manifest.creates.directory } : {}),
     ...(release.manifest.inputs ? { asks: release.manifest.inputs } : {}),
-    ...(groups.length > 0 ? { choice: { what: components ? "components" : "parts", groups } } : {}),
+    ...(groups.length > 0 ? { choice: { groups } } : {}),
   };
 }
-
-/**
- * A base mod's components are asked for every install rather than carried over: they are the installer's own
- * list, ZAX records no selection for them, and the installer's wizard would ask too.
- *
- * Only where this host would actually run that installer. The choice exists in the Inno installer and nowhere
- * else - RPU's build moves the optional dats out of `mods/` for that route alone, and the zip every other
- * system takes ships all of them - so offering it here would be offering a choice that changes nothing.
- */
-const componentsOf = (release: ModRelease): readonly ChoiceGroup[] | undefined =>
-  release.installer?.route === "windows" ? release.manifest.installer?.windows?.components : undefined;
 
 /**
  * Every feed's current release. A feed that cannot answer costs its own row, not the listing: the other mods
@@ -1003,7 +986,7 @@ export async function readModFeeds(
     if ("release" in answer) {
       const { release } = answer;
       releases.push(release);
-      published.push(publishedFrom(release, componentsOf(release)));
+      published.push(publishedFrom(release));
     } else {
       // Only a base mod earns a row here: that one is the whole installation, so a user who cannot get it
       // needs to know why. A stacking mod that is unreachable or has not adopted the format offers the same
@@ -1045,10 +1028,7 @@ export async function readModInstallState(
     // A created install stamps its own copy, one directory in, which is where this reads it.
     const baseVersion =
       release.manifest.type === "base" ? await installedBaseVersion(platform, created ?? install.path) : undefined;
-    const components = componentsOf(release);
-    const carried: CarriedSelection = components
-      ? { selection: [], dropped: [], ask: true }
-      : carryOver(release, record.mods.find((mod) => mod.id === release.manifest.id)?.parts);
+    const carried = carryOver(release, record.mods.find((mod) => mod.id === release.manifest.id)?.parts);
     standing[release.manifest.id] = {
       availability: availability(release, {
         install,

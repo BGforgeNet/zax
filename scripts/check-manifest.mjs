@@ -42,13 +42,6 @@ try {
     `OK: ${manifest.id} ${version} (${manifest.type}); payload: ${payload}; ` +
       `${manifest.settings.length} setting(s), ${manifest.conflicts.length} conflict rule(s)`,
   );
-  // The components, spelled the way the installer's command line will carry them: an author checking a base
-  // manifest is checking exactly this list, and a name that is wrong here installs the wrong thing silently.
-  for (const group of manifest.installer?.windows?.components ?? [])
-    console.log(
-      `  ${group.label} (pick ${group.pick}): ` +
-        group.options.map((one) => `${one.id}${one.required ? " [always]" : ""}`).join(", "),
-    );
   // Spelled out because a part id is permanent and an author's first sight of one is here: what this prints
   // is what every future release has to keep naming, and what an install records.
   for (const group of manifest.parts ?? [])

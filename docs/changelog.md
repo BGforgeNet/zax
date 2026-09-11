@@ -17,8 +17,10 @@ mods as well as settings.
   own. Upgrades keep the changes you made to a mod's ini rather than overwriting them, an interrupted install
   can be resumed or put back exactly, and removal deletes only what was recorded as installed. A mod's row says
   what it is and who wrote it, and opens its forum thread or its home page where the release publishes one.
-- **Big mods too.** Restoration Project and the Unofficial Patch install through their own installers, with the
-  components they offer chosen in ZAX on Windows. The Restoration Project's 2.3 and 2.4 lines are two entries
+- **Big mods too.** Restoration Project and the Unofficial Patch install through their own installers. On
+  Windows that installer's own window opens, where you pick your language and anything else it offers. ZAX
+  points it at the right folder, waits, and takes over again when it finishes - and says so if you close it
+  rather than treating that as a failure. The Restoration Project's 2.3 and 2.4 lines are two entries
   rather than one: each updates within its own line, and only one of them installs on any game. Fallout et tu
   builds a second game beside this one out of your own copy of Fallout 1, and joins the game list when it is
   done. It is installed once and never updated in place: where one is already there - a folder in this game, or

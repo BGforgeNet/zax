@@ -24,10 +24,10 @@
  * is what knows it: the Windows route resolves to the release's sole `.exe` and the other to its sole archive.
  * That also survives an upstream rename, where a name spelled here would go on missing until ZAX shipped again.
  *
- * RPU's and UPU's component trees are upstream's own, read from `extra/inno/inno.iss` and its includes in each
- * repository. The fragments below are shared by both documents because upstream shares them: the same
- * `components_translations.iss` and `components_ammo.iss` sit in both repositories, and both installers are
- * built from the same script. A tree that diverges takes a copy of its fragment rather than editing it here.
+ * None of them describes what its installer offers, and that is the point: a copy of upstream's component tree
+ * kept here would be a second home for a table `extra/inno/inno.iss` already owns, going stale against the next
+ * release with nothing to notice. The wizard reads it out of the executable the user downloaded instead
+ * (`innoArguments` in `mod-base.ts` carries the argument).
  */
 
 export interface VendoredManifest {
@@ -37,81 +37,6 @@ export interface VendoredManifest {
   text: string;
 }
 
-/** What the installer always selects. Inno marks it `fixed`; `required` is what passes it to `/COMPONENTS`. */
-const CORE = `      - label: The mod itself
-        pick: any
-        options:
-          - id: core
-            label: Core files
-            required: true
-            help: Everything the mod is - its data, the sfall and hi-res patch builds it ships, and the config
-              they need.`;
-
-/**
- * The ten languages both BGforge installers offer. English installs no file and writes no `language` key -
- * it is the game left as it is - and is offered rather than left implicit so that picking it and picking
- * nothing are the same install, both deliberate.
- */
-const LANGUAGES = `      - label: Language
-        pick: one
-        options:
-          - id: translation\\english
-            label: English
-            help: What the mod ships. No translation file is installed.
-          - id: translation\\czech
-            label: Czech
-          - id: translation\\french
-            label: French
-          - id: translation\\german
-            label: German
-          - id: translation\\hungarian
-            label: Hungarian
-          - id: translation\\italian
-            label: Italian
-          - id: translation\\polish
-            label: Polish
-          - id: translation\\portuguese
-            label: Portuguese
-          - id: translation\\russian
-            label: Russian
-          - id: translation\\spanish
-            label: Spanish`;
-
-/** The formulas sfall's `DamageFormula` selects, which is the setting each of these writes. */
-const AMMO = `      - label: Ammo damage formula
-        pick: one
-        options:
-          - id: ammo\\default
-            label: Default
-            help: Fallout 2's own formula (sfall DamageFormula 0).
-          - id: ammo\\glovz
-            label: Glovz's
-            help: sfall DamageFormula 1.
-          - id: ammo\\yaam
-            label: YAAM
-            help: sfall DamageFormula 5.`;
-
-const WALK_SPEED = `      - label: Walk speed fix
-        pick: one
-        options:
-          - id: walk_speed\\high_fps
-            label: High FPS
-          - id: walk_speed\\low_fps
-            label: Low FPS`;
-
-const GORIS = `      - label: Faster derobing for Goris
-        pick: one
-        options:
-          - id: goris\\high_fps
-            label: High FPS
-          - id: goris\\low_fps
-            label: Low FPS`;
-
-const QOL = `          - id: qol
-            label: Enable sfall QoL features
-            help: Turns on a set of sfall options - the action point bar, damage and karma readouts, party
-              member details and more.`;
-
 const rpu = (id: string, name: string): string => `spec: 1
 id: ${id}
 name: ${name}
@@ -120,34 +45,7 @@ type: base
 becomes: fallout2rpu
 installer:
   windows:
-    silent: inno
-    components:
-${CORE}
-${LANGUAGES}
-${AMMO}
-${WALK_SPEED}
-${GORIS}
-      - label: Weapon animations
-        pick: any
-        options:
-          - id: wpn_anims\\rifle
-            label: New rifle animations
-          - id: wpn_anims\\wakizashi
-            label: New wakizashi blade animations
-          - id: wpn_anims\\ext_flamer
-            label: Extended flamer attack animations
-      - label: Extras
-        pick: any
-        options:
-${QOL}
-          - id: worldmap
-            label: Visually enhanced world map
-          - id: cassidy_head
-            label: Talking head and voice for Cassidy
-          - id: imp_stranger
-            label: Improved Mysterious Stranger
-          - id: alternative_explosions
-            label: Alternative explosion animations (from Tactics)
+    built-with: inno
   other:
     run: rpu-install.sh
 `;
@@ -160,17 +58,7 @@ type: base
 becomes: fallout2upu
 installer:
   windows:
-    silent: inno
-    components:
-${CORE}
-${LANGUAGES}
-${AMMO}
-${WALK_SPEED}
-${GORIS}
-      - label: Extras
-        pick: any
-        options:
-${QOL}
+    built-with: inno
   other:
     run: upu-install.sh
 `;

@@ -1428,7 +1428,7 @@ describe("a mod that offers parts", () => {
     name: "Cassidy",
     version: "1.2",
     type: "pluggable" as const,
-    choices: { what: "parts" as const, groups, ...parts },
+    choices: { groups, ...parts },
     availability: { kind: "install" as const },
   });
 

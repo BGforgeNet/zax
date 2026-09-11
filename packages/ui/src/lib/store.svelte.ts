@@ -1683,12 +1683,7 @@ class Store {
         // that now resolves differently comes back as a refusal to look again rather than as a surprise.
         // The plan's own choices and folders, not the dialogs': what runs is what the resolved plan said it
         // would, down to which folder it reads from.
-        const chosen =
-          held.plan.kind === "base"
-            ? held.plan.components
-            : held.plan.kind === "stacking"
-              ? held.plan.parts
-              : undefined;
+        const chosen = held.plan.kind === "stacking" ? held.plan.parts : undefined;
         const answers = held.plan.kind === "creates" ? held.plan.inputs : undefined;
         const outcome = await backend.installMod(
           install,

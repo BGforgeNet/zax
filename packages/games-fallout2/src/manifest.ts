@@ -120,25 +120,6 @@ export interface ModPartGroup {
 export type ModType = "pluggable" | "permanent" | "base";
 
 /**
- * One choice inside the installer's own component list. Not a part: a part names a release asset and this
- * names a string passed to one installer, so the two are different fields whatever their shape has in common.
- */
-export interface ModComponent {
-  /** The installer's own name for it, verbatim - `walk_speed\low_fps` as the Inno script spells it. */
-  id: string;
-  label: string;
-  help?: string;
-  /** Selected whatever the user picks. Inno's `/COMPONENTS` deselects everything it does not name. */
-  required?: boolean;
-}
-
-interface ModComponentGroup {
-  label: string;
-  pick: "one" | "any";
-  options: readonly ModComponent[];
-}
-
-/**
  * How a base mod installs, per platform. Both routes exist because upstream publishes both, and they are not
  * the same install: the Windows one is an installer program that takes the game directory as an argument,
  * while the other is a payload extracted over the game with a script inside it that finishes the job.
@@ -151,10 +132,12 @@ interface ModInstaller {
      * name stays in the format for a release whose assets leave the choice open.
      */
     asset?: string;
-    /** The convention ZAX invokes it by. `inno` is the only one this version knows. */
-    silent: "inno";
-    /** The choices that installer offers. Windows-only, because only the Inno route has them. */
-    components?: readonly ModComponentGroup[];
+    /**
+     * The toolkit the installer was built with, which is what says how to drive it. A fact about the asset
+     * rather than about the invocation, so it stays true as the command line changes. `inno` is the only one
+     * this version knows.
+     */
+    builtWith: "inno";
   };
   other?: {
     asset?: string;
@@ -643,38 +626,25 @@ export function partOptions(manifest: ModManifest): readonly ModPart[] {
 }
 
 /**
- * A grouped choice, whatever is being chosen: the manifest's parts and the installer's components are the
- * same question in two places, and one reader keeps them the same question for the interface too.
+ * The choices a release offers. Groups and options keep the order the manifest declares them in: that order
+ * is the author's one lever over how the choice reads, and nothing here has a better one to impose.
  */
-function parseGroups<T>(
-  value: unknown,
-  what: string,
-  option: (raw: unknown, where: string) => T,
-): readonly { label: string; pick: "one" | "any"; options: readonly T[] }[] {
-  const groups = items(value, what).map((raw, at): { label: string; pick: "one" | "any"; options: readonly T[] } => {
-    const where = `${what} group ${at + 1}`;
+function parseParts(value: unknown): readonly ModPartGroup[] {
+  const groups = items(value, `"parts"`).map((raw, at): ModPartGroup => {
+    const where = `"parts" group ${at + 1}`;
     const fields = record(raw, where, GROUP_FIELDS);
     const pick = text(fields["pick"], `${where}'s pick`, SHORT_TEXT);
     // On the refusing side of the ignorance rule, and the settings entries' opposite: `pick` decides what
     // lands on disk, so reading an unknown one as `any` would install what the author never described.
     if (pick !== "one" && pick !== "any")
-      needsNewerZax(`a ${what} group picks "${pick}", which this version does not implement`);
+      needsNewerZax(`a "parts" group picks "${pick}", which this version does not implement`);
     const options = items(fields["options"], `${where}'s options`).map((entry, i) =>
-      option(entry, `${where} option ${i + 1}`),
+      parsePart(entry, `${where} option ${i + 1}`),
     );
     if (options.length === 0) refuse(`${where} is empty, so it offers nothing to pick`);
     return { label: text(fields["label"], `${where}'s label`, SHORT_TEXT), pick, options };
   });
-  if (groups.length === 0) refuse(`${what} is empty, so it offers nothing to pick`);
-  return groups;
-}
-
-/**
- * The choices a release offers. Groups and options keep the order the manifest declares them in: that order
- * is the author's one lever over how the choice reads, and nothing here has a better one to impose.
- */
-function parseParts(value: unknown): readonly ModPartGroup[] {
-  const groups = parseGroups(value, `"parts"`, parsePart);
+  if (groups.length === 0) refuse(`"parts" is empty, so it offers nothing to pick`);
 
   // Unique across the manifest rather than per group: the recorded selection names ids flat, and a group is
   // no part of the address.
@@ -698,30 +668,11 @@ function parseParts(value: unknown): readonly ModPartGroup[] {
   return groups;
 }
 
-const COMPONENT_FIELDS = ["id", "label", "help", "required"];
 const INSTALLER_PLATFORMS = ["windows", "other"];
 
 /**
- * One component of the installer's own list. Its id is the installer's name for it rather than an id ZAX
- * mints, so the shapes ZAX bounds elsewhere do not apply - Inno spells a child component `walk_speed\low_fps`.
- * What is bounded is what the command line can carry: the names go into one comma-separated quoted argument,
- * and either character in a name would break that argument apart.
- */
-function parseComponent(value: unknown, where: string): ModComponent {
-  const fields = record(value, where, COMPONENT_FIELDS);
-  const id = text(fields["id"], `${where}'s id`, SHORT_TEXT);
-  if (/[",]/.test(id)) refuse(`${where}'s id ("${id}") cannot be passed to an installer`);
-  return {
-    id,
-    label: text(fields["label"], `${where}'s label`, SHORT_TEXT),
-    ...(fields["help"] !== undefined ? { help: text(fields["help"], `${where}'s help`, LONG_TEXT) } : {}),
-    ...(fields["required"] === true ? { required: true } : {}),
-  };
-}
-
-/**
  * How a base mod installs, per platform. An unknown platform key takes the newer-ZAX wording rather than the
- * unknown-field one, and so does an unknown `silent`: both decide what ZAX executes, and reading either as
+ * unknown-field one, and so does an unknown `built-with`: both decide what ZAX executes, and reading either as
  * "not for me" would run the wrong thing rather than nothing.
  */
 function parseInstaller(value: unknown): ModInstaller {
@@ -737,23 +688,13 @@ function parseInstaller(value: unknown): ModInstaller {
 
   const out: ModInstaller = {};
   if (platforms["windows"] !== undefined) {
-    const fields = record(platforms["windows"], `"installer" windows`, ["asset", "silent", "components"]);
-    const silent = text(fields["silent"], `"installer" windows silent`, SHORT_TEXT);
-    if (silent !== "inno")
-      needsNewerZax(`its Windows installer is run as "${silent}", which this version does not know how to run`);
-    const components =
-      fields["components"] === undefined
-        ? undefined
-        : parseGroups(fields["components"], `"components"`, parseComponent);
-    const named = new Set<string>();
-    for (const component of components?.flatMap((group) => group.options) ?? []) {
-      if (named.has(component.id)) refuse(`"components" names "${component.id}" twice`);
-      named.add(component.id);
-    }
+    const fields = record(platforms["windows"], `"installer" windows`, ["asset", "built-with"]);
+    const builtWith = text(fields["built-with"], `"installer" windows built-with`, SHORT_TEXT);
+    if (builtWith !== "inno")
+      needsNewerZax(`its Windows installer was built with "${builtWith}", which this version cannot run`);
     out.windows = {
       ...(fields["asset"] !== undefined ? { asset: assetName(fields["asset"], `"installer" windows asset`) } : {}),
-      silent,
-      ...(components ? { components } : {}),
+      builtWith,
     };
   }
   if (platforms["other"] !== undefined) {

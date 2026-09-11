@@ -837,7 +837,6 @@ describe("the version dialog", () => {
 
 describe("the parts dialog", () => {
   const choice = (over: Record<string, unknown> = {}) => ({
-    what: "parts",
     selection: ["core"],
     dropped: [],
     ask: true,
@@ -881,38 +880,17 @@ describe("the parts dialog", () => {
     expect(view().text()).toContain("No longer offered by 14.8, so it cannot be kept: oldmaps");
   });
 
-  test("ticks a required component beyond reach rather than hiding it", () => {
-    const groups = [
-      {
-        label: "Components",
-        pick: "any",
-        options: [
-          { id: "engine", label: "Engine", required: true },
-          { id: "music", label: "Music" },
-        ],
-      },
-    ];
-    store.modParts = { offer: offer({ choices: choice({ what: "components", groups }) }), chosen: [] } as never;
-    const drawn = view();
-    const engine = drawn.all<HTMLInputElement>("input[type=checkbox]")[0]!;
-    expect(engine.checked).toBe(true);
-    expect(engine.disabled).toBe(true);
-    expect(drawn.text()).toContain("Always installed.");
-  });
-
   test("draws a pick-one group as radios", () => {
     const groups = [{ label: "Speed", pick: "one", options: [{ id: "fast", label: "Fast" }] }];
     store.modParts = { offer: offer({ choices: choice({ groups }) }), chosen: ["fast"] } as never;
     expect(view().all("input[type=radio]").length).toBe(1);
   });
 
-  test("holds Continue when a stacking mod has nothing ticked, since that installs nothing", () => {
+  test("holds Continue when nothing is ticked, since that installs nothing", () => {
     store.modParts = { offer: offer({ choices: choice() }), chosen: [] } as never;
     expect(view().control("Continue").hasAttribute("disabled")).toBe(true);
-  });
 
-  test("lets an installer through with nothing ticked, since it still installs what it always does", () => {
-    store.modParts = { offer: offer({ choices: choice({ what: "components" }) }), chosen: [] } as never;
+    store.modParts = { offer: offer({ choices: choice() }), chosen: ["core"] } as never;
     expect(view().control("Continue").hasAttribute("disabled")).toBe(false);
   });
 });
@@ -982,16 +960,11 @@ describe("the plan dialog", () => {
     expect(text).toContain("This cannot be undone.");
   });
 
-  test("names an installer's components by the words they were chosen under", () => {
-    const choices = {
-      what: "components",
-      selection: [],
-      dropped: [],
-      ask: false,
-      groups: [{ label: "Speed", pick: "one", options: [{ id: "walk_speed\\low_fps", label: "Low FPS walking" }] }],
-    };
+  test("warns that a Windows installer opens a window of its own, and what is chosen in it", () => {
+    // The plan is the last screen before the install runs, and on this route it is about to hand over to a
+    // wizard. Unannounced, that window reads as something having gone wrong rather than as the next step.
     store.modPlan = {
-      offer: offer({ becomes: "fallout2rpu", choices }),
+      offer: offer({ becomes: "fallout2rpu" }),
       version: "1.4",
       plan: {
         kind: "base",
@@ -999,14 +972,28 @@ describe("the plan dialog", () => {
         asset: "a.exe",
         route: "windows",
         download: 1024,
-        components: ["walk_speed\\low_fps"],
         becomes: "fallout2rpu",
         fingerprint: "f",
       },
     } as never;
-    const text = view().text();
-    expect(text).toContain("Components: Low FPS walking");
-    expect(text).not.toContain("walk_speed");
+    expect(view().text()).toContain("Its own installer window opens, where you choose what to install");
+  });
+
+  test("says nothing of a wizard on the route that has none, which runs a script and returns", () => {
+    store.modPlan = {
+      offer: offer({ becomes: "fallout2rpu" }),
+      version: "1.4",
+      plan: {
+        kind: "base",
+        version: "1.4",
+        asset: "a.zip",
+        route: "other",
+        download: 1024,
+        becomes: "fallout2rpu",
+        fingerprint: "f",
+      },
+    } as never;
+    expect(view().text()).not.toContain("installer window opens");
   });
 
   test("names the folder a creating mod makes and the folders it reads", () => {
@@ -1060,7 +1047,7 @@ describe("the plan dialog", () => {
 
   test("says a single dropped part is, and two are, no longer offered", () => {
     const withDropped = (dropped: string[]) => ({
-      offer: offer({ choices: { what: "parts", selection: [], dropped, ask: false, groups: [] } }),
+      offer: offer({ choices: { selection: [], dropped, ask: false, groups: [] } }),
       version: "14.8",
       plan: { kind: "stacking", files: [], orderLines: [], removes: [], parts: ["core"], fingerprint: "f" },
     });
@@ -1075,7 +1062,6 @@ describe("the plan dialog", () => {
     store.modPlan = {
       offer: offer({
         choices: {
-          what: "parts",
           selection: ["core"],
           dropped: [],
           ask: false,

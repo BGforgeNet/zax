@@ -18,8 +18,7 @@ import { holdUserFiles, mergeUserFiles } from "./mod-state.js";
 import { CONFIG_FILES } from "./files.js";
 import { preflightArchive } from "./archive-preflight.js";
 import { caseSensitiveAt, lowercaseTree, mixedCasePaths } from "./case-lowering.js";
-import type { ModComponent, ModManifest } from "./manifest.js";
-import { chooseFrom } from "./mod-choice.js";
+import type { ModManifest } from "./manifest.js";
 import { fetchAsset, type ModProgress } from "./mod-asset.js";
 import { conflictFor } from "./mod-install.js";
 import { modWorkDirectory } from "./mod-transaction.js";
@@ -44,8 +43,6 @@ export interface BaseInstallPlan {
   unpacked?: number;
   /** Free bytes on the game's filesystem, where the host could say. */
   free?: number;
-  /** The components chosen, including the ones the manifest marks required. Windows only. */
-  components?: readonly string[];
   /**
    * How many entries the case-lowering pass would rename before the install runs. Absent where the pass does
    * not apply - a filesystem that folds case, or an install that is already this mod's.
@@ -66,17 +63,6 @@ function isSameInstall(record: InstallRecord, install: Install, manifest: ModMan
   return manifest.becomes !== undefined && install.type === manifest.becomes;
 }
 
-/** Every component this install passes to the installer: what was chosen, plus what is always on. */
-export function componentsFor(manifest: ModManifest, selection: readonly string[]): readonly ModComponent[] {
-  const groups = manifest.installer?.windows?.components ?? [];
-  const chosen = chooseFrom(groups, selection, { thing: "component", of: manifest.name });
-  const required = groups.flatMap((group) => group.options).filter((option) => option.required);
-  const seen = new Set<string>();
-  // Declared order, and each once: this list becomes one comma-separated argument, and a name twice in it
-  // is a difference the installer could read either way.
-  return [...required, ...chosen].filter((option) => (seen.has(option.id) ? false : seen.add(option.id)));
-}
-
 /**
  * Resolves what installing this base mod would do, and downloads what it needs to say so - without letting
  * the installer near the game directory.
@@ -89,7 +75,6 @@ export async function planBaseInstall(
   platform: Platform,
   install: Install,
   release: ModRelease,
-  selection: readonly string[] = [],
   options?: ModProgress,
 ): Promise<BaseInstallPlan> {
   const { manifest } = release;
@@ -113,13 +98,6 @@ export async function planBaseInstall(
     const refusal = await conflictFor(platform, install, release);
     if (refusal !== null) throw new Error(refusal);
   }
-
-  // Only where this host runs the installer that has them. The zip route ships every optional dat and takes
-  // no component argument, so naming a component in its plan would name something that changes nothing.
-  const components =
-    installer.route === "windows" && manifest.installer?.windows?.components
-      ? componentsFor(manifest, selection).map((component) => component.id)
-      : undefined;
 
   // Before the download rather than after it: the pass can refuse over a pair of colliding names, and that
   // refusal is worth having before an 800 MB transfer rather than after one. The upgrade arm skips it for the
@@ -174,40 +152,38 @@ export async function planBaseInstall(
     download,
     ...(unpacked !== undefined ? { unpacked } : {}),
     ...(free !== null ? { free } : {}),
-    ...(components !== undefined ? { components } : {}),
     ...(lowercasing !== undefined && lowercasing > 0 ? { lowercasing } : {}),
     becomes: manifest.becomes,
-    fingerprint: fnv1a(
-      [manifest.version, installer.asset.digest ?? "", installer.route, ...(components ?? [])].join("\n"),
-    ),
+    fingerprint: fnv1a([manifest.version, installer.asset.digest ?? "", installer.route].join("\n")),
   };
 }
 
-/** Inno's own switches, from its documented command line. Read once, spelled here, verified against the docs. */
-const INNO_SILENT = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"];
+/**
+ * The command line for an Inno installer: aimed at this install, logging where ZAX can read it, and leaving
+ * every other decision to the wizard.
+ *
+ * Deliberately not silent, and deliberately naming no components. `/COMPONENTS` replaces the selection rather
+ * than adding to it - it selects a custom type and deselects everything it does not name - so passing it at
+ * all means ZAX holding a copy of the component tree out of upstream's `inno.iss`, which nothing verifies and
+ * which goes stale against the next release in the direction of silently installing less than the user asked
+ * for. Letting the wizard open reads that tree out of the executable the user just downloaded instead. What it
+ * costs is the directory page, which `/DIR` already answers, and a click-through.
+ */
+export function innoArguments(installPath: string, log: string): readonly string[] {
+  return [`/DIR=${installPath}`, `/LOG=${log}`, "/NORESTART"];
+}
 
 /**
- * The command line for an Inno installer: silent, aimed at this install, logging where ZAX can read it, and
- * naming every component to select.
+ * The two exit codes Inno documents for a user who stopped the wizard themselves, and they are not one case:
+ * 2 is cancelled before the install began, 5 is cancelled part way through it. What separates them is whether
+ * anything of the mod is on disk, which decides both what the user is told and whether the unfinished record
+ * stays behind for a later run to offer a retry over.
  *
- * `/COMPONENTS` selects a custom type and deselects everything it does not name, so the list has to be
- * complete rather than a diff from the default - which is why the manifest marks its required components and
- * why an ancestor is passed with its child: `walk_speed\low_fps` is Inno's own spelling for a component
- * inside `walk_speed`, and a child arrives with its parent selected in the wizard too.
+ * Reachable only now that the wizard is shown. Read as cancellation on the Inno route alone: the other route
+ * runs upstream's shell script, where these numbers are that script's to define and mean nothing here.
  */
-export function innoArguments(installPath: string, log: string, components?: readonly string[]): readonly string[] {
-  const selected = new Set<string>();
-  for (const id of components ?? []) {
-    const pieces = id.split("\\");
-    for (let at = 1; at <= pieces.length; at++) selected.add(pieces.slice(0, at).join("\\"));
-  }
-  return [
-    ...INNO_SILENT,
-    `/DIR=${installPath}`,
-    `/LOG=${log}`,
-    ...(selected.size > 0 ? [`/COMPONENTS=${[...selected].join(",")}`] : []),
-  ];
-}
+const INNO_CANCELLED_BEFORE = 2;
+const INNO_CANCELLED_DURING = 5;
 
 /** What a finished base install leaves the caller to act on. */
 export interface BaseInstallOutcome {
@@ -236,7 +212,6 @@ export async function applyBaseInstall(
   platform: Platform,
   install: Install,
   release: ModRelease,
-  plan: BaseInstallPlan,
   options?: ModProgress,
   now: Date = new Date(),
 ): Promise<BaseInstallOutcome> {
@@ -253,7 +228,7 @@ export async function applyBaseInstall(
   const claim = await takeInstallLock(platform, install.path, `Installing ${manifest.name}`);
   if ("refused" in claim) throw new Error(claim.refused);
   try {
-    return await installUnderLock(platform, install, release, plan, becomes, claim, options, now);
+    return await installUnderLock(platform, install, release, becomes, claim, options, now);
   } finally {
     await claim.release();
   }
@@ -267,7 +242,6 @@ async function installUnderLock(
   platform: Platform,
   install: Install,
   release: ModRelease,
-  plan: BaseInstallPlan,
   /** Narrowed by the caller, which refuses a manifest without one before any of this is reached. */
   becomes: GameType,
   claim: InstallLock,
@@ -343,7 +317,7 @@ async function installUnderLock(
     outcome = await platform.process.run(script, [], { cwd: install.path, onStart: hold(script) });
   } else {
     const log = platform.paths.join(work, "installer.log");
-    outcome = await platform.process.run(at, innoArguments(install.path, log, plan.components), {
+    outcome = await platform.process.run(at, innoArguments(install.path, log), {
       cwd: install.path,
       onStart: hold(at),
     });
@@ -351,10 +325,19 @@ async function installUnderLock(
 
   const installerBackup = insidePath(platform, install.path, "backup");
   if (outcome.code !== 0) {
+    // Cancelling is an answer, not a fault, so it is said as one - and only for the route whose exit codes
+    // mean this. Before the install began, the record of an install that never started goes with it: leaving
+    // one would have the next run offer to resume something the user declined, over a folder holding none of
+    // it. Cancelled part way through falls through to the sentence below, which is exactly what happened.
+    if (installer.route === "windows" && outcome.code === INNO_CANCELLED_BEFORE) {
+      await saveRecord(platform, withoutBase(await loadRecord(platform, install.path), manifest.id));
+      throw new Error(`${manifest.name}'s installer was cancelled, so nothing of it was installed.`);
+    }
+    const cancelled = installer.route === "windows" && outcome.code === INNO_CANCELLED_DURING;
     // Reported, not unwound. What ZAX can say is how far it got and where the installer put what it moved.
     throw new Error(
-      `${manifest.name}'s installer stopped with code ${outcome.code ?? "no exit code"}. The game folder is part way through the install and ZAX cannot undo it - what the installer moved aside is under ${installerBackup}.${
-        outcome.output.trim() ? ` It said: ${outcome.output.trim().split("\n").slice(-3).join(" ")}` : ""
+      `${manifest.name}'s installer ${cancelled ? "was cancelled part way through" : `stopped with code ${outcome.code ?? "no exit code"}`}. The game folder is part way through the install and ZAX cannot undo it - what the installer moved aside is under ${installerBackup}.${
+        !cancelled && outcome.output.trim() ? ` It said: ${outcome.output.trim().split("\n").slice(-3).join(" ")}` : ""
       }`,
     );
   }
@@ -374,4 +357,9 @@ async function installUnderLock(
 function withBase(record: InstallRecord, mod: InstalledMod): InstallRecord {
   // Spread, so the entries this version could not read survive an install of something else entirely.
   return { ...record, mods: [...record.mods.filter((held) => held.id !== mod.id), mod] };
+}
+
+/** The same record with this mod's entry gone - what a cancelled install leaves, having deployed nothing. */
+function withoutBase(record: InstallRecord, id: string): InstallRecord {
+  return { ...record, mods: record.mods.filter((held) => held.id !== id) };
 }

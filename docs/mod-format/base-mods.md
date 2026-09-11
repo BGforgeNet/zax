@@ -9,13 +9,7 @@ type: base
 becomes: fallout2rpu
 installer:
   windows:
-    silent: inno
-    components:
-      - label: Walk speed fix
-        pick: one
-        options:
-          - { id: core, label: Core, required: true }
-          - { id: 'walk_speed\low_fps', label: Low FPS }
+    built-with: inno
   other:
     run: rpu-install.sh
 ```
@@ -25,8 +19,9 @@ later gate reads. `needs.game` defaults to `[fallout2]` for a base mod rather th
 
 The two routes are not the same install, which is why they are declared separately:
 
-- **`windows`** names an installer program. `silent: inno` is the convention ZAX invokes it by, and the only one
-  it knows today. ZAX passes the install directory to it, along with the components chosen.
+- **`windows`** names an installer program. `built-with: inno` says which toolkit produced it, which is what tells
+  ZAX how to drive it, and `inno` is the only one it knows today. ZAX passes the install directory and a log
+  path, and lets the installer's own wizard open.
 - **`other`** names a payload and a script inside it. ZAX extracts the payload over the game directory and runs
   `run` there, which is exactly what the manual instructions say to do by hand.
 
@@ -36,14 +31,22 @@ upstream's installer names carry the version, that is what keeps the manifest a 
 one edited before every tag. Name `asset` where a release publishes two of a shape and only you can say which
 is the installer - a release ZAX cannot read it from is refused with the ambiguity named, not guessed at.
 
-**Components are the Windows route's alone**, because that is where they exist: RPU's build moves its optional
-dats out of `mods/` for the Inno installer only, and the zip ships all of them. Each component's `id` is the
-installer's own name for it, verbatim, and `required: true` marks one that is selected whatever the user picks -
-Inno's component switch deselects everything it does not name.
+**The manifest does not describe what the installer offers, and cannot.** ZAX runs the Windows installer with
+its wizard shown, so the user makes those choices in the installer's own window - the language above all, which
+is a real file the installer places and nothing outside it can supply. The alternative is Inno's component
+switch, which replaces the selection rather than adding to it: passing it means carrying a copy of upstream's
+component tree in the manifest, where it goes stale against the next release with nothing to notice and the
+failure is a quiet partial install. Where a choice is only a key in a config file, ZAX offers it on a settings
+page instead and at any time rather than once - the ammo damage formula is the case, and it is
+`sfall.Misc.DamageFormula` in the catalog.
 
-An installer this version cannot run - a `silent` convention it does not know, a platform key it has no name
+An installer this version cannot run - a `built-with` toolkit it does not know, a platform key it has no name
 for - refuses as needing a newer ZAX rather than as a misspelling. Both decide what gets executed, so there is
 nothing safe to assume about either.
+
+The Windows route is also the only install here the user can call off part way: cancelling the wizard before it
+starts writing is reported as the answer it is, and the record of an install that never began goes with it.
+Cancelling once it has started reports like any other interrupted base install, because that is what it is.
 
 Nothing about a base install is undone: there is no uninstall, and a failed one is reported with how far it got
 and where the installer's own backup directory is, rather than unwound.

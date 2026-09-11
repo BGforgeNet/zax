@@ -110,7 +110,7 @@ describe("claiming a game directory", () => {
     const platform = new MemoryPlatform({
       dirs: [INSTALL],
       livePids: [9876],
-      commands: { 9876: "/tmp/zax/rpu_v2.4.34.exe /VERYSILENT /DIR=/games/fallout2" },
+      commands: { 9876: "/tmp/zax/rpu_v2.4.34.exe /DIR=/games/fallout2 /NORESTART" },
     });
     await leftBehind(platform, {
       host: "memory",

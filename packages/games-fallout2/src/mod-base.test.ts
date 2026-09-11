@@ -5,7 +5,8 @@ import { parseManifest } from "./manifest.js";
 import type { ModRelease } from "./mod-feed.js";
 import { stamp } from "@zax/core";
 import { loadRecord } from "./records.js";
-import { applyBaseInstall, componentsFor, innoArguments, planBaseInstall } from "./mod-base.js";
+import { modWorkDirectory } from "./mod-transaction.js";
+import { applyBaseInstall, innoArguments, planBaseInstall } from "./mod-base.js";
 
 const GAME = "/game";
 const install: Install = { path: GAME, type: "fallout2" };
@@ -31,18 +32,7 @@ conflicts:
 installer:
   windows:
     asset: rpu_v2.4.34.exe
-    silent: inno
-    components:
-      - label: Included
-        pick: any
-        options:
-          - { id: core, label: Core, required: true }
-          - { id: worldmap, label: Enhanced world map }
-      - label: Walk speed fix
-        pick: one
-        options:
-          - { id: high, label: High FPS }
-          - { id: low, label: Low FPS }
+    built-with: inno
   other:
     asset: rpu_v2.4.34.zip
     run: rpu-install.sh
@@ -149,12 +139,12 @@ describe("planning a base install", () => {
       so the id in it is one this machine is still running.
     */
     const platform = basePlatform({ livePids: [9876] });
-    const ready = await planBaseInstall(platform, install, await release());
+    await planBaseInstall(platform, install, await release());
     // Written after the plan, so what refuses below is the claim rather than anything the plan could not do.
     const left = { host: "memory", pid: 9876, what: "Installing RPU", taken: 1 };
     await platform.fs.write(`${GAME}/.zax-lock`, new TextEncoder().encode(JSON.stringify(left)));
 
-    await expect(applyBaseInstall(platform, install, await release(), ready)).rejects.toThrow(
+    await expect(applyBaseInstall(platform, install, await release())).rejects.toThrow(
       /Installing RPU is already running in this game folder on this machine, as process 9876/,
     );
     // Nothing was run: the refusal comes before the backup, the lowercasing and the installer.
@@ -173,32 +163,6 @@ describe("planning a base install", () => {
     await planBaseInstall(platform, install, await release());
     await planBaseInstall(platform, install, await release());
     expect(platform.downloaded).toHaveLength(1);
-  });
-});
-
-describe("the components an installer is given", () => {
-  const manifest = parseManifest(new TextEncoder().encode(MANIFEST));
-
-  it("always includes the required ones, in the order the manifest declares them", () => {
-    expect(componentsFor(manifest, ["low"]).map((one) => one.id)).toEqual(["core", "low"]);
-    // Inno's own switch deselects everything it does not name, so "required" is a thing to pass, not to skip.
-    expect(componentsFor(manifest, []).map((one) => one.id)).toEqual(["core"]);
-  });
-
-  it("does not repeat a required component the user also picked", () => {
-    expect(componentsFor(manifest, ["core", "worldmap"]).map((one) => one.id)).toEqual(["core", "worldmap"]);
-  });
-
-  it("refuses a selection the installer could not carry out", () => {
-    expect(() => componentsFor(manifest, ["high", "low"])).toThrow(/Only one Walk speed fix/);
-    expect(() => componentsFor(manifest, ["nonesuch"])).toThrow(/does not offer a component/);
-  });
-
-  it("carries the selection into the plan, required components and all", async () => {
-    const plan = await planBaseInstall(basePlatform({ os: "windows" }), install, await release("windows"), [
-      "worldmap",
-    ]);
-    expect(plan.components).toEqual(["core", "worldmap"]);
   });
 });
 
@@ -271,8 +235,8 @@ describe("running the installer", () => {
   it("extracts the payload, runs the script it names, and merges the user's settings back in", async () => {
     const platform = installing({ code: 0, output: "RPU installed. Backup is in backup/rpu." });
     const found = await release();
-    const plan = await planBaseInstall(platform, install, found);
-    const done = await applyBaseInstall(platform, install, found, plan, undefined, new Date("2024-05-05T09:00:00Z"));
+    await planBaseInstall(platform, install, found);
+    const done = await applyBaseInstall(platform, install, found, undefined, new Date("2024-05-05T09:00:00Z"));
 
     expect(done).toMatchObject({ version: "2.4.34", becomes: "fallout2rpu" });
     expect(platform.textAt(`${GAME}/mods/rpu.dat`)).toBe("DAT");
@@ -297,7 +261,8 @@ describe("running the installer", () => {
   it("records the install as this version of a base mod, and leaves nothing to remove", async () => {
     const platform = installing({ code: 0, output: "" });
     const found = await release();
-    await applyBaseInstall(platform, install, found, await planBaseInstall(platform, install, found));
+    await planBaseInstall(platform, install, found);
+    await applyBaseInstall(platform, install, found);
 
     const [held] = (await loadRecord(platform, GAME)).mods;
     expect(held).toMatchObject({ id: "rpu", version: "2.4.34", type: "base", complete: true, files: [] });
@@ -308,8 +273,8 @@ describe("running the installer", () => {
   it("reports a failed installer with its code and where its backup went, and stays unfinished", async () => {
     const platform = installing({ code: 4, output: "out of space\nAborting.\n" });
     const found = await release();
-    const plan = await planBaseInstall(platform, install, found);
-    await expect(applyBaseInstall(platform, install, found, plan)).rejects.toThrow(/code 4/);
+    await planBaseInstall(platform, install, found);
+    await expect(applyBaseInstall(platform, install, found)).rejects.toThrow(/code 4/);
 
     const [held] = (await loadRecord(platform, GAME)).mods;
     // Incomplete rather than absent: something is on disk and the record says so, which is what a relaunch
@@ -320,47 +285,100 @@ describe("running the installer", () => {
   it("says what the installer said, so a failure is diagnosable rather than a number", async () => {
     const platform = installing({ code: 1, output: "line one\nline two\nno room on device\n" });
     const found = await release();
-    const plan = await planBaseInstall(platform, install, found);
-    await expect(applyBaseInstall(platform, install, found, plan)).rejects.toThrow(/no room on device/);
+    await planBaseInstall(platform, install, found);
+    await expect(applyBaseInstall(platform, install, found)).rejects.toThrow(/no room on device/);
   });
 
   it("lowercases the tree before the payload lands, and not on a second install", async () => {
     const platform = installing({ code: 0, output: "" }, { [`${GAME}/Master.dat`]: "DAT" });
     const found = await release();
-    const first = await applyBaseInstall(platform, install, found, await planBaseInstall(platform, install, found));
+    await planBaseInstall(platform, install, found);
+    const first = await applyBaseInstall(platform, install, found);
     expect(first.renamed).toBe(1);
     expect(platform.textAt(`${GAME}/master.dat`)).toBe("DAT");
 
     // The install is this mod's now, so the second run leaves the payload's own spellings alone.
-    const again = await applyBaseInstall(platform, install, found, await planBaseInstall(platform, install, found));
+    await planBaseInstall(platform, install, found);
+    const again = await applyBaseInstall(platform, install, found);
     expect(again.renamed).toBe(0);
   });
 });
 
-describe("the command an Inno installer is given", () => {
-  it("is silent, aimed at this install, and logs where ZAX can read it", () => {
-    expect(innoArguments("C:\\Games\\Fallout2", "C:\\log.txt")).toEqual([
-      "/VERYSILENT",
-      "/SUPPRESSMSGBOXES",
-      "/NORESTART",
-      "/DIR=C:\\Games\\Fallout2",
-      "/LOG=C:\\log.txt",
-    ]);
+describe("a wizard the user closed", () => {
+  /*
+    Reachable only because ZAX shows the wizard. Inno separates the two cancellations by whether it had begun
+    writing, and so does this: one leaves a folder with none of the mod in it, the other leaves one part way
+    through, and telling them apart is the difference between "nothing happened" and "this cannot be undone".
+  */
+  // The downloaded installer's own path, which is the program the Windows route runs. Derived from the same
+  // helper the install uses rather than spelled out, so a change of working directory cannot leave this
+  // naming a program nothing runs - which would read as a missing canned answer rather than a wrong path.
+  const EXE_AT = (() => {
+    const probe = new MemoryPlatform({});
+    return probe.paths.join(modWorkDirectory(probe, install, "rpu"), "rpu_v2.4.34.exe");
+  })();
+
+  const cancelling = (code: number) => basePlatform({ os: "windows", runs: { [EXE_AT]: { code, output: "" } } });
+
+  it("says nothing was installed when it was closed before it began, and records no attempt", async () => {
+    const platform = cancelling(2);
+    const found = await release("windows");
+    await planBaseInstall(platform, install, found);
+
+    await expect(applyBaseInstall(platform, install, found)).rejects.toThrow(
+      /cancelled, so nothing of it was installed/,
+    );
+    // No entry at all, where a failure leaves an incomplete one: an install that never started is not one to
+    // offer a resume over, and a record saying otherwise would have the next launch offer exactly that.
+    expect((await loadRecord(platform, GAME)).mods).toEqual([]);
   });
 
-  it("names every component to select, parents included", () => {
-    // Inno's switch deselects everything it does not name, and a child component is selected inside its
-    // parent - which is what its own name says, `walk_speed\\low_fps` sitting under `walk_speed`.
-    const args = innoArguments("C:\\Games\\Fallout2", "C:\\log.txt", ["core", "walk_speed\\low_fps"]);
-    expect(args[args.length - 1]).toBe("/COMPONENTS=core,walk_speed,walk_speed\\low_fps");
+  it("reports one closed part way through as the unfinished install it is, and keeps the record", async () => {
+    const platform = cancelling(5);
+    const found = await release("windows");
+    await planBaseInstall(platform, install, found);
+
+    // The one message read whole rather than matched twice: a second install over the first would be a
+    // different run against a folder the first one left behind, which is not what either assertion is about.
+    const said = await applyBaseInstall(platform, install, found).then(
+      () => "it did not fail",
+      (error: unknown) => (error instanceof Error ? error.message : String(error)),
+    );
+    expect(said).toContain("was cancelled part way through. The game folder is part way through the install");
+    // No exit code in it: the user knows what they did, and a number reads as a fault of the installer's.
+    expect(said).not.toContain("code 5");
+    expect((await loadRecord(platform, GAME)).mods[0]).toMatchObject({ id: "rpu", complete: false });
+  });
+
+  it("reads those codes as cancellation on the Inno route alone, not from somebody's shell script", async () => {
+    // The other route runs upstream's own script, where 2 is whatever that script decided it means.
+    const platform = new MemoryPlatform({
+      files: { [`${GAME}/fallout2.exe`]: "" },
+      downloads: { [ZIP_URL]: PAYLOAD },
+      archives: { [PAYLOAD]: CONTENTS },
+      runs: { [`${GAME}/rpu-install.sh`]: { code: 2, output: "" } },
+    });
+    const found = await release();
+    await planBaseInstall(platform, install, found);
+
+    await expect(applyBaseInstall(platform, install, found)).rejects.toThrow(/stopped with code 2/);
   });
 });
 
-describe("components on a system whose route has none", () => {
-  it("plans no components for the payload route, whose zip ships them all anyway", async () => {
-    // The manifest declares components for its Windows installer; this host takes the other route, where
-    // there is nothing to pass them to.
-    const plan = await planBaseInstall(basePlatform(), install, await release("other"));
-    expect(plan.components).toBeUndefined();
+describe("the command an Inno installer is given", () => {
+  it("aims it at this install and logs where ZAX can read it, and says nothing else", () => {
+    expect(innoArguments("C:\\Games\\Fallout2", "C:\\log.txt")).toEqual([
+      "/DIR=C:\\Games\\Fallout2",
+      "/LOG=C:\\log.txt",
+      "/NORESTART",
+    ]);
+  });
+
+  it("neither silences the wizard nor names components, which is what leaves both to the installer", () => {
+    // The two switches this deliberately omits, asserted by absence because absence is the decision: either
+    // one back would put the component list under ZAX's control, and with it a copy of upstream's `inno.iss`.
+    const args = innoArguments("C:\\Games\\Fallout2", "C:\\log.txt").join(" ");
+    expect(args).not.toMatch(/SILENT/);
+    expect(args).not.toMatch(/COMPONENTS/);
   });
 });

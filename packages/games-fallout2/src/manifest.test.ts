@@ -549,18 +549,7 @@ conflicts:
 installer:
   windows:
     asset: rpu_v2.4.34.exe
-    silent: inno
-    components:
-      - label: Extras
-        pick: any
-        options:
-          - { id: core, label: Core, required: true }
-          - { id: "wpn_anims\\\\rifle", label: New rifle animations, help: Replaces the rifle animations. }
-      - label: Walk speed fix
-        pick: one
-        options:
-          - { id: "walk_speed\\\\high_fps", label: High FPS }
-          - { id: "walk_speed\\\\low_fps", label: Low FPS }
+    built-with: inno
   other:
     asset: rpu_v2.4.34.zip
     run: rpu-install.sh
@@ -569,7 +558,7 @@ installer:
 describe("a base mod's manifest", () => {
   const refuses = (text: string, cause: RegExp) => expect(() => parsed(text)).toThrow(cause);
 
-  it("reads the installer per platform, and the components only the Windows one has", () => {
+  it("reads the installer per platform, each route with what only it carries", () => {
     const manifest = parsed(RPU);
     expect(manifest.type).toBe("base");
     expect(manifest.becomes).toBe("fallout2rpu");
@@ -577,16 +566,7 @@ describe("a base mod's manifest", () => {
     // upstream scripts enforce themselves, and the opposite of a stacking mod's "anywhere".
     expect(manifest.installOn).toEqual(["fallout2"]);
     expect(manifest.installer?.other).toEqual({ asset: "rpu_v2.4.34.zip", run: "rpu-install.sh" });
-    expect(manifest.installer?.windows?.silent).toBe("inno");
-    expect(manifest.installer?.windows?.components?.map((group) => group.options.map((one) => one.id))).toEqual([
-      ["core", "wpn_anims\\rifle"],
-      ["walk_speed\\high_fps", "walk_speed\\low_fps"],
-    ]);
-    expect(manifest.installer?.windows?.components?.[0]?.options[0]).toEqual({
-      id: "core",
-      label: "Core",
-      required: true,
-    });
+    expect(manifest.installer?.windows).toEqual({ asset: "rpu_v2.4.34.exe", builtWith: "inno" });
   });
 
   it("keeps a stacking mod's defaults where a base mod's differ", () => {
@@ -608,21 +588,11 @@ describe("a base mod's manifest", () => {
   });
 
   it("asks for a newer ZAX when the installer needs something this version cannot run", () => {
-    // Each of these decides what ZAX executes: reading an unknown platform key as "not mine" would run the
-    // other platform's installer, and an unknown silent convention would put a wizard in front of the user.
-    refuses(RPU.replace("silent: inno", "silent: nsis"), /newer version of ZAX/);
+    // Both decide what ZAX executes, and each way of driving an installer is its own: reading an unknown
+    // platform key as "not mine" would run the other platform's installer, and an unknown toolkit would be
+    // driven with Inno's own switches, which another one reads as file names or as nothing at all.
+    refuses(RPU.replace("built-with: inno", "built-with: nsis"), /newer version of ZAX/);
     refuses(RPU.replace("  other:", "  haiku:"), /newer version of ZAX/);
-    refuses(RPU.replace("pick: one", "pick: at-least-one"), /newer version of ZAX/);
-  });
-
-  it("refuses a component name the installer's command line could not carry", () => {
-    // The names go into one comma-separated, quoted argument; either character in a name breaks it apart.
-    refuses(RPU.replace("id: core", 'id: "core,extra"'), /cannot be passed/);
-    refuses(RPU.replace("id: core", "id: 'co\"re'"), /cannot be passed/);
-  });
-
-  it("refuses a component named twice, wherever the two sit", () => {
-    refuses(RPU.replace('id: "walk_speed\\\\high_fps"', "id: core"), /names "core" twice/);
   });
 
   it("refuses an installer that runs something outside what its payload deploys", () => {
@@ -634,7 +604,7 @@ describe("a base mod's manifest", () => {
     // manifest that leaves the name out is written once instead of edited before every tag.
     const unnamed = RPU.replace("    asset: rpu_v2.4.34.exe\n", "").replace("    asset: rpu_v2.4.34.zip\n", "");
     const manifest = parsed(unnamed);
-    expect(manifest.installer?.windows).toEqual({ silent: "inno", components: expect.any(Array) });
+    expect(manifest.installer?.windows).toEqual({ builtWith: "inno" });
     expect(manifest.installer?.other).toEqual({ run: "rpu-install.sh" });
   });
 
@@ -642,9 +612,10 @@ describe("a base mod's manifest", () => {
     refuses(RPU.replace("asset: rpu_v2.4.34.exe", "asset: builds/rpu.exe"), /is not a file name/);
   });
 
-  it("takes an installer with no components at all - not every one offers a choice", () => {
-    const plain = `${RPU.slice(0, RPU.indexOf("    components:"))}${RPU.slice(RPU.indexOf("  other:"))}`;
-    expect(parsed(plain).installer?.windows?.components).toBeUndefined();
+  it("refuses a Windows route that describes what its installer offers, which is the installer's to say", () => {
+    // Retired from the format rather than parsed and ignored: a manifest carrying this list was written
+    // expecting ZAX to act on it, and accepting it quietly would install something other than it describes.
+    refuses(RPU.replace("built-with: inno", "built-with: inno\n    components: []"), /unknown field "components"/);
   });
 });
 

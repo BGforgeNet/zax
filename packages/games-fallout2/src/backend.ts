@@ -219,9 +219,9 @@ export interface Backend {
   modInstallState(install: Install): Promise<ModInstallState>;
   /**
    * Downloads and verifies a mod's newest release, answering the resolved plan the confirmation shows.
-   * `choices` names what was picked before installing - a release's parts, or a base installer's components -
-   * and is ignored by a release that offers neither. A base mod answers with the thinner plan of the two,
-   * which says so: the installer decides what lands, so naming files there would be inventing them.
+   * `choices` names the parts picked before installing, and is ignored by a release that offers none. A base
+   * mod answers with the thinner plan of the two, which says so: the installer decides what lands, so naming
+   * files there would be inventing them.
    */
   planMod(
     install: Install,
@@ -538,7 +538,7 @@ export function createBackend(platform: Platform, shell: Shell, seams: BackendSe
         return planCreateInstall(platform, install, release, answers ?? {}, await extractionTool(progress), progress);
       }
       return release.manifest.type === "base"
-        ? planBaseInstall(platform, install, release, selection, progress)
+        ? planBaseInstall(platform, install, release, progress)
         : planModInstall(platform, install, release, selection, progress);
     },
     installMod: async (install, modId, fingerprint, choices, answers, version) => {
@@ -558,9 +558,9 @@ export function createBackend(platform: Platform, shell: Shell, seams: BackendSe
         return applyCreateInstall(platform, install, release, plan, tool, progress, new Date());
       }
       if (release.manifest.type === "base") {
-        const plan = await planBaseInstall(platform, install, release, selection, progress);
+        const plan = await planBaseInstall(platform, install, release, progress);
         if (plan.fingerprint !== fingerprint) throw stale();
-        return applyBaseInstall(platform, install, release, plan, progress, new Date());
+        return applyBaseInstall(platform, install, release, progress, new Date());
       }
       const plan = await planModInstall(platform, install, release, selection, progress);
       if (plan.fingerprint !== fingerprint) throw stale();

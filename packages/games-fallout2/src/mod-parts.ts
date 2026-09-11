@@ -42,8 +42,8 @@ export function offeredParts(release: ModRelease): readonly ModPartGroup[] {
  */
 export function chosenParts(release: ModRelease, selection: readonly string[]): readonly ModPart[] {
   const { manifest } = release;
-  // Nothing chosen is a refusal here and not in the shared rules: an installer's components may legitimately
-  // come to nothing but what is required, while a mod installing none of its own parts installs nothing.
+  // A mod installing none of its own parts installs nothing, so an empty selection is a refusal rather than a
+  // choice - said here rather than in the shared rules, which judge a selection and not its size.
   if (selection.length === 0)
     throw new Error(`Nothing of ${manifest.name} is selected, so there is nothing to install.`);
   return chooseFrom(offeredParts(release), selection, { thing: "part", of: manifest.name });

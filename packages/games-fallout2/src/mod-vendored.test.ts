@@ -11,10 +11,6 @@ const parsed = (id: string, version: string) => {
   return parseManifest(encoder.encode(text), { version });
 };
 
-/** Every component id the manifest offers, in the order its groups declare them. */
-const componentIds = (groups: readonly { options: readonly { id: string }[] }[] = []) =>
-  groups.flatMap((group) => group.options.map((option) => option.id));
-
 describe("the vendored manifests", () => {
   it("names no installer asset, leaving each release to supply its own", () => {
     // Both BGforge mods publish `<mod>_v<version>.exe` and `.zip`, so a name written here would be a copy of
@@ -42,37 +38,15 @@ describe("the vendored manifests", () => {
     expect(parsed("upu", "34")).toMatchObject({ type: "base", becomes: "fallout2upu" });
   });
 
-  it("carries upstream's own component tree, backslashes and all", () => {
-    const rpu = parsed("rpu24", "2.4.34");
-    const ids = componentIds(rpu.installer?.windows?.components);
-    // Inno spells a child inside its parent with a backslash, and the id is that spelling verbatim - a
-    // double-quoted YAML scalar would refuse the document rather than carry it.
-    expect(ids).toContain("translation\\english");
-    expect(ids).toContain("walk_speed\\low_fps");
-    expect(ids).toContain("wpn_anims\\ext_flamer");
-    expect(rpu.installer?.windows?.components?.map((group) => group.label)).toEqual([
-      "The mod itself",
-      "Language",
-      "Ammo damage formula",
-      "Walk speed fix",
-      "Faster derobing for Goris",
-      "Weapon animations",
-      "Extras",
-    ]);
-    // `core` is Inno's one fixed component here, and what marks it is `required` rather than the group.
-    const core = rpu.installer?.windows?.components?.[0]?.options[0];
-    expect(core).toMatchObject({ id: "core", required: true });
-  });
-
-  it("offers the ten languages both installers ship, at most one of them", () => {
+  it("describes no installer choice, leaving the wizard to read its own", () => {
+    // The point of carrying no tree: what the installer offers lives in upstream's `inno.iss` and is read out
+    // of the executable at install time, so there is nothing here to go stale against the next release.
     for (const [id, version] of [
+      ["rpu23", "2.3.34"],
       ["rpu24", "2.4.34"],
       ["upu", "34"],
     ] as const) {
-      const language = parsed(id, version).installer?.windows?.components?.[1];
-      expect(language?.label).toBe("Language");
-      expect(language?.pick).toBe("one");
-      expect(language?.options).toHaveLength(10);
+      expect(parsed(id, version).installer?.windows).toEqual({ builtWith: "inno" });
     }
   });
 
@@ -83,19 +57,7 @@ describe("the vendored manifests", () => {
     const newer = parsed("rpu24", "2.4.34");
     expect(older.name).toBe("Restoration Project Updated 2.3");
     expect(older.becomes).toBe(newer.becomes);
-    expect(componentIds(older.installer?.windows?.components)).toEqual(
-      componentIds(newer.installer?.windows?.components),
-    );
-    expect(older.installer?.windows?.silent).toBe(newer.installer?.windows?.silent);
-  });
-
-  it("gives UPU the tree it has rather than RPU's", () => {
-    // UPU's inno.iss is RPU's without the extras: no world map, weapon animations, Cassidy or explosions.
-    const ids = componentIds(parsed("upu", "34").installer?.windows?.components);
-    expect(ids).toContain("qol");
-    expect(ids).not.toContain("worldmap");
-    expect(ids).not.toContain("cassidy_head");
-    expect(ids.filter((id) => id.startsWith("wpn_anims"))).toEqual([]);
+    expect(older.installer).toEqual(newer.installer);
   });
 
   it("describes Fallout et tu as the install it creates", () => {

@@ -1,10 +1,10 @@
 /**
- * A grouped choice made before an install, and the rules a selection has to satisfy.
+ * A grouped choice made before an install, and the rules a selection has to satisfy - a group that takes at
+ * most one, an option that needs another, an id nothing offers.
  *
- * Two things ask it: a release's parts, each naming its own asset, and a Windows installer's own components,
- * each naming a string that installer understands. They are different fields of different manifests and they
- * are the same question, so the rules live here once - a group that takes at most one, an option that needs
- * another, an id nothing offers - and the interface draws both from one shape.
+ * Held apart from the manifest so the interface draws the choice from a shape of its own rather than from a
+ * parsed manifest: the renderer reads no manifest, and what it needs to draw a group of options is less than
+ * what a part declares.
  */
 
 /** The least an option has to be for the rules below to judge it, and for the interface to draw it. */

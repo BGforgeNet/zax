@@ -418,7 +418,7 @@ installer:
 
   /*
     Driven by a fingerprint that is not this plan's rather than by moving the folder, as the plain-mod case
-    above does: a base plan is fingerprinted over the release - version, asset digest, route, components - so
+    above does: a base plan is fingerprinted over the release alone - version, asset digest, route - so
     the folder cannot move it, and what a mismatch stands for here is the publisher replacing the asset.
   */
   it("refuses a base install against a fingerprint that is not the plan's", async () => {

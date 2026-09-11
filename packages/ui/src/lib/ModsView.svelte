@@ -697,21 +697,17 @@
             part.needs === undefined || chosen.includes(part.needs)
               ? null
               : partLabels(store.modParts.offer, [part.needs])[0]}
-          <!-- A component the installer always selects is shown rather than hidden, and not as a choice: it
-             is part of what installing means, so its box is ticked and beyond reach. -->
-          {@const fixed = "required" in part && part.required === true}
           <label class="part" class:blocked={waits !== null}>
             <input
               type={group.pick === "one" ? "radio" : "checkbox"}
               name={group.label}
-              checked={fixed || chosen.includes(part.id)}
-              disabled={fixed || waits !== null}
+              checked={chosen.includes(part.id)}
+              disabled={waits !== null}
               onchange={(event) => store.setModPart(part.id, event.currentTarget.checked)}
             />
             <span>
               <span class="part-name">{part.label}</span>
               {#if part.help}<span class="note">{part.help}</span>{/if}
-              {#if fixed}<span class="note">Always installed.</span>{/if}
               <!-- Named rather than merely greyed: what to tick to make it available is the whole answer. -->
               {#if waits !== null}<span class="note">Needs {waits}.</span>{/if}
             </span>
@@ -722,13 +718,8 @@
   {/if}
   {#snippet footer()}
     <button onclick={() => store.dismissModParts()}>Cancel</button>
-    <!-- A mod installing none of its own parts installs nothing; an installer with nothing ticked still
-       installs what it always installs, so only the first is a reason to hold the button. -->
-    <button
-      class="primary"
-      disabled={store.modParts?.offer.choices?.what === "parts" && store.modParts.chosen.length === 0}
-      onclick={() => void store.confirmModParts()}
-    >
+    <!-- A mod installing none of its own parts installs nothing, so the button waits for one. -->
+    <button class="primary" disabled={store.modParts?.chosen.length === 0} onclick={() => void store.confirmModParts()}>
       Continue
     </button>
   {/snippet}
@@ -790,10 +781,11 @@
         Download: {megabytes(plan.download)}{#if plan.unpacked}, unpacking to {megabytes(plan.unpacked)}{/if}
       </li>
       {#if plan.free !== undefined}<li>Free on this drive: {megabytes(plan.free)}</li>{/if}
-      {#if plan.components && plan.components.length > 0}
-        <!-- By the names they were chosen under, not the installer's own: `walk_speed\low_fps` is what goes
-           on the command line, and nobody picked that. -->
-        <li>Components: {partLabels(store.modPlan.offer, plan.components).join(", ")}</li>
+      {#if plan.route === "windows"}
+        <!-- Said here because it is the one part of this install ZAX does not perform, and the user is about
+           to be handed a window nothing on this screen led them to expect. What that window offers is the
+           installer's own, so this says where the choices are made rather than naming any of them. -->
+        <li>Its own installer window opens, where you choose what to install</li>
       {/if}
       {#if plan.lowercasing}
         <!-- Its own line rather than something that happens silently: it is the widest-reaching rename here. -->
