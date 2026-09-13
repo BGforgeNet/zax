@@ -29,9 +29,11 @@ overrides:
   # will never be re-released; 5.0.0 restores it. Its one break is being ESM-only, which svelte-check loads
   # fine.
   chokidar: ^5.0.0
-  # Two advisories under electron-builder, both fixed in a version its own tree already allows: ajv asks for
-  # fast-uri ^3.0.1 and plist for @xmldom/xmldom ^0.8.8, while the lockfile sat on 3.1.5 and 0.8.13. These
-  # raise the floor to the patched release without leaving either range, so they can go once electron-builder
-  # resolves there by itself. The 0.8 line of xmldom is deprecated and still the only one plist accepts.
+  # Advisories under electron-builder, each fixed in a version its own tree already allows: ajv asks for
+  # fast-uri ^3.0.1, plist for @xmldom/xmldom ^0.8.8 and builder-util for js-yaml ^4.1.0, while the lockfile
+  # sat on 3.1.5, 0.8.13 and 4.3.1. These raise the floor to the patched release without leaving any range, so
+  # they can go once electron-builder resolves there by itself. The 0.8 line of xmldom is deprecated and still
+  # the only one plist accepts.
   fast-uri: ^3.1.6
   "@xmldom/xmldom": ^0.8.15
+  js-yaml: ^4.3.2
