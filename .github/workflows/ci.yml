@@ -93,6 +93,8 @@ jobs:
       - run: ./.github/scripts/lint-workflows.sh
       - run: ./.github/scripts/draft-release.test.sh
       - run: ./actions/pack-mod/scripts/pack.test.sh
+      # The committed bundle rather than its sources, on the runner's own Node, as a caller's job would run it.
+      - run: ./actions/mod-ini/scripts/action.test.sh
 
   # Packaging is its own gate: the tests run the sources, and none of them would notice a file left out of the
   # archive, a path that only resolves in a checkout, or a target that stopped building on one platform. Three

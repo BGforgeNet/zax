@@ -41,11 +41,16 @@ It refuses before packing anything when the run is not on a tag, when the tag na
 no `f2mod.yml` at the repository root, or when nothing sits under `mods/` - each of which would otherwise
 produce a release ZAX silently passes over.
 
+With `check-ini` set to `soft` or `hard`, it first checks the ini files against the manifest's settings exactly as
+the [`mod-ini` action](../mod-ini/README.md) does, and packs nothing on a mismatch. That check runs on the
+runner's own Node, 20 or later; on a runner with none, add `actions/setup-node` before this step.
+
 | Input       | Default         |                                                                          |
 | ----------- | --------------- | ------------------------------------------------------------------------ |
 | `paths`     | `mods`          | What goes into the archive, one path per line, relative to `directory`.  |
 | `directory` | `.`             | What those paths are relative to. `mods/` must land at the archive root. |
 | `name`      | repository name | The archive's base name.                                                 |
+| `check-ini` | empty           | `soft` or `hard` checks the ini files first; empty skips the check.      |
 
 | Output    |                                              |
 | --------- | -------------------------------------------- |

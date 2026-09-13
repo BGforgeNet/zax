@@ -246,6 +246,8 @@ export interface ModManifest {
   settings: readonly ModSetting[];
   /** Entries the schema declares that this version cannot draw. The mod installs; these controls do not. */
   dropped: readonly DroppedSetting[];
+  /** `settings.sections.<name>`: what each ini section is for, keyed by the name the settings' addresses use. */
+  sectionHelp?: Readonly<Record<string, string>>;
 }
 
 const CATALOG_IDS = new Set(SETTINGS.map((setting) => setting.id));
@@ -569,6 +571,37 @@ function parseSettings(value: unknown, modId: string, granted: readonly string[]
     kept = survivors;
   }
   return { settings: kept, dropped };
+}
+
+const SECTION_HELP_PREFIX = "settings.sections.";
+
+/** A section name, which is an address up to its first dot - so it cannot hold one. */
+const SECTION_SHAPE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * One flat key per described section rather than a mapping, the dotted spelling every other grouped field uses.
+ * A description must land on a section some setting is in - a dropped one counts - since one that names nothing
+ * is a misspelt section, and would otherwise describe a part of the ini no setting reaches.
+ */
+function parseSectionHelp(
+  fields: Record<string, unknown>,
+  settings: readonly ModSetting[],
+  dropped: readonly DroppedSetting[],
+): Record<string, string> | undefined {
+  const keys = Object.keys(fields).filter((key) => key.startsWith(SECTION_HELP_PREFIX));
+  if (keys.length === 0) return undefined;
+  const sections = new Set([
+    ...settings.map((setting) => ownTarget(setting).section),
+    ...dropped.map((gone) => gone.address.split(".")[0] ?? ""),
+  ]);
+  const out: Record<string, string> = {};
+  for (const key of keys) {
+    const section = key.slice(SECTION_HELP_PREFIX.length);
+    if (!SECTION_SHAPE.test(section)) refuse(`"${key}" does not name an ini section`);
+    if (!sections.has(section)) refuse(`"${key}" describes a section no setting is in`);
+    out[section] = text(fields[key], `"${key}"`, LONG_TEXT);
+  }
+  return out;
 }
 
 /**
@@ -896,7 +929,9 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
       needsNewerZax(`its "installer" names the platform "${platform}", which this version cannot run`);
   }
 
-  const fields = record(root, "the manifest", MANIFEST_FIELDS);
+  // A section's description spells the section in its key, so the allowed set is whatever sections are named.
+  const sectionKeys = isRecord(root) ? Object.keys(root).filter((key) => key.startsWith(SECTION_HELP_PREFIX)) : [];
+  const fields = record(root, "the manifest", [...MANIFEST_FIELDS, ...sectionKeys]);
 
   // Everything after this is judged by this version's rules, so the number that selects them is checked here.
   const spec = fields["spec"];
@@ -1014,6 +1049,9 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
   // A release supplies its sole archive as a default. For a parts manifest that asset describes nothing this
   // install would deploy, so it is passed over rather than refused - the release did nothing wrong.
   const archive = fields["archive"] ?? (parts ? undefined : defaults.archive);
+  const schema =
+    fields["settings"] === undefined ? { settings: [], dropped: [] } : parseSettings(fields["settings"], id, granted);
+  const sectionHelp = parseSectionHelp(fields, schema.settings, schema.dropped);
 
   return {
     id,
@@ -1039,8 +1077,7 @@ export function parseManifest(bytes: Uint8Array, defaults: ManifestDefaults = {}
     ...(parts !== undefined ? { parts } : {}),
     ...(states(fields, "order") ? { order: parseOrder(fields) } : {}),
     conflicts: fields["conflicts"] === undefined ? [] : parseConflicts(fields["conflicts"]),
-    ...(fields["settings"] === undefined
-      ? { settings: [], dropped: [] }
-      : parseSettings(fields["settings"], id, granted)),
+    ...schema,
+    ...(sectionHelp !== undefined ? { sectionHelp } : {}),
   };
 }

@@ -1,0 +1,27 @@
+# Checks a mod's ini files against the settings its f2mod.yml describes, or writes them from it and pushes the
+# result. The same judgement as `pnpm mod-ini`, from one bundled file, since a caller has no ZAX checkout.
+#
+# A JavaScript action rather than a composite one so the runner supplies the Node it runs on; a composite step
+# would take whatever `node` the caller's PATH holds, or none.
+
+name: Check a ZAX mod's ini
+description: Checks a mod's ini files against the settings its f2mod.yml describes, or generates and pushes them.
+
+inputs:
+  mode:
+    description: "`check` fails on any mismatch; `generate` writes the files from the manifest, then commits and pushes them."
+    default: check
+  match:
+    description: "For check: `soft` lets the ini carry entries the manifest leaves out, `hard` wants an exact match."
+    default: soft
+  directory:
+    description: What the settings' `mods/...` paths are relative to - the same directory `pack-mod` packs from.
+    default: "."
+
+outputs:
+  changed:
+    description: Whether generate committed and pushed anything. Always false for check.
+
+runs:
+  using: node24
+  main: dist/action.mjs

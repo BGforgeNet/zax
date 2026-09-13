@@ -45,6 +45,27 @@ must not become uninstallable for having sat on the wrong side of one.
 A gated control carries a link that sets what it waits on, following the chain where the controller is gated in
 turn, so list `is` values in the order you would recommend them - the first is the one that link writes.
 
+A section can say what it is for, one top-level key per section, spelled as the addresses spell it:
+
+```yaml
+settings.sections.main: Turn each component on or off.
+settings.sections.run_speed: Fine tuning for the run speed component.
+```
+
+A description naming a section no setting is in refuses the manifest, since that is a misspelt section. Its text
+runs to 1000 characters, and a block scalar keeps its line breaks.
+
 The ini files a mod ships are the user's to edit, and an upgrade keeps their edits: every `.ini` in the payload
 is merged key by key, the user's values winning over the release's new defaults, with the previously shipped
 copy telling the two apart.
+
+## Keeping the schema and the ini together
+
+Nothing at install compares the two, so a key renamed in the ini and not here becomes a control that writes a
+line the mod never reads. `pnpm mod-ini check` from a ZAX checkout catches that before a release: every described
+key must be in its file, with its `default` as the value shipped and a value its `kind` accepts. `--match soft`,
+the default, lets the file carry entries the schema leaves out; `--match hard` wants the two to agree exactly.
+`pnpm mod-ini generate` goes the other way and writes each file from the schema alone, replacing what it held:
+each section's description as comments above its header, and each setting's help and accepted values as comments
+above its key, with its label standing in for a setting that has no help.
+The [`mod-ini` action](../../actions/mod-ini/README.md) runs either in a repository's CI.

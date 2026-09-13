@@ -223,6 +223,43 @@ describe("parseManifest refusals", () => {
     refuses(entry("section."), /not a "section.key" address/);
   });
 
+  it("reads a section's description from its own flat key, leaving the field absent where none is given", () => {
+    const described = `${FO2TWEAKS}settings.sections.main: Turn each component on or off.
+settings.sections.run_speed: |
+  Fine tuning.
+  Per critter.
+settings:
+  main.a: { kind: bool, label: A }
+  run_speed.dude: { kind: bool, label: Dude }
+`;
+    expect(parsed(described).sectionHelp).toEqual({
+      main: "Turn each component on or off.",
+      run_speed: "Fine tuning.\nPer critter.\n",
+    });
+    expect(parsed(`${FO2TWEAKS}settings:\n  main.a: { kind: bool, label: A }\n`)).not.toHaveProperty("sectionHelp");
+  });
+
+  it("counts a section whose only settings this version dropped as described", () => {
+    const later = `${FO2TWEAKS}settings.sections.dials: Dials.\nsettings:\n  dials.a: { kind: dial, label: A }\n`;
+    expect(parsed(later).sectionHelp).toEqual({ dials: "Dials." });
+  });
+
+  it("refuses a section description naming no section a setting is in, or no section at all", () => {
+    const setting = "settings:\n  main.a: { kind: bool, label: A }\n";
+    refuses(
+      `${FO2TWEAKS}settings.sections.mian: Typo.\n${setting}`,
+      `"settings.sections.mian" describes a section no setting is in`,
+    );
+    refuses(`${FO2TWEAKS}settings.sections.main: Nothing to describe.\n`, /describes a section no setting is in/);
+    refuses(
+      `${FO2TWEAKS}settings.sections.main.a: Too deep.\n${setting}`,
+      `"settings.sections.main.a" does not name an ini section`,
+    );
+    refuses(`${FO2TWEAKS}settings.sections.: Empty.\n${setting}`, /does not name an ini section/);
+    refuses(`${FO2TWEAKS}settings.sections.main: [a, list]\n${setting}`, /"settings.sections.main"/);
+    refuses(`${FO2TWEAKS}settings.sections: { main: Nested. }\n${setting}`, /unknown field "settings.sections"/);
+  });
+
   it("drops a control gated on a setting nobody defines, and the mod with it stays installable", () => {
     const gated = `${FO2TWEAKS}settings:
   main.a: { kind: bool, label: A, gated-by: { id: nothing.known, is: [1] } }

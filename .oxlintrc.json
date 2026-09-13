@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Not linted, unlike the generated catalog and layout: every line of ours in it is linted at its source, and
+  // the rest is `yaml` inlined, whose findings are not ours to act on.
+  "ignorePatterns": ["actions/mod-ini/dist/"],
   // oxlint reports correctness findings as warnings and still exits 0; the gate needs them to fail.
   "categories": { "correctness": "error" },
   // Naming this field replaces the default set rather than adding to it, so the three that are on by default

@@ -21,6 +21,9 @@ inputs:
   name:
     description: The archive's base name. Defaults to the repository's own name.
     default: ""
+  check-ini:
+    description: "`soft` or `hard` checks the ini files against f2mod.yml before packing, as the mod-ini action does. Empty skips it."
+    default: ""
 
 outputs:
   archive:
@@ -40,6 +43,8 @@ runs:
         PATHS: ${{ inputs.paths }}
         DIRECTORY: ${{ inputs.directory }}
         NAME: ${{ inputs.name }}
+        CHECK_INI: ${{ inputs.check-ini }}
+        ACTION_PATH: ${{ github.action_path }}
       # Addressed through `github.action_path` rather than relatively: the working directory is the caller's
       # checkout, and the script lives beside the action in this repository.
       run: "${{ github.action_path }}/scripts/pack.sh"

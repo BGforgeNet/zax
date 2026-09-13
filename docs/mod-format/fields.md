@@ -4,7 +4,8 @@ Every field a manifest may carry. [The landing page](../mod-format.md) has the f
 
 Keys are flat. Where a field used to nest, the dot is part of the key itself: a manifest writes
 `needs.sfall: "4.4.5"` at the top level, never a `needs:` mapping with `sfall` inside it. `settings` is the one
-exception, since its nesting is the schema an author writes rather than a wrapper around two values.
+exception, since its nesting is the schema an author writes rather than a wrapper around two values. A key whose
+last part is a name you choose, as in `settings.sections.main`, is one field per name.
 
 | Field                          | Required           | Meaning                                                                                |
 | ------------------------------ | ------------------ | -------------------------------------------------------------------------------------- |
@@ -39,6 +40,7 @@ exception, since its nesting is the schema an author writes rather than a wrappe
 | `extract-dat.into`             | with `from`        | Where those files land inside the created install.                                     |
 | `conflicts`                    | no                 | When installing refuses; see below.                                                    |
 | `settings`                     | no                 | The settings schema; see [Settings](settings.md).                                      |
+| `settings.sections.<section>`  | no                 | What one ini section of the schema is for; see [Settings](settings.md).                |
 
 ## What the release supplies
 

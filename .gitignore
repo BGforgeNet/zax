@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Committed: an action runs from the repository at its caller's ref, with nothing built. CI checks it is current.
+!/actions/mod-ini/dist/
 tmp/
 
 # What `pnpm test:coverage` writes.
