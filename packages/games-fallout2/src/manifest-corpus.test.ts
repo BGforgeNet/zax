@@ -48,9 +48,9 @@ describe("the manifest corpus", () => {
     });
   }
 
-  // Anchored to a file a real repository publishes, not only to specimens written here. Its content is
-  // upstream's to change, so what is asserted is that it still parses - the shapes are the specimens' job.
-  it("reads the manifest FO2tweaks publishes", () => {
+  // A full-sized schema for a real mod's ini, drafted here: FO2tweaks publishes no manifest by either route.
+  // What is asserted is that it still parses - the shapes are the specimens' job.
+  it("reads the drafted FO2tweaks manifest", () => {
     const manifest = parseManifest(new Uint8Array(readFileSync("fixtures/fo2tweaks/f2mod.yml")), { version: "14.7" });
     expect(manifest.id).toBe("fo2tweaks");
     expect(manifest.settings.length).toBeGreaterThan(0);
