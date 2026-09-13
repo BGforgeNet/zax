@@ -43,7 +43,7 @@ describe("which build a folder should run", () => {
   });
 
   it("deploys and pins the build the user asked for", () => {
-    expect(chooseBuild(deployed(NEW), [NEW, OLD], OLD.release.published)).toEqual({
+    expect(chooseBuild(deployed(NEW), [NEW, OLD], { published: OLD.release.published })).toEqual({
       run: "deploy",
       build: OLD,
       pin: true,
@@ -51,11 +51,23 @@ describe("which build a folder should run", () => {
   });
 
   it("pins without deploying when the build asked for is the one already there", () => {
-    expect(chooseBuild(deployed(OLD), [NEW, OLD], OLD.release.published)).toEqual({ run: "here", pin: true });
+    expect(chooseBuild(deployed(OLD), [NEW, OLD], { published: OLD.release.published })).toEqual({
+      run: "here",
+      pin: true,
+    });
   });
 
   // The cache moved since the version list was drawn. Refusing beats running a build nobody chose.
   it("refuses a build the cache no longer holds", () => {
-    expect(chooseBuild(deployed(NEW), [NEW], OLD.release.published)).toEqual({ run: "nothing" });
+    expect(chooseBuild(deployed(NEW), [NEW], { published: OLD.release.published })).toEqual({ run: "nothing" });
+  });
+
+  // What a plain run cannot do: null leaves the pin standing, so asking for latest is the only way off it.
+  it("clears the pin and moves a pinned folder to the newest build when asked for latest", () => {
+    expect(chooseBuild(deployed(OLD, true), [NEW, OLD], "latest")).toEqual({ run: "deploy", build: NEW, pin: false });
+  });
+
+  it("clears the pin without deploying when the pinned build is already the newest", () => {
+    expect(chooseBuild(deployed(NEW, true), [NEW, OLD], "latest")).toEqual({ run: "here", pin: false });
   });
 });

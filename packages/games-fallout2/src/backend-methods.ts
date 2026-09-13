@@ -43,6 +43,7 @@ export const BACKEND_METHODS = [
   "engineReleases",
   "fetchEngine",
   "forgetEngine",
+  "useEngineBuild",
   "installedHiresVersion",
   "latestZax",
   "listSaves",

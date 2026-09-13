@@ -84,6 +84,7 @@ export {
   type ModRemoval,
 } from "./mod-install.js";
 export { BACKEND_METHODS, fromMethods, wrapMethods } from "./backend-methods.js";
+export type { BuildPick } from "./engine-choice.js";
 export {
   RELEASES_PAGE,
   createBackend,

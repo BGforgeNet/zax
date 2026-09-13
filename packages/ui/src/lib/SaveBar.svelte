@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { BuildPick } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
   import EngineCaution from "./EngineCaution.svelte";
   import { isPreview } from "./host.js";
@@ -34,10 +35,10 @@
   const mark = (releases: string, build: { release: string; published: string }) =>
     releases === "tagged" ? build.release : day(build.published);
 
-  function run(engineId: string, published: string | null): void {
+  function run(engineId: string, pick: BuildPick | null): void {
     choosing = null;
     understood = false;
-    void store.play(engineId, published);
+    void store.play(engineId, pick);
   }
 
   /**
@@ -99,13 +100,16 @@
       {/if}
       {#if choosing === engine.id}
         <div class="menu" role="menu">
-          <!-- First, and what an unpinned folder follows: fetching a newer build moves it forward. -->
+          <!--
+            First, and what an unpinned folder follows: fetching a newer build moves it forward. Asks for latest
+            rather than for nothing, since nothing leaves a pinned folder where it is.
+          -->
           <button
             role="menuitem"
             class:on={deployed?.pinned !== true}
             disabled={!store.install || isPreview || store.busy !== null}
             title={isPreview ? OUTSIDE : store.busyReason}
-            onclick={() => run(engine.id, null)}
+            onclick={() => run(engine.id, "latest")}
           >
             Latest
           </button>
@@ -115,7 +119,7 @@
               class:on={deployed?.pinned === true && deployed.published === version.published}
               disabled={!store.install || isPreview || store.busy !== null}
               title={isPreview ? OUTSIDE : store.busyReason}
-              onclick={() => run(engine.id, version.published)}
+              onclick={() => run(engine.id, { published: version.published })}
             >
               {mark(engine.releases, version)}
             </button>

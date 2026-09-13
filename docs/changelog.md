@@ -40,10 +40,11 @@ mods as well as settings.
 - **Alternative engines.** Fetch Fallout II Community Edition or Fallout Fission and run either alongside the
   game's own engine - no Wine needed on Linux or macOS, since they are native builds. The Engines tab is about
   the machine rather than one game: a build fetched once is offered to every game folder, and reaches a folder
-  the first time that folder runs it.
-- **More than one build of an engine.** Keep several and pick which to run from the arrow beside Run in CE.
-  Games follow the newest build you hold until you choose otherwise, and a game you pin to an older build stays
-  on it.
+  the first time that folder runs it or when you pick it for that game.
+- **More than one build of an engine.** Keep several, and choose which one each game uses on the Engines tab,
+  where every card shows the selected game's build - or pick one as you run it from the arrow beside Run in CE.
+  Games follow the newest build you hold until you choose otherwise, a game you pin to an older build stays on
+  it, and Follow latest takes it back.
 - **Update checks run at startup.** What ZAX, sfall, the engines and the mod feeds have published is asked for
   when the window opens rather than waiting on a Check button - once, since none of it depends on which game is
   selected. Switching games only re-checks that game's folder. A machine that cannot reach any of it is left as

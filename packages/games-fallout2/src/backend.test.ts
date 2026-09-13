@@ -747,6 +747,31 @@ describe("engines across the boundary", () => {
     expect((await backend.deployedEngines(SECOND))[0]?.release).toBe("continious");
   });
 
+  // Picking a build on the Engines tab: the same placement a run makes, with no program started after it.
+  it("puts a picked build in a folder and pins it there, starting nothing", async () => {
+    const platform = enginePlatform({ files: { "/games/one/fallout2.exe": "", "/games/two/fallout2.exe": "" } });
+    const backend = await fetched(platform);
+    const held = (await backend.machineEngines())[0]!.versions[0]!;
+
+    await backend.useEngineBuild(SECOND, "fallout2-ce", { published: held.published });
+
+    expect(platform.launched).toEqual([]);
+    expect(await platform.fs.stat("/games/two/fallout2-ce")).not.toBeNull();
+    expect((await backend.deployedEngines(SECOND))[0]).toMatchObject({ published: held.published, pinned: true });
+    expect(await backend.deployedEngines(install), "and no other folder moved").toEqual([]);
+  });
+
+  it("clears a folder's pin when latest is picked", async () => {
+    const platform = enginePlatform({ files: { "/games/two/fallout2.exe": "" } });
+    const backend = await fetched(platform);
+    const held = (await backend.machineEngines())[0]!.versions[0]!;
+    await backend.useEngineBuild(SECOND, "fallout2-ce", { published: held.published });
+
+    await backend.useEngineBuild(SECOND, "fallout2-ce", "latest");
+
+    expect((await backend.deployedEngines(SECOND))[0]?.pinned).toBeUndefined();
+  });
+
   it("refuses rather than launching when the machine holds no build", async () => {
     const platform = enginePlatform();
     const backend = createBackend(platform, { chooseFolder: async () => null });

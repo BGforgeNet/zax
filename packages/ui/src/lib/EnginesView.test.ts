@@ -123,6 +123,89 @@ describe("the builds this machine holds", () => {
   });
 });
 
+/*
+  The one part of each card about the selected game. The rest of the card is the machine's and must read the same
+  whichever game is selected; this line is what changes.
+*/
+describe("the selected game's build", () => {
+  const HELD = [
+    { release: "v1.4.0", published: "2026-05-01T00:00:00Z", commit: null },
+    { release: "v1.3.0", published: "2026-01-01T00:00:00Z", commit: null },
+  ];
+  const deployed = (published: string, pinned: boolean) => ({
+    "fallout2-ce": {
+      id: "fallout2-ce",
+      release: published === HELD[0]!.published ? "v1.4.0" : "v1.3.0",
+      published,
+      complete: true,
+      files: ["fallout2-ce"],
+      ...(pinned ? { pinned: true as const } : {}),
+    },
+  });
+  const rowOf = (v: ReturnType<typeof view>, release: string) =>
+    v.all(".held").find((row) => row.textContent?.trim().startsWith(release))!;
+  const buttonsIn = (element: Element) => [...element.querySelectorAll("button")].map((b) => b.textContent?.trim());
+
+  beforeEach(() => {
+    store.engines = [{ ...TAGGED, versions: HELD }] as never;
+  });
+
+  test("says the game has none yet, and offers every build the machine holds", () => {
+    store.engineDeployed = {};
+    const v = view();
+    expect(v.one(".this-game").textContent?.replace(/\s+/g, " ").trim()).toBe("This game none yet Follow latest");
+    expect(buttonsIn(rowOf(v, "v1.4.0"))).toEqual(["Remove", "Use here"]);
+    expect(buttonsIn(rowOf(v, "v1.3.0"))).toEqual(["Remove", "Use here"]);
+  });
+
+  test("names a pinned build, marks its row, and offers nothing on that row that would change nothing", () => {
+    store.engineDeployed = deployed(HELD[1]!.published, true);
+    const v = view();
+    expect(v.one(".this-game").textContent?.replace(/\s+/g, " ").trim()).toBe("This game v1.3.0 pinned Follow latest");
+    expect(rowOf(v, "v1.3.0").querySelector(".tag")?.textContent).toBe("used here");
+    expect(buttonsIn(rowOf(v, "v1.3.0"))).toEqual(["Remove"]);
+    expect(rowOf(v, "v1.4.0").querySelector(".tag")).toBeNull();
+    expect(buttonsIn(rowOf(v, "v1.4.0"))).toEqual(["Remove", "Use here"]);
+  });
+
+  test("offers no Follow latest where the game already follows the newest build and holds it", () => {
+    store.engineDeployed = deployed(HELD[0]!.published, false);
+    const v = view();
+    expect(v.one(".this-game").textContent?.replace(/\s+/g, " ").trim()).toBe(
+      "This game v1.4.0 follows the newest build",
+    );
+    // The build it runs can still be pinned, and says so rather than offering to use what is already in use.
+    expect(buttonsIn(rowOf(v, "v1.4.0"))).toEqual(["Remove", "Pin here"]);
+  });
+
+  // Unpinned but behind: the next run would move it, and the button does it now instead.
+  test("offers Follow latest to an unpinned game behind the newest build the machine holds", () => {
+    store.engineDeployed = deployed(HELD[1]!.published, false);
+    expect(buttonsIn(view().one(".this-game"))).toEqual(["Follow latest"]);
+  });
+
+  test("picks a build for the game through the store, naming which", () => {
+    const use = vi.spyOn(store, "useEngineBuild").mockResolvedValue(undefined);
+    store.engineDeployed = {};
+    const v = view();
+    rowOf(v, "v1.3.0").querySelector<HTMLButtonElement>(".use")!.click();
+    expect(use).toHaveBeenCalledExactlyOnceWith("fallout2-ce", { published: "2026-01-01T00:00:00Z" });
+  });
+
+  test("asks for latest rather than a named build from Follow latest", () => {
+    const use = vi.spyOn(store, "useEngineBuild").mockResolvedValue(undefined);
+    store.engineDeployed = deployed(HELD[1]!.published, true);
+    view().control("Follow latest").click();
+    expect(use).toHaveBeenCalledExactlyOnceWith("fallout2-ce", "latest");
+  });
+
+  test("says the game's build is behind what was published, as the game's and not the machine's", () => {
+    store.engineDeployed = deployed(HELD[1]!.published, true);
+    store.engineLatest = { "fallout2-ce": { release: "v1.4.0", published: "2026-05-01T00:00:00Z" } } as never;
+    expect(view().text()).toContain("This game runs an older build than the latest published.");
+  });
+});
+
 describe("the network-bound buttons", () => {
   test("are refused in a host with no machine to reach, and say which host has one", () => {
     const v = view();
@@ -138,6 +221,6 @@ describe("the warnings", () => {
   test("warn about the lowercase rename and about installing into a running game", () => {
     const text = view().text();
     expect(text).toContain("lowercased game folder");
-    expect(text).toContain("Quit the game before running a different build");
+    expect(text).toContain("Quit the game before running or picking a different build");
   });
 });

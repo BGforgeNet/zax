@@ -1749,13 +1749,32 @@ describe("engines", () => {
 
   test("runs the build the caller names rather than the newest", async () => {
     const launch = launching();
-    await store.play("fallout2-ce", "2026-07-01T00:00:00Z");
-    expect(launch).toHaveBeenCalledWith(
-      expect.objectContaining({ path: PREVIEW_INSTALL }),
-      null,
-      "fallout2-ce",
-      "2026-07-01T00:00:00Z",
-    );
+    await store.play("fallout2-ce", { published: "2026-07-01T00:00:00Z" });
+    expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, "fallout2-ce", {
+      published: "2026-07-01T00:00:00Z",
+    });
+  });
+
+  test("puts a picked build in the folder without launching, and redraws from what is deployed after", async () => {
+    const launch = launching();
+    const deployed = {
+      id: "fallout2-ce",
+      release: "continious",
+      published: "2026-07-01T00:00:00Z",
+      complete: true,
+      files: ["fallout2-ce"],
+      pinned: true as const,
+    };
+    const use = vi.spyOn(hostBackend, "useEngineBuild").mockResolvedValue(undefined);
+    vi.spyOn(hostBackend, "deployedEngines").mockResolvedValue([deployed]);
+
+    await store.useEngineBuild("fallout2-ce", { published: "2026-07-01T00:00:00Z" });
+
+    expect(use).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ path: PREVIEW_INSTALL }), "fallout2-ce", {
+      published: "2026-07-01T00:00:00Z",
+    });
+    expect(store.engineDeployed["fallout2-ce"]).toEqual(deployed);
+    expect(launch).not.toHaveBeenCalled();
   });
 
   /*
@@ -1798,17 +1817,14 @@ describe("engines", () => {
   test("running anyway launches the build the held launch was for", async () => {
     withFission();
     const launch = launching();
-    await store.play("fission", "2026-08-01T00:00:00Z");
+    await store.play("fission", { published: "2026-08-01T00:00:00Z" });
     // Asserted before confirming, or the test passes just as well with no gate at all: `play` alone would
     // launch with these same arguments.
     expect(launch).not.toHaveBeenCalled();
     await store.confirmLaunch(false);
-    expect(launch).toHaveBeenCalledWith(
-      expect.objectContaining({ path: PREVIEW_INSTALL }),
-      null,
-      "fission",
-      "2026-08-01T00:00:00Z",
-    );
+    expect(launch).toHaveBeenCalledWith(expect.objectContaining({ path: PREVIEW_INSTALL }), null, "fission", {
+      published: "2026-08-01T00:00:00Z",
+    });
   });
 
   // Unticked is the default and has to stay one: the next run asks again.

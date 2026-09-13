@@ -52,6 +52,7 @@ import {
   wrapMethods,
   type Backend,
   type Divergence,
+  type BuildPick,
   type CachedBuild,
   type EngineListing,
   type OrderClaim,
@@ -2111,7 +2112,7 @@ class Store {
     engine: EngineListing | null;
     /** The caution to show, or null where the engine raises none or the user has dismissed it. */
     caution: string | null;
-    published: string | null;
+    pick: BuildPick | null;
     /** What is in the mods folder that this engine will not load, named one per line on the dialog. */
     missed: readonly Mod[];
     /** What the launch does to the mod order, or null where it leaves it alone. */
@@ -2119,14 +2120,14 @@ class Store {
   } | null>(null);
 
   /**
-   * Starts the game, through an engine when one is named and the original executable otherwise. `published`
-   * names the build to run, or null to follow what the folder holds and what the cache offers.
+   * Starts the game, through an engine when one is named and the original executable otherwise. `pick` names
+   * the build to run, or null to follow what the folder holds and what the cache offers.
    *
    * An engine that declares a caution stops here rather than starting. What such an engine does to the game
    * folder outlives the session it did it in, so it is said before the launch rather than reported after one -
    * and it is said every time until the user says not to, since one reading is easy to forget by the next run.
    */
-  async play(engineId: string | null = null, published: string | null = null): Promise<void> {
+  async play(engineId: string | null = null, pick: BuildPick | null = null): Promise<void> {
     const install = this.install;
     if (!install) return;
     const engine = engineId === null ? null : this.engines.find((one) => one.id === engineId);
@@ -2144,14 +2145,14 @@ class Store {
       this.pendingLaunch = {
         engine: engine ?? null,
         caution: cautioned ? (engine?.caution ?? null) : null,
-        published,
+        pick,
         missed,
         swap,
       };
       this.pendingLaunchId = engineId;
       return;
     }
-    await this.startGame(engineId, published);
+    await this.startGame(engineId, pick);
   }
 
   /**
@@ -2167,7 +2168,7 @@ class Store {
       this.acceptedCautions = [...this.acceptedCautions, pending.engine.id];
       await this.persist();
     }
-    await this.startGame(engineId, pending.published);
+    await this.startGame(engineId, pending.pick);
   }
 
   /** Which engine the held launch is for - null is the game's own executable, which `pendingLaunch` cannot say. */
@@ -2178,12 +2179,12 @@ class Store {
   }
 
   /** The launch itself, reached both by the engines that need nothing said and by the dialog for the ones that do. */
-  private async startGame(engineId: string | null, published: string | null): Promise<void> {
+  private async startGame(engineId: string | null, pick: BuildPick | null): Promise<void> {
     const install = this.install;
     if (!install) return;
     const engine = engineId === null ? null : this.engines.find((one) => one.id === engineId);
     await this.run(engine ? `Starting the game in ${engine.short}` : "Starting the game", async () => {
-      await backend.launch(install, this.sfallInstalled, engineId, published);
+      await backend.launch(install, this.sfallInstalled, engineId, pick);
       /*
         The deployed build only, not a whole reread of the install. A full read takes the mods, and reading the
         mods swaps the order file back to sfall's format - which would race the engine now starting for the very
@@ -2344,6 +2345,24 @@ class Store {
     await this.run(`Removing ${engine?.name ?? "the engine"}`, async () => {
       await backend.forgetEngine(engineId, published);
       await this.readMachineEngines();
+      return null;
+    });
+  }
+
+  /**
+   * Puts a build in the selected folder without starting the game, and records the pick: a build by name pins
+   * the folder to it, `latest` follows the newest the machine holds. Nothing to report after it - the folder's
+   * line on the Engines tab changes, which is the answer.
+   */
+  async useEngineBuild(engineId: string, pick: BuildPick): Promise<void> {
+    const install = this.install;
+    if (!install) return;
+    const engine = this.engines.find((one) => one.id === engineId);
+    await this.run(`Putting ${engine?.name ?? "the engine"} in this game`, async () => {
+      await backend.useEngineBuild(install, engineId, pick);
+      // The deployed builds only, for the reason `startGame` gives: nothing else in the folder moved.
+      const deployed = await backend.deployedEngines(install);
+      this.engineDeployed = Object.fromEntries(deployed.map((one) => [one.id, one]));
       return null;
     });
   }

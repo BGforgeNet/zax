@@ -34,6 +34,8 @@
       {#each store.engines as engine (engine.id)}
         {@const latest = store.engineLatest[engine.id]}
         {@const icon = ENGINE_ICON[engine.id]}
+        {@const here = store.install ? store.engineDeployed[engine.id] : undefined}
+        {@const newest = engine.versions[0]}
         <section class="engine">
           <!-- The icon spans the name and the link together, which is the pair that identifies the project. -->
           <div class="head">
@@ -71,16 +73,23 @@
           <!--
             What this machine holds. Labelled, or the dated rows read as a continuation of the Latest line
             above them rather than as a list of something else. A game folder gets one of these the first time
-            it runs the engine.
+            it runs the engine, or when one is picked for it below.
           -->
           <p class="line">
             On this machine
             {#if engine.versions.length === 0}<span class="unknown">no build yet</span>{/if}
           </p>
           {#each engine.versions as version (version.published)}
+            {@const usedHere = here?.published === version.published}
             <p class="line held">
               <strong>{mark(engine, version)}</strong>
               {#if version.commit}<code class="sha">{sha(version.commit)}</code>{/if}
+              <!-- A slot drawn whether or not the tag is in it, so picking a build moves no link on the row. -->
+              {#if store.install}
+                <span class="slot">
+                  {#if usedHere}<span class="tag">used here</span>{/if}
+                </span>
+              {/if}
               <button
                 class="drop"
                 disabled={store.busy !== null}
@@ -89,6 +98,21 @@
               >
                 Remove
               </button>
+              <!--
+                After Remove, so the one link that comes and goes is the last on the row. Absent where it would
+                change nothing - this build, already pinned here - and named for what it does on the build the game
+                already runs, which is pin it.
+              -->
+              {#if store.install && !(usedHere && here?.pinned)}
+                <button
+                  class="use"
+                  disabled={store.busy !== null}
+                  title={store.busyReason}
+                  onclick={() => void store.useEngineBuild(engine.id, { published: version.published })}
+                >
+                  {usedHere ? "Pin here" : "Use here"}
+                </button>
+              {/if}
             </p>
           {/each}
 
@@ -109,8 +133,35 @@
             </button>
           </div>
 
-          {#if store.engineOutdated(engine.id)}
-            <p class="note">A newer build has been published.</p>
+          <!--
+            The one part of the card about the selected game rather than the machine, under its own label so a
+            change of game reads as this line changing and nothing above it.
+          -->
+          {#if store.install}
+            <p class="line this-game">
+              This game
+              {#if here}
+                <strong>{mark(engine, here)}</strong>
+                {#if here.commit}<code class="sha">{sha(here.commit)}</code>{/if}
+                <span class="unknown">{here.pinned ? "pinned" : "follows the newest build"}</span>
+              {:else}
+                <span class="unknown">none yet</span>
+              {/if}
+              <!-- Hidden only where the game already follows the newest build and holds it. -->
+              {#if newest && !(here && !here.pinned && here.published === newest.published)}
+                <button
+                  class="use"
+                  disabled={store.busy !== null}
+                  title={store.busyReason}
+                  onclick={() => void store.useEngineBuild(engine.id, "latest")}
+                >
+                  Follow latest
+                </button>
+              {/if}
+            </p>
+            {#if store.engineOutdated(engine.id)}
+              <p class="note">This game runs an older build than the latest published.</p>
+            {/if}
           {/if}
         </section>
       {/each}
@@ -122,8 +173,8 @@
       -->
       {#if store.engines.length > 0}
         <p class="note">
-          A native run on a case-sensitive filesystem wants a lowercased game folder. Quit the game before running a
-          different build - the first run of one writes into the game's directory.
+          A native run on a case-sensitive filesystem wants a lowercased game folder. Quit the game before running or
+          picking a different build - either one writes into the game's directory.
         </p>
       {/if}
     </div>
@@ -248,8 +299,9 @@
     gap: 8px;
   }
 
-  /* On its own row rather than in the button bar below: it acts on one build, not on the engine. */
-  .drop {
+  /* On its own row rather than in the button bar below: each acts on one build, not on the engine. */
+  .drop,
+  .use {
     background: none;
     border: none;
     padding: 0;
@@ -258,7 +310,37 @@
     text-decoration: underline;
   }
 
-  .drop:disabled {
+  /* Set off from the machine's lines above it, which the label alone did not do at a glance. */
+  .this-game {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border);
+  }
+
+  /* A floor rather than a width: a date fits, and a longer tag grows its own row rather than being cut. */
+  .held strong {
+    min-width: 6.5em;
+  }
+
+  /* Wide enough for the tag at its own size, which is the only thing it ever holds. */
+  .slot {
+    width: 6.5em;
+    font-size: 10.5px;
+  }
+
+  .tag {
+    font-size: 10.5px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 3px;
+    padding: 0 4px;
+  }
+
+  .drop:disabled,
+  .use:disabled {
     cursor: not-allowed;
     opacity: 0.55;
   }

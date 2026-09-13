@@ -71,7 +71,7 @@ import {
 } from "./mod-install.js";
 import { installCachedEngine, installedEngines, pinEngine } from "./engine-install.js";
 import { cachedEngines, engineReleases, fetchEngineBuild, forgetEngine, type EngineRelease } from "./engine-release.js";
-import { chooseBuild } from "./engine-choice.js";
+import { chooseBuild, type BuildPick } from "./engine-choice.js";
 import { ENGINES, buildFor, engineById, type ReleaseModel } from "./engines.js";
 import { loadRecord, reconcileRecord, saveRecord, type InstalledEngine } from "./records.js";
 import { readTransaction, releaseOf } from "./mod-transaction.js";
@@ -272,6 +272,11 @@ export interface Backend {
   fetchEngine(engineId: string, published: string | null): Promise<EngineRelease>;
   /** Drops one build from the cache. Nothing is removed from any game folder. */
   forgetEngine(engineId: string, published: string): Promise<void>;
+  /**
+   * Puts the picked build in one game folder without running anything, and records the pick - what a run with
+   * the same pick would do before it started the program.
+   */
+  useEngineBuild(install: Install, engineId: string, pick: BuildPick): Promise<void>;
   /** Read only: nothing here installs the hi-res patch, so this reports what is there and stops. */
   installedHiresVersion(install: Install): Promise<string | null>;
   latestZax(): Promise<ZaxRelease>;
@@ -283,15 +288,10 @@ export interface Backend {
    */
   orderSwap(install: Install, engineId: string | null): Promise<OrderSwap | null>;
   /**
-   * `engineId` names an alternative engine, or null for the game's own executable. `published` names the build
-   * to run, or null to follow what the folder holds and what the cache offers - see `engine-choice.ts`.
+   * `engineId` names an alternative engine, or null for the game's own executable. `pick` is the build to run,
+   * or null to follow what the folder holds and what the cache offers - see `engine-choice.ts`.
    */
-  launch(
-    install: Install,
-    sfallVersion: string | null,
-    engineId: string | null,
-    published: string | null,
-  ): Promise<void>;
+  launch(install: Install, sfallVersion: string | null, engineId: string | null, pick: BuildPick | null): Promise<void>;
   open(target: OpenTarget): Promise<void>;
   wipe(which: WipeTarget): Promise<void>;
   /**
@@ -485,6 +485,31 @@ export function createBackend(platform: Platform, shell: Shell, seams: BackendSe
     await saveRecord(platform, { ...record, written });
   };
 
+  /**
+   * Brings a folder to the build `pick` names and records whether it is pinned there, returning the build the
+   * machine runs. Shared by a run and by picking a build on the Engines tab, so choosing one without starting
+   * the game leaves the folder exactly as that run would have.
+   */
+  const placeEngine = async (install: Install, engineId: string, pick: BuildPick | null) => {
+    const engine = engineById(engineId);
+    const build = buildFor(engine, platform.os, platform.arch);
+    if (!build) throw new Error(`${engine.name} publishes no build ZAX can run on this machine.`);
+    const deployed = (await installedEngines(platform, install)).find((one) => one.id === engineId);
+    const choice = chooseBuild(deployed, await cachedEngines(platform, engine, build.asset), pick);
+    if (choice.run === "nothing") {
+      throw new Error(`ZAX has no copy of ${engine.name} for this game. Fetch one on the Engines tab first.`);
+    }
+    // Deploying is what choosing a build amounts to: a folder holds one, so switching means unpacking the
+    // other over it - the same deployment, backup and record write an install has always made.
+    if (choice.run === "deploy") {
+      const at = { published: choice.build.release.published, pin: choice.pin };
+      await installCachedEngine(platform, install, engineId, at, new Date(), reporting());
+    } else if (choice.pin !== (deployed?.pinned ?? false)) {
+      await pinEngine(platform, install, engineId, choice.pin);
+    }
+    return build;
+  };
+
   return {
     chooseFolder: async (holding) => shell.chooseFolder(holding),
 
@@ -644,30 +669,18 @@ export function createBackend(platform: Platform, shell: Shell, seams: BackendSe
         engineId === null ? "sfall" : (engineById(engineId).orderFormat ?? "sfall"),
       ),
 
+    useEngineBuild: async (install, engineId, pick) => {
+      await placeEngine(install, engineId, pick);
+    },
+
     // The program comes from the record and the catalog, never from the renderer - a caller that could name
     // the program would be naming a program for the machine to start.
-    launch: async (install, sfallVersion, engineId, published) => {
+    launch: async (install, sfallVersion, engineId, pick) => {
       let program: string | null = null;
       let wanted: OrderFormat = "sfall";
       if (engineId !== null) {
-        const engine = engineById(engineId);
-        wanted = engine.orderFormat ?? "sfall";
-        const build = buildFor(engine, platform.os, platform.arch);
-        if (!build) throw new Error(`${engine.name} publishes no build ZAX can run on this machine.`);
-        const deployed = (await installedEngines(platform, install)).find((one) => one.id === engineId);
-        const choice = chooseBuild(deployed, await cachedEngines(platform, engine, build.asset), published);
-        if (choice.run === "nothing") {
-          throw new Error(`ZAX has no copy of ${engine.name} to run here. Fetch one on the Engines tab first.`);
-        }
-        // Deploying is what choosing a build amounts to: a folder holds one, so switching means unpacking the
-        // other over it - the same deployment, backup and record write an install has always made.
-        if (choice.run === "deploy") {
-          const at = { published: choice.build.release.published, pin: choice.pin };
-          await installCachedEngine(platform, install, engineId, at, new Date(), reporting());
-        } else if (choice.pin !== (deployed?.pinned ?? false)) {
-          await pinEngine(platform, install, engineId, choice.pin);
-        }
-        program = build.program;
+        wanted = engineById(engineId).orderFormat ?? "sfall";
+        program = (await placeEngine(install, engineId, pick)).program;
       }
       // Before the program starts, never after it exits: the seam's `launch` resolves once the game is up, and
       // a swap owed to a session ZAX did not see the end of is a swap that never happens.

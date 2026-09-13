@@ -182,6 +182,18 @@ export const previewPlatform: Platform = (() => {
       [`${PREVIEW_INSTALL}/mods/fo2tweaks.ini`]: fo2tweaksIni,
       "preview/config/zax.yml": PREVIEW_STATE_YML,
     },
+    /*
+      What each engine's cached archive unpacks to, keyed by the text `cachedBuild` writes into it, so picking a
+      build on the Engines tab deploys for real. Without contents the preflight refuses the archive, and a
+      refused archive is deleted from the cache - the build would vanish from the tab on the first pick.
+    */
+    archives: {
+      "preview fallout2-ce": {
+        "fallout2-ce-linux-x64/fallout2-ce": "preview",
+        "fallout2-ce-linux-x64/ce.dat": "preview",
+      },
+      "preview fission": { "fallout-fission-linux-x64": "preview", "fission.dat": "preview" },
+    },
   });
 
   return {
@@ -283,7 +295,7 @@ await saveRecord(previewPlatform, {
 */
 const cachedBuild = async (engine: string, asset: string, release: string, published: string) => {
   const at = `preview/cache/packages/engines/${engine}/${published.replace(/[^0-9]/g, "")}`;
-  await previewPlatform.fs.write(`${at}/${asset}`, new TextEncoder().encode("preview"));
+  await previewPlatform.fs.write(`${at}/${asset}`, new TextEncoder().encode(`preview ${engine}`));
   await previewPlatform.fs.write(
     `${at}/release.json`,
     new TextEncoder().encode(JSON.stringify({ release, published, commit: null })),
