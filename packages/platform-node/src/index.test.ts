@@ -74,12 +74,14 @@ describe("asking whether a process is running", () => {
     expect(command, "the host had nothing to say about its own running process").not.toBeNull();
     // Whatever the runner is invoked as, node is in it - that is what the claim's substring test matches on.
     expect(command?.toLowerCase()).toContain("node");
-  });
+    // Windows answers through a PowerShell start and a CIM query, which alone took most of the default five
+    // seconds on a CI runner and passed them once the other test files were contending for it.
+  }, 30_000);
 
   it("says nothing rather than rejecting for an id that is not running", async () => {
     expect(await platform.process.commandOf(2 ** 30)).toBeNull();
     expect(await platform.process.commandOf(0)).toBeNull();
-  });
+  }, 30_000);
 
   it("classifies entries as files and directories", async () => {
     await platform.fs.write(at("game", "fallout2.exe"), new Uint8Array([0x4d, 0x5a]));
