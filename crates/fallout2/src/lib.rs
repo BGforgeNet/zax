@@ -9,6 +9,7 @@ pub mod dat;
 pub mod files;
 pub mod fission;
 pub mod hires;
+pub mod install_lock;
 pub mod launch;
 pub mod layout;
 pub mod mod_choice;
