@@ -10,6 +10,7 @@ pub mod catalog;
 pub mod hash;
 pub mod ini;
 pub mod ini_merge;
+pub mod install;
 pub mod keys;
 pub mod stamp;
 pub mod text;
