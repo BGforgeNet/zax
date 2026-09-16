@@ -20,5 +20,6 @@ pub mod mod_state;
 pub mod mod_vendored;
 pub mod pe_version;
 pub mod places;
+pub mod records;
 pub mod sfall;
 pub mod trouble;
