@@ -1,0 +1,61 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/fallout2", "crates/platform", "crates/shell"]
+
+# The crates mirror packages/ one for one, and dependencies point inward the same way: zax-core may
+# not reach zax-platform's implementations, only the traits it is handed.
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+zax-core = { path = "crates/core" }
+zax-fallout2 = { path = "crates/fallout2" }
+zax-platform = { path = "crates/platform" }
+
+[workspace.lints.rust]
+# An `unsafe` operation inside an `unsafe fn` still needs its own `unsafe` block, so each one is
+# marked and greppable rather than blanket-authorized by the signature. This is the edition 2024
+# default; stated explicitly so it survives a project that sets an older edition.
+unsafe_op_in_unsafe_fn = "deny"
+
+# Public types are inspectable.
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+# `expect` is warn rather than deny because it is permitted on an invariant that genuinely cannot
+# fail - the message stating why is the part no lint can check.
+unwrap_used = "deny"
+expect_used = "warn"
+unwrap_in_result = "warn"
+
+# Every `unsafe` block carries a `// SAFETY:` comment.
+undocumented_unsafe_blocks = "deny"
+
+# A std `MutexGuard` held across an `.await` blocks the executor thread and can deadlock the runtime.
+await_holding_lock = "deny"
+
+# `&String`/`&Vec<T>` in a signature where `&str`/`&[T]` accepts strictly more callers.
+ptr_arg = "warn"
+
+needless_range_loop = "warn"
+
+# A new variant then breaks the match instead of being silently absorbed.
+wildcard_enum_match_arm = "warn"
+
+# The blanket impl gives `Into` for free, and a direct `Into` conflicts.
+from_over_into = "warn"
+
+derive_partial_eq_without_eq = "warn"
+
+[profile.release]
+# The shipped binary is the whole point of leaving Electron; these are the settings that decide its
+# size. lto and one codegen unit cost build time, panic=abort drops the unwinding tables.
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ZAX",
+  "version": "../../package.json",
+  "identifier": "net.bgforge.zax",
+  "build": {
+    "frontendDist": "../../packages/app/dist/renderer",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ZAX",
+        "width": 1100,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["appimage", "deb", "nsis", "dmg"],
+    "icon": ["../../packages/app/build/icon.png"],
+    "category": "Utility",
+    "shortDescription": "Configuration and mod manager for Fallout 2",
+    "publisher": "BGforge"
+  }
+}

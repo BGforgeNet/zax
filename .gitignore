@@ -15,6 +15,12 @@ release/
 # Scratch: the extraction scripts and fetched upstream sources the catalog generators read.
 .work/
 
+# What cargo builds into. Cargo.lock is committed: the crates here build a binary, not a library.
+target/
+
+# Capability schemas tauri-build regenerates on every build from tauri.conf.json.
+crates/shell/gen/schemas/
+
 # Per-user state the application writes, when it is run from a checkout.
 zax.yml
 
