@@ -12,3 +12,6 @@ workspace = true
 
 [dependencies]
 zax-platform.workspace = true
+
+[dev-dependencies]
+proptest = "1.11.0"
