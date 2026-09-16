@@ -4,7 +4,6 @@ description = "Tauri shell: window lifecycle and the command surface the interfa
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
 publish.workspace = true
 
 [lints]

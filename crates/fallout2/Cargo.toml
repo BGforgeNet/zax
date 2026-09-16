@@ -4,7 +4,6 @@ description = "Catalog, layout, actions and backend for one game"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
 publish.workspace = true
 
 [lints]
