@@ -10,7 +10,7 @@
  * Rust parameter is named, which is why the objects below read the way they do.
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke.js";
 
 import type { AppState } from "./bindings/AppState";
 import type { BuildPick } from "./bindings/BuildPick";

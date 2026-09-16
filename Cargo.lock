@@ -5353,6 +5353,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zax-preview"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "zax-core",
+ "zax-fallout2",
+ "zax-platform",
+]
+
+[[package]]
 name = "zax-shell"
 version = "0.1.0"
 dependencies = [

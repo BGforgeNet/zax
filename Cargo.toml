@@ -5,6 +5,7 @@ members = [
   "crates/fallout2",
   "crates/host",
   "crates/platform",
+  "crates/preview",
   "crates/shell",
 ]
 

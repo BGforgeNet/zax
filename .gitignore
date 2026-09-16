@@ -21,6 +21,10 @@ target/
 # Capability schemas tauri-build regenerates on every build from tauri.conf.json.
 crates/shell/gen/schemas/
 
+# The browser preview's WebAssembly, which `scripts/build-preview.sh` writes. A build artifact rather than
+# a generated source: it is megabytes of binary, and nothing reads it but the page that loads it.
+packages/ui/src/lib/preview-wasm/
+
 # Per-user state the application writes, when it is run from a checkout.
 zax.yml
 
