@@ -1,18 +1,11 @@
-//! Reading and writing archives, in pure Rust.
+//! Reading and writing archives.
 //!
 //! The TypeScript ran 7-Zip compiled to WebAssembly, which read every format the project meets from one
-//! artifact. Pure crates cost that generality: `zip`, `sevenz-rust2` and `tar` over `flate2` cover the
-//! four formats the releases this installs actually publish, and the two they do not cover are refused
-//! by name rather than mis-read.
+//! artifact. Here `zip`, `sevenz-rust2` and `tar` over `flate2` cover the formats the releases this
+//! installs publish, and a disk image is mounted by the system that can open one (`disk_image`).
 //!
-//! What that leaves out is recorded here rather than left to be discovered:
-//!
-//! - `.rar` is in the payload suffixes a mod may publish, and no pure-Rust crate decodes it. A mod
-//!   release that ships one is refused with a sentence saying so, which is the honest answer where the
-//!   alternative is shipping a C library to read a format no followed feed currently uses.
-//! - `.dmg` is how fallout2-ce publishes its macOS build. Reading one means reading HFS+, which again
-//!   no pure-Rust crate does. The refusal names the format, so a macOS user is told why rather than
-//!   shown a broken install.
+//! `.rar` is in the payload suffixes a mod may publish and has no reader here: no followed feed ships
+//! one, and a mod release that does is refused by name rather than mis-read.
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read as _, Write as _};
@@ -23,6 +16,8 @@ use zax_platform::archive::{
 };
 use zax_platform::{Error, Result};
 
+mod disk_image;
+
 /// Which reader a file's name asks for. Decided by the name rather than by sniffing: a release states
 /// what it published, and a `.tar.gz` and a `.7z` are told apart by their suffixes everywhere else in
 /// this application too.
@@ -32,6 +27,8 @@ enum Format {
     SevenZip,
     Tar,
     TarGzip,
+    /// An Apple disk image, which is mounted rather than parsed.
+    DiskImage,
     /// A format this build has no reader for, named so the refusal can say which.
     Unreadable(&'static str),
 }
@@ -51,7 +48,7 @@ fn format_of(archive: &Path) -> Format {
         return Format::Unreadable("RAR");
     }
     if name.ends_with(".dmg") {
-        return Format::Unreadable("Apple disk image");
+        return Format::DiskImage;
     }
     // Everything else is tried as a zip, which is what an asset with no suffix ZAX knows most often is.
     Format::Zip
@@ -149,7 +146,11 @@ impl HostArchive {
                     .read_to_end(&mut held)
                     .map_err(|err| broken(archive, &err))?;
             }
-            Format::Tar | Format::Zip | Format::SevenZip | Format::Unreadable(_) => {
+            Format::Tar
+            | Format::Zip
+            | Format::SevenZip
+            | Format::DiskImage
+            | Format::Unreadable(_) => {
                 Self::open(archive)?
                     .read_to_end(&mut held)
                     .map_err(|err| failed("read", archive, err))?;
@@ -164,6 +165,7 @@ impl Archive for HostArchive {
         std::fs::create_dir_all(destination).map_err(|err| failed("mkdir", destination, err))?;
         match format_of(archive) {
             Format::Unreadable(format) => Err(unreadable(archive, format)),
+            Format::DiskImage => disk_image::extract(archive, destination, options),
             Format::Zip => {
                 let mut held = zip::ZipArchive::new(Self::open(archive)?)
                     .map_err(|err| broken(archive, &err))?;
@@ -232,6 +234,7 @@ impl Archive for HostArchive {
     fn list(&self, archive: &Path) -> Result<Vec<ArchiveEntryInfo>> {
         match format_of(archive) {
             Format::Unreadable(format) => Err(unreadable(archive, format)),
+            Format::DiskImage => disk_image::list(archive),
             Format::Zip => {
                 let mut held = zip::ZipArchive::new(Self::open(archive)?)
                     .map_err(|err| broken(archive, &err))?;
@@ -392,10 +395,7 @@ mod tests {
         assert_eq!(format_of(Path::new("ce-linux.tgz")), Format::TarGzip);
         assert_eq!(format_of(Path::new("x.tar")), Format::Tar);
         assert_eq!(format_of(Path::new("mod.rar")), Format::Unreadable("RAR"));
-        assert_eq!(
-            format_of(Path::new("Fallout.dmg")),
-            Format::Unreadable("Apple disk image")
-        );
+        assert_eq!(format_of(Path::new("Fallout.dmg")), Format::DiskImage);
     }
 
     #[test]
