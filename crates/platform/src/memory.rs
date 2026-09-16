@@ -52,7 +52,11 @@ fn normalize(path: &str) -> String {
         }
     }
     let joined = parts.join("/");
-    if absolute { format!("/{joined}") } else { joined }
+    if absolute {
+        format!("/{joined}")
+    } else {
+        joined
+    }
 }
 
 fn normalize_path(path: &Path) -> String {
@@ -195,6 +199,10 @@ pub struct LaunchRecord {
     pub cwd: Option<String>,
     pub log: Option<String>,
     pub env: BTreeMap<String, String>,
+    /// Whether this went through `run_wasm` rather than `run`. Recorded so a test asserting the
+    /// command need not know the route and one asserting the route can - the two are a real
+    /// difference on a host with no native build of the tool.
+    pub wasm: bool,
 }
 
 /// One recorded archive write, with what was in it at the time. The contents are captured rather
@@ -347,10 +355,14 @@ impl MemoryPlatform {
         self.state().records.clone()
     }
 
-    /// An archive's canned contents, by its path or by the text sitting at that path.
+    /// An archive's canned contents, by its normalized path or by the text sitting at that path.
+    ///
+    /// Both callers already normalize, and normalizing is idempotent, so there is no separate
+    /// raw-key lookup: it would resolve to the same key. A fixture therefore has to be keyed the
+    /// way `normalize` spells the path.
     fn canned_contents(&self, archive: &str) -> Option<&BTreeMap<String, Content>> {
         let at = normalize(archive);
-        if let Some(found) = self.options.archives.get(&at).or_else(|| self.options.archives.get(archive)) {
+        if let Some(found) = self.options.archives.get(&at) {
             return Some(found);
         }
         let held = self.state().files.get(&at).cloned()?;
@@ -443,7 +455,17 @@ impl FileSystem for MemoryPlatform {
         if state.files.contains_key(&at) {
             return Ok(false);
         }
-        put(&mut state, &at, data.to_vec());
+        // Unlike `write`, the parent is not created: the real host opens with O_EXCL and fails with
+        // ENOENT when the directory is missing, and a double that quietly succeeds there would hide
+        // a caller claiming a lock on a directory that is not.
+        let parent = parent_of(&at);
+        if !parent.is_empty() && parent != "/" && !state.dirs.contains(&parent) {
+            return Err(missing("create_exclusive", &at));
+        }
+        state.files.insert(at.clone(), data.to_vec());
+        state.clock += 1;
+        let now = state.clock;
+        state.times.insert(at, now);
         Ok(true)
     }
 
@@ -527,7 +549,9 @@ impl FileSystem for MemoryPlatform {
         state
             .files
             .retain(|key, _| key != &at && !key.starts_with(&under));
-        state.dirs.retain(|key| key != &at && !key.starts_with(&under));
+        state
+            .dirs
+            .retain(|key| key != &at && !key.starts_with(&under));
         Ok(())
     }
 
@@ -611,6 +635,7 @@ fn record_of(program: &Path, args: &[String], options: &LaunchOptions<'_>) -> La
         cwd: options.cwd.as_deref().map(normalize_path),
         log: options.log.as_deref().map(normalize_path),
         env: options.env.clone(),
+        wasm: false,
     }
 }
 
@@ -667,6 +692,20 @@ impl ProcessLauncher for MemoryPlatform {
         Ok(self.options.live_pids.contains(&pid))
     }
 
+    /// Answered from the same table as `run`, keyed by the module's path: which of the two routes a
+    /// tool took is the host's business, and a test that stated what the tool says should not have
+    /// to know. The record carries the route so a test that cares can still tell.
+    fn run_wasm(&self, module: &Path, args: &[String]) -> Result<RunOutcome> {
+        let name = normalize_path(module);
+        self.state().records.ran.push(LaunchRecord {
+            wasm: true,
+            ..record_of(module, args, &LaunchOptions::default())
+        });
+        self.canned_run(&name, args)
+            .cloned()
+            .ok_or_else(|| missing("run_wasm", &name))
+    }
+
     /// Only what a test says. Absent means the host could not tell, which is the answer a caller
     /// must not act on - so a test that wants the reuse check exercised has to say what the id is
     /// running.
@@ -713,12 +752,16 @@ impl Network for MemoryPlatform {
         {
             return Err(Error::Cancelled);
         }
-        let payload = self.options.downloads.get(url).ok_or_else(|| NetworkError {
-            kind: NetworkFailure::Offline,
-            url: url.to_owned(),
-            message: format!("No canned download for {url}"),
-            status: None,
-        })?;
+        let payload = self
+            .options
+            .downloads
+            .get(url)
+            .ok_or_else(|| NetworkError {
+                kind: NetworkFailure::Offline,
+                url: url.to_owned(),
+                message: format!("No canned download for {url}"),
+                status: None,
+            })?;
         let data = payload.as_bytes();
         // Reported in one go rather than in pieces: there is nothing here to be slow, and a caller
         // that draws progress should still see it reach the end.
@@ -964,6 +1007,61 @@ mod tests {
     }
 
     #[test]
+    fn create_exclusive_refuses_a_directory_that_is_not_there() {
+        // The real host opens with O_EXCL and gets ENOENT. A claim on a directory that is not there
+        // is a claim on nothing, so the double must not quietly invent the directory.
+        let p = MemoryPlatform::default();
+        assert!(p.create_exclusive(&at("/absent/held"), b"first").is_err());
+        assert_eq!(p.all_files(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn run_wasm_answers_from_the_same_table_but_records_the_route() {
+        let outcome = RunOutcome {
+            code: Some(0),
+            output: "extracted".to_owned(),
+        };
+        let p = MemoryPlatform::new(MemoryOptions {
+            runs: BTreeMap::from([("/cache/dat3.wasm".to_owned(), outcome.clone())]),
+            ..MemoryOptions::default()
+        });
+        let args = vec!["x".to_owned()];
+        assert_eq!(
+            p.run_wasm(&at("/cache/dat3.wasm"), &args)
+                .expect("run_wasm"),
+            outcome
+        );
+
+        let ran = p.records().ran;
+        assert_eq!(ran.len(), 1);
+        assert_eq!(ran[0].args, args);
+        assert!(ran[0].wasm, "the module route must be distinguishable");
+    }
+
+    #[test]
+    fn run_records_that_it_was_not_the_module_route() {
+        let p = MemoryPlatform::new(MemoryOptions {
+            runs: BTreeMap::from([(
+                "/cache/dat3".to_owned(),
+                RunOutcome {
+                    code: Some(0),
+                    output: String::new(),
+                },
+            )]),
+            ..MemoryOptions::default()
+        });
+        p.run(&at("/cache/dat3"), &[], &LaunchOptions::default())
+            .expect("run");
+        assert!(!p.records().ran[0].wasm);
+    }
+
+    #[test]
+    fn run_wasm_of_an_unknown_module_fails() {
+        let p = MemoryPlatform::default();
+        assert!(p.run_wasm(&at("/cache/absent.wasm"), &[]).is_err());
+    }
+
+    #[test]
     fn append_extends_rather_than_replaces() {
         let p = MemoryPlatform::default();
         p.append(&at("/log"), b"one\n").expect("append");
@@ -1016,7 +1114,8 @@ mod tests {
     #[test]
     fn rename_moves_a_whole_directory() {
         let p = with_files(&[("/mods/old/a.txt", "a"), ("/mods/old/deep/b.txt", "b")]);
-        p.rename(&at("/mods/old"), &at("/mods/new")).expect("rename");
+        p.rename(&at("/mods/old"), &at("/mods/new"))
+            .expect("rename");
         assert_eq!(p.fs().read(&at("/mods/new/a.txt")).expect("read"), b"a");
         assert_eq!(
             p.fs().read(&at("/mods/new/deep/b.txt")).expect("read"),

@@ -79,6 +79,33 @@ jobs:
       # The plain run rather than the measured one - the floor is a property of the code, and `verify` gates it.
       - run: pnpm test
 
+  # The Rust workspace, which the Tauri shell is being built in. Its own job for the same reason as
+  # `lint-workflows`: it shares no step with the Node gate, so the two run at once. Linux alone -
+  # nothing under `crates/` is host-specific yet, and the seam's own host implementations are what
+  # will earn a matrix when they land.
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      # What the webview binds against on Linux. The runner image carries the Rust toolchain already.
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libsoup-3.0-dev
+      # Keyed on the lockfile: the dependency tree is what the build time is, and it moves only when
+      # that file does.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: ./.github/scripts/rust-gate.sh
+
   # Separate from `verify` because it needs none of the Node install and shares nothing with it, so the two run
   # at once rather than one after the other.
   lint-workflows:

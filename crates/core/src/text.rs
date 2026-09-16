@@ -101,9 +101,18 @@ mod tests {
         assert_eq!(
             lines,
             vec![
-                Line { body: b"a", eol: b"\r\n" },
-                Line { body: b"b", eol: b"\n" },
-                Line { body: b"c", eol: b"" },
+                Line {
+                    body: b"a",
+                    eol: b"\r\n"
+                },
+                Line {
+                    body: b"b",
+                    eol: b"\n"
+                },
+                Line {
+                    body: b"c",
+                    eol: b""
+                },
             ]
         );
     }
@@ -111,14 +120,26 @@ mod tests {
     #[test]
     fn split_lines_keeps_a_trailing_terminator() {
         let lines = split_lines(b"a\n");
-        assert_eq!(lines, vec![Line { body: b"a", eol: b"\n" }]);
+        assert_eq!(
+            lines,
+            vec![Line {
+                body: b"a",
+                eol: b"\n"
+            }]
+        );
     }
 
     #[test]
     fn split_lines_treats_a_lone_cr_as_body() {
         // A bare CR is not a terminator on any host ZAX targets, so it stays in the body.
         let lines = split_lines(b"a\rb\n");
-        assert_eq!(lines, vec![Line { body: b"a\rb", eol: b"\n" }]);
+        assert_eq!(
+            lines,
+            vec![Line {
+                body: b"a\rb",
+                eol: b"\n"
+            }]
+        );
     }
 
     #[test]
@@ -132,8 +153,14 @@ mod tests {
         assert_eq!(
             lines,
             vec![
-                Line { body: b"", eol: b"\n" },
-                Line { body: b"", eol: b"\n" },
+                Line {
+                    body: b"",
+                    eol: b"\n"
+                },
+                Line {
+                    body: b"",
+                    eol: b"\n"
+                },
             ]
         );
     }

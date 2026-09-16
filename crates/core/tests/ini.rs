@@ -19,6 +19,9 @@ fn parse(text: &str) -> IniDocument {
     IniDocument::parse(text.as_bytes())
 }
 
+// Every input in this file is ASCII, so the decode cannot fail; a panic here is the helper telling
+// the author they added a case that needs the byte-level assertions instead.
+#[expect(clippy::expect_used)]
 fn render(doc: &IniDocument) -> String {
     String::from_utf8(doc.to_bytes()).expect("the test inputs are all ASCII")
 }
@@ -163,7 +166,10 @@ fn set_does_not_splice_onto_a_preceding_line_without_a_terminator() {
     // into one unparseable line.
     let mut doc = parse("[Main]\r\nAlpha=1\r\n[Misc]\r\nBeta=2");
     doc.set_str("Misc", "Gamma", "3");
-    assert_eq!(render(&doc), "[Main]\r\nAlpha=1\r\n[Misc]\r\nBeta=2\r\nGamma=3\r\n");
+    assert_eq!(
+        render(&doc),
+        "[Main]\r\nAlpha=1\r\n[Misc]\r\nBeta=2\r\nGamma=3\r\n"
+    );
 }
 
 #[test]
@@ -266,7 +272,10 @@ fn entries_carry_the_comment_block_above_them() {
     let doc = parse("[S]\n; first line\n; second line\nKey=1\n");
     let entries = doc.entries();
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].comment.as_deref(), Some("first line second line"));
+    assert_eq!(
+        entries[0].comment.as_deref(),
+        Some("first line second line")
+    );
 }
 
 #[test]
