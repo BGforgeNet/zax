@@ -4762,6 +4762,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "url",
  "yaml-rust2",
  "zax-core",
  "zax-platform",
