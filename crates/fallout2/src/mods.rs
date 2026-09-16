@@ -35,7 +35,10 @@ pub const MODS_ORDER_PATH: &str = "mods/mods_order.txt";
 ///
 /// sfall names a path per line; Fission writes pipe-separated records and skips every line without a
 /// pipe, so neither reader tolerates the other's file and each rewrites the whole thing into its own.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, ts_rs::TS,
+)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum OrderFormat {
     Sfall,
@@ -94,7 +97,8 @@ pub fn order_format_of(text: &str) -> OrderFormat {
 }
 
 /// What is on disk under a mod's name. `Missing` is an entry whose file or folder is no longer there.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum ModKind {
     Dat,
@@ -103,7 +107,8 @@ pub enum ModKind {
     Missing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct Mod {
     /// The entry as the file writes it, relative to `mods\`.
@@ -115,7 +120,8 @@ pub struct Mod {
 }
 
 /// An installed mod as the order list needs it: what to call it, and what it put in the mods folder.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModOwner {
     pub name: String,
@@ -127,7 +133,8 @@ pub struct ModOwner {
 ///
 /// One claim per mod rather than per entry: a mod that deploys several states one place for all of
 /// them.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct OrderClaim {
     /// The entries the claim places, spelled as the order file names them.
@@ -156,14 +163,16 @@ pub fn order_dats(paths: &[String]) -> Vec<String> {
 }
 
 /// Something in the mods folder that the engine could load.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModsDirEntry {
     pub name: String,
     pub kind: ModKind,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModsSnapshot {
     /// The order file exactly as read, or `None` when the install has none.
@@ -183,7 +192,8 @@ pub struct ModsSnapshot {
     pub claims: Vec<OrderClaim>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModsSaveRequest {
     pub install_path: String,
@@ -650,7 +660,8 @@ pub fn save_mods(platform: &dyn Platform, request: &ModsSaveRequest) -> Result<S
 }
 
 /// What a launch would change about the mod order, when it would change anything.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct OrderSwap {
     /// The format the file is in now, and the one the engine about to run reads.

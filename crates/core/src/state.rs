@@ -13,7 +13,8 @@ use crate::zax_file::{StoredInstall, ZaxFile, format_zax_file, parse_zax_file};
 
 const ZAX_FILE_NAME: &str = "zax.yml";
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
     /// Installs that are on the list and readable now, with the type read from the directory.
@@ -41,7 +42,8 @@ impl Default for AppState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct LoadedState {
     pub state: AppState,
     /// Why the file could not be read, when it could not be. The caller shows this and does not

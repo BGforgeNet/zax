@@ -11,7 +11,8 @@ use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 
 use crate::install::{Theme, WineConfig};
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct StoredInstall {
     pub path: String,
     /// Only what the user typed: an install left at its type's name stores nothing, so it follows

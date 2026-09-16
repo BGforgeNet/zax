@@ -31,7 +31,8 @@ use crate::mod_grants::grants_for;
 /// not write.
 const RECORD_FORMAT: i64 = 1;
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledMod {
     /// Bound to the manifest's own id shape: it names a working directory, and a record is a file on
@@ -91,7 +92,8 @@ pub struct OpaqueMod {
 ///
 /// Not a mod: it deploys outside `mods/`, so none of the manifest machinery applies to it, and what
 /// it needs recording is only what the directory cannot say - which release these bytes are.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledEngine {
     pub id: String,

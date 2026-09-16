@@ -16,7 +16,8 @@ use zax_platform::{Platform, Result};
 use crate::ini::IniDocument;
 
 /// One key to write. The catalog maps a setting id to this; core does not know what a setting is.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct ConfigChange {
     pub file: String,
     pub section: String,
@@ -75,7 +76,8 @@ pub fn load_config_files(
 
 /// Crosses the boundary as `{"written": [...]}` or `{"stale": [...]}`: which of the two happened is
 /// the whole answer, and a shape that says so in the tag cannot be read as the other by mistake.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub enum SaveOutcome {
     Written(Vec<String>),
@@ -85,7 +87,8 @@ pub enum SaveOutcome {
     Stale(Vec<String>),
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct SaveRequest {
     pub install_path: PathBuf,

@@ -9,7 +9,8 @@
 use crate::ini::IniDocument;
 
 /// A key both sides changed. The user's value is kept; the caller decides whether to say so.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct MergeConflict {
     pub section: String,
     pub key: String,
@@ -19,7 +20,8 @@ pub struct MergeConflict {
 
 /// A key the release retired that the user had left at the old default, so it is gone from the
 /// result.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct RemovedKey {
     pub section: String,
     pub key: String,

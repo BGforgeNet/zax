@@ -30,7 +30,8 @@ const TRANSACTION_FORMAT: i64 = 3;
 const JOURNAL: &str = "transaction.json";
 
 /// Where one payload came from, kept verbatim so a retry fetches what the first attempt did.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct PinnedAsset {
     pub name: String,
     pub url: String,
@@ -83,7 +84,8 @@ pub struct ModTransaction {
 /// The journal as it sits on disk. Its own shape rather than serde on the types above, because
 /// `InstalledMod` carries a YAML value for the fields a newer ZAX may have written and JSON has no
 /// place to put one - so the entry travels as the YAML the record itself holds.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 struct Journal {
     transaction: i64,
     id: String,
@@ -105,7 +107,8 @@ struct Journal {
 }
 
 /// One record entry as the journal writes it.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 struct RecordedMod {
     id: String,
     version: String,

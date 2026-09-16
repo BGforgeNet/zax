@@ -12,7 +12,8 @@ use crate::mods::OrderFormat;
 
 /// How a project publishes. `Rolling` republishes one release in place and carries no version number,
 /// so its publication time is its version; `Tagged` names versions that can be compared.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum ReleaseModel {
     Rolling,

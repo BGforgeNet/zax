@@ -50,7 +50,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Spelled across the command boundary the way [`fmt::Display`] spells it, so the interface reads one
 /// name for a system rather than one per surface.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, ts_rs::TS,
+)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum OperatingSystem {
     Windows,
@@ -61,7 +64,10 @@ pub enum OperatingSystem {
 /// The processor a build has to match. `Other` is every architecture ZAX names no build for, which
 /// is a real answer rather than a gap: a caller with no build for the pair falls back to a portable
 /// one, and a wrong guess here would hand a host a binary it cannot execute.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, ts_rs::TS,
+)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum Architecture {
     X64,

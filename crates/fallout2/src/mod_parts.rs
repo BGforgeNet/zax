@@ -108,7 +108,8 @@ pub fn chosen_parts(release: &ModRelease, selection: &[String]) -> Result<Vec<Mo
 }
 
 /// Where an install stands in a release's choices: what to install, what went, and whether to ask.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct CarriedSelection {
     /// The parts to install, in declared order - the recorded choice re-matched against this release.

@@ -38,7 +38,8 @@ const RELEASE_LIST: &str = "https://sourceforge.net/projects/sfall/rss?path=/sfa
 /// from.
 const DDRAW_INI: &str = "ddraw.ini";
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct SfallRelease {
     pub version: String,
@@ -167,7 +168,8 @@ pub fn latest_sfall(platform: &dyn Platform) -> Result<SfallRelease> {
     })
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct SfallUpdate {
     pub version: String,

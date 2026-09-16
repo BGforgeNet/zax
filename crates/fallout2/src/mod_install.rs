@@ -42,7 +42,8 @@ use crate::mods::{
 use crate::recommended_order::{order_with, place_for, recommendation_for};
 use crate::records::{InstallRecord, InstalledMod, assert_usable, load_record, save_record};
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct PlannedFile {
     /// Relative to the install, under `mods/`.
@@ -55,7 +56,8 @@ pub struct PlannedFile {
 }
 
 /// The resolved plan, shown before anything is written.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModInstallPlan {
     pub files: Vec<PlannedFile>,
@@ -73,7 +75,8 @@ pub struct ModInstallPlan {
     pub fingerprint: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModInstallOutcome {
     pub version: String,
@@ -1035,7 +1038,8 @@ fn created_directory(recorded: &InstalledMod) -> Option<String> {
         .map(|creates| creates.directory)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModRemoval {
     /// What was deleted, relative to the install.

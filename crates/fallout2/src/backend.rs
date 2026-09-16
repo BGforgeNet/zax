@@ -74,7 +74,8 @@ use crate::sfall::{
 };
 
 /// The application's own directories, and which machine this is. Read once, at startup.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct MachineDescription {
     pub os: OperatingSystem,
@@ -86,7 +87,8 @@ pub struct MachineDescription {
 
 /// One of ZAX's own directories, named rather than passed as a path so a renderer cannot ask for
 /// another.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum OwnDirectory {
     Backup,
@@ -96,7 +98,8 @@ pub enum OwnDirectory {
 
 /// Something of ZAX's own the user can empty. The log is a file rather than a directory, hence its own
 /// arm.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(tag = "what", rename_all = "lowercase")]
 pub enum WipeTarget {
     Own { directory: OwnDirectory },
@@ -104,7 +107,8 @@ pub enum WipeTarget {
 }
 
 /// Which of a mod's own pages to open.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum ModPage {
     Forum,
@@ -114,7 +118,8 @@ pub enum ModPage {
 /// Somewhere the desktop's own handler is asked to open. Named for the same reason: a mod's page is
 /// asked for by naming which page of which mod, never by handing over the address, so what is opened is
 /// always something ZAX itself read rather than something a caller supplied.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(tag = "what", rename_all = "lowercase")]
 pub enum OpenTarget {
     Own { directory: OwnDirectory },
@@ -126,7 +131,8 @@ pub enum OpenTarget {
 pub const RELEASES_PAGE: &str = "https://github.com/BGforgeNet/zax/releases/latest";
 
 /// One installed mod's configuration surface: who it belongs to, and the schema its record carries.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModSettingsGroup {
     pub mod_id: String,
@@ -140,7 +146,8 @@ pub struct ModSettingsGroup {
 }
 
 /// One build the machine holds, as a version list needs it. Addressed by `published`, not by tag.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct CachedBuild {
     /// The release's tag, as published. A rolling project republishes one, so it does not identify a
@@ -152,7 +159,8 @@ pub struct CachedBuild {
 }
 
 /// What this machine would install of one engine, where it publishes a build for it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct MachineBuild {
     pub asset: String,
@@ -162,7 +170,8 @@ pub struct MachineBuild {
 /// One engine as the Engines tab needs it: what it is, what this machine would install, and which
 /// builds it already holds. Nothing here is a game folder's business - what is deployed in one is
 /// `deployed_engines`.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct EngineListing {
     pub id: String,
@@ -185,7 +194,8 @@ pub struct EngineListing {
 ///
 /// Tagged with the kind the TypeScript carried on each of the three plans, so the interface tells them
 /// apart by reading one field rather than by which others are present.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum InstallPlan {
     Stacking(ModInstallPlan),
@@ -206,7 +216,8 @@ impl InstallPlan {
 }
 
 /// What one finished install left behind, whichever route ran it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum InstallOutcome {
     Stacking(ModInstallOutcome),
@@ -216,7 +227,8 @@ pub enum InstallOutcome {
 
 /// How far a long operation has got, in the words the interface shows. Plain fields because it crosses
 /// a process boundary on the desktop.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct OperationProgress {
     /// What is happening now - "Downloading sfall 4.5".

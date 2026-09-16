@@ -64,7 +64,8 @@ pub struct ModFeed {
 /// `counter` marks the line that the pre-split history belongs to - RPU's bare `v30` and everything
 /// below it is 2.3's past, and an install that stamps no version at all is that line's to repair
 /// rather than the newer line's to take over.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModLine {
     pub prefix: &'static str,
@@ -168,7 +169,8 @@ pub const MOD_FEEDS: &[ModFeed] = &[
 ];
 
 /// Which of the two installer routes a host takes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum InstallerRoute {
     Windows,
@@ -176,7 +178,8 @@ pub enum InstallerRoute {
 }
 
 /// A base mod's installer for the platform ZAX is running on, and which of the two routes it is.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseInstaller {
     pub route: InstallerRoute,
@@ -268,7 +271,8 @@ fn releases_url(repository: &str) -> String {
     format!("https://api.github.com/repos/{repository}/releases?per_page=100")
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseAsset {
     pub name: String,
@@ -807,7 +811,8 @@ pub fn fetch_feed(platform: &dyn Platform, feed: &FeedSource, now: i64) -> Resul
 ///
 /// Tagged with the kind, which is the field every surface branches on, and spelled the way the
 /// interface reads it: `install-over` rather than `installOver`, as the TypeScript named them.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Availability {
     Install,
@@ -1145,7 +1150,8 @@ pub fn present_in_mods(
 }
 
 /// One mod as the interface lists it, everything plain enough to cross the process boundary.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModOffer {
     pub id: String,
@@ -1176,7 +1182,8 @@ pub struct ModOffer {
 }
 
 /// Everything the interface needs to draw a choice it cannot compute: the renderer reads no manifest.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ChoiceOffer {
     /// The groups this release can deliver, in the order the manifest declares them.
@@ -1185,7 +1192,8 @@ pub struct ChoiceOffer {
 }
 
 /// A feed that could not answer, and why.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct FeedFailure {
     pub repository: String,
@@ -1194,7 +1202,8 @@ pub struct FeedFailure {
     pub why: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModListing {
     pub offers: Vec<ModOffer>,
@@ -1206,7 +1215,8 @@ pub struct ModListing {
 
 /// What one feed has published, with nothing of any install in it - a repository publishes one release,
 /// whichever game folder is on screen. This is the half of an offer that survives a change of game.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct PublishedMod {
     pub id: String,
@@ -1229,7 +1239,8 @@ pub struct PublishedMod {
 }
 
 /// Every feed's current release, and the feeds that could not answer. Read once, not once per install.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModFeedListing {
     pub published: Vec<PublishedMod>,
@@ -1238,7 +1249,8 @@ pub struct ModFeedListing {
 
 /// Where one install stands against the published mods, which is everything a change of game
 /// invalidates.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct ModInstallState {
     /// By mod id, for the published mods this install could say something about.
@@ -1247,7 +1259,8 @@ pub struct ModInstallState {
     pub unfollowed: Vec<ModOffer>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct Standing {
     pub availability: Availability,

@@ -16,8 +16,19 @@
 /// Spelled across the boundary exactly as `as_str` spells it for `zax.yml`, so one name identifies a
 /// type everywhere rather than one for the file and another for the interface.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    ts_rs::TS,
 )]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum GameType {
     Fallout2,
@@ -99,7 +110,8 @@ impl GameType {
 
 /// Wine settings are per install rather than global: one install can be a Windows build under its
 /// own prefix while another is native, and a prefix that is right for one is wrong for the other.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct WineConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,
@@ -129,7 +141,8 @@ impl WineConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct Install {
     pub path: String,
     /// Named `type` across the boundary, as the interface and `zax.yml` both spell it.
@@ -388,8 +401,18 @@ pub const UNSEARCHABLE_DIRECTORIES: &[&str] = &[
 ];
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    ts_rs::TS,
 )]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
     Light,

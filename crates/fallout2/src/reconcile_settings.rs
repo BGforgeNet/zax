@@ -35,7 +35,8 @@ pub fn address(file: &str, section: &str, key: &str) -> String {
 }
 
 /// One address taking part, and what it now says.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct HeldTarget {
     pub target: SettingTarget,
@@ -46,7 +47,8 @@ pub struct HeldTarget {
 /// `settle` and `choose` is set: neither, where the disagreement has already been accepted and there is
 /// nothing left to do - it is still reported, because a caller has to know these addresses differ
 /// whether or not it is being asked to act on them.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct Divergence {
     pub id: String,

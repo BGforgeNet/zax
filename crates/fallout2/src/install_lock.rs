@@ -25,7 +25,8 @@ use zax_platform::{Platform, Result};
 const LOCK_NAME: &str = ".zax-lock";
 
 /// What a lock says about itself. Every field is for the message a refusal has to write.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 struct LockRecord {
     /// The machine that took it, which is the only thing a lock on a share can be judged by from
     /// elsewhere.

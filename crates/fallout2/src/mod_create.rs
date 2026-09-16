@@ -45,7 +45,8 @@ use crate::records::{InstallRecord, InstalledMod, assert_usable, load_record, sa
 /// What creating an install would do. Thicker than a delegated base mod's plan, because ZAX performs
 /// this one and therefore knows - but still not a file list: ten thousand payload entries are not
 /// something anybody reads before pressing a button.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct CreateInstallPlan {
     pub version: String,
@@ -67,7 +68,8 @@ pub struct CreateInstallPlan {
     pub fingerprint: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "camelCase")]
 pub struct CreateInstallOutcome {
     pub version: String,
