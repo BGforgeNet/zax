@@ -13,7 +13,12 @@
 ///
 /// `Fo1In2` is not a fifth patch but a different game: Fallout 1 rebuilt on this engine, in its own
 /// directory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// Spelled across the boundary exactly as `as_str` spells it for `zax.yml`, so one name identifies a
+/// type everywhere rather than one for the file and another for the interface.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum GameType {
     Fallout2,
     Fallout2Up,
@@ -94,9 +99,11 @@ impl GameType {
 
 /// Wine settings are per install rather than global: one install can be a Windows build under its
 /// own prefix while another is native, and a prefix that is right for one is wrong for the other.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WineConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub debug: Option<String>,
 }
 
@@ -122,13 +129,17 @@ impl WineConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Install {
     pub path: String,
+    /// Named `type` across the boundary, as the interface and `zax.yml` both spell it.
+    #[serde(rename = "type")]
     pub game_type: GameType,
     /// What the user chose to call this install. `None` means the type's own name, which is what
     /// most use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wine: Option<WineConfig>,
 }
 
@@ -376,7 +387,10 @@ pub const UNSEARCHABLE_DIRECTORIES: &[&str] = &[
     "dev",
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum Theme {
     Light,
     Dark,

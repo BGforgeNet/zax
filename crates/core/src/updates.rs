@@ -8,7 +8,7 @@ use zax_platform::{Architecture, Error, OperatingSystem, Platform, Result};
 
 const LATEST_RELEASE: &str = "https://api.github.com/repos/BGforgeNet/zax/releases/latest";
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ZaxRelease {
     pub version: String,
     /// The build for the machine asking, or the release page when it publishes nothing that machine

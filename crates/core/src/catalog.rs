@@ -6,14 +6,14 @@
 
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::keys::{KEYS, key_name};
 
 /// The types here deserialize from what `scripts/gen/gen-catalog.mjs` emits, which is the same data
 /// the TypeScript build reads. Field names stay in that file's spelling rather than Rust's, so the
 /// generator has one output shape and not two.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ChoiceOption {
     pub value: String,
     pub label: String,
@@ -24,7 +24,7 @@ pub struct ChoiceOption {
 /// Bounds and presentation for a numeric setting.
 ///
 /// `sentinels` name values that are not quantities - 0 meaning "native", -1 meaning "auto".
-#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct NumericKind {
     #[serde(default)]
     pub min: Option<f64>,
@@ -36,7 +36,7 @@ pub struct NumericKind {
     pub sentinels: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum SettingKind {
     /// Raw engine scale (volumes run 0..32767) shown to the user as a percentage.
@@ -67,7 +67,7 @@ pub enum SettingKind {
 /// sentinel.
 /// Externally tagged, which is what spells these as `{"is": [..]}` and `{"isNot": [..]}` - the shape
 /// the generator writes.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ValueTest {
     Is(Vec<String>),
@@ -78,7 +78,7 @@ pub enum ValueTest {
 ///
 /// Most settings have a single target; a setting that more than one engine carries under its own
 /// name has one per engine, so that the several names stay one row.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingTarget {
     pub file: String,
@@ -99,7 +99,7 @@ pub struct SettingTarget {
 }
 
 /// The test is flattened beside the id, which is how the generator writes it: `{id, is: [..]}`.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Gate {
     pub id: String,
     #[serde(flatten)]
@@ -111,7 +111,7 @@ pub struct Gate {
 /// A separate type because the first target is the address the id was minted from, so it stays the
 /// id's source even where its file is absent. Holding it apart is what lets [`Targets::own`] answer
 /// without a fallible lookup, which is the guarantee the TypeScript got from a non-empty tuple type.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(try_from = "Vec<SettingTarget>")]
 pub struct Targets {
     own: SettingTarget,
@@ -175,7 +175,7 @@ impl Targets {
 
 /// A pairing the engine handles badly, warned about only while both settings are in the states
 /// named. Unlike a gate, each setting still works alone, so neither is disabled.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Conflict {
     pub id: String,
     /// `self` in the emitted data, which Rust cannot name a field.
@@ -188,13 +188,13 @@ pub struct Conflict {
 
 /// ZAX owns this value and always writes it. Shown read-only with the reason, rather than hidden, so
 /// the choice is visible instead of looking like the setting simply went missing.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Managed {
     pub value: String,
     pub reason: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingDef {
     pub id: String,

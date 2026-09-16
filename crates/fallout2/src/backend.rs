@@ -74,7 +74,8 @@ use crate::sfall::{
 };
 
 /// The application's own directories, and which machine this is. Read once, at startup.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MachineDescription {
     pub os: OperatingSystem,
     pub backup_directory: String,
@@ -85,7 +86,8 @@ pub struct MachineDescription {
 
 /// One of ZAX's own directories, named rather than passed as a path so a renderer cannot ask for
 /// another.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum OwnDirectory {
     Backup,
     Debug,
@@ -94,14 +96,16 @@ pub enum OwnDirectory {
 
 /// Something of ZAX's own the user can empty. The log is a file rather than a directory, hence its own
 /// arm.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "what", rename_all = "lowercase")]
 pub enum WipeTarget {
-    Own(OwnDirectory),
+    Own { directory: OwnDirectory },
     Log,
 }
 
 /// Which of a mod's own pages to open.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ModPage {
     Forum,
     Homepage,
@@ -110,9 +114,10 @@ pub enum ModPage {
 /// Somewhere the desktop's own handler is asked to open. Named for the same reason: a mod's page is
 /// asked for by naming which page of which mod, never by handing over the address, so what is opened is
 /// always something ZAX itself read rather than something a caller supplied.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "what", rename_all = "lowercase")]
 pub enum OpenTarget {
-    Own(OwnDirectory),
+    Own { directory: OwnDirectory },
     Log,
     Download,
     Mod { id: String, page: ModPage },
@@ -121,7 +126,8 @@ pub enum OpenTarget {
 pub const RELEASES_PAGE: &str = "https://github.com/BGforgeNet/zax/releases/latest";
 
 /// One installed mod's configuration surface: who it belongs to, and the schema its record carries.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModSettingsGroup {
     pub mod_id: String,
     pub name: String,
@@ -134,7 +140,8 @@ pub struct ModSettingsGroup {
 }
 
 /// One build the machine holds, as a version list needs it. Addressed by `published`, not by tag.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CachedBuild {
     /// The release's tag, as published. A rolling project republishes one, so it does not identify a
     /// build.
@@ -145,7 +152,8 @@ pub struct CachedBuild {
 }
 
 /// What this machine would install of one engine, where it publishes a build for it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MachineBuild {
     pub asset: String,
     pub program: String,
@@ -154,7 +162,8 @@ pub struct MachineBuild {
 /// One engine as the Engines tab needs it: what it is, what this machine would install, and which
 /// builds it already holds. Nothing here is a game folder's business - what is deployed in one is
 /// `deployed_engines`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EngineListing {
     pub id: String,
     pub name: String,
@@ -173,7 +182,11 @@ pub struct EngineListing {
 }
 
 /// What a plan resolved to, whichever of the three shapes an install takes.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Tagged with the kind the TypeScript carried on each of the three plans, so the interface tells them
+/// apart by reading one field rather than by which others are present.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
 pub enum InstallPlan {
     Stacking(ModInstallPlan),
     Base(BaseInstallPlan),
@@ -193,7 +206,8 @@ impl InstallPlan {
 }
 
 /// What one finished install left behind, whichever route ran it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
 pub enum InstallOutcome {
     Stacking(ModInstallOutcome),
     Base(BaseInstallOutcome),
@@ -202,7 +216,8 @@ pub enum InstallOutcome {
 
 /// How far a long operation has got, in the words the interface shows. Plain fields because it crosses
 /// a process boundary on the desktop.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OperationProgress {
     /// What is happening now - "Downloading sfall 4.5".
     pub step: String,
@@ -1289,7 +1304,7 @@ impl Backend {
                 self.platform().process().open(Path::new(&url))
             }
             OpenTarget::Log => self.platform().process().open(&log_file(self.platform())),
-            OpenTarget::Own(which) => self.platform().process().open(&self.own(*which)),
+            OpenTarget::Own { directory } => self.platform().process().open(&self.own(*directory)),
         }
     }
 
@@ -1302,8 +1317,8 @@ impl Backend {
     pub fn wipe(&self, which: WipeTarget) -> Result<()> {
         match which {
             WipeTarget::Log => self.platform().fs().remove(&log_file(self.platform())),
-            WipeTarget::Own(which) => {
-                let at = self.own(which);
+            WipeTarget::Own { directory } => {
+                let at = self.own(directory);
                 self.platform().fs().remove(&at)?;
                 self.platform().fs().mkdir(&at)
             }
@@ -1459,7 +1474,9 @@ mod tests {
             .write(&at.join("old"), b"a backup")
             .expect("a write");
         backend
-            .wipe(WipeTarget::Own(OwnDirectory::Backup))
+            .wipe(WipeTarget::Own {
+                directory: OwnDirectory::Backup,
+            })
             .expect("a wipe");
         assert_eq!(platform.fs().stat(&at.join("old")).expect("a read"), None);
         assert!(
@@ -1482,7 +1499,9 @@ mod tests {
         let (backend, platform) = backend_with(&[]);
         backend.open(&OpenTarget::Log).expect("an open");
         backend
-            .open(&OpenTarget::Own(OwnDirectory::Debug))
+            .open(&OpenTarget::Own {
+                directory: OwnDirectory::Debug,
+            })
             .expect("an open");
         let opened = platform.records().opened;
         assert_eq!(opened.len(), 2);

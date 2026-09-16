@@ -20,7 +20,8 @@ pub enum BuildChoice {
 /// What a user picked for a folder: one build by its publication instant, or `Latest` to clear a pin
 /// and follow the newest build the machine holds. Two variants rather than two strings, since a tag
 /// could be spelled `latest` and an instant cannot be told from one by type.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "pick", rename_all = "lowercase")]
 pub enum BuildPick {
     Published(String),
     Latest,

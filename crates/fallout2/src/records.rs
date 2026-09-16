@@ -31,7 +31,8 @@ use crate::mod_grants::grants_for;
 /// not write.
 const RECORD_FORMAT: i64 = 1;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InstalledMod {
     /// Bound to the manifest's own id shape: it names a working directory, and a record is a file on
     /// disk.
@@ -68,6 +69,11 @@ pub struct InstalledMod {
     /// A later ZAX may record more per mod than this one knows, and rewriting the file for an
     /// unrelated install would otherwise throw that away while every field this one knows
     /// round-tripped.
+    ///
+    /// Not sent across the command boundary: it is the record's own business, the interface has
+    /// nothing to do with it, and a value this version cannot interpret has no meaning to give a
+    /// renderer.
+    #[serde(skip)]
     pub carried: BTreeMap<String, Yaml>,
 }
 
@@ -85,7 +91,8 @@ pub struct OpaqueMod {
 ///
 /// Not a mod: it deploys outside `mods/`, so none of the manifest machinery applies to it, and what
 /// it needs recording is only what the directory cannot say - which release these bytes are.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InstalledEngine {
     pub id: String,
     /// The release's tag, as published. `continious` for a project that republishes one release in

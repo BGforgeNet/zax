@@ -42,7 +42,8 @@ use crate::mods::{
 use crate::recommended_order::{order_with, place_for, recommendation_for};
 use crate::records::{InstallRecord, InstalledMod, assert_usable, load_record, save_record};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlannedFile {
     /// Relative to the install, under `mods/`.
     pub path: String,
@@ -54,7 +55,8 @@ pub struct PlannedFile {
 }
 
 /// The resolved plan, shown before anything is written.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModInstallPlan {
     pub files: Vec<PlannedFile>,
     /// The mods-folder entries this install owns, as the manifest spells them - added or re-enabled in
@@ -71,7 +73,8 @@ pub struct ModInstallPlan {
     pub fingerprint: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModInstallOutcome {
     pub version: String,
     pub files: Vec<String>,
@@ -1032,7 +1035,8 @@ fn created_directory(recorded: &InstalledMod) -> Option<String> {
         .map(|creates| creates.directory)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModRemoval {
     /// What was deleted, relative to the install.
     pub files: Vec<String>,

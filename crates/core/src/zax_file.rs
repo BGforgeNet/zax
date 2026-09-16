@@ -11,12 +11,14 @@ use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 
 use crate::install::{Theme, WineConfig};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct StoredInstall {
     pub path: String,
     /// Only what the user typed: an install left at its type's name stores nothing, so it follows
     /// the type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wine: Option<WineConfig>,
 }
 

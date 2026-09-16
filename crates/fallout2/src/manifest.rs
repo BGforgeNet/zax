@@ -92,7 +92,8 @@ pub struct ManifestDefaults {
 
 /// A mod setting is a catalog definition plus the value the release ships, kept for revert and
 /// display.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModSetting {
     pub def: SettingDef,
     pub default: Option<String>,
@@ -107,7 +108,8 @@ pub struct ModSetting {
 /// there - so a control this version cannot render costs the user a knob and never costs
 /// correctness, and refusing the mod over one would make a mod uninstallable for sitting on the
 /// wrong side of a ZAX release.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DroppedSetting {
     /// The address the manifest spelled, `section.key`.
     pub address: String,
@@ -128,7 +130,8 @@ pub struct ConflictRule {
 /// A part names its own release asset, because that is what every real case is - four zips, four
 /// dats, two zips - and no part is ever a subset of another's archive, so nothing here slices an
 /// archive up.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModPart {
     /// Permanent the way the mod's id is: the recorded selection names it, so a rename reads as a
     /// new part.
@@ -144,7 +147,8 @@ pub struct ModPart {
 }
 
 /// How many of a group's options may be taken.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Pick {
     /// Picks at most one - a group may end with nothing chosen.
     One,
@@ -163,7 +167,8 @@ pub struct ModPartGroup {
 ///
 /// Pluggable stacks and comes off again, permanent stacks and never does, base transforms the game
 /// into another one - which is why only a base mod names an installer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ModType {
     Pluggable,
     Permanent,
@@ -207,7 +212,8 @@ pub struct ModCreates {
 }
 
 /// A value ZAX must ask the user for, with the file that says the answer is the right one.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModInput {
     pub id: String,
     pub label: String,

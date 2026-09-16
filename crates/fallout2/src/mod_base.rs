@@ -39,7 +39,8 @@ use crate::records::{InstallRecord, InstalledMod, assert_usable, load_record, sa
 /// What installing a base mod would do, as far as anything but the installer can say. Thinner than a
 /// stacking mod's plan on purpose, and the plan says so: the installer decides what lands, so naming
 /// files here would be inventing them.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BaseInstallPlan {
     pub version: String,
     /// The asset that installs it, and which of the two routes it takes.
@@ -249,7 +250,8 @@ const INNO_CANCELLED_BEFORE: i32 = 2;
 const INNO_CANCELLED_DURING: i32 = 5;
 
 /// What a finished base install leaves the caller to act on.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BaseInstallOutcome {
     pub version: String,
     /// What the install now is - the caller re-reads the directory to confirm it.

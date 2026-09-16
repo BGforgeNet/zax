@@ -74,7 +74,8 @@ pub fn list_saves(platform: &dyn Platform, install: &Install) -> Result<Vec<Stri
     Ok(slots)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DebugPackage {
     /// Where the archive was written.
     pub path: PathBuf,

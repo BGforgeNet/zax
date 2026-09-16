@@ -16,7 +16,7 @@ use zax_platform::{Platform, Result};
 use crate::ini::IniDocument;
 
 /// One key to write. The catalog maps a setting id to this; core does not know what a setting is.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ConfigChange {
     pub file: String,
     pub section: String,
@@ -73,7 +73,10 @@ pub fn load_config_files(
     Ok(out)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Crosses the boundary as `{"written": [...]}` or `{"stale": [...]}`: which of the two happened is
+/// the whole answer, and a shape that says so in the tag cannot be read as the other by mistake.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum SaveOutcome {
     Written(Vec<String>),
     /// Files that changed on disk since they were read. Nothing is written: applying half a save and
@@ -82,13 +85,15 @@ pub enum SaveOutcome {
     Stale(Vec<String>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SaveRequest {
     pub install_path: PathBuf,
     /// The contents the edits were made against, as [`load_config_files`] answered.
     pub original: ConfigFileContents,
     pub changes: Vec<ConfigChange>,
     /// The same map [`load_config_files`] was given, so a save writes where the read read.
+    #[serde(default)]
     pub paths: ConfigFilePaths,
 }
 

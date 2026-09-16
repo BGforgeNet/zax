@@ -15,14 +15,16 @@ use crate::engines::{EngineBuild, EngineDefinition, ReleaseModel, build_for, eng
 use crate::records::InstalledEngine;
 
 /// One published file: what it is called, where it is, and how big the release says it is.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EngineAsset {
     pub name: String,
     pub url: String,
     pub size: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EngineRelease {
     /// The release's tag, as published.
     pub release: String,

@@ -16,13 +16,15 @@ pub trait ChoiceOption {
 }
 
 /// How many of a group's options may be taken.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Pick {
     One,
     Any,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChoiceGroup<T> {
     pub label: String,
     pub pick: Pick,
