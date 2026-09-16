@@ -2,4 +2,9 @@
 
 pub mod catalog;
 pub mod dat;
+pub mod files;
+pub mod fission;
 pub mod layout;
+pub mod mod_grants;
+pub mod pe_version;
+pub mod trouble;
