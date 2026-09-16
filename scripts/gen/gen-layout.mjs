@@ -257,6 +257,8 @@ export const LAYOUT: readonly LayoutFile[] = ${JSON.stringify(files, null, 1)};
 `;
 
 fs.writeFileSync("packages/games-fallout2/src/layout.ts", out);
+// The same tree as data, for the Rust build, which deserializes it rather than compiling it.
+fs.writeFileSync("crates/fallout2/data/layout.json", `${JSON.stringify(files, null, 1)}\n`);
 console.log(
   `${files.length} groups, ${files.reduce((n, f) => n + f.tabs.length, 0)} tabs, ` +
     `${settings} placed settings and ${engineRows} engine rows over them`,

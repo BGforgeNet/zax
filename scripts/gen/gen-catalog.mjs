@@ -768,6 +768,13 @@ if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === fs.realp
       `export const SETTINGS: readonly SettingDef[] = [\n${body},\n];\n`,
   );
 
+  // The same settings as data, for the Rust build, which deserializes them rather than compiling one
+  // struct literal per setting. One setting per line for the same reason the module above is.
+  fs.writeFileSync(
+    "crates/fallout2/data/catalog.json",
+    `[\n${defs.map((d) => `  ${JSON.stringify(d)}`).join(",\n")}\n]\n`,
+  );
+
   const counts = {};
   for (const d of defs) for (const t of d.targets) counts[t.file] = (counts[t.file] ?? 0) + 1;
   console.log("total:", defs.length);

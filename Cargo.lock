@@ -4706,6 +4706,7 @@ name = "zax-core"
 version = "0.1.0"
 dependencies = [
  "proptest",
+ "serde",
  "serde_json",
  "url",
  "yaml-rust2",
@@ -4717,6 +4718,8 @@ name = "zax-fallout2"
 version = "0.1.0"
 dependencies = [
  "dat3-core",
+ "serde",
+ "serde_json",
  "zax-core",
  "zax-platform",
 ]

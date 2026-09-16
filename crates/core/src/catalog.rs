@@ -6,32 +6,44 @@
 
 use std::collections::BTreeMap;
 
+use serde::Deserialize;
+
 use crate::keys::{KEYS, key_name};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The types here deserialize from what `scripts/gen/gen-catalog.mjs` emits, which is the same data
+/// the TypeScript build reads. Field names stay in that file's spelling rather than Rust's, so the
+/// generator has one output shape and not two.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct ChoiceOption {
     pub value: String,
     pub label: String,
+    #[serde(default)]
     pub help: Option<String>,
 }
 
 /// Bounds and presentation for a numeric setting.
 ///
 /// `sentinels` name values that are not quantities - 0 meaning "native", -1 meaning "auto".
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 pub struct NumericKind {
+    #[serde(default)]
     pub min: Option<f64>,
+    #[serde(default)]
     pub max: Option<f64>,
+    #[serde(default)]
     pub unit: Option<String>,
+    #[serde(default)]
     pub sentinels: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum SettingKind {
     /// Raw engine scale (volumes run 0..32767) shown to the user as a percentage.
     Scale {
         max: f64,
     },
+    #[serde(rename_all = "camelCase")]
     Bool {
         on_value: String,
         off_value: String,
@@ -39,6 +51,7 @@ pub enum SettingKind {
     Int(NumericKind),
     Float(NumericKind),
     Text {
+        #[serde(default)]
         path: bool,
     },
     Choice {
@@ -52,7 +65,10 @@ pub enum SettingKind {
 /// `IsNot` covers controllers with an open range, where the interesting states cannot be listed: "a
 /// key is bound" is every value but none, and "idling is on" is every value but the disabled
 /// sentinel.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Externally tagged, which is what spells these as `{"is": [..]}` and `{"isNot": [..]}` - the shape
+/// the generator writes.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ValueTest {
     Is(Vec<String>),
     IsNot(Vec<String>),
@@ -62,7 +78,8 @@ pub enum ValueTest {
 ///
 /// Most settings have a single target; a setting that more than one engine carries under its own
 /// name has one per engine, so that the several names stay one row.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SettingTarget {
     pub file: String,
     pub section: String,
@@ -77,12 +94,15 @@ pub struct SettingTarget {
     /// look effective. Per target rather than per setting: a prerequisite can hold on one engine and
     /// not on the next, and a shared gate would either over-restrict the others or write a value
     /// that silently does nothing.
+    #[serde(default)]
     pub gated_by: Option<Gate>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The test is flattened beside the id, which is how the generator writes it: `{id, is: [..]}`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Gate {
     pub id: String,
+    #[serde(flatten)]
     pub test: ValueTest,
 }
 
@@ -91,10 +111,29 @@ pub struct Gate {
 /// A separate type because the first target is the address the id was minted from, so it stays the
 /// id's source even where its file is absent. Holding it apart is what lets [`Targets::own`] answer
 /// without a fallible lookup, which is the guarantee the TypeScript got from a non-empty tuple type.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "Vec<SettingTarget>")]
 pub struct Targets {
     own: SettingTarget,
     others: Vec<SettingTarget>,
+}
+
+impl TryFrom<Vec<SettingTarget>> for Targets {
+    type Error = &'static str;
+
+    /// The generator writes a plain array. Rejecting an empty one here is what keeps the non-empty
+    /// guarantee [`Targets::own`] rests on: a setting with no address has no id to have been minted
+    /// from.
+    fn try_from(targets: Vec<SettingTarget>) -> std::result::Result<Self, Self::Error> {
+        let mut targets = targets.into_iter();
+        let own = targets
+            .next()
+            .ok_or("a setting must name at least one target")?;
+        Ok(Self {
+            own,
+            others: targets.collect(),
+        })
+    }
 }
 
 impl Targets {
@@ -136,30 +175,37 @@ impl Targets {
 
 /// A pairing the engine handles badly, warned about only while both settings are in the states
 /// named. Unlike a gate, each setting still works alone, so neither is disabled.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Conflict {
     pub id: String,
+    /// `self` in the emitted data, which Rust cannot name a field.
+    #[serde(rename = "self")]
     pub self_test: ValueTest,
+    #[serde(rename = "other")]
     pub other_test: ValueTest,
     pub note: String,
 }
 
 /// ZAX owns this value and always writes it. Shown read-only with the reason, rather than hidden, so
 /// the choice is visible instead of looking like the setting simply went missing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Managed {
     pub value: String,
     pub reason: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SettingDef {
     pub id: String,
     pub targets: Targets,
     pub kind: SettingKind,
     pub label: String,
+    #[serde(default)]
     pub help: Option<String>,
+    #[serde(default)]
     pub conflicts_with: Option<Conflict>,
+    #[serde(default)]
     pub managed: Option<Managed>,
 }
 

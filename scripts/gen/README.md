@@ -1,6 +1,8 @@
 # Catalog and layout generation
 
-`packages/games-fallout2/src/catalog.ts` and `layout.ts` are generated modules. Their sources:
+`packages/games-fallout2/src/catalog.ts` and `layout.ts` are generated modules, and
+`crates/fallout2/data/catalog.json` and `layout.json` are the same content as data, which the Rust build
+deserializes rather than compiling. Both pairs come out of one run; neither is edited by hand. Their sources:
 
 - `formats/*.yml` - the previous implementation's format definitions, copied verbatim from the `python` branch
   (`zax/formats/*.yml` there). They carry each setting's type, bounds, options, names and descriptions.
