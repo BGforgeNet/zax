@@ -27,6 +27,32 @@ pub fn stamp(now: LocalTime) -> String {
     )
 }
 
+/// A UTC instant, for the log, which is read alongside logs from other programs and so states an
+/// absolute time rather than the reader's own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Utc {
+    pub year: i32,
+    /// 1 to 12.
+    pub month: u8,
+    /// 1 to 31.
+    pub day: u8,
+    pub hour: u8,
+    pub minute: u8,
+    pub second: u8,
+    pub millisecond: u16,
+}
+
+impl Utc {
+    /// The shape `Date.prototype.toISOString` produces, which is what the existing log lines carry.
+    #[must_use]
+    pub fn iso8601(self) -> String {
+        format!(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+            self.year, self.month, self.day, self.hour, self.minute, self.second, self.millisecond
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

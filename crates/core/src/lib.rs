@@ -7,11 +7,15 @@
 
 pub mod action;
 pub mod catalog;
+pub mod config_io;
+pub mod directories;
+pub mod fs;
 pub mod hash;
 pub mod ini;
 pub mod ini_merge;
 pub mod install;
 pub mod keys;
+pub mod log;
 pub mod stamp;
 pub mod text;
 pub mod validate;
