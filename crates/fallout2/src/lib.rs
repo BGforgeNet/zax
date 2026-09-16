@@ -2,6 +2,7 @@
 
 pub mod actions;
 pub mod archive_preflight;
+pub mod backend;
 pub mod base_version;
 pub mod case_lowering;
 pub mod catalog;

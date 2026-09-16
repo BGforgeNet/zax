@@ -24,7 +24,14 @@ use crate::engine_config::live_targets;
 /// side.
 #[must_use]
 pub fn address_of(target: &SettingTarget) -> String {
-    format!("{}|{}|{}", target.file, target.section, target.key)
+    address(&target.file, &target.section, &target.key)
+}
+
+/// The same key from the three parts alone, for a caller holding an address that is not a target -
+/// a config change on its way into the record.
+#[must_use]
+pub fn address(file: &str, section: &str, key: &str) -> String {
+    format!("{file}|{section}|{key}")
 }
 
 /// One address taking part, and what it now says.
