@@ -6,6 +6,7 @@ pub mod base_version;
 pub mod case_lowering;
 pub mod catalog;
 pub mod dat;
+pub mod debug_package;
 pub mod engine_choice;
 pub mod engine_config;
 pub mod engine_install;
