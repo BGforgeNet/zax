@@ -1,6 +1,12 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/fallout2", "crates/platform", "crates/shell"]
+members = [
+  "crates/core",
+  "crates/fallout2",
+  "crates/host",
+  "crates/platform",
+  "crates/shell",
+]
 
 # The crates mirror packages/ one for one, and dependencies point inward the same way: zax-core may
 # not reach zax-platform's implementations, only the traits it is handed.
@@ -14,6 +20,7 @@ publish = false
 [workspace.dependencies]
 zax-core = { path = "crates/core" }
 zax-fallout2 = { path = "crates/fallout2" }
+zax-host = { path = "crates/host" }
 zax-platform = { path = "crates/platform" }
 
 [workspace.lints.rust]
