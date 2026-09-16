@@ -18,6 +18,7 @@ pub mod mod_created;
 pub mod mod_grants;
 pub mod mod_state;
 pub mod mod_vendored;
+pub mod mods;
 pub mod pe_version;
 pub mod places;
 pub mod records;
