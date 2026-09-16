@@ -20,6 +20,7 @@ pub mod launch;
 pub mod layout;
 pub mod manifest;
 pub mod mod_asset;
+pub mod mod_base;
 pub mod mod_choice;
 pub mod mod_created;
 pub mod mod_feed;
