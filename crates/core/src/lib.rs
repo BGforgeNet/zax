@@ -5,9 +5,11 @@
 //! into something whose keys could be read, which is a question Rust answers at the deserializer
 //! instead.
 
+pub mod catalog;
 pub mod hash;
 pub mod ini;
 pub mod ini_merge;
+pub mod keys;
 pub mod stamp;
 pub mod text;
 pub mod vdf;
