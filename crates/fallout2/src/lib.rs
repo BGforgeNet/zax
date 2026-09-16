@@ -30,6 +30,8 @@ pub mod mod_state;
 pub mod mod_transaction;
 pub mod mod_vendored;
 pub mod mods;
+#[cfg(test)]
+pub mod pe_fixture;
 pub mod pe_version;
 pub mod places;
 pub mod recommended_order;

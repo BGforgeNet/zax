@@ -98,6 +98,23 @@ mod tests {
     }
 
     #[test]
+    fn the_installs_own_library_answers_with_what_it_records() {
+        // The positive control the two absences below rest on.
+        let platform = MemoryPlatform::new(MemoryOptions {
+            files: BTreeMap::from([(
+                "/games/f2/ddraw.dll".to_owned(),
+                Content::from(crate::pe_fixture::library(&[("FileVersion", "4.5")])),
+            )]),
+            ..MemoryOptions::default()
+        });
+        let install = Install::new("/games/f2", GameType::Fallout2);
+        assert_eq!(
+            installed_library_version(&platform, &install, "ddraw.dll").expect("read"),
+            Some("4.5".to_owned())
+        );
+    }
+
+    #[test]
     fn a_library_the_install_does_not_have_answers_none() {
         let platform = MemoryPlatform::default();
         let install = Install::new("/games/f2", GameType::Fallout2);
