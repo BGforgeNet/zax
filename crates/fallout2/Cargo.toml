@@ -10,5 +10,6 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+dat3-core = { git = "https://github.com/BGforgeNet/dat3", rev = "78d67769ed2da2f793b723ef19fac5e55970910c", version = "0.11.0" }
 zax-core.workspace = true
 zax-platform.workspace = true

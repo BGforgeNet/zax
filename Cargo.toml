@@ -7,7 +7,8 @@ members = ["crates/core", "crates/fallout2", "crates/platform", "crates/shell"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+# Floor set by dat3-core, which zax-fallout2 links for DAT archives.
+rust-version = "1.87"
 publish = false
 
 [workspace.dependencies]

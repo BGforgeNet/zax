@@ -199,10 +199,6 @@ pub struct LaunchRecord {
     pub cwd: Option<String>,
     pub log: Option<String>,
     pub env: BTreeMap<String, String>,
-    /// Whether this went through `run_wasm` rather than `run`. Recorded so a test asserting the
-    /// command need not know the route and one asserting the route can - the two are a real
-    /// difference on a host with no native build of the tool.
-    pub wasm: bool,
 }
 
 /// One recorded archive write, with what was in it at the time. The contents are captured rather
@@ -635,7 +631,6 @@ fn record_of(program: &Path, args: &[String], options: &LaunchOptions<'_>) -> La
         cwd: options.cwd.as_deref().map(normalize_path),
         log: options.log.as_deref().map(normalize_path),
         env: options.env.clone(),
-        wasm: false,
     }
 }
 
@@ -690,20 +685,6 @@ impl ProcessLauncher for MemoryPlatform {
     /// lock left by an interrupted run has to be tested against.
     fn alive(&self, pid: u32) -> Result<bool> {
         Ok(self.options.live_pids.contains(&pid))
-    }
-
-    /// Answered from the same table as `run`, keyed by the module's path: which of the two routes a
-    /// tool took is the host's business, and a test that stated what the tool says should not have
-    /// to know. The record carries the route so a test that cares can still tell.
-    fn run_wasm(&self, module: &Path, args: &[String]) -> Result<RunOutcome> {
-        let name = normalize_path(module);
-        self.state().records.ran.push(LaunchRecord {
-            wasm: true,
-            ..record_of(module, args, &LaunchOptions::default())
-        });
-        self.canned_run(&name, args)
-            .cloned()
-            .ok_or_else(|| missing("run_wasm", &name))
     }
 
     /// Only what a test says. Absent means the host could not tell, which is the answer a caller
@@ -1013,52 +994,6 @@ mod tests {
         let p = MemoryPlatform::default();
         assert!(p.create_exclusive(&at("/absent/held"), b"first").is_err());
         assert_eq!(p.all_files(), Vec::<String>::new());
-    }
-
-    #[test]
-    fn run_wasm_answers_from_the_same_table_but_records_the_route() {
-        let outcome = RunOutcome {
-            code: Some(0),
-            output: "extracted".to_owned(),
-        };
-        let p = MemoryPlatform::new(MemoryOptions {
-            runs: BTreeMap::from([("/cache/dat3.wasm".to_owned(), outcome.clone())]),
-            ..MemoryOptions::default()
-        });
-        let args = vec!["x".to_owned()];
-        assert_eq!(
-            p.run_wasm(&at("/cache/dat3.wasm"), &args)
-                .expect("run_wasm"),
-            outcome
-        );
-
-        let ran = p.records().ran;
-        assert_eq!(ran.len(), 1);
-        assert_eq!(ran[0].args, args);
-        assert!(ran[0].wasm, "the module route must be distinguishable");
-    }
-
-    #[test]
-    fn run_records_that_it_was_not_the_module_route() {
-        let p = MemoryPlatform::new(MemoryOptions {
-            runs: BTreeMap::from([(
-                "/cache/dat3".to_owned(),
-                RunOutcome {
-                    code: Some(0),
-                    output: String::new(),
-                },
-            )]),
-            ..MemoryOptions::default()
-        });
-        p.run(&at("/cache/dat3"), &[], &LaunchOptions::default())
-            .expect("run");
-        assert!(!p.records().ran[0].wasm);
-    }
-
-    #[test]
-    fn run_wasm_of_an_unknown_module_fails() {
-        let p = MemoryPlatform::default();
-        assert!(p.run_wasm(&at("/cache/absent.wasm"), &[]).is_err());
     }
 
     #[test]

@@ -93,18 +93,4 @@ pub trait ProcessLauncher: Send + Sync {
     /// positive disagreement. Reading it costs a process on most hosts, so ask only once something
     /// already answered `alive`.
     fn command_of(&self, pid: u32) -> Result<Option<String>>;
-
-    /// Runs a WebAssembly module compiled against WASI and answers as `run` does. Separate from
-    /// `run` because a module is not a program the operating system can start: something has to host
-    /// it, and which something is the host's business rather than the caller's.
-    ///
-    /// The module is given the whole filesystem, which is the authority a native build of the same
-    /// tool would have had - the point of running one is that ZAX has no native build for this
-    /// machine, not that it trusts the tool less.
-    ///
-    /// This is not the archive route. Extraction is pure Rust now, and the only module left is the
-    /// DAT tool, which upstream publishes no macOS build of - so on macOS this method is the whole
-    /// of a mod's ability to unpack a DAT. Which runtime hosts it is still open: the Electron shell
-    /// borrowed Node's WASI, and a Tauri shell has to carry its own or ship a native build instead.
-    fn run_wasm(&self, module: &Path, args: &[String]) -> Result<RunOutcome>;
 }
