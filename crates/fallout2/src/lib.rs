@@ -12,6 +12,7 @@ pub mod hires;
 pub mod install_lock;
 pub mod launch;
 pub mod layout;
+pub mod manifest;
 pub mod mod_choice;
 pub mod mod_grants;
 pub mod mod_state;
