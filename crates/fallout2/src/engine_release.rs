@@ -55,7 +55,7 @@ impl std::fmt::Debug for EngineProgress<'_> {
 }
 
 impl EngineProgress<'_> {
-    fn step(&self, said: &str) {
+    pub(crate) fn step(&self, said: &str) {
         if let Some(on_step) = self.on_step {
             on_step(said);
         }

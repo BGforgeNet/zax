@@ -8,6 +8,7 @@ pub mod catalog;
 pub mod dat;
 pub mod engine_choice;
 pub mod engine_config;
+pub mod engine_install;
 pub mod engine_release;
 pub mod engines;
 pub mod files;
