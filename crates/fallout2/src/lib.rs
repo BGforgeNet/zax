@@ -17,4 +17,5 @@ pub mod mod_grants;
 pub mod mod_state;
 pub mod pe_version;
 pub mod places;
+pub mod sfall;
 pub mod trouble;
