@@ -18,6 +18,8 @@ pub mod keys;
 pub mod log;
 pub mod stamp;
 pub mod text;
+pub mod updates;
 pub mod validate;
 pub mod vdf;
 pub mod version;
+pub mod zax_file;
