@@ -4759,6 +4759,7 @@ version = "0.1.0"
 dependencies = [
  "dat3-core",
  "pelite",
+ "regex",
  "serde",
  "serde_json",
  "zax-core",
