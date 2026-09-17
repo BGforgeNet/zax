@@ -7,4 +7,4 @@ import type { RecordedMod } from "./RecordedMod";
  * `InstalledMod` carries a YAML value for the fields a newer ZAX may have written and JSON has no
  * place to put one - so the entry travels as the YAML the record itself holds.
  */
-export type Journal = { transaction: bigint, id: string, archive?: PinnedAsset | null, parts?: { [key in string]: PinnedAsset } | null, selection?: Array<string> | null, manifestText: string, version: string, previous?: RecordedMod | null, order?: string | null, preexisting: Array<string>, };
+export type Journal = { transaction: number, id: string, archive?: PinnedAsset | null, parts?: { [key in string]: PinnedAsset } | null, selection?: Array<string> | null, manifestText: string, version: string, previous?: RecordedMod | null, order?: string | null, preexisting: Array<string>, };

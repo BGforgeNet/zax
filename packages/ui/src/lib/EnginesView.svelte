@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { EngineListing } from "@zax/fallout2";
+  import type { EngineListing } from "./bindings/EngineListing";
   import Dialog from "./Dialog.svelte";
   import EngineCaution from "./EngineCaution.svelte";
-  import { isPreview } from "./host.js";
+  import { isPreview } from "./invoke.js";
   import { ENGINE_ICON } from "./icons.js";
   import { store } from "./store.svelte.js";
 
@@ -108,7 +108,8 @@
                   class="use"
                   disabled={store.busy !== null}
                   title={store.busyReason}
-                  onclick={() => void store.useEngineBuild(engine.id, { published: version.published })}
+                  onclick={() =>
+                    void store.useEngineBuild(engine.id, { pick: "published", published: version.published })}
                 >
                   {usedHere ? "Pin here" : "Use here"}
                 </button>
@@ -153,7 +154,7 @@
                   class="use"
                   disabled={store.busy !== null}
                   title={store.busyReason}
-                  onclick={() => void store.useEngineBuild(engine.id, "latest")}
+                  onclick={() => void store.useEngineBuild(engine.id, { pick: "latest" })}
                 >
                   Follow latest
                 </button>

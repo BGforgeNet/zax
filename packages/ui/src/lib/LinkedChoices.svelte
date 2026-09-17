@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { valueLabel } from "@zax/core";
   import { store } from "./store.svelte.js";
 
   /*
@@ -11,20 +10,17 @@
 </script>
 
 {#each store.settingsChoices as choice (choice.id)}
-  {@const def = store.defOf(choice.id)}
-  {#if def && choice.choose}
-    <div class="tab-banner choice" role="alert">
-      <span class="what">
-        <strong>{def.label}</strong> was changed in more than one place. Which one is right?
-      </span>
-      {#each choice.choose as moved (moved.target.file)}
-        <button onclick={() => store.chooseLinked(choice.id, moved.value)}>
-          {valueLabel(def, moved.value)}
-          <span class="where">{moved.target.file}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
+  <div class="tab-banner choice" role="alert">
+    <span class="what">
+      <strong>{choice.label}</strong> was changed in more than one place. Which one is right?
+    </span>
+    {#each choice.options as moved (moved.file)}
+      <button onclick={() => store.chooseLinked(choice.id, moved.value)}>
+        {moved.label}
+        <span class="where">{moved.file}</span>
+      </button>
+    {/each}
+  </div>
 {/each}
 
 <style>

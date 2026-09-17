@@ -86,7 +86,6 @@ pub struct ReadingView {
     /// Where this is set, `rows` holds only the rows that changed since the view of that revision, and
     /// `discovered` and `mod_settings` are absent, having not changed. A caller that does not hold that
     /// view asks for a whole one.
-    #[ts(type = "number | null")]
     pub since: Option<u64>,
     /// Keys the files hold that the catalog does not describe.
     pub discovered: Option<Vec<SettingDef>>,
@@ -95,7 +94,7 @@ pub struct ReadingView {
     pub groups: Vec<GroupView>,
     pub actions: Vec<ActionView>,
     /// Linked settings whose engines have each moved, so which value survives is the user's call.
-    pub choices: Vec<Divergence>,
+    pub choices: Vec<ChoiceView>,
     pub carry: Option<String>,
     /// Unsaved edits, the mod order counting once however much of it moved.
     pub modified_count: usize,
@@ -122,7 +121,6 @@ pub struct ReadingView {
 #[serde(rename_all = "camelCase")]
 pub struct AppView {
     /// Higher is newer. An answer carrying a lower one than the view on screen is stale.
-    #[ts(type = "number")]
     pub revision: u64,
     pub machine: MachineDescription,
     pub installs: Vec<Install>,
@@ -214,7 +212,11 @@ impl Backend {
                 rows: changed.unwrap_or(rows),
                 groups: settings.groups(),
                 actions: settings.actions(own_debug.as_deref()),
-                choices: settings.choices.clone(),
+                choices: settings
+                    .choices
+                    .iter()
+                    .filter_map(|choice| choice_view(settings, choice))
+                    .collect(),
                 carry: reading.carry.clone(),
                 modified_count: settings.overrides.len() + usize::from(order.changed),
                 settings_changed: settings.settings_changed(),
@@ -497,32 +499,34 @@ impl Backend {
         Ok(self.view_of(&mut held))
     }
 
-    /// # Errors
-    ///
-    /// Fails where no install is selected.
-    pub fn set_setting(&self, id: &str, value: &str) -> Result<AppView> {
-        let mut held = self.held();
-        Self::reading_mut(&mut held)?.settings.set(id, value);
-        Ok(self.view_of(&mut held))
-    }
-
-    /// Sets a scale setting from the percentage its slider shows, rounded to the engine's own scale.
+    /// Applies edits in the order given. Several at once because the interface sends what piled up while
+    /// the previous answer was on its way: sent one by one, two edits can reach this lock in either order,
+    /// and a slider would settle on whichever value arrived last rather than the one it was left at.
     ///
     /// # Errors
     ///
-    /// Fails where no install is selected or the setting is not a scale.
-    pub fn set_percent(&self, id: &str, percent: f64) -> Result<AppView> {
+    /// Fails where no install is selected, or a percentage names a setting that is not a scale. Edits
+    /// before the refused one stay applied, and the view that comes back says so.
+    pub fn set_settings(&self, edits: &[SettingEdit]) -> Result<AppView> {
         let mut held = self.held();
         let settings = &mut Self::reading_mut(&mut held)?.settings;
-        let Some(zax_core::catalog::SettingKind::Scale { max }) =
-            settings.def_of(id).map(|def| &def.kind)
-        else {
-            return Err(Error::Unsupported(format!(
-                "{id} is not set as a percentage."
-            )));
-        };
-        let value = zax_core::catalog::percent_to_scale(percent, *max);
-        settings.set(id, &value);
+        for edit in edits {
+            let value = match &edit.to {
+                SettingValue::Raw(value) => value.clone(),
+                SettingValue::Percent(percent) => {
+                    let Some(zax_core::catalog::SettingKind::Scale { max }) =
+                        settings.def_of(&edit.id).map(|def| &def.kind)
+                    else {
+                        return Err(Error::Unsupported(format!(
+                            "{} is not set as a percentage.",
+                            edit.id
+                        )));
+                    };
+                    zax_core::catalog::percent_to_scale(*percent, *max)
+                }
+            };
+            settings.set(&edit.id, &value);
+        }
         Ok(self.view_of(&mut held))
     }
 
@@ -1214,6 +1218,44 @@ impl Backend {
     }
 }
 
+/// A setting whose engines have each moved, as the question about it is asked.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
+#[serde(rename_all = "camelCase")]
+pub struct ChoiceView {
+    pub id: String,
+    pub label: String,
+    /// Each value that moved, with the file it moved in.
+    pub options: Vec<ChoiceOptionView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
+#[serde(rename_all = "camelCase")]
+pub struct ChoiceOptionView {
+    pub file: String,
+    pub value: String,
+    pub label: String,
+}
+
+/// A divergence the user has to settle, or nothing where it is not one of those.
+fn choice_view(settings: &SettingsSession, choice: &Divergence) -> Option<ChoiceView> {
+    let def = settings.def_of(&choice.id)?;
+    let moved = choice.choose.as_ref()?;
+    Some(ChoiceView {
+        id: choice.id.clone(),
+        label: def.label.clone(),
+        options: moved
+            .iter()
+            .map(|one| ChoiceOptionView {
+                file: one.target.file.clone(),
+                value: one.value.clone(),
+                label: zax_core::catalog::value_label(def, &one.value),
+            })
+            .collect(),
+    })
+}
+
 /// Stores what a directory now is, after something changed it.
 fn retype(installs: &mut [Install], path: &str, game_type: GameType) {
     if let Some(install) = installs.iter_mut().find(|one| one.path == path) {
@@ -1221,23 +1263,31 @@ fn retype(installs: &mut [Install], path: &str, game_type: GameType) {
     }
 }
 
+/// One edit to a setting: a value as the file holds it, or a scale's value as its slider shows it.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
+pub struct SettingEdit {
+    pub id: String,
+    pub to: SettingValue,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
+#[serde(rename_all = "camelCase")]
+pub enum SettingValue {
+    Raw(String),
+    Percent(f64),
+}
+
 /// One edit to a mod order.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(tag = "edit", rename_all = "camelCase")]
 pub enum OrderEdit {
-    Toggle {
-        name: String,
-    },
-    Shift {
-        name: String,
-        #[ts(type = "number")]
-        by: i64,
-    },
+    Toggle { name: String },
+    Shift { name: String, by: i64 },
     Sort,
-    Forget {
-        name: String,
-    },
+    Forget { name: String },
     ForgetMissing,
 }
 

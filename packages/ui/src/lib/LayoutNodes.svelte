@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { LayoutNode } from "@zax/fallout2";
+  import type { LayoutNode } from "./bindings/LayoutNode";
   import LayoutNodes from "./LayoutNodes.svelte";
   import ResolutionPresets from "./ResolutionPresets.svelte";
   import SettingRow from "./SettingRow.svelte";

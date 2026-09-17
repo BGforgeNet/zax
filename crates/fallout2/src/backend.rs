@@ -72,7 +72,7 @@ mod app;
 
 pub use app::{
     Answered, AppView, InstallReport, ModInstallRequest, OrderEdit, ReadingView, SaveRefusal,
-    Started,
+    SettingEdit, SettingValue, Started,
 };
 
 use crate::sfall::{

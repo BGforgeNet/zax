@@ -79,9 +79,8 @@ describe("the Wine fields", () => {
 });
 
 describe("with nothing selected", () => {
-  test("says to pick an install rather than drawing empty fields", () => {
-    store.installs = [];
-    store.selectedInstall = "";
+  test("says to pick an install rather than drawing empty fields", async () => {
+    await store.removeInstall(PREVIEW_INSTALL);
     const view = panel();
     expect(view.one("p.empty").textContent).toContain("Select an install");
     expect(view.all("input")).toHaveLength(0);

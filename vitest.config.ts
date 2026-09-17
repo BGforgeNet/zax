@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: { conditions: ["browser"] },
   test: {
     include: ["packages/*/src/**/*.test.ts", "scripts/**/*.test.ts"],
+    // The preview's WebAssembly, loaded from disk before the interface's tests import it - see the file.
+    setupFiles: ["packages/ui/vitest.setup.ts"],
     coverage: {
       provider: "v8",
       // Text for the run's own output, and the lcov data on its own for anything that reads it afterwards.

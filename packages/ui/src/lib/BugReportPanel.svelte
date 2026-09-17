@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { DEBUG_PACKAGE_CONTENTS } from "@zax/fallout2";
   import ActionCard from "./ActionCard.svelte";
   import Dialog from "./Dialog.svelte";
   import { store } from "./store.svelte.js";
@@ -105,7 +104,7 @@
           {store.busy === "Creating the debug package" ? "Collecting..." : "Create debug package"}
         </button>
         <ul class="contents">
-          {#each DEBUG_PACKAGE_CONTENTS as item (item)}
+          {#each store.catalog?.debugPackageContents ?? [] as item (item)}
             <li>{item}</li>
           {/each}
         </ul>

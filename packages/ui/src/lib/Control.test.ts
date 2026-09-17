@@ -1,9 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { SETTINGS } from "@zax/fallout2";
-import type { SettingDef } from "@zax/core";
 import Control from "./Control.svelte";
-import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
+import { catalogDef as def, render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
 
 /*
@@ -13,12 +11,6 @@ import { store } from "./store.svelte.js";
   precision. Every case below drives a real catalog definition rather than a hand-made one, so a kind whose
   shape changes upstream fails here instead of rendering the wrong widget.
 */
-
-const def = (id: string): SettingDef => {
-  const found = SETTINGS.find((setting) => setting.id === id);
-  if (!found) throw new Error(`no catalog setting "${id}" - the id it was written against was renamed`);
-  return found;
-};
 
 const BOOL = "sfall.Misc.UseFileSystemOverride";
 const CHOICE = "sfall.Misc.DamageFormula";
@@ -117,20 +109,22 @@ describe("a scale setting", () => {
     control speaks percent in both directions. This is the pair that has to agree: what the readout shows and
     what a move writes.
   */
-  test("reads the engine's own scale as a percentage", () => {
+  test("reads the engine's own scale as a percentage", async () => {
     const kind = def(SCALE).kind;
     if (kind.type !== "scale") throw new Error("the fixture setting stopped being a scale");
     store.set(SCALE, String(kind.max));
+    await store.idle();
     expect(draw(SCALE).text()).toContain("100%");
   });
 
-  test("writes a percentage back on the engine's scale", () => {
+  test("writes a percentage back on the engine's scale", async () => {
     const kind = def(SCALE).kind;
     if (kind.type !== "scale") throw new Error("the fixture setting stopped being a scale");
     const view = draw(SCALE);
     const slider = view.one<HTMLInputElement>("input[type=range]");
     slider.value = "50";
     slider.dispatchEvent(new Event("input", { bubbles: true }));
+    await store.idle();
     expect(Number(store.valueOf(SCALE))).toBeCloseTo(kind.max / 2, -1);
   });
 });

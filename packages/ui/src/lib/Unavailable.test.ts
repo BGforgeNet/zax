@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import Unavailable from "./Unavailable.svelte";
-import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
+import { plantLibrary, render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
 
 /*
@@ -42,12 +42,12 @@ describe("what it says is missing", () => {
     is a different situation from one missing because nothing installed it - and the two need different wording,
     since only one of them is fixed by installing anything.
   */
-  test("distinguishes an installed hi-res patch missing its config from one that was never installed", () => {
-    store.hiresInstalled = null;
+  test("distinguishes an installed hi-res patch missing its config from one that was never installed", async () => {
+    expect(store.hiresInstalled).toBeNull();
     expect(draw({ file: "f2_res.ini" }).text()).toContain("is not installed");
     unmountAll();
 
-    store.hiresInstalled = "4.1.8";
+    await plantLibrary("f2_res.dll", "4.1.8");
     const view = draw({ file: "f2_res.ini" });
     expect(view.text()).toContain("4.1.8 is installed");
     expect(view.text()).toContain("not in the game folder");

@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import GamesPanel from "./GamesPanel.svelte";
-import { PREVIEW_INSTALL, render, reseedPreview, unmountAll } from "./preview-fixture.js";
-import { previewPlatform } from "./preview-host.js";
+import { bytes, disk, PREVIEW_INSTALL, render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
 
 /*
@@ -63,7 +62,7 @@ describe("the list", () => {
     afterEach(() => (store.busy = null));
 
     test("greys out every row but the one the operation belongs to, naming what is running", async () => {
-      await previewPlatform.fs.write("preview/other/fallout2.exe", new Uint8Array([0x4d, 0x5a]));
+      disk().writeFile("preview/other/fallout2.exe", bytes("MZ"));
       await store.addInstall("preview/other");
       await store.selectInstall(PREVIEW_INSTALL);
       store.busy = "Installing RPU";
@@ -87,8 +86,8 @@ describe("the list", () => {
     });
   });
 
-  test("says the list is empty rather than drawing nothing", () => {
-    store.installs = [];
+  test("says the list is empty rather than drawing nothing", async () => {
+    await store.removeInstall(PREVIEW_INSTALL);
     const view = panel();
     expect(view.one("li.empty").textContent).toBe("No installs yet.");
   });
@@ -204,9 +203,8 @@ describe("removing an install", () => {
     expect(view.one<HTMLDialogElement>("dialog").open).toBe(false);
   });
 
-  test("is off with nothing selected", () => {
-    store.installs = [];
-    store.selectedInstall = "";
+  test("is off with nothing selected", async () => {
+    await store.removeInstall(PREVIEW_INSTALL);
     expect(panel().control("Remove from list").hasAttribute("disabled")).toBe(true);
   });
 });

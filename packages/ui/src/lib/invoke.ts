@@ -11,32 +11,51 @@
  * fixture it is seeded with.
  */
 
-export const PREVIEW_REASON = "The browser preview has no machine to reach - this needs the desktop build.";
+import type { OperationProgress } from "./bindings/OperationProgress";
 
-/** What a long operation reports as it runs, as one message. */
-export interface OperationProgress {
-  step: string;
-  received?: number;
-  total?: number;
-  cancellable: boolean;
-}
+export const PREVIEW_REASON = "The browser preview has no machine to reach - this needs the desktop build.";
 
 /** Whether a Tauri shell is presenting this page, which is what decides the host. */
 const onDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-/** The preview's machine, made once and only where there is no shell. */
-let previewMachine: Promise<{ invoke(name: string, args: string): string; onProgress(listener: (said: string) => void): void }> | null =
-  null;
-
-async function preview(): Promise<{
+/** The preview machine as its WebAssembly wrapper presents it. */
+export interface PreviewMachine {
   invoke(name: string, args: string): string;
   onProgress(listener: (said: string) => void): void;
-}> {
-  previewMachine ??= (async () => {
-    const wasm = await import("./preview-wasm/zax_preview.js");
-    await wasm.default();
-    return new wasm.ZaxPreview();
-  })();
+  writeFile(path: string, bytes: Uint8Array): void;
+  readFile(path: string): Uint8Array;
+  removeFile(path: string): void;
+}
+
+/** The preview's machine, made once and only where there is no shell. */
+let previewMachine: Promise<PreviewMachine> | null = null;
+/** Where progress goes, kept so a machine made afresh reports to the same place. */
+const progressListeners: Array<(progress: OperationProgress) => void> = [];
+
+async function makePreview(): Promise<PreviewMachine> {
+  const wasm = await import("./preview-wasm/zax_preview.js");
+  await wasm.default();
+  const machine = new wasm.ZaxPreview();
+  machine.onProgress((said: string) => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- written by the preview from the Rust type this binding was generated from.
+    const progress = JSON.parse(said) as OperationProgress;
+    for (const listener of progressListeners) listener(progress);
+  });
+  return machine;
+}
+
+/** The preview's machine, made on first use. */
+export async function preview(): Promise<PreviewMachine> {
+  previewMachine ??= makePreview();
+  return previewMachine;
+}
+
+/**
+ * Replaces the preview's machine with a freshly seeded one. What a test starts from, so no case reads the
+ * disk the last one wrote.
+ */
+export async function resetPreview(): Promise<PreviewMachine> {
+  previewMachine = makePreview();
   return previewMachine;
 }
 
@@ -62,6 +81,7 @@ export async function invoke<T>(name: string, args: Record<string, unknown> = {}
     // The preview throws the sentence itself, which is what the shell's channel carries too.
     throw new Error(typeof error === "string" ? error : String(error));
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the answer is the command's own Rust type serialized, and `T` its generated binding: the same trust the shell's own `invoke<T>` extends.
   return JSON.parse(answered) as T;
 }
 
@@ -72,8 +92,7 @@ export async function onProgress(listener: (progress: OperationProgress) => void
     await listen<OperationProgress>("zax://progress", (event) => listener(event.payload));
     return;
   }
-  const machine = await preview();
-  machine.onProgress((said) => listener(JSON.parse(said) as OperationProgress));
+  progressListeners.push(listener);
 }
 
 /** Whether this is the browser preview, which several surfaces say out loud. */

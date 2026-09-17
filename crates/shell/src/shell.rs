@@ -17,19 +17,6 @@ use zax_platform::{Error, Result};
 /// operation at a time.
 pub const PROGRESS_EVENT: &str = "zax://progress";
 
-/// Progress as it crosses to the interface. Its own shape rather than serde on the domain's, because
-/// the field names are part of what the interface reads.
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ProgressMessage {
-    step: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    received: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    total: Option<u64>,
-    cancellable: bool,
-}
-
 #[derive(Debug)]
 pub struct WindowShell {
     app: AppHandle,
@@ -100,15 +87,8 @@ impl Shell for WindowShell {
     fn report(&self, progress: &OperationProgress) {
         // A window that has gone is not a failure of the operation reporting to it: the work carries
         // on and its result is what the caller acts on.
-        let _ = self.app.emit(
-            PROGRESS_EVENT,
-            ProgressMessage {
-                step: progress.step.clone(),
-                received: progress.received,
-                total: progress.total,
-                cancellable: progress.cancellable,
-            },
-        );
+        // The domain's own shape, whose binding is what the interface reads the message as.
+        let _ = self.app.emit(PROGRESS_EVENT, progress);
     }
 
     fn now(&self) -> LocalTime {
@@ -154,8 +134,8 @@ mod tests {
     }
 
     #[test]
-    fn progress_crosses_with_the_names_the_interface_reads() {
-        let held = ProgressMessage {
+    fn progress_crosses_with_the_names_and_nulls_the_binding_declares() {
+        let held = OperationProgress {
             step: "Downloading sfall 4.5".to_owned(),
             received: Some(1),
             total: None,
@@ -164,8 +144,7 @@ mod tests {
         let written = serde_json::to_string(&held).expect("a message the shell writes");
         assert!(written.contains("\"step\""), "{written}");
         assert!(written.contains("\"cancellable\":true"), "{written}");
-        // A count the server did not declare is absent rather than null: the interface reads its
-        // presence.
-        assert!(!written.contains("\"total\""), "{written}");
+        // A count the server did not declare is null, which is what the interface's type says it is.
+        assert!(written.contains("\"total\":null"), "{written}");
     }
 }

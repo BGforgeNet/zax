@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import App from "./App.svelte";
-import { render, reseedPreview, unmountAll } from "./lib/preview-fixture.js";
+import { PREVIEW_INSTALL, render, reseedPreview, unmountAll } from "./lib/preview-fixture.js";
 import { store } from "./lib/store.svelte.js";
 
 /*
@@ -54,9 +54,10 @@ describe("the view strip", () => {
     for (const dot of dots) expect(dot.getAttribute("aria-hidden")).toBe("true");
   });
 
-  test("marks the settings dot once a setting is edited, and says so in its tooltip", () => {
+  test("marks the settings dot once a setting is edited, and says so in its tooltip", async () => {
     const setting = "sfall.Misc.UseFileSystemOverride";
     store.set(setting, store.valueOf(setting) === "1" ? "0" : "1");
+    await store.idle();
     const view = app();
     const dot = view.all(".topbar .dot")[0]!;
     expect(dot.classList.contains("unsaved")).toBe(true);
@@ -123,7 +124,7 @@ describe("the status bar", () => {
 
   test("prefers the progress text over the bare operation name once there is one", () => {
     store.busy = "Updating sfall";
-    store.progress = { step: "Downloading sfall", received: 5, total: 10 };
+    store.progress = { step: "Downloading sfall", received: 5, total: 10, cancellable: true };
     const view = app();
     expect(view.one(".statusbar .step").textContent).toBe("Downloading sfall");
     expect(view.one(".statusbar .amount").textContent).toBe("50% of 0.0 MB");
@@ -136,16 +137,16 @@ describe("the theme", () => {
     The palette reads the used color-scheme, so applying a theme is one attribute on the root element. "system"
     removes it rather than pinning a value, or the choice would stop following the OS.
   */
-  test("stamps the chosen theme on the root element", () => {
-    store.theme = "dark";
+  test("stamps the chosen theme on the root element", async () => {
+    await store.setTheme("dark");
     app();
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
   });
 
-  test("removes the attribute for system rather than writing a value", () => {
-    store.theme = "dark";
+  test("removes the attribute for system rather than writing a value", async () => {
+    await store.setTheme("dark");
     const view = app();
-    store.theme = "system";
+    await store.setTheme("system");
     view.settle();
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
   });
@@ -195,9 +196,8 @@ describe("the window keys", () => {
 });
 
 describe("with no install", () => {
-  test("shows the first-run screen and no save bar for it to act on", () => {
-    store.installs = [];
-    store.selectedInstall = "";
+  test("shows the first-run screen and no save bar for it to act on", async () => {
+    await store.removeInstall(PREVIEW_INSTALL);
     store.loaded = true;
     const view = app();
 
@@ -209,9 +209,8 @@ describe("with no install", () => {
     While the state file is still being read the views draw their empty shape, so the bar draws with them rather
     than appearing under the pointer a moment later.
   */
-  test("keeps the save bar while the state file is still being read", () => {
-    store.installs = [];
-    store.selectedInstall = "";
+  test("keeps the save bar while the state file is still being read", async () => {
+    await store.removeInstall(PREVIEW_INSTALL);
     store.loaded = false;
     const view = app();
 

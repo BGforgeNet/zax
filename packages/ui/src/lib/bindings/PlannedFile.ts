@@ -4,7 +4,7 @@ export type PlannedFile = {
 /**
  * Relative to the install, under `mods/`.
  */
-path: string, size: bigint, 
+path: string, size: number, 
 /**
  * Whether something already sits at the target - what restore would put back.
  */

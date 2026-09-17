@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { SETTINGS } from "@zax/fallout2";
 import SettingsView from "./SettingsView.svelte";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
@@ -13,7 +12,7 @@ import { store } from "./store.svelte.js";
 
 beforeEach(async () => {
   await reseedPreview();
-  store.query = "";
+  await store.setQuery("");
 });
 afterEach(unmountAll);
 
@@ -57,9 +56,10 @@ describe("the group strip", () => {
     for (const dot of dots) expect(dot.getAttribute("aria-hidden")).toBe("true");
   });
 
-  test("marks the dot and counts in its tooltip once a setting in that group is edited", () => {
+  test("marks the dot and counts in its tooltip once a setting in that group is edited", async () => {
     const setting = "sfall.Misc.UseFileSystemOverride";
     store.set(setting, store.valueOf(setting) === "1" ? "0" : "1");
+    await store.idle();
     const v = view();
     const marked = v.all(".dot.unsaved");
     expect(marked).toHaveLength(1);
@@ -119,14 +119,14 @@ describe("the All settings tab", () => {
     expect(view().all(".count")).toHaveLength(0);
   });
 
-  test("counts matches against the catalog total once narrowed", () => {
-    store.query = "damage";
+  test("counts matches against the catalog total once narrowed", async () => {
+    await store.setQuery("damage");
     const v = view();
-    expect(v.one(".count").textContent).toMatch(new RegExp(`^\\d+ of ${SETTINGS.length}$`));
+    expect(v.one(".count").textContent).toMatch(new RegExp(`^\\d+ of ${store.catalog?.settings.length}$`));
   });
 
-  test("says what matched nothing rather than showing an empty list", () => {
-    store.query = "zzzz-no-such-setting";
+  test("says what matched nothing rather than showing an empty list", async () => {
+    await store.setQuery("zzzz-no-such-setting");
     const v = view();
     expect(v.text()).toContain('Nothing matches "zzzz-no-such-setting"');
   });
@@ -135,8 +135,8 @@ describe("the All settings tab", () => {
     Grouped under the address they came from, so a run of rows reads as the tab it belongs to rather than as one
     badge repeated down the column. The heading is also the way back to that tab.
   */
-  test("heads each run of results with the tab they live on, and going there opens it", () => {
-    store.query = "damage";
+  test("heads each run of results with the tab they live on, and going there opens it", async () => {
+    await store.setQuery("damage");
     const v = view();
     const heads = v.all("button.found");
     expect(heads.length).toBeGreaterThan(0);
@@ -150,8 +150,8 @@ describe("the All settings tab", () => {
     Install is the one settings tab holding nothing from the catalog, so search cannot reach it the way it
     reaches the rest: without this, "folder" reports nothing while the tab sits in plain view.
   */
-  test("offers the Install tab as its own result, and going there clears the filter behind you", () => {
-    store.query = "folder";
+  test("offers the Install tab as its own result, and going there clears the filter behind you", async () => {
+    await store.setQuery("folder");
     const v = view();
     expect(store.installMatches, "the term the offer rests on").toBe(true);
 
@@ -163,15 +163,15 @@ describe("the All settings tab", () => {
     expect(store.query).toBe("");
   });
 
-  test("draws no Install offer for a term the tab has nothing to do with", () => {
-    store.query = "damage";
+  test("draws no Install offer for a term the tab has nothing to do with", async () => {
+    await store.setQuery("damage");
     expect(store.installMatches).toBe(false);
     expect(offer(view())).toBeUndefined();
   });
 
   // Ctrl-F from the window: the tab is opened by the store, and the pane is what puts the caret in the box.
-  test("focuses and selects the filter when the window asks for search", () => {
-    store.query = "damage";
+  test("focuses and selects the filter when the window asks for search", async () => {
+    await store.setQuery("damage");
     const v = view();
     const box = v.one<HTMLInputElement>("input[type=search]");
     expect(document.activeElement).not.toBe(box);

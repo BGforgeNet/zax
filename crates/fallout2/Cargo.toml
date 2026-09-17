@@ -9,6 +9,10 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Builders for inputs ZAX never writes itself - a versioned library - for the preview's tests to plant.
+fixtures = []
+
 [dependencies]
 dat3-core = { git = "https://github.com/BGforgeNet/dat3", rev = "78d67769ed2da2f793b723ef19fac5e55970910c", version = "0.11.0" }
 pelite = "0.10.0"

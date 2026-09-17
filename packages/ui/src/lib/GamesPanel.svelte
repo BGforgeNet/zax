@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { GAME_TYPES, displayName, type Install } from "@zax/core";
+  import type { Install } from "./bindings/Install";
   import Dialog from "./Dialog.svelte";
-  import { isPreview, PREVIEW_REASON } from "./host.js";
+  import { isPreview, PREVIEW_REASON } from "./invoke.js";
   import { GAME_ICON } from "./icons.js";
   import { store } from "./store.svelte.js";
 
@@ -42,7 +42,7 @@
 <div class="panel">
   <ul class="installs">
     {#each store.installs as install (install.path)}
-      {@const type = GAME_TYPES[install.type]}
+      {@const type = store.gameType(install.type)}
       <li>
         <!--
           Right-click renames, which is what a list of named things is expected to do; F2 is handled for the
@@ -68,7 +68,7 @@
           <span class="text">
             <span class="top">
               <!-- The path below is what tells two installs of one type apart; the name says what the game is. -->
-              <span class="name">{displayName(install)}</span>
+              <span class="name">{store.nameOf(install)}</span>
               <span class="badge">{type.badge}</span>
             </span>
             <span class="path">{install.path}</span>
@@ -126,7 +126,7 @@
 
 <Dialog open={confirming !== null} title="Remove from the list?" dismiss={() => (confirming = null)}>
   {#if confirming}
-    <p class="ask"><strong>{displayName(confirming)}</strong></p>
+    <p class="ask"><strong>{store.nameOf(confirming)}</strong></p>
     <p class="ask path">{confirming.path}</p>
     <p class="ask">
       ZAX forgets this installation: it drops off the list, along with what ZAX recorded about it. Nothing in the game

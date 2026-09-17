@@ -15,6 +15,10 @@ value: string | null, modified: boolean,
  */
 absent: boolean, display: string, 
 /**
+ * What a value ZAX pins reads as, for the setting that has one.
+ */
+pinned: string | null, 
+/**
  * The value as its slider's percentage, for a scale setting.
  */
 percent: number | null, sentinel: string | null, 

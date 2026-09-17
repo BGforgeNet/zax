@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isPreview, PREVIEW_REASON } from "./host.js";
+  import { isPreview, PREVIEW_REASON } from "./invoke.js";
   import { store } from "./store.svelte.js";
 
   // `reason` is given where the caller already knows why - an engine that has not written its settings yet.

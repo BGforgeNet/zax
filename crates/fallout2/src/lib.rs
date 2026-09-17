@@ -36,7 +36,7 @@ pub mod mod_transaction;
 pub mod mod_vendored;
 pub mod mods;
 pub mod order_session;
-#[cfg(test)]
+#[cfg(any(test, feature = "fixtures"))]
 pub mod pe_fixture;
 pub mod pe_version;
 pub mod places;

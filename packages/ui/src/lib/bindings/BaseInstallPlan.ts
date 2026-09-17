@@ -15,15 +15,15 @@ asset: string, route: InstallerRoute,
 /**
  * What the download needs, from what the release states about the asset.
  */
-download: bigint, 
+download: number, 
 /**
  * What the payload unpacks to, where the route lets ZAX read that before running anything.
  */
-unpacked: bigint | null, 
+unpacked: number | null, 
 /**
  * Free bytes on the game's filesystem, where the host could say.
  */
-free: bigint | null, 
+free: number | null, 
 /**
  * How many entries the case-lowering pass would rename before the install runs. Absent where the
  * pass does not apply - a filesystem that folds case, or an install that is already this mod's.

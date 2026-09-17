@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { BuildPick } from "@zax/fallout2";
+  import type { BuildPick } from "./bindings/BuildPick";
   import Dialog from "./Dialog.svelte";
   import EngineCaution from "./EngineCaution.svelte";
-  import { isPreview } from "./host.js";
+  import { isPreview } from "./invoke.js";
   import { store } from "./store.svelte.js";
 
   const OUTSIDE = "The browser preview cannot start a program - this needs the desktop build";
@@ -109,7 +109,7 @@
             class:on={deployed?.pinned !== true}
             disabled={!store.install || isPreview || store.busy !== null}
             title={isPreview ? OUTSIDE : store.busyReason}
-            onclick={() => run(engine.id, "latest")}
+            onclick={() => run(engine.id, { pick: "latest" })}
           >
             Latest
           </button>
@@ -119,7 +119,7 @@
               class:on={deployed?.pinned === true && deployed.published === version.published}
               disabled={!store.install || isPreview || store.busy !== null}
               title={isPreview ? OUTSIDE : store.busyReason}
-              onclick={() => run(engine.id, { published: version.published })}
+              onclick={() => run(engine.id, { pick: "published", published: version.published })}
             >
               {mark(engine.releases, version)}
             </button>

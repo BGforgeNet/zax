@@ -4,6 +4,7 @@
 //! seam and the backend behind it are made once, and every operation the interface can ask for is
 //! registered as a command.
 
+pub mod closing;
 pub mod commands;
 pub mod shell;
 
@@ -42,8 +43,7 @@ macro_rules! zax_commands {
             commands::set_autosave,
             commands::accept_caution,
             commands::scan,
-            commands::set_setting,
-            commands::set_percent,
+            commands::set_settings,
             commands::revert_settings,
             commands::apply_action,
             commands::satisfy_gate,
@@ -73,6 +73,7 @@ macro_rules! zax_commands {
             commands::open,
             commands::wipe,
             commands::cancel,
+            commands::set_busy,
         ]
     };
 }
@@ -124,6 +125,8 @@ fn download_note(
 pub fn run() -> tauri::Result<()> {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(closing::Busy::default())
+        .on_window_event(closing::on_window_event)
         .setup(|app| {
             // The shell needs the window's handle, and the backend needs the shell, so both are made
             // here rather than before the builder runs.

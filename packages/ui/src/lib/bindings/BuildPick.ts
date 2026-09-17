@@ -5,4 +5,4 @@
  * and follow the newest build the machine holds. Two variants rather than two strings, since a tag
  * could be spelled `latest` and an instant cannot be told from one by type.
  */
-export type BuildPick = { "pick": "published" } & string | { "pick": "latest" };
+export type BuildPick = { "pick": "published", published: string, } | { "pick": "latest" };

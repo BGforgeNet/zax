@@ -12,6 +12,7 @@
     // regeneration undoes. They stay linted - only formatting is excluded.
     "packages/games-fallout2/src/catalog.ts",
     "packages/games-fallout2/src/layout.ts",
+    "crates/fallout2/data/",
     // ts-rs writes one file per Rust type, from the Rust that defines it. Same rule: reformatting is
     // churn the next `cargo test` undoes.
     "packages/ui/src/lib/bindings/",

@@ -10,15 +10,15 @@ export type CreateInstallPlan = { version: string,
 /**
  * The directory it makes, relative to the host install.
  */
-directory: string, asset: string, download: bigint, 
+directory: string, asset: string, download: number, 
 /**
  * What the payload unpacks to, read from its own directory.
  */
-unpacked: bigint, 
+unpacked: number, 
 /**
  * Free bytes on the host's filesystem, where the host could say.
  */
-free: bigint | null, 
+free: number | null, 
 /**
  * The folders the user pointed at, by input id.
  */

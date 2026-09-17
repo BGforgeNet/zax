@@ -294,8 +294,9 @@ pub struct RowView {
     /// The key is not in the file at all, so the component uses its own default.
     pub absent: bool,
     pub display: String,
+    /// What a value ZAX pins reads as, for the setting that has one.
+    pub pinned: Option<String>,
     /// The value as its slider's percentage, for a scale setting.
-    #[ts(type = "number | null")]
     pub percent: Option<i64>,
     pub sentinel: Option<String>,
     /// Why the value is not one the component accepts.
@@ -707,6 +708,10 @@ impl SettingsSession {
             modified: self.is_modified(&def.id),
             absent: self.baseline_of(&def.id).is_none(),
             display: display_value(def, value.as_deref()),
+            pinned: def
+                .managed
+                .as_ref()
+                .map(|managed| display_value(def, Some(&managed.value))),
             percent: match (&def.kind, value.as_deref()) {
                 (SettingKind::Scale { max }, Some(raw)) => Some(scale_to_percent(raw, *max)),
                 _ => None,

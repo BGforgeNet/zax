@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { InstalledEngine } from "./bindings/InstalledEngine";
 import EnginesView from "./EnginesView.svelte";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
@@ -32,9 +33,8 @@ const ROLLING = {
 
 beforeEach(async () => {
   await reseedPreview();
-  store.engines = [TAGGED] as never;
-  store.engineLatest = {};
-  store.busy = null;
+  vi.spyOn(store, "engines", "get").mockReturnValue([TAGGED] as never);
+  vi.spyOn(store, "engineLatest", "get").mockReturnValue({});
 });
 afterEach(() => {
   unmountAll();
@@ -60,7 +60,9 @@ describe("each engine's heading", () => {
   });
 
   test("says why there is nothing to install where the project publishes no build for this machine", () => {
-    store.engines = [{ ...TAGGED, build: null, why: "Fallout II CE publishes no build for this machine." }] as never;
+    vi.spyOn(store, "engines", "get").mockReturnValue([
+      { ...TAGGED, build: null, why: "Fallout II CE publishes no build for this machine." },
+    ] as never);
     const v = view();
     expect(v.one(".problem").textContent).toContain("publishes no build for this machine");
     expect(v.control("Fetch latest").hasAttribute("disabled")).toBe(true);
@@ -73,13 +75,17 @@ describe("how a build is named", () => {
     tag says nothing and the publication date is what separates two builds.
   */
   test("a tagged project shows its release tag", () => {
-    store.engineLatest = { "fallout2-ce": { release: "v1.4.0", published: "2026-05-01T00:00:00Z" } } as never;
+    vi.spyOn(store, "engineLatest", "get").mockReturnValue({
+      "fallout2-ce": { release: "v1.4.0", published: "2026-05-01T00:00:00Z" },
+    } as never);
     expect(view().text()).toContain("v1.4.0");
   });
 
   test("a rolling project shows the publication date rather than its unchanging tag", () => {
-    store.engines = [ROLLING] as never;
-    store.engineLatest = { fission: { release: "continuous", published: "2026-05-01T00:00:00Z" } } as never;
+    vi.spyOn(store, "engines", "get").mockReturnValue([ROLLING] as never);
+    vi.spyOn(store, "engineLatest", "get").mockReturnValue({
+      fission: { release: "continuous", published: "2026-05-01T00:00:00Z" },
+    } as never);
     const text = view().text();
     expect(text).not.toContain("continuous");
     expect(text).toContain(new Date("2026-05-01T00:00:00Z").toLocaleDateString());
@@ -87,9 +93,9 @@ describe("how a build is named", () => {
 
   /* Shortened the way git does: seven characters identify the commit and a full sha reads as noise. */
   test("shows the commit a build came from, shortened", () => {
-    store.engineLatest = {
+    vi.spyOn(store, "engineLatest", "get").mockReturnValue({
       "fallout2-ce": { release: "v1.4.0", published: "2026-05-01T00:00:00Z", commit: "0123456789abcdef" },
-    } as never;
+    } as never);
     const code = view().one("code.sha");
     expect(code.textContent).toBe("0123456");
   });
@@ -110,14 +116,14 @@ describe("the builds this machine holds", () => {
   });
 
   test("lists a row per build, newest first as the cache returns them", () => {
-    store.engines = [{ ...TAGGED, versions: HELD }] as never;
+    vi.spyOn(store, "engines", "get").mockReturnValue([{ ...TAGGED, versions: HELD }] as never);
     const rows = view().all(".held");
     expect(rows.map((row) => row.textContent?.trim().split(/\s+/)[0])).toEqual(["v1.4.0", "v1.3.0"]);
   });
 
   test("drops one build through the store, naming which", () => {
     const forget = vi.spyOn(store, "forgetEngine").mockResolvedValue(undefined);
-    store.engines = [{ ...TAGGED, versions: HELD }] as never;
+    vi.spyOn(store, "engines", "get").mockReturnValue([{ ...TAGGED, versions: HELD }] as never);
     view().all<HTMLButtonElement>(".drop")[0]!.click();
     expect(forget).toHaveBeenCalledExactlyOnceWith("fallout2-ce", "2026-05-01T00:00:00Z");
   });
@@ -132,14 +138,16 @@ describe("the selected game's build", () => {
     { release: "v1.4.0", published: "2026-05-01T00:00:00Z", commit: null },
     { release: "v1.3.0", published: "2026-01-01T00:00:00Z", commit: null },
   ];
-  const deployed = (published: string, pinned: boolean) => ({
+  const deployed = (published: string, pinned: boolean): Record<string, InstalledEngine> => ({
     "fallout2-ce": {
       id: "fallout2-ce",
       release: published === HELD[0]!.published ? "v1.4.0" : "v1.3.0",
       published,
       complete: true,
       files: ["fallout2-ce"],
-      ...(pinned ? { pinned: true as const } : {}),
+      backup: null,
+      commit: null,
+      pinned,
     },
   });
   const rowOf = (v: ReturnType<typeof view>, release: string) =>
@@ -147,11 +155,11 @@ describe("the selected game's build", () => {
   const buttonsIn = (element: Element) => [...element.querySelectorAll("button")].map((b) => b.textContent?.trim());
 
   beforeEach(() => {
-    store.engines = [{ ...TAGGED, versions: HELD }] as never;
+    vi.spyOn(store, "engines", "get").mockReturnValue([{ ...TAGGED, versions: HELD }] as never);
   });
 
   test("says the game has none yet, and offers every build the machine holds", () => {
-    store.engineDeployed = {};
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue({});
     const v = view();
     expect(v.one(".this-game").textContent?.replace(/\s+/g, " ").trim()).toBe("This game none yet Follow latest");
     expect(buttonsIn(rowOf(v, "v1.4.0"))).toEqual(["Remove", "Use here"]);
@@ -159,7 +167,7 @@ describe("the selected game's build", () => {
   });
 
   test("names a pinned build, marks its row, and offers nothing on that row that would change nothing", () => {
-    store.engineDeployed = deployed(HELD[1]!.published, true);
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue(deployed(HELD[1]!.published, true));
     const v = view();
     expect(v.one(".this-game").textContent?.replace(/\s+/g, " ").trim()).toBe("This game v1.3.0 pinned Follow latest");
     expect(rowOf(v, "v1.3.0").querySelector(".tag")?.textContent).toBe("used here");
@@ -169,7 +177,7 @@ describe("the selected game's build", () => {
   });
 
   test("offers no Follow latest where the game already follows the newest build and holds it", () => {
-    store.engineDeployed = deployed(HELD[0]!.published, false);
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue(deployed(HELD[0]!.published, false));
     const v = view();
     expect(v.one(".this-game").textContent?.replace(/\s+/g, " ").trim()).toBe(
       "This game v1.4.0 follows the newest build",
@@ -180,28 +188,35 @@ describe("the selected game's build", () => {
 
   // Unpinned but behind: the next run would move it, and the button does it now instead.
   test("offers Follow latest to an unpinned game behind the newest build the machine holds", () => {
-    store.engineDeployed = deployed(HELD[1]!.published, false);
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue(deployed(HELD[1]!.published, false));
     expect(buttonsIn(view().one(".this-game"))).toEqual(["Follow latest"]);
   });
 
   test("picks a build for the game through the store, naming which", () => {
     const use = vi.spyOn(store, "useEngineBuild").mockResolvedValue(undefined);
-    store.engineDeployed = {};
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue({});
     const v = view();
     rowOf(v, "v1.3.0").querySelector<HTMLButtonElement>(".use")!.click();
-    expect(use).toHaveBeenCalledExactlyOnceWith("fallout2-ce", { published: "2026-01-01T00:00:00Z" });
+    expect(use).toHaveBeenCalledExactlyOnceWith("fallout2-ce", {
+      pick: "published",
+      published: "2026-01-01T00:00:00Z",
+    });
   });
 
   test("asks for latest rather than a named build from Follow latest", () => {
     const use = vi.spyOn(store, "useEngineBuild").mockResolvedValue(undefined);
-    store.engineDeployed = deployed(HELD[1]!.published, true);
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue(deployed(HELD[1]!.published, true));
     view().control("Follow latest").click();
-    expect(use).toHaveBeenCalledExactlyOnceWith("fallout2-ce", "latest");
+    expect(use).toHaveBeenCalledExactlyOnceWith("fallout2-ce", { pick: "latest" });
   });
 
   test("says the game's build is behind what was published, as the game's and not the machine's", () => {
-    store.engineDeployed = deployed(HELD[1]!.published, true);
-    store.engineLatest = { "fallout2-ce": { release: "v1.4.0", published: "2026-05-01T00:00:00Z" } } as never;
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue(deployed(HELD[1]!.published, true));
+    vi.spyOn(store, "engineLatest", "get").mockReturnValue({
+      "fallout2-ce": { release: "v1.4.0", published: "2026-05-01T00:00:00Z" },
+    } as never);
+    // The comparison is the held state's, made against what a check found.
+    vi.spyOn(store, "engineOutdated").mockReturnValue(true);
     expect(view().text()).toContain("This game runs an older build than the latest published.");
   });
 });

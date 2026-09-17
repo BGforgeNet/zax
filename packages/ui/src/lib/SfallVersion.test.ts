@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import SfallVersion from "./SfallVersion.svelte";
-import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
+import { plantLibrary, PREVIEW_INSTALL, render, reseedPreview, unmountAll } from "./preview-fixture.js";
+import type { SfallRelease } from "./bindings/SfallRelease";
 import { store } from "./store.svelte.js";
 
 /*
@@ -12,12 +13,18 @@ import { store } from "./store.svelte.js";
 
 beforeEach(async () => {
   await reseedPreview();
-  store.sfallInstalled = "4.4.6";
-  store.sfallLatest = null;
-  store.sfallVersions = [];
-  store.sfallVersionsRead = false;
-  store.busy = null;
+  await plantLibrary("ddraw.dll", "4.4.6");
 });
+
+/**
+ * A newer release as a check would have found it, and the comparison the held state then makes. The preview
+ * reaches no feed, so a check cannot.
+ */
+const newer = () => {
+  const release: SfallRelease = { version: "9.9.9", url: "" };
+  vi.spyOn(store, "sfallLatest", "get").mockReturnValue(release);
+  vi.spyOn(store, "sfallOutdated", "get").mockReturnValue(true);
+};
 afterEach(() => {
   unmountAll();
   store.busy = null;
@@ -31,15 +38,13 @@ describe("what it reports", () => {
     expect(block().one("strong").textContent).toBe("4.4.6");
   });
 
-  test("says nothing is installed rather than showing a blank", () => {
-    store.sfallInstalled = null;
+  test("says nothing is installed rather than showing a blank", async () => {
+    await plantLibrary("ddraw.dll", null);
     expect(block().text()).toContain("not installed");
   });
 
-  test("distinguishes no install selected from sfall not being installed", () => {
-    store.sfallInstalled = null;
-    store.installs = [];
-    store.selectedInstall = "";
+  test("distinguishes no install selected from sfall not being installed", async () => {
+    await store.removeInstall(PREVIEW_INSTALL);
     expect(block().text()).toContain("no install selected");
   });
 
@@ -64,7 +69,7 @@ describe("the buttons", () => {
   });
 
   test("offer the update once a newer release is known, with a title saying what it does", () => {
-    store.sfallLatest = { version: "9.9.9" } as never;
+    newer();
     const update = block().control("Update");
     expect(update.hasAttribute("disabled")).toBe(false);
     expect(update.getAttribute("title")).toMatch(/keeping your settings/i);
@@ -75,7 +80,7 @@ describe("the buttons", () => {
     expect(block().text()).toContain("Checking...");
     unmountAll();
 
-    store.sfallLatest = { version: "9.9.9" } as never;
+    newer();
     store.busy = "Updating sfall";
     expect(block().text()).toContain("Updating...");
   });
@@ -128,7 +133,7 @@ describe("the note about what an update keeps", () => {
     expect(block().all(".carried")).toHaveLength(1);
     unmountAll();
 
-    store.sfallLatest = { version: "9.9.9" } as never;
+    newer();
     expect(block().one(".carried").classList.contains("applies")).toBe(true);
   });
 });

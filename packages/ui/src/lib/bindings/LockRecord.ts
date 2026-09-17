@@ -26,4 +26,4 @@ command?: string | null,
 /**
  * When it was taken, in milliseconds since the epoch. Reported, never used to decide staleness.
  */
-taken: bigint, };
+taken: number, };

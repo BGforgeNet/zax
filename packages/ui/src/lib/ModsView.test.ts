@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { SETTINGS } from "@zax/fallout2";
+import type { ModListing } from "./bindings/ModListing";
+import type { ModOffer } from "./bindings/ModOffer";
+import type { ModPart } from "./bindings/ModPart";
+import type { SettingDef } from "./bindings/SettingDef";
+import { commands } from "./commands.js";
 import ModsView from "./ModsView.svelte";
-import { backend as hostBackend } from "./host.js";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
 
@@ -10,47 +13,69 @@ import { store } from "./store.svelte.js";
   The mods tab. Almost everything here turns on what state a mod is already in, and each state gets its own
   sentence: installed and current, a version behind, installed by hand with no record, newer than the feed
   offers, an install that never finished. Getting one of those wrong tells the user something false about their
-  own game folder, and none of the wording is reachable from a test of the store.
+  own game folder.
+
+  Which state a mod is in is worked out on the other side of the command boundary, and tested there. What is
+  pinned here is the sentence each state gets, so the listing is presented directly.
 */
 
-/*
-  Both halves are set rather than the listing they combine into: the view reads `store.modListing`, which is
-  derived through the real `listingFrom` - so driving the halves exercises that join instead of stepping over it.
-*/
+/**
+ * An offer as the listing carries it: whatever the case needs, over a mod that is otherwise unremarkable. `type`
+ * is accepted for the mod's type, which is how these cases read.
+ */
+const offer = (over: Record<string, unknown> = {}): ModOffer => {
+  const { type, ...rest } = over;
+  return {
+    id: "fo2tweaks",
+    name: "FO2tweaks",
+    version: "14.8",
+    modType: (type as ModOffer["modType"] | undefined) ?? "pluggable",
+    author: null,
+    description: null,
+    forum: false,
+    homepage: false,
+    reason: null,
+    becomes: null,
+    creates: null,
+    asks: [],
+    choices: null,
+    noFeed: false,
+    availability: { kind: "install" },
+    ...rest,
+  } as ModOffer;
+};
+
+/** A blocked availability names what is installed, or states that nothing is. */
+const available = (availability: Record<string, unknown>) =>
+  (availability.kind === "blocked" ? { from: null, ...availability } : availability) as ModOffer["availability"];
+
+const listing = (offers: ModOffer[], failures: ModListing["failures"] = []) =>
+  vi.spyOn(store, "modListing", "get").mockReturnValue({ offers, failures });
+
 const publish = (
   over: Record<string, unknown> = {},
   availability: Record<string, unknown> = { kind: "install" },
-  failures: unknown[] = [],
-) => {
-  const { id = "fo2tweaks", ...rest } = over;
-  store.modFeeds = {
-    published: [{ id, name: "FO2tweaks", version: "14.8", type: "pluggable", ...rest }],
-    failures,
-  } as never;
-  store.modStanding = { standing: { [id as string]: { availability } }, unfollowed: [] } as never;
-};
+  failures: ModListing["failures"] = [],
+) => listing([offer({ ...over, availability: available(availability) })], failures);
 
-/** Neither feed nor standing describes these; the record alone does, so they arrive already complete. */
-const onlyInRecord = (offers: unknown[]) => {
-  store.modFeeds = { published: [], failures: [] } as never;
-  store.modStanding = { standing: {}, unfollowed: offers } as never;
-};
+/** Rows only the install's record describes arrive complete, as the listing carries them. */
+const onlyInRecord = (offers: Array<Record<string, unknown>>) =>
+  listing(offers.map((one) => offer({ ...one, availability: available(one.availability as Record<string, unknown>) })));
 
-const nothingPublished = (failures: unknown[] = []) => {
-  store.modFeeds = { published: [], failures } as never;
-  store.modStanding = { standing: {}, unfollowed: [] } as never;
+const nothingPublished = (failures: ModListing["failures"] = []) => listing([], failures);
+
+/** A catalog setting any case can draw a row for. */
+const someSetting = (): SettingDef => {
+  const first = store.catalog?.settings[0];
+  if (!first) throw new Error("the catalog is empty");
+  return first;
 };
 
 beforeEach(async () => {
   await reseedPreview();
-  // The store asks the feeds whenever the install changes; let that read finish so the tab is not mid-flight.
+  // Startup reads the feeds on its own; let that read finish so the tab is not mid-flight.
   await vi.waitFor(() => expect(store.readingOffers).toBe(false));
   store.modsTab = "installation";
-  store.busy = null;
-  store.modVersionPick = null;
-  store.modParts = null;
-  store.modInputs = null;
-  store.modPlan = null;
 });
 afterEach(() => {
   unmountAll();
@@ -61,7 +86,7 @@ afterEach(() => {
 const view = () => render(ModsView as never, {} as never);
 
 describe("the tab strip", () => {
-  // Four in the preview, which holds a build of the engine the fourth is for; three where none is held.
+  // Four in the preview, whose seeded install has Fission deployed; three where it has not.
   test("offers a tab per subject, in the order they are read in", () => {
     const v = view();
     const tabs = v.all(".tabbar [role=tab]").map((tab) => (tab.textContent ?? "").trim());
@@ -115,8 +140,7 @@ describe("asking the feeds again", () => {
 describe("before the feeds have answered", () => {
   /* "Reading" and "not read yet" are different states, and a shared message would hide which one this is. */
   test("distinguishes a read in flight from one that never started", () => {
-    store.modFeeds = null;
-    store.modStanding = null;
+    vi.spyOn(store, "modListing", "get").mockReturnValue(null);
     expect(view().one("p.empty").textContent).toContain("have not been read yet");
   });
 });
@@ -254,13 +278,10 @@ describe("what an offer's status says", () => {
     the mistake the branch is here to avoid. Driven through the preview's own et tu install rather than a
     hand-made offer, since what decides is the type ZAX reads off that directory.
   */
-  test("names this installation rather than a folder inside it where the created game is the one on screen", async () => {
-    await store.addInstall("fixtures/fo1in2");
-    await store.selectInstall("fixtures/fo1in2");
-    await vi.waitFor(() => expect(store.readingOffers).toBe(false));
-    expect(store.install?.type, "the preview fixture ZAX reads as Fallout et tu").toBe("fo1in2");
-
+  test("names this installation rather than a folder inside it where the created game is the one on screen", () => {
     publish({ type: "base", becomes: "fo1in2", creates: "Fallout1in2" }, { kind: "install" });
+    // Whether it is, is decided against the type read off the directory - on the other side, and tested there.
+    vi.spyOn(store, "createsInPlace").mockReturnValue(true);
     const notes = view()
       .all("p.status")
       .map((p) => p.textContent ?? "");
@@ -301,10 +322,10 @@ describe("what a row says the mod is", () => {
 
   /* The address never reaches this side: the row asks for a page of a mod by name and the backend resolves it. */
   test("asks the backend for the page rather than for an address", () => {
-    const opened = vi.spyOn(hostBackend, "open").mockResolvedValue();
+    const opened = vi.spyOn(commands, "open").mockResolvedValue();
     publish({ homepage: true });
     view().all(".offer .by button")[0]?.click();
-    expect(opened).toHaveBeenCalledWith({ mod: "fo2tweaks", page: "homepage" });
+    expect(opened).toHaveBeenCalledWith({ what: "mod", id: "fo2tweaks", page: "homepage" });
   });
 });
 
@@ -417,29 +438,25 @@ describe("what a row offers to do", () => {
     expect(drawn.one(".scroll").hasAttribute("inert")).toBe(false);
   });
 
-  test("disables a row's actions while the rows describe some other game, and says why", () => {
+  test("disables a row's actions while the feeds and the folder are being read again, and says why", () => {
     publish();
-    const selected = store.selectedInstall;
-    store.selectedInstall = "/games/elsewhere";
+    vi.spyOn(store, "readingOffers", "get").mockReturnValue(true);
     const drawn = view();
     expect(drawn.all(".offer .primary")[0]?.hasAttribute("disabled")).toBe(true);
     // The reason on screen, not only a greyed control: both come from one sentence in the store.
     expect(drawn.one(".reading p").textContent).toBe(store.modsUnsettled);
-    expect(drawn.text()).toContain("Reading this game's folder.");
+    expect(drawn.text()).toContain("Rereading the feeds and this game's folder.");
     // The whole tab under it, refused in one act rather than control by control.
     expect(drawn.one(".scroll").hasAttribute("inert")).toBe(true);
-    store.selectedInstall = selected;
   });
 
   test("places the reason outside the scrolling flow, so the rows it describes do not move under it", () => {
     // The sentence used to sit above the rows and take its height from them, so every change of game pushed
     // the list down and let it back up for the length of one read.
     publish();
-    const selected = store.selectedInstall;
-    store.selectedInstall = "/games/elsewhere";
+    vi.spyOn(store, "readingOffers", "get").mockReturnValue(true);
     const drawn = view();
     expect(drawn.one(".scroll").contains(drawn.one(".reading"))).toBe(false);
-    store.selectedInstall = selected;
   });
 
   test("refuses the version picker where the feeds cannot be read, and says which host can", () => {
@@ -492,65 +509,38 @@ describe("a feed that could not be read", () => {
 });
 
 describe("the Fission sub-tab", () => {
-  /*
-    The engine has to be one this machine holds a build of, or the tab is not there at all - which is the
-    default and what the strip tests above rely on.
-  */
-  const withFission = () => {
-    // Deployed in this folder, which is what the sub-tab follows - a build in the machine's cache says nothing
-    // about whether this install has ever run it.
-    store.engineDeployed = {
-      fission: { id: "fission", release: "0.9.6.8", published: "2026-08-01T00:00:00Z", complete: true, files: [] },
-    } as never;
-    store.engines = [
-      ...store.engines.filter((one) => one.id !== "fission"),
-      {
-        id: "fission",
-        name: "Fallout Fission",
-        short: "Fission",
-        page: "https://example.invalid/fission",
-        releases: "tagged",
-        build: { asset: "fallout-fission-linux-x64.zip", program: "fallout-fission-linux-x64" },
-        caution: "Fission does not read the sfall load order.",
-        versions: [{ release: "0.9.6.8", published: "2026-08-01T00:00:00Z", commit: null }],
-      },
-    ] as never;
+  /** What the folder holds, split the way Fission's folder scan splits it - a rule tested on the other side. */
+  const folderOf = (loads: string[], missed: string[]) => {
+    const mods = [...loads, ...missed].map((name) => ({ name, enabled: true, kind: "dat" as const, owner: null }));
+    vi.spyOn(store, "mods", "get").mockReturnValue(mods);
+    vi.spyOn(store, "fissionMods", "get").mockReturnValue(mods.filter((one) => loads.includes(one.name)));
+    vi.spyOn(store, "fissionMissed", "get").mockReturnValue(mods.filter((one) => missed.includes(one.name)));
   };
 
-  /* One of each shape the rule separates, so both halves of the tab have something to draw. */
-  const folderOf = () => {
-    store.mods = [
-      { name: "mod_rpu.dat", enabled: true, kind: "dat" },
-      { name: "fo2tweaks.dat", enabled: true, kind: "dat" },
-      { name: "restoration", enabled: false, kind: "folder" },
-      // Gone from the folder, so it belongs to neither list here - the load order is where it is dealt with.
-      { name: "old_patch.dat", enabled: true, kind: "missing" },
-    ] as never;
-  };
-
-  test("is absent in a folder Fission has never run in", () => {
-    store.engineDeployed = {};
-    const tabs = view()
+  const tabs = () =>
+    view()
       .all(".tabbar [role=tab]")
       .map((tab) => (tab.textContent ?? "").trim());
-    expect(tabs).not.toContain("Fission load order");
+
+  // The seeded install has Fission deployed, which is what the sub-tab follows: a build in the machine's cache
+  // says nothing about whether this folder has ever run it.
+  test("appears where it is deployed", () => {
+    expect(tabs()).toContain("Fission load order");
   });
 
-  test("appears once it is deployed there", () => {
-    withFission();
-    const tabs = view()
-      .all(".tabbar [role=tab]")
-      .map((tab) => (tab.textContent ?? "").trim());
-    expect(tabs).toContain("Fission load order");
+  test("is absent in a folder Fission has never run in", () => {
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue({});
+    expect(tabs()).not.toContain("Fission load order");
   });
 
   test("lists only what Fission would load", () => {
-    withFission();
-    folderOf();
+    folderOf(["mod_rpu.dat"], ["fo2tweaks.dat", "restoration"]);
     store.modsTab = "fission";
-    const v = view();
-    const listed = v.all(".mod:not(.skipped) .name").map((one) => one.textContent);
-    expect(listed).toEqual(["mod_rpu.dat"]);
+    expect(
+      view()
+        .all(".mod:not(.skipped) .name")
+        .map((one) => one.textContent),
+    ).toEqual(["mod_rpu.dat"]);
   });
 
   /*
@@ -558,11 +548,13 @@ describe("the Fission sub-tab", () => {
     still one its folder scan finds. Reporting it as off here would attribute an sfall fact to Fission.
   */
   test("draws no enabled state, which belongs to a file this engine ignores", () => {
-    withFission();
-    store.mods = [
-      { name: "mod_rpu.dat", enabled: true, kind: "dat" },
-      { name: "mod_bgs.dat", enabled: false, kind: "dat" },
-    ] as never;
+    const mods = [
+      { name: "mod_rpu.dat", enabled: true, kind: "dat" as const, owner: null },
+      { name: "mod_bgs.dat", enabled: false, kind: "dat" as const, owner: null },
+    ];
+    vi.spyOn(store, "mods", "get").mockReturnValue(mods);
+    vi.spyOn(store, "fissionMods", "get").mockReturnValue(mods);
+    vi.spyOn(store, "fissionMissed", "get").mockReturnValue([]);
     store.modsTab = "fission";
     const v = view();
     expect(v.all(".mod:not(.skipped) .name").map((one) => one.textContent)).toEqual(["mod_rpu.dat", "mod_bgs.dat"]);
@@ -574,30 +566,15 @@ describe("the Fission sub-tab", () => {
     mod, which is the wrong thing to conclude and the reason this tab exists.
   */
   test("names what it left out rather than dropping it silently", () => {
-    withFission();
-    folderOf();
+    folderOf(["mod_rpu.dat"], ["fo2tweaks.dat", "restoration"]);
     store.modsTab = "fission";
     const v = view();
-    const skipped = v.all(".mod.skipped .name").map((one) => one.textContent);
-    expect(skipped).toEqual(["fo2tweaks.dat", "restoration"]);
+    expect(v.all(".mod.skipped .name").map((one) => one.textContent)).toEqual(["fo2tweaks.dat", "restoration"]);
     expect(v.one(".missed-head").textContent).toContain("2 entries");
   });
 
-  /*
-    The heading says these are in the mods folder. An entry whose file is gone is not, so listing it there would
-    make that sentence false for it - and the folder scan Fission runs would not have seen it either.
-  */
-  test("leaves out an entry whose file is gone, which is not in the folder to begin with", () => {
-    withFission();
-    folderOf();
-    store.modsTab = "fission";
-    const v = view();
-    expect(v.all(".mod .name").map((one) => one.textContent)).not.toContain("old_patch.dat");
-  });
-
   test("says so where nothing in the folder is named the way Fission needs", () => {
-    withFission();
-    store.mods = [{ name: "fo2tweaks.dat", enabled: true, kind: "dat" }] as never;
+    folderOf([], ["fo2tweaks.dat"]);
     store.modsTab = "fission";
     const v = view();
     expect(v.all(".mod:not(.skipped)")).toHaveLength(0);
@@ -606,10 +583,11 @@ describe("the Fission sub-tab", () => {
 
   /* The same sentence the engines list and the launch dialog carry - one text, read off the listing. */
   test("carries the engine's caution over the list it is about", () => {
-    withFission();
-    folderOf();
+    folderOf(["mod_rpu.dat"], []);
     store.modsTab = "fission";
-    expect(view().one(".caution-slot").textContent).toContain("does not read the sfall load order");
+    const caution = store.engines.find((one) => one.id === "fission")?.caution;
+    if (!caution) throw new Error("Fission no longer declares a caution");
+    expect(view().one(".caution-slot").textContent).toContain(caution);
   });
 });
 
@@ -631,10 +609,11 @@ describe("the load order", () => {
     expect(owners.length).toBeLessThan(v.all(".mod").length);
   });
 
-  test("toggling an entry marks the order changed", () => {
+  test("toggling an entry marks the order changed", async () => {
     const v = view();
     const first = v.all<HTMLInputElement>(".pick input")[0]!;
     first.click();
+    await store.idle();
     v.settle();
     expect(store.modsChanged).toBe(true);
   });
@@ -661,10 +640,11 @@ describe("the load order", () => {
     expect(v.all(".mod")[0]!.querySelector("button.move")!.getAttribute("aria-label")).toBe(`Move ${name} up`);
   });
 
-  test("moving an entry down reorders the list", () => {
+  test("moving an entry down reorders the list", async () => {
     const v = view();
     const before = store.mods.map((mod) => mod.name);
     v.all(".mod")[0]!.querySelector<HTMLButtonElement>("button.move.down")!.click();
+    await store.idle();
     v.settle();
     expect(store.mods.map((mod) => mod.name)).toEqual([before[1], before[0], ...before.slice(2)]);
   });
@@ -684,7 +664,7 @@ describe("the load order", () => {
   });
 
   test("says the folder is empty rather than drawing nothing", () => {
-    store.mods = [];
+    vi.spyOn(store, "mods", "get").mockReturnValue([]);
     const v = view();
     expect(v.one("p.empty").textContent).toContain("Nothing in this install's");
   });
@@ -693,19 +673,20 @@ describe("the load order", () => {
     The two bulk actions. Both rewrite the whole file in one press, and neither is reachable except by clicking
     - so the tooltip tests above assert what they say while nothing asserted what they do.
   */
-  test("sorting to the recommendation reorders the file and marks it changed", () => {
+  test("sorting to the recommendation reorders the file and marks it changed", async () => {
     const v = view();
     const sort = v.control("Sort to the recommendation") as HTMLButtonElement;
     expect(store.againstRecommendation.length, "the seed has to be out of order for this to move").toBeGreaterThan(0);
 
     const before = store.mods.map((mod) => mod.name);
     sort.click();
+    await store.idle();
     v.settle();
     expect(store.mods.map((mod) => mod.name)).not.toEqual(before);
     expect(store.modsChanged).toBe(true);
   });
 
-  test("forgetting the missing entries drops them from the list and leaves the rest", () => {
+  test("forgetting the missing entries drops them from the list and leaves the rest", async () => {
     const v = view();
     const before = store.mods.length;
     const missing = store.missingMods.length;
@@ -714,6 +695,7 @@ describe("the load order", () => {
     // One row's own Forget where that is all there is, the bulk control where the view offers it.
     const bulk = v.all("button").find((button) => button.textContent?.trim() === "Forget all missing");
     (bulk ?? v.all(".mod.gone button").find((b) => b.textContent?.trim() === "Forget"))!.click();
+    await store.idle();
     v.settle();
 
     expect(store.mods).toHaveLength(before - (bulk ? missing : 1));
@@ -727,15 +709,20 @@ describe("mod settings", () => {
   });
 
   test("says no mod carries a schema rather than showing an empty pane", () => {
-    store.modSettings = [];
+    vi.spyOn(store, "modSettings", "get").mockReturnValue([]);
     expect(view().one("p.empty").textContent).toContain("No installed mod carries a settings schema");
   });
 
   test("draws a section per mod, headed by its name, with a way to open the file itself", () => {
-    const setting = SETTINGS[0]!;
-    store.modSettings = [
-      { modId: "fo2tweaks", name: "FO2tweaks", files: ["mods/fo2tweaks.ini"], settings: [setting], dropped: [] },
-    ] as never;
+    vi.spyOn(store, "modSettings", "get").mockReturnValue([
+      {
+        modId: "fo2tweaks",
+        name: "FO2tweaks",
+        files: ["mods/fo2tweaks.ini"],
+        settings: [{ def: someSetting(), default: null }],
+        dropped: [],
+      },
+    ]);
     const v = view();
     expect(v.one(".section-head h2").textContent).toBe("FO2tweaks");
     expect(v.text()).toContain("Open the file");
@@ -743,12 +730,23 @@ describe("mod settings", () => {
 
   /* One section is no choice, so the strip only appears when there are two. */
   test("shows the ini's sections as sub-tabs only where there is more than one", () => {
-    const [a, b] = [SETTINGS[0]!, SETTINGS.find((s) => s.targets[0]!.section !== SETTINGS[0]!.targets[0]!.section)!];
-    store.modSettings = [{ modId: "m", name: "M", files: ["mods/m.ini"], settings: [a], dropped: [] }] as never;
+    const a = someSetting();
+    const b = store.catalog?.settings.find((s) => s.targets[0]!.section !== a.targets[0]!.section);
+    if (!b) throw new Error("the catalog holds one section only");
+    const group = (defs: SettingDef[]) => [
+      {
+        modId: "m",
+        name: "M",
+        files: ["mods/m.ini"],
+        settings: defs.map((def) => ({ def, default: null })),
+        dropped: [],
+      },
+    ];
+    const schemas = vi.spyOn(store, "modSettings", "get").mockReturnValue(group([a]));
     expect(view().all(".subtabs")).toHaveLength(0);
     unmountAll();
 
-    store.modSettings = [{ modId: "m", name: "M", files: ["mods/m.ini"], settings: [a, b], dropped: [] }] as never;
+    schemas.mockReturnValue(group([a, b]));
     expect(view().all(".subtabs")).toHaveLength(1);
   });
 
@@ -757,33 +755,33 @@ describe("mod settings", () => {
     apologies down the section would drown the settings that do work.
   */
   test("says once how many settings need a newer ZAX, naming them", () => {
-    store.modSettings = [
+    vi.spyOn(store, "modSettings", "get").mockReturnValue([
       {
         modId: "m",
         name: "M",
         files: ["mods/m.ini"],
-        settings: [SETTINGS[0]!],
+        settings: [{ def: someSetting(), default: null }],
         dropped: [{ address: "main.newthing", why: "unknown kind" }],
       },
-    ] as never;
+    ]);
     const text = view().text();
     expect(text).toContain("One setting needs a newer ZAX");
     expect(text).toContain("main.newthing");
   });
 
   test("pluralises that note rather than saying 'One setting' twice", () => {
-    store.modSettings = [
+    vi.spyOn(store, "modSettings", "get").mockReturnValue([
       {
         modId: "m",
         name: "M",
         files: ["mods/m.ini"],
-        settings: [SETTINGS[0]!],
+        settings: [{ def: someSetting(), default: null }],
         dropped: [
           { address: "main.a", why: "unknown kind" },
           { address: "main.b", why: "unknown kind" },
         ],
       },
-    ] as never;
+    ]);
     expect(view().text()).toContain("2 settings need a newer ZAX");
   });
 });
@@ -793,16 +791,6 @@ describe("mod settings", () => {
   folder - which release is installed, which parts of it, which folder it reads from, what lands where - and
   none of that wording is reachable from a test of the store, which knows the values but not the sentences.
 */
-
-/** An offer as the dialogs receive it: whatever the case needs, over a mod that is otherwise unremarkable. */
-const offer = (over: Record<string, unknown> = {}) => ({
-  id: "fo2tweaks",
-  name: "FO2tweaks",
-  version: "14.8",
-  type: "pluggable",
-  availability: { kind: "install" },
-  ...over,
-});
 
 describe("the version dialog", () => {
   test("marks the release the feed offers, and leaves the others plain", () => {
@@ -836,21 +824,24 @@ describe("the version dialog", () => {
 });
 
 describe("the parts dialog", () => {
-  const choice = (over: Record<string, unknown> = {}) => ({
-    selection: ["core"],
-    dropped: [],
-    ask: true,
-    groups: [
+  const part = (id: string, label: string, over: Partial<ModPart> = {}): ModPart => ({
+    id,
+    label,
+    help: null,
+    archive: `${id}.dat`,
+    entries: null,
+    needs: null,
+    ...over,
+  });
+  const choice = (over: { dropped?: string[]; groups?: unknown[] } = {}) => ({
+    carried: { selection: ["core"], dropped: over.dropped ?? [], ask: true },
+    groups: over.groups ?? [
       {
         label: "Content",
         pick: "any",
-        options: [
-          { id: "core", label: "Core files" },
-          { id: "extra", label: "Extra maps", help: "Adds two maps.", needs: "core" },
-        ],
+        options: [part("core", "Core files"), part("extra", "Extra maps", { help: "Adds two maps.", needs: "core" })],
       },
     ],
-    ...over,
   });
 
   test("draws one control per part, under the group the manifest named", () => {
@@ -881,7 +872,7 @@ describe("the parts dialog", () => {
   });
 
   test("draws a pick-one group as radios", () => {
-    const groups = [{ label: "Speed", pick: "one", options: [{ id: "fast", label: "Fast" }] }];
+    const groups = [{ label: "Speed", pick: "one", options: [part("fast", "Fast")] }];
     store.modParts = { offer: offer({ choices: choice({ groups }) }), chosen: ["fast"] } as never;
     expect(view().all("input[type=radio]").length).toBe(1);
   });
@@ -910,7 +901,7 @@ describe("the folder-question dialog", () => {
   test("opens the picker on the file rather than on the folder around it", async () => {
     // A folder picker shows no files, so the one thing that settles whether this is the right copy of the
     // other game is the thing the user cannot see. The shell answers with the folder either way.
-    const picker = vi.spyOn(hostBackend, "chooseFolder").mockResolvedValue("/games/fallout");
+    const picker = vi.spyOn(commands, "chooseFolder").mockResolvedValue("/games/fallout");
     // To the field's own type rather than `never`: the assertion below reads the answer back, and `never`
     // narrows the field out of existence for the rest of the test.
     store.modInputs = { offer: offer({ asks }), chosen: [], answers: {} } as typeof store.modInputs;
@@ -972,6 +963,9 @@ describe("the plan dialog", () => {
         asset: "a.exe",
         route: "windows",
         download: 1024,
+        unpacked: null,
+        free: null,
+        lowercasing: null,
         becomes: "fallout2rpu",
         fingerprint: "f",
       },
@@ -989,6 +983,9 @@ describe("the plan dialog", () => {
         asset: "a.zip",
         route: "other",
         download: 1024,
+        unpacked: null,
+        free: null,
+        lowercasing: null,
         becomes: "fallout2rpu",
         fingerprint: "f",
       },
@@ -998,7 +995,10 @@ describe("the plan dialog", () => {
 
   test("names the folder a creating mod makes and the folders it reads", () => {
     store.modPlan = {
-      offer: offer({ name: "Fo1in2", asks: [{ id: "fallout1", label: "Fallout 1 folder", holds: "master.dat" }] }),
+      offer: offer({
+        name: "Fo1in2",
+        asks: [{ id: "fallout1", label: "Fallout 1 folder", holds: "master.dat", help: null }],
+      }),
       version: "2.0",
       plan: {
         kind: "creates",
@@ -1007,6 +1007,7 @@ describe("the plan dialog", () => {
         asset: "fo1in2.zip",
         download: 700 * 1024,
         unpacked: 3 * 1024 * 1024,
+        free: null,
         inputs: { fallout1: "/games/fallout" },
         extracts: 42,
         becomes: "fo1in2",
@@ -1029,11 +1030,12 @@ describe("the plan dialog", () => {
       plan: {
         kind: "stacking",
         files: [
-          { path: "mods/fo2tweaks.dat", size: 10, overwrites: false },
-          { path: "mods/fo2tweaks.ini", size: 2, overwrites: true },
+          { path: "mods/fo2tweaks.dat", size: 10, overwrites: false, part: null },
+          { path: "mods/fo2tweaks.ini", size: 2, overwrites: true, part: null },
         ],
         orderLines: ["fo2tweaks.dat"],
         removes: ["mods/old.dat"],
+        parts: null,
         fingerprint: "f",
       },
     } as never;
@@ -1047,7 +1049,7 @@ describe("the plan dialog", () => {
 
   test("says a single dropped part is, and two are, no longer offered", () => {
     const withDropped = (dropped: string[]) => ({
-      offer: offer({ choices: { selection: [], dropped, ask: false, groups: [] } }),
+      offer: offer({ choices: { carried: { selection: [], dropped, ask: false }, groups: [] } }),
       version: "14.8",
       plan: { kind: "stacking", files: [], orderLines: [], removes: [], parts: ["core"], fingerprint: "f" },
     });
@@ -1062,10 +1064,16 @@ describe("the plan dialog", () => {
     store.modPlan = {
       offer: offer({
         choices: {
-          selection: ["core"],
-          dropped: [],
-          ask: false,
-          groups: [{ label: "Content", pick: "any", options: [{ id: "core", label: "Core files" }] }],
+          carried: { selection: ["core"], dropped: [], ask: false },
+          groups: [
+            {
+              label: "Content",
+              pick: "any",
+              options: [
+                { id: "core", label: "Core files", help: null, archive: "core.dat", entries: null, needs: null },
+              ],
+            },
+          ],
         },
       }),
       version: "14.8",

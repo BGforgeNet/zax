@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ENGINES, LAYOUT, SETTINGS } from "@zax/fallout2";
+  import type { LayoutFile } from "./bindings/LayoutFile";
   import BugReportPanel from "./BugReportPanel.svelte";
   import FixesPanel from "./FixesPanel.svelte";
   import HiresVersion from "./HiresVersion.svelte";
@@ -23,8 +23,8 @@
   const tab = $derived(file ? (store.fileTab[file.id] ?? file.tabs[0]?.title ?? "") : "");
   // A group's own name in the tooltip: the filename for the game's three, the engine's full name for the rest,
   // since "fallout2-ce" is the id a person would have to already know.
-  const nameOf = (f: (typeof LAYOUT)[number]) =>
-    f.engine === undefined ? f.id : (ENGINES.find((e) => e.id === f.engine)?.name ?? f.engine);
+  const nameOf = (f: LayoutFile) =>
+    f.engine === null ? f.id : (store.engines.find((e) => e.id === f.engine)?.name ?? f.engine);
   const items = $derived(file?.tabs.find((t) => t.title === tab)?.items ?? []);
   // The search box lives on the "all settings" tab; the window still focuses it with Ctrl-F.
   let searchBox = $state<HTMLInputElement | null>(null);
@@ -140,12 +140,13 @@
             type="search"
             placeholder="Filter by name, key, section or tab"
             aria-label="Filter settings"
-            bind:value={store.query}
+            value={store.query}
+            oninput={(e) => void store.setQuery(e.currentTarget.value)}
           />
           <!-- Only while narrowing: with nothing typed, a count against the catalog total reads as a filter
                being applied, when what is on screen is everything the layout places. -->
           {#if store.query.trim() !== ""}
-            <span class="count">{store.results.length} of {SETTINGS.length}</span>
+            <span class="count">{store.results.length} of {store.catalog?.settings.length ?? 0}</span>
           {/if}
         </div>
         {#if store.installMatches}
@@ -153,7 +154,7 @@
             class="found"
             onclick={() => {
               store.settingsTab = "install";
-              store.query = "";
+              void store.setQuery("");
             }}>Install</button
           >
           <InstallPanel />
@@ -161,8 +162,8 @@
         {#each store.results as r, i (r.def.id)}
           <!-- Grouped under the address they came from, so a run of rows reads as the tab it belongs to
                rather than as one badge repeated down the column. -->
-          {#if r.where !== store.results[i - 1]?.where}
-            <button class="found" onclick={() => store.goTo(r.place)}>{r.where}</button>
+          {#if r.place.place !== store.results[i - 1]?.place.place}
+            <button class="found" onclick={() => store.goTo(r.place)}>{r.place.place}</button>
           {/if}
           <SettingRow def={r.def} />
         {:else}
@@ -175,7 +176,7 @@
              the engine's own first run. Hiding them would answer "what can this engine do" with a blank pane. -->
         {#if refusal}
           <Unavailable reason={refusal} />
-        {:else if store.install && file.engine === undefined && !store.hasFile(file.id)}
+        {:else if store.install && file.engine === null && !store.hasFile(file.id)}
           <Unavailable file={file.id} />
         {/if}
         <!--

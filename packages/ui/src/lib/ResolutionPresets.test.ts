@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { COMMON_RESOLUTIONS } from "@zax/fallout2";
 import ResolutionPresets from "./ResolutionPresets.svelte";
-import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
+import { disk, PREVIEW_INSTALL, render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
 
 /*
@@ -42,7 +41,7 @@ describe("choosing a preset", () => {
 
 describe("the list offered", () => {
   test("carries every common resolution, plus the placeholder", () => {
-    expect(draw().all("option")).toHaveLength(COMMON_RESOLUTIONS.length + 1);
+    expect(draw().all("option")).toHaveLength((store.catalog?.resolutions.length ?? 0) + 1);
   });
 
   /*
@@ -59,8 +58,9 @@ describe("the list offered", () => {
     expect(view.text()).toContain("Smaller modes are omitted");
   });
 
-  test("offers the whole list again once scaling is off", () => {
+  test("offers the whole list again once scaling is off", async () => {
     store.set(SCALE, "0");
+    await store.idle();
     const view = draw();
     expect(view.all("option").map((option) => option.textContent?.trim())).toContain("800 x 600");
     expect(view.text()).not.toContain("Smaller modes are omitted");
@@ -68,8 +68,9 @@ describe("the list offered", () => {
 });
 
 describe("an install without the hi-res patch's config", () => {
-  test("refuses the control, following the same rule the rows do", () => {
-    store.contents = { ...store.contents, "f2_res.ini": undefined };
+  test("refuses the control, following the same rule the rows do", async () => {
+    disk().removeFile(`${PREVIEW_INSTALL}/f2_res.ini`);
+    await store.start();
     expect(draw().one<HTMLSelectElement>("select").disabled).toBe(true);
   });
 });

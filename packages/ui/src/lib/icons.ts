@@ -1,4 +1,4 @@
-import type { GameType } from "@zax/core";
+import type { GameType } from "./bindings/GameType";
 
 import bgforge from "../assets/bgforge.png";
 import fallout2 from "../assets/fallout2.png";

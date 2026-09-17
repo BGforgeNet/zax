@@ -12,7 +12,7 @@ step: string,
 /**
  * Bytes so far and bytes expected, when the step is a transfer and the server said how big it is.
  */
-received: bigint | null, total: bigint | null, 
+received: number | null, total: number | null, 
 /**
  * Whether `cancel` would reach this step. Declared rather than inferred from the byte counts being
  * present: the interface offers the button on this, and a control that is offered and does nothing

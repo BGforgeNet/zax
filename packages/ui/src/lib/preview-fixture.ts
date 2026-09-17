@@ -1,22 +1,20 @@
 /**
- * The shared setup every test that drives the interface needs: the preview disk put back the way it was
- * seeded, and - for the component tests - a component mounted against it.
+ * The shared setup every test that drives the interface needs: a freshly seeded preview machine, and - for the
+ * component tests - a component mounted against it.
  *
- * Extracted rather than repeated because the store is a singleton over a mutable in-memory disk, so a test
- * that saves leaves the next one reading its output. One reseed, written once, is what keeps a suite of
- * component files from each carrying its own half-correct copy of it.
+ * Extracted rather than repeated because the store is a singleton, so a test that saves leaves the next one
+ * reading its output unless the machine under it is replaced. One reseed, written once, is what keeps a suite
+ * of component files from each carrying its own half-correct copy of it.
  */
 
 import { flushSync, mount, unmount, type Component } from "svelte";
-import { ENGINE_CONFIG_FILES } from "@zax/fallout2";
-import { PREVIEW_INSTALL, previewPlatform } from "./preview-host.js";
+import type { SettingDef } from "./bindings/SettingDef";
+import { resetPreview, type PreviewMachine } from "./invoke.js";
+import { ZaxPreview } from "./preview-wasm/zax_preview.js";
 import { store } from "./store.svelte.js";
-import fallout2cfg from "../../../../fixtures/f2up/fallout2.cfg?raw";
-import f2resini from "../../../../fixtures/f2up/f2_res.ini?raw";
-import ddrawini from "../../../../fixtures/f2up/ddraw.ini?raw";
 
-/** Re-exported so a test names the install it drives through the same module it gets its setup from. */
-export { PREVIEW_INSTALL } from "./preview-host.js";
+/** The install the preview opens on: the one with a mods folder, a record and an engine deployed. */
+export const PREVIEW_INSTALL = "fixtures/f2up";
 
 /** latin1, as every config file this application reads and writes is. */
 export const bytes = (text: string) => {
@@ -29,37 +27,61 @@ export const bytes = (text: string) => {
 export const ORDER_FILE = `${PREVIEW_INSTALL}/mods/mods_order.txt`;
 export const MOD_INI = `${PREVIEW_INSTALL}/mods/fo2tweaks.ini`;
 
-/** Captured on the first run, before any test has written to them, so the seed is not repeated here to drift. */
-let seededOrder: Uint8Array | null = null;
-let seededModIni: Uint8Array | null = null;
+let machine: PreviewMachine | null = null;
+
+/** The preview's disk, for a test that changes a file underneath the interface. */
+export function disk(): PreviewMachine {
+  if (machine === null) throw new Error("reseedPreview has not run, so there is no machine to reach");
+  return machine;
+}
 
 /**
- * Puts the preview disk back to its seeded state and reloads the store from it.
+ * Puts a library recording this version at a path in the install, which is what ZAX reads an installed sfall or
+ * hi-res patch version from. `null` takes it away.
+ */
+export async function plantLibrary(name: "ddraw.dll" | "f2_res.dll", version: string | null): Promise<void> {
+  const at = `${PREVIEW_INSTALL}/${name}`;
+  if (version === null) disk().removeFile(at);
+  else disk().writeFile(at, ZaxPreview.versionedLibrary(version));
+  await store.start();
+}
+
+/** A file on that disk, as latin1 text. */
+export const read = (path: string): string => new TextDecoder("latin1").decode(disk().readFile(path));
+
+/**
+ * Replaces the preview machine with a freshly seeded one and starts the store over it.
  *
- * Without this the gate and conflict cases run against an empty baseline, where every value reads as absent -
- * and they pass, because "absent" is also what a closed gate looks like.
+ * One install listed, deliberately narrower than the six a fresh preview lists: these cases are about adding,
+ * refusing and relabelling, and each of them asserts against the whole list. The other directories stay on
+ * the disk - the state file is what decides which are listed.
  */
 export async function reseedPreview(): Promise<void> {
-  // Any write the last test's edits scheduled goes first: autosave ships on, so a case that edits and ends
-  // inside the debounce would otherwise fire its save part-way through the next one.
-  await store.setAutosave(false);
-  // One install, deliberately narrower than the six a fresh preview lists: these cases are about adding,
-  // refusing and relabelling, and each of them asserts against the whole list. The other five directories stay
-  // on the disk - the state file is what decides which are listed, so they are inert until something adds them.
-  const seeded = `games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\n`;
-  await previewPlatform.fs.write("preview/config/zax.yml", new TextEncoder().encode(seeded));
-  // The config files too: a test that saves rewrites them, and the next test would inherit that.
-  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/fallout2.cfg`, bytes(fallout2cfg));
-  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/f2_res.ini`, bytes(f2resini));
-  await previewPlatform.fs.write(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddrawini));
-  // And an engine's own config goes, so a test that writes one does not leave the next install looking like
-  // one an engine has already run in. Reseeding fallout2.cfg clears fallout2-ce's mark with it.
-  for (const name of ENGINE_CONFIG_FILES) await previewPlatform.fs.remove(`${PREVIEW_INSTALL}/${name}`);
-  seededOrder ??= await previewPlatform.fs.read(ORDER_FILE);
-  await previewPlatform.fs.write(ORDER_FILE, seededOrder);
-  seededModIni ??= await previewPlatform.fs.read(MOD_INI);
-  await previewPlatform.fs.write(MOD_INI, seededModIni);
+  machine = await resetPreview();
+  machine.writeFile(
+    "preview/config/zax.yml",
+    bytes(`games:\n- path: ${PREVIEW_INSTALL}\ntheme: system\nautosave: false\n`),
+  );
+  store.view = "settings";
+  store.notice = null;
+  store.busy = null;
+  store.modPlan = null;
+  store.modParts = null;
+  store.modInputs = null;
+  store.modVersionPick = null;
+  store.pendingLaunch = null;
+  store.pendingFetch = null;
+  store.sfallVersions = [];
+  store.sfallVersionsRead = false;
+  await store.setQuery("");
   await store.start();
+}
+
+/** A catalog setting by id, or a failure naming the id a test was written against. */
+export function catalogDef(id: string): SettingDef {
+  const found = store.defOf(id);
+  if (!found) throw new Error(`no setting "${id}" - the id it was written against was renamed`);
+  return found;
 }
 
 /** What a mounted component's test holds: where it was drawn, and the queries worth having on hand. */
@@ -113,11 +135,9 @@ export function render<P extends Record<string, unknown>>(component: Component<P
     one,
     all: <E extends Element = HTMLElement>(selector: string) => [...target.querySelectorAll<E>(selector)],
     control: (name: string) => {
-      // Exact accessible name rather than a text search: `testing.md` wants a control driven by identity, and
-      // "Install" as a substring matches "Install the latest sfall" as readily as the button meant here.
-      // Controls inside a closed dialog are skipped: the interface keeps all four in the DOM at once, and the
-      // browser makes only the open one reachable, so counting the others would find duplicates a user cannot
-      // press.
+      // Exact accessible name rather than a text search: "Install" as a substring matches "Install the latest
+      // sfall" as readily as the button meant here. Controls inside a closed dialog are skipped: the interface
+      // keeps its dialogs in the DOM at once, and the browser makes only the open one reachable.
       const candidates = [...target.querySelectorAll<HTMLElement>("button, a, input, select, [role=tab]")].filter(
         (element) =>
           element.closest("dialog:not([open])") === null &&

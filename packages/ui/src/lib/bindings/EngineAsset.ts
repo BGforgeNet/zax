@@ -3,4 +3,4 @@
 /**
  * One published file: what it is called, where it is, and how big the release says it is.
  */
-export type EngineAsset = { name: string, url: string, size: bigint, };
+export type EngineAsset = { name: string, url: string, size: number, };

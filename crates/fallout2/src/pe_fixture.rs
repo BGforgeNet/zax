@@ -2,7 +2,14 @@
 //! everything that reads a version through it. Built rather than vendored because a real `ddraw.dll` is
 //! nearly a megabyte and what the reader has to get right is the resource, not the code.
 //!
-//! Test-only: nothing ZAX ships writes PE images.
+//! For tests: nothing ZAX ships writes PE images. The preview's interface tests reach it through the
+//! `fixtures` feature, to put a library with a version on the in-memory disk.
+
+#![expect(
+    clippy::expect_used,
+    reason = "every length converted here is bounded by the fixed layout this builds, far inside the widths \
+              the format stores"
+)]
 
 /// A key or value as the resource format spells it: UTF-16LE, NUL-terminated.
 fn utf16z(text: &str) -> Vec<u8> {

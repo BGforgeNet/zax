@@ -11,10 +11,7 @@ import { VERSION } from "./version.js";
   directory is about to go, is the feature rather than a nicety.
 */
 
-beforeEach(async () => {
-  await reseedPreview();
-  store.zaxLatest = null;
-});
+beforeEach(reseedPreview);
 afterEach(() => {
   unmountAll();
   vi.restoreAllMocks();
@@ -37,7 +34,10 @@ describe("the version block", () => {
   });
 
   test("offers the download once a newer release is known", () => {
-    store.zaxLatest = "999.0.0";
+    // What a check would have found, and the comparison the held state makes against it. The preview reaches
+    // no feed, so a check cannot.
+    vi.spyOn(store, "zaxLatest", "get").mockReturnValue("999.0.0");
+    vi.spyOn(store, "zaxOutdated", "get").mockReturnValue(true);
     const view = panel();
     expect(view.text()).toContain("999.0.0");
     // Still refused in a host that cannot leave the page, but the reason changes to the one that matters.

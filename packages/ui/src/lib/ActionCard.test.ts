@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { ACTIONS } from "@zax/fallout2";
+import type { Action } from "./bindings/Action";
 import ActionCard from "./ActionCard.svelte";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
@@ -15,10 +15,14 @@ import { store } from "./store.svelte.js";
   One that writes config keys and nothing else. The two logging actions also set the install's WINEDEBUG, which
   is written to the record rather than left pending - a different path, and not the one this card is about.
 */
-const action = ACTIONS.find((one) => one.wine === undefined);
-if (!action) throw new Error("every action now carries a Wine side; this file needs one that does not");
+let action: Action;
 
-beforeEach(reseedPreview);
+beforeEach(async () => {
+  await reseedPreview();
+  const found = store.catalog?.actions.find((one) => one.wine === null);
+  if (!found) throw new Error("every action now carries a Wine side; this file needs one that does not");
+  action = found;
+});
 afterEach(unmountAll);
 
 const card = () => render(ActionCard as never, { action } as never);
@@ -40,9 +44,10 @@ describe("an action that has not been applied", () => {
     Every key at once. An action that wrote some of them would leave the install in a state the user never asked
     for and the card would go on reading as unapplied, which is the shape of a fix that silently does nothing.
   */
-  test("writes every one of its keys on a single click", () => {
+  test("writes every one of its keys on a single click", async () => {
     const view = card();
     view.control("Apply").click();
+    await store.idle();
     view.settle();
 
     for (const [id, value] of Object.entries(action.targets)) expect(store.valueOf(id), id).toBe(value);
@@ -50,9 +55,10 @@ describe("an action that has not been applied", () => {
 });
 
 describe("an action already applied", () => {
-  test("says so instead of offering the click again", () => {
+  test("says so instead of offering the click again", async () => {
     const view = card();
     view.control("Apply").click();
+    await store.idle();
     view.settle();
 
     expect(view.all("button")).toHaveLength(0);

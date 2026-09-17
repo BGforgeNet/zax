@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { DEBUG_PACKAGE_CONTENTS } from "@zax/fallout2";
 import BugReportPanel from "./BugReportPanel.svelte";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
@@ -50,7 +49,9 @@ describe("the steps", () => {
   /* Taken from the domain rather than listed in the view, so the archive and the promise cannot drift. */
   test("names everything the archive carries", async () => {
     const text = (await withSlots()).text();
-    for (const item of DEBUG_PACKAGE_CONTENTS) expect(text).toContain(item);
+    const contents = store.catalog?.debugPackageContents ?? [];
+    expect(contents.length).toBeGreaterThan(0);
+    for (const item of contents) expect(text).toContain(item);
   });
 });
 
@@ -190,6 +191,7 @@ describe("turning logging back off", () => {
     const enable = store.actionById("debug.enable");
     if (!enable) throw new Error("the catalog no longer defines debug.enable");
     store.applyAction(enable);
+    await store.idle();
     view.settle();
     expect(view.text()).toContain("turn it back off once the report is filed");
   });

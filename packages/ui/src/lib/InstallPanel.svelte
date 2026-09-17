@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { GAME_TYPES } from "@zax/core";
   import { store } from "./store.svelte.js";
 
   // Written on commit rather than per keystroke: each write is a rewrite of the state file on disk.
@@ -26,7 +25,7 @@
         class="prose"
         type="text"
         value={current.alias ?? ""}
-        placeholder={GAME_TYPES[current.type].name}
+        placeholder={store.gameType(current.type).name}
         aria-label="Alias"
         onchange={(e) => void store.setAlias(current.path, e.currentTarget.value)}
       />
@@ -39,7 +38,7 @@
   <div class="row">
     <div class="label"><span class="name">Folder</span></div>
     <div class="control"><span class="static">{current.path}</span></div>
-    <div class="notes"><span class="help">{GAME_TYPES[current.type].label}.</span></div>
+    <div class="notes"><span class="help">{store.gameType(current.type).label}.</span></div>
   </div>
 
   <!-- Wine only exists off Windows, matching the previous interface, which hid its whole tab there. -->

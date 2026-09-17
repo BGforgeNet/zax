@@ -1,12 +1,5 @@
 <script lang="ts">
-  import {
-    KEY_BY_SCANCODE,
-    SCANCODE_BY_DOM_CODE,
-    parseScancode,
-    percentToScale,
-    scaleToPercent,
-    type SettingDef,
-  } from "@zax/core";
+  import type { SettingDef } from "./bindings/SettingDef";
   import { store } from "./store.svelte.js";
 
   // Which control the previous interface drew. A bounded float was a slider there, and the catalog kind alone
@@ -18,7 +11,7 @@
   // On `code` rather than `key`: the file stores a physical scancode, and `key` is what the layout makes of
   // the keypress - it also names modifiers and function keys in a way no scancode answers to.
   function onKeyCapture(event: KeyboardEvent) {
-    const code = SCANCODE_BY_DOM_CODE[event.code];
+    const code = store.catalog?.scancodes[event.code];
     if (code) {
       event.preventDefault();
       store.set(def.id, code);
@@ -91,8 +84,7 @@
     >
   </div>
 {:else if def.kind.type === "scale"}
-  {@const max = def.kind.max}
-  {@const percent = scaleToPercent(value, max)}
+  {@const percent = store.percentOf(def.id) ?? 0}
   <!-- The engine stores 0..max; a raw 22281 means nothing to a user, so the control speaks percent. -->
   <div class="slider">
     <input
@@ -101,7 +93,7 @@
       max="100"
       value={percent}
       aria-label={def.label}
-      oninput={(e) => store.set(def.id, percentToScale(Number(e.currentTarget.value), max))}
+      oninput={(e) => store.setPercent(def.id, Number(e.currentTarget.value))}
     />
     <span class="readout">{percent}%</span>
   </div>
@@ -125,7 +117,7 @@
     type="text"
     class="keycap"
     readonly
-    value={KEY_BY_SCANCODE[parseScancode(value)] ?? value}
+    value={store.row(def.id)?.display ?? value}
     aria-label={`${def.label} (press a key)`}
     placeholder="press a key"
     onkeydown={onKeyCapture}

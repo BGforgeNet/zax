@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { pendingTargets, type Action } from "@zax/core";
+  import type { Action } from "./bindings/Action";
   import { store } from "./store.svelte.js";
 
   let { action }: { action: Action } = $props();
 
   const applied = $derived(store.actionApplied(action));
-  const pending = $derived(pendingTargets(action, (id) => store.valueOf(id), store.actionWineDebug));
+  const pending = $derived(store.actionPending(action));
 </script>
 
 <article class:applied>
@@ -17,7 +17,7 @@
     <span class="done">{action.appliedLabel}</span>
   {:else}
     <button onclick={() => store.applyAction(action)}>Apply</button>
-    <span class="count">{pending.length}</span>
+    <span class="count">{pending}</span>
   {/if}
 </article>
 

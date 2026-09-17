@@ -1,13 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-  "crates/core",
-  "crates/fallout2",
-  "crates/host",
-  "crates/platform",
-  "crates/preview",
-  "crates/shell",
-]
+members = ["crates/core", "crates/fallout2", "crates/host", "crates/platform", "crates/preview", "crates/shell"]
 
 # The crates mirror packages/ one for one, and dependencies point inward the same way: zax-core may
 # not reach zax-platform's implementations, only the traits it is handed.

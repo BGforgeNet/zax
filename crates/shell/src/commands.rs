@@ -17,7 +17,7 @@ use tauri::State;
 use zax_core::install::{Theme, WineConfig};
 use zax_fallout2::backend::{
     Answered, AppView, Backend, InstallPlan, InstallReport, ModInstallRequest, OpenTarget,
-    OrderEdit, SaveRefusal, Started, WipeTarget,
+    OrderEdit, SaveRefusal, SettingEdit, Started, WipeTarget,
 };
 use zax_fallout2::catalog_view::{CatalogView, SearchResults, catalog_view, search_settings};
 use zax_fallout2::debug_package::DebugPackage;
@@ -155,13 +155,8 @@ pub async fn scan(backend: Held<'_>) -> Answer<Answered<usize>> {
 // --- editing the selected install -----------------------------------------------------------------
 
 #[tauri::command]
-pub async fn set_setting(backend: Held<'_>, id: String, value: String) -> Answer<AppView> {
-    off_thread(&backend, move |backend| backend.set_setting(&id, &value)).await
-}
-
-#[tauri::command]
-pub async fn set_percent(backend: Held<'_>, id: String, percent: f64) -> Answer<AppView> {
-    off_thread(&backend, move |backend| backend.set_percent(&id, percent)).await
+pub async fn set_settings(backend: Held<'_>, edits: Vec<SettingEdit>) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.set_settings(&edits)).await
 }
 
 #[tauri::command]
@@ -406,4 +401,10 @@ pub async fn wipe(backend: Held<'_>, which: WipeTarget) -> Answer<()> {
 #[tauri::command]
 pub fn cancel(backend: Held<'_>) {
     backend.cancel();
+}
+
+/// What the interface says is running, which the window asks about before it closes on it.
+#[tauri::command]
+pub fn set_busy(busy: State<'_, crate::closing::Busy>, what: Option<String>) {
+    busy.set(what.as_deref());
 }

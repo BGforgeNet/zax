@@ -21,7 +21,6 @@ const INSIDE_THE_SEAM: Readonly<Record<string, readonly string[]>> = {
   platform: ["spark-md5"],
   core: ["@zax/platform", "yaml"],
   "games-fallout2": ["@zax/core", "@zax/platform", "pe-library", "resedit", "yaml"],
-  ui: ["@zax/core", "@zax/fallout2", "@zax/platform", "@zax/platform/memory", "svelte"],
 };
 
 const PACKAGES = join(dirname(fileURLToPath(import.meta.url)), "..", "..");

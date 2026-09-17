@@ -105,7 +105,10 @@ impl Machine {
     }
 
     fn set(&mut self, id: &str, value: &str) {
-        self.act("set_setting", &json!({ "id": id, "value": value }));
+        self.act(
+            "set_settings",
+            &json!({ "edits": [{ "id": id, "to": { "raw": value } }] }),
+        );
     }
 
     fn save(&mut self) -> Value {
@@ -179,7 +182,10 @@ fn an_edit_sends_only_the_rows_it_changed_and_a_view_out_of_step_is_sent_whole()
     } else {
         "1"
     };
-    let patch = held.call("set_setting", &json!({ "id": MUSIC, "value": flipped }));
+    let patch = held.call(
+        "set_settings",
+        &json!({ "edits": [{ "id": MUSIC, "to": { "raw": flipped } }] }),
+    );
     let sent = patch["reading"]["rows"]
         .as_object()
         .map_or(0, serde_json::Map::len);
@@ -191,8 +197,14 @@ fn an_edit_sends_only_the_rows_it_changed_and_a_view_out_of_step_is_sent_whole()
     assert!(patch["reading"]["rows"][MUSIC]["modified"] == true);
 
     // A view nobody applied leaves the next patch based on a revision the interface does not hold.
-    let unapplied = held.call("set_setting", &json!({ "id": MUSIC, "value": "0" }));
-    held.act("set_setting", &json!({ "id": MUSIC, "value": flipped }));
+    let unapplied = held.call(
+        "set_settings",
+        &json!({ "edits": [{ "id": MUSIC, "to": { "raw": "0" } }] }),
+    );
+    held.act(
+        "set_settings",
+        &json!({ "edits": [{ "id": MUSIC, "to": { "raw": flipped } }] }),
+    );
     assert!(unapplied["revision"].as_u64() < held.view["revision"].as_u64());
     assert_eq!(held.value_of(MUSIC), Some(flipped));
     assert_eq!(

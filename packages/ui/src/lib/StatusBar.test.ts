@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import StatusBar from "./StatusBar.svelte";
-import { backend as hostBackend } from "./host.js";
+import { commands } from "./commands.js";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
 
@@ -61,7 +61,12 @@ describe("while an operation runs", () => {
   */
   test("lets only the step give way, since the amount is the bounded half", () => {
     store.busy = "Installing";
-    store.progress = { step: "Downloading something with a very long name indeed", received: 1, total: 2 };
+    store.progress = {
+      step: "Downloading something with a very long name indeed",
+      received: 1,
+      total: 2,
+      cancellable: false,
+    };
     const view = bar();
 
     expect(view.one(".step").className).toContain("step");
@@ -83,12 +88,12 @@ describe("stopping it", () => {
     expect(bar().all(".stop"), "while the bytes are moving").toHaveLength(1);
 
     unmountAll();
-    store.progress = { step: "Installing the files", cancellable: false };
+    store.progress = { step: "Installing the files", received: null, total: null, cancellable: false };
     expect(bar().all(".stop"), "and not once the transfer is done").toHaveLength(0);
   });
 
   test("asks the backend to stop, and says so while it unwinds", async () => {
-    const asked = vi.spyOn(hostBackend, "cancel").mockResolvedValue(undefined);
+    const asked = vi.spyOn(commands, "cancel").mockResolvedValue(undefined);
     store.busy = "Installing";
     store.progress = { step: "Downloading", received: 1, total: 2, cancellable: true };
     const view = bar();

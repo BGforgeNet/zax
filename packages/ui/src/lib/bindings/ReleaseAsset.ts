@@ -4,4 +4,4 @@ export type ReleaseAsset = { name: string, url: string,
 /**
  * GitHub states `sha256:<hex>`; kept verbatim and split where it is checked.
  */
-digest: string | null, size: bigint | null, };
+digest: string | null, size: number | null, };

@@ -5,7 +5,7 @@
     the half the browser preview cannot do.
   */
   import Dialog from "./Dialog.svelte";
-  import { isPreview } from "./host.js";
+  import { isPreview } from "./invoke.js";
   import { store } from "./store.svelte.js";
 
   const OUTSIDE = "The browser preview cannot reach the release feed - this needs the desktop build";

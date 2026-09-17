@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { displayValue, sentinelLabel, validate, valueLabel, type SettingDef } from "@zax/core";
+  import type { SettingDef } from "./bindings/SettingDef";
   import Control from "./Control.svelte";
   import { store } from "./store.svelte.js";
 
@@ -22,46 +22,41 @@
     group?: string | undefined;
   } = $props();
 
+  // Everything below is what the held state answered about this row. The rules that decide it - which address
+  // a tab shows, whether a gate holds, what a fix would write - are worked out there, not here.
+  const row = $derived(store.row(def.id));
   // The address this row edits. A linked setting has more than one, and which of them a row shows follows the
   // tab it sits on: the same setting is a different key, under a different gate, on each component's tab.
-  const address = $derived(store.targetFor(def, group));
+  const view = $derived(store.address(def.id, group));
+  const address = $derived(view?.target ?? def.targets[0]);
   // A controller in another file carries its address inline - the one exemption from the same-tab rule.
-  const elsewhere = (other: SettingDef) => {
-    const file = store.targetFor(other, group).file;
-    return file === address.file ? "" : ` (${file})`;
-  };
+  const elsewhere = (file: string) => (file === address?.file ? "" : ` (${file})`);
 
   // The whole tab is refused: the engine is installed but has not written its settings yet.
   const refused = $derived(group !== undefined && store.groupRefusal(group) !== null);
-  const modified = $derived(store.isModified(def.id));
+  const modified = $derived(row?.modified ?? false);
   // Where the value came from, when it was not typed here. A row that is marked changed with nothing on
   // screen saying why reads as ZAX having edited the install on its own.
-  const carriedFrom = $derived(store.reconciled[def.id]?.from);
-  const value = $derived(store.valueOf(def.id));
-  const validation = $derived(validate(def, value));
-  const sentinel = $derived(sentinelLabel(def, value));
+  const carriedFrom = $derived(row?.carriedFrom ?? null);
   // Not while the whole tab is refused: nothing there is in the file yet, so the note is true of every row
-  // at once and the banner above them already says it. Repeated down the column it is noise, and it crowds
-  // out the notes that do differ per row.
-  const absent = $derived(store.isAbsent(def.id) && !store.isModified(def.id) && !refused);
-  const gate = $derived(store.gateOf(def, group));
+  // at once and the banner above them already says it.
+  const absent = $derived((row?.absent ?? false) && !modified && !refused);
+  const gate = $derived(view?.gate ?? null);
   // Null where the chain cannot be written from here - a pinned value, a missing file, a gate naming no one
-  // value. The note then stands alone and the user sets the controller themselves, as they did before.
-  const requirements = $derived(store.requirementsFor(def, group));
-  // Where the note pins one value, "set it" says enough. Where it names a range - "DX9 fullscreen or DX9
-  // windowed or ..." - the link says which of them the click writes, rather than leaving the user to find out.
+  // value. The note then stands alone and the user sets the controller themselves.
+  const requirements = $derived(view?.requirements ?? null);
   /**
    * Everything the row waits on, listed flat and each phrased the same way. A controller that is itself gated
-   * blocks this row just as much, and which of them waits on which is not something the reader has to work
-   * out - what matters is that all of them have to be set, which is what the button does.
+   * blocks this row just as much, and what matters is that all of them have to be set, which is what the
+   * button does.
    */
   const needs = $derived.by(() => {
     if (!gate) return "";
     // Only the first link is known when the chain cannot be walked to the end.
-    const links = requirements ?? [{ def: gate.controller, wants: gate.wants }];
+    const links = requirements ?? [{ label: gate.controllerLabel, file: gate.controllerFile, wants: gate.wants }];
     return links
       .map((link, at) =>
-        nested && at === 0 ? `${link.wants} above` : `${link.def.label}${elsewhere(link.def)} = ${link.wants}`,
+        nested && at === 0 ? `${link.wants} above` : `${link.label}${elsewhere(link.file)} = ${link.wants}`,
       )
       .join(", ");
   });
@@ -71,17 +66,16 @@
     if (!requirements || !first || !gate) return "";
     if (requirements.length === 2) return "set both";
     if (requirements.length > 2) return `set all ${requirements.length}`;
-    const pinned = "is" in gate.test && gate.test.is.length === 1;
-    return pinned ? "set it" : `set ${valueLabel(first.def, first.value)}`;
+    return gate.single ? "set it" : `set ${first.valueLabel}`;
   });
-  const conflict = $derived(store.conflictOf(def));
+  const conflict = $derived(row?.conflict ?? null);
   const managed = $derived(def.managed);
   const inert = $derived(gate !== null && !gate.active);
-  const origin = $derived(`${address.file} [${address.section}] ${address.key}`);
+  const origin = $derived(address ? `${address.file} [${address.section}] ${address.key}` : "");
   // What the same value is written to elsewhere. Named in full - file, section and key - because that is what
   // makes the claim checkable against the file itself, which is the point of showing it at all.
-  const linked = $derived(store.linkedTo(def, group));
   const linkNote = $derived.by(() => {
+    const linked = view?.linked ?? [];
     if (linked.length === 0) return "";
     const say = (one: { at: { file: string; section: string; key: string }; live: boolean }) =>
       `${one.at.file} [${one.at.section}] ${one.at.key}${one.live ? "" : " (not until that engine has run)"}`;
@@ -91,7 +85,7 @@
   // The component this setting belongs to is not installed, or an engine installed here has not yet written
   // its settings. Editing would write a config file for it, which is not a thing to do on the user's behalf,
   // so the row reads but does not take input.
-  const unavailable = $derived(store.install !== undefined && (!store.hasFile(address.file) || refused));
+  const unavailable = $derived(store.install !== undefined && (!(view?.hasFile ?? false) || refused));
 </script>
 
 <div class="row" class:modified class:inert class:nested>
@@ -127,7 +121,7 @@
 
   <div class="control">
     {#if managed}
-      <span class="pinned">{displayValue(def, managed.value)}</span>
+      <span class="pinned">{row?.pinned ?? managed.value}</span>
     {:else}
       <!--
         A fieldset so one attribute disables whichever control this row draws. A gated setting is disabled as
@@ -147,12 +141,12 @@
       <span class="gate">
         needs {needs}
         {#if requirements && fixWord}
-          <button class="fix" onclick={() => store.satisfyGate(def, group)}>{fixWord}</button>
+          <button class="fix" onclick={() => void store.satisfyGate(def, group)}>{fixWord}</button>
         {/if}
       </span>
     {/if}
     {#if conflict}
-      <span class="clash" role="alert">clashes with {conflict.other.label}: {conflict.note}</span>
+      <span class="clash" role="alert">clashes with {conflict.otherLabel}: {conflict.note}</span>
     {/if}
     {#if absent}
       <span class="absent" title="Setting it here adds the key to the file">
@@ -162,8 +156,8 @@
     {#if carriedFrom}
       <span class="carried">changed in {carriedFrom} - save to keep it, or revert</span>
     {/if}
-    {#if sentinel}<span class="sentinel">{sentinel}</span>{/if}
-    {#if !validation.ok}<span class="invalid" role="alert">{validation.reason}</span>{/if}
+    {#if row?.sentinel}<span class="sentinel">{row.sentinel}</span>{/if}
+    {#if row?.invalid}<span class="invalid" role="alert">{row.invalid}</span>{/if}
   </div>
 
   <!-- At the row's end rather than beside the label: the row's colour already says it changed, this undoes it.

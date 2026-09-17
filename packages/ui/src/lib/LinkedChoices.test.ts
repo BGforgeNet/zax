@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { SETTINGS } from "@zax/fallout2";
 import LinkedChoices from "./LinkedChoices.svelte";
-import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
+import { bytes, disk, PREVIEW_INSTALL, read, render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
 
 /*
@@ -12,25 +11,26 @@ import { store } from "./store.svelte.js";
   until one is picked.
 */
 
-/** A catalog row with two addresses, which is what a divergence is about. */
-const linked = SETTINGS.find((setting) => setting.targets.length > 1);
-if (!linked) throw new Error("the catalog no longer carries a setting with more than one address");
+/** Carried by the game's own sfall file and by Fission, which the seeded install has deployed. */
+const BARTER = "sfall.Interface.ExpandBarter";
 
-const [first, second] = [linked.targets[0]!, linked.targets[1]!];
-
-beforeEach(async () => {
-  await reseedPreview();
-  store.settingsChoices = [];
-});
+beforeEach(reseedPreview);
 afterEach(unmountAll);
 
-const pose = (values: [string, string]) => {
-  // Both addresses took part and both moved, which is exactly the shape reconciliation hands over here.
-  const moved = [
-    { target: first, value: values[0] },
-    { target: second, value: values[1] },
-  ];
-  store.settingsChoices = [{ id: linked.id, at: moved, choose: moved }];
+/**
+ * Both engines moved off what ZAX wrote: ZAX writes 0 to both, then Fission's own screen writes 1 and sfall's
+ * file is edited to 2. Reached through the files, as a user's own engines would reach it.
+ */
+const pose = async () => {
+  disk().writeFile(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=0\n"));
+  await store.start();
+  store.set(BARTER, "0");
+  await store.idle();
+  await store.save();
+  const ddraw = read(`${PREVIEW_INSTALL}/ddraw.ini`);
+  disk().writeFile(`${PREVIEW_INSTALL}/fission.cfg`, bytes("[enhancements]\nEnhancedBarter=1\n"));
+  disk().writeFile(`${PREVIEW_INSTALL}/ddraw.ini`, bytes(ddraw.replace(/ExpandBarter=0/, "ExpandBarter=2")));
+  await store.start();
   return render(LinkedChoices as never, {} as never);
 };
 
@@ -42,45 +42,48 @@ describe("nothing to decide", () => {
 });
 
 describe("two values that both moved", () => {
-  test("names the setting and asks which is right", () => {
-    const view = pose(["0", "1"]);
-    expect(view.text()).toContain(linked.label);
+  test("names the setting and asks which is right", async () => {
+    const view = await pose();
+    expect(view.text()).toContain(store.defOf(BARTER)?.label ?? BARTER);
     expect(view.text()).toContain("was changed in more than one place");
   });
 
-  test("raises it as an alert rather than as ordinary text", () => {
-    expect(pose(["0", "1"]).all("[role=alert]")).toHaveLength(1);
+  test("raises it as an alert rather than as ordinary text", async () => {
+    expect((await pose()).all("[role=alert]")).toHaveLength(1);
   });
 
   /*
     Named by the file each came from, because that is the only thing distinguishing them - two buttons reading
     "On" and "Off" with no source would be a coin toss.
   */
-  test("offers one button per value, each naming the file it came from", () => {
-    const view = pose(["0", "1"]);
-    const buttons = view.all("button");
+  test("offers one button per value, each naming the file it came from", async () => {
+    const view = await pose();
+    const buttons = view.all("button").map((button) => button.textContent ?? "");
     expect(buttons).toHaveLength(2);
-    expect(buttons[0]!.textContent).toContain(first.file);
-    expect(buttons[1]!.textContent).toContain(second.file);
+    expect(buttons.some((text) => text.includes("ddraw.ini"))).toBe(true);
+    expect(buttons.some((text) => text.includes("fission.cfg"))).toBe(true);
   });
 
-  test("writes nothing until one is picked", () => {
-    const before = store.valueOf(linked.id);
-    pose(["0", "1"]);
-    expect(store.valueOf(linked.id)).toBe(before);
+  test("writes nothing until one is picked", async () => {
+    await pose();
+    expect(read(`${PREVIEW_INSTALL}/fission.cfg`)).toContain("EnhancedBarter=1");
+    expect(read(`${PREVIEW_INSTALL}/ddraw.ini`)).toContain("ExpandBarter=2");
+    expect(store.isModified(BARTER)).toBe(false);
   });
 
   /*
     Answering leaves an ordinary pending edit rather than writing the file, so the choice can still be reverted
     before the save - and the banner goes, since the question has been answered.
   */
-  test("picking one leaves it as a pending edit and takes the question away", () => {
-    const view = pose(["0", "1"]);
-    view.all("button")[1]!.click();
+  test("picking one leaves it as a pending edit and takes the question away", async () => {
+    const view = await pose();
+    const fission = view.all("button").find((button) => button.textContent?.includes("fission.cfg"));
+    fission?.click();
+    await store.idle();
     view.settle();
 
-    expect(store.valueOf(linked.id)).toBe("1");
-    expect(store.isModified(linked.id)).toBe(true);
+    expect(store.valueOf(BARTER)).toBe("1");
+    expect(store.isModified(BARTER)).toBe(true);
     expect(view.all("button")).toHaveLength(0);
   });
 });

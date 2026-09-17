@@ -24,7 +24,11 @@ pub enum BuildChoice {
 #[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(tag = "pick", rename_all = "lowercase")]
 pub enum BuildPick {
-    Published(String),
+    /// A struct variant rather than a newtype over the instant: serde cannot tag a newtype holding a
+    /// string internally, so the newtype form failed to cross the boundary in either direction.
+    Published {
+        published: String,
+    },
     Latest,
 }
 
@@ -40,7 +44,7 @@ pub fn choose_build(
     cached: &[CachedEngine],
     asked: Option<&BuildPick>,
 ) -> BuildChoice {
-    if let Some(BuildPick::Published(at)) = asked {
+    if let Some(BuildPick::Published { published: at }) = asked {
         let Some(wanted) = cached.iter().find(|one| one.release.published == *at) else {
             // The cache moved since the list was drawn. Refusing beats silently running a different
             // build.
@@ -81,6 +85,20 @@ pub fn choose_build(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pick_crosses_the_boundary_and_back() {
+        for pick in [
+            BuildPick::Published {
+                published: "2025-05-01T00:00:00Z".to_owned(),
+            },
+            BuildPick::Latest,
+        ] {
+            let sent = serde_json::to_string(&pick).expect("a pick serializes");
+            let read: BuildPick = serde_json::from_str(&sent).expect("and reads back");
+            assert_eq!(read, pick, "{sent}");
+        }
+    }
     use crate::engine_release::EngineRelease;
     use std::path::PathBuf;
 
@@ -190,7 +208,9 @@ mod tests {
             choose_build(
                 Some(&deployed(NEW, false)),
                 &[build(NEW), build(OLD)],
-                Some(&BuildPick::Published(OLD.to_owned()))
+                Some(&BuildPick::Published {
+                    published: OLD.to_owned()
+                })
             ),
             BuildChoice::Deploy {
                 build: build(OLD),
@@ -205,7 +225,9 @@ mod tests {
             choose_build(
                 Some(&deployed(OLD, false)),
                 &[build(OLD)],
-                Some(&BuildPick::Published(OLD.to_owned()))
+                Some(&BuildPick::Published {
+                    published: OLD.to_owned()
+                })
             ),
             BuildChoice::Here { pin: true }
         );
@@ -218,7 +240,9 @@ mod tests {
             choose_build(
                 Some(&deployed(NEW, false)),
                 &[build(NEW)],
-                Some(&BuildPick::Published(OLD.to_owned()))
+                Some(&BuildPick::Published {
+                    published: OLD.to_owned()
+                })
             ),
             BuildChoice::Nothing
         );

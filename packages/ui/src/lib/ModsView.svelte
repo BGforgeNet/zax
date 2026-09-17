@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { GAME_TYPES, ownTarget, type GameType } from "@zax/core";
-  import { createsInPlace, type ModOffer, type ModSettingsGroup } from "@zax/fallout2";
+  import type { GameType } from "./bindings/GameType";
+  import type { ModOffer } from "./bindings/ModOffer";
+  import type { ModSettingsGroup } from "./bindings/ModSettingsGroup";
   import Dialog from "./Dialog.svelte";
   import EngineCaution from "./EngineCaution.svelte";
   import SettingRow from "./SettingRow.svelte";
-  import { isPreview } from "./host.js";
+  import { isPreview } from "./invoke.js";
   import { MOD_ICON } from "./icons.js";
   import { store } from "./store.svelte.js";
 
@@ -89,7 +90,7 @@
     if (state.kind === "installed") return `${offer.version} is what is installed.`;
     // Only a base mod: it is put in place by its own installer, which has no way back down. Anything that is
     // files in the mods folder takes an older release the same way it takes a newer one.
-    if (state.kind === "downgrade" && offer.type === "base")
+    if (state.kind === "downgrade" && offer.modType === "base")
       return `${offer.version} is older than the installed ${state.from}, and a base mod cannot be put back.`;
     return null;
   }
@@ -135,19 +136,19 @@
     const state = offer.availability;
     // What is installed decides, not what is offered: a mod that turns permanent in its next release is
     // still the removable one on disk until that release is installed.
-    if ((state.kind === "convert" ? state.was : offer.type) !== "pluggable") return false;
+    if ((state.kind === "convert" ? state.was : offer.modType) !== "pluggable") return false;
     // A refused release says nothing about what is already there. The sfall gate answers before the version
     // comparison, so a blocked row naming an installed version is the ordinary state of a mod that raised its
     // floor in a later release - removable, like every other install, and not updatable until the gate passes.
-    if (state.kind === "blocked") return state.from !== undefined;
+    if (state.kind === "blocked") return state.from !== null;
     return ["installed", "upgrade", "downgrade", "install-over", "unfollowed", "convert"].includes(state.kind);
   }
 
   /** A schema's sections, in the order the manifest declares them - the author's one lever over layout. */
   function sectionsOf(group: ModSettingsGroup): string[] {
     const seen: string[] = [];
-    for (const def of group.settings) {
-      const section = ownTarget(def).section;
+    for (const { def } of group.settings) {
+      const section = def.targets[0]?.section ?? "";
       if (!seen.includes(section)) seen.push(section);
     }
     return seen;
@@ -161,15 +162,14 @@
     store.modSectionTab[group.modId] ?? sectionsOf(group)[0] ?? "";
 
   /** The name ZAX gives the game a base mod turns this install into. */
-  const gameName = (type: GameType): string => GAME_TYPES[type].name;
+  const gameName = (type: GameType): string => store.gameType(type).name;
 
   /**
    * Whether the install this mod makes is the one on screen rather than a folder inside it, which is what the
    * game it creates looks like once that folder is on the list itself. Naming the folder there would send the
    * user looking inside their own game for a copy of it.
    */
-  const isThisInstall = (offer: ModOffer): boolean =>
-    store.install !== undefined && createsInPlace(store.install.type, offer);
+  const isThisInstall = (offer: ModOffer): boolean => store.createsInPlace(offer);
 
   /** Sizes as a person reads them. Bytes are what the release states; nobody counts in them. */
   const megabytes = (bytes: number): string =>
@@ -182,7 +182,7 @@
   }
 
   /** An input id as the manifest labels it, for a plan naming the folders it was pointed at. */
-  const inputLabel = (offer: ModOffer, id: string): string => offer.asks?.find((input) => input.id === id)?.label ?? id;
+  const inputLabel = (offer: ModOffer, id: string): string => offer.asks.find((input) => input.id === id)?.label ?? id;
 
   function installLabel(offer: ModOffer): string | null {
     switch (offer.availability.kind) {
@@ -322,8 +322,8 @@
                 {/if}
                 <div class="about">
                   <span class="mod-name">{offer.name}</span>
-                  {#if offer.type !== "pluggable"}
-                    <span class="badge">{offer.type}</span>
+                  {#if offer.modType !== "pluggable"}
+                    <span class="badge">{offer.modType}</span>
                   {/if}
                 </div>
                 <span class="cell current">{currentOf(offer)}</span>
@@ -331,12 +331,12 @@
                 <div class="notes">
                   <!-- What the release says about itself, above the lines ZAX says about it: a row that had
                    only a name left the question of what the mod is to somewhere outside the application. -->
-                  {#if offer.description !== undefined}
+                  {#if offer.description !== null}
                     <p class="status">{offer.description}</p>
                   {/if}
-                  {#if offer.author !== undefined || offer.forum || offer.homepage}
+                  {#if offer.author !== null || offer.forum || offer.homepage}
                     <p class="status by">
-                      {#if offer.author !== undefined}<span>By {offer.author}</span>{/if}
+                      {#if offer.author !== null}<span>By {offer.author}</span>{/if}
                       <!-- The page is asked for by name: nothing here holds the address, which is what keeps a
                        manifest from naming what the machine opens. -->
                       {#if offer.forum}
@@ -344,7 +344,7 @@
                           class="link"
                           disabled={store.busy !== null}
                           title={store.busyReason}
-                          onclick={() => void store.open({ mod: offer.id, page: "forum" })}>Forum</button
+                          onclick={() => void store.open({ what: "mod", id: offer.id, page: "forum" })}>Forum</button
                         >
                       {/if}
                       {#if offer.homepage}
@@ -352,7 +352,8 @@
                           class="link"
                           disabled={store.busy !== null}
                           title={store.busyReason}
-                          onclick={() => void store.open({ mod: offer.id, page: "homepage" })}>Homepage</button
+                          onclick={() => void store.open({ what: "mod", id: offer.id, page: "homepage" })}
+                          >Homepage</button
                         >
                       {/if}
                     </p>
@@ -360,7 +361,7 @@
                   {#if status !== null}
                     <p class="status" class:warn={offer.availability.kind === "downgrade"}>{status}</p>
                   {/if}
-                  {#if offer.type === "base"}
+                  {#if offer.modType === "base"}
                     <!-- Said before install as well as after, because it is the thing to know going in. The two
                      kinds of base mod need different sentences: one replaces this installation and the other
                      leaves it alone, so the way back differs as much as the install does - and the folder one
@@ -373,7 +374,7 @@
                           : "Cannot be uninstalled: it replaces the installation rather than adding to it."}
                     </p>
                   {/if}
-                  {#if offer.type === "permanent" && offer.reason !== undefined}
+                  {#if offer.modType === "permanent" && offer.reason !== null}
                     <!-- The declared reason stands in for the Remove control the row never gets - and it is
                      said before install too, since permanence is something to know going in. -->
                     <p class="status">Cannot be uninstalled: {offer.reason}</p>
@@ -602,7 +603,9 @@
               </div>
             {/if}
             <div class="list">
-              {#each group.settings.filter((def) => ownTarget(def).section === activeSection(group)) as def (def.id)}
+              {#each group.settings
+                .map((one) => one.def)
+                .filter((def) => def.targets[0]?.section === activeSection(group)) as def (def.id)}
                 <SettingRow {def} />
               {/each}
             </div>
@@ -682,10 +685,10 @@
 <Dialog open={store.modParts !== null} title="Choose what to install" dismiss={() => store.dismissModParts()}>
   {#if store.modParts?.offer.choices}
     {@const chosen = store.modParts.chosen}
-    {#if store.modParts.offer.choices.dropped.length > 0}
+    {#if store.modParts.offer.choices.carried.dropped.length > 0}
       <p class="plan-lead">
         No longer offered by {store.modParts.offer.version}, so it cannot be kept:
-        <code>{store.modParts.offer.choices.dropped.join(", ")}</code>.
+        <code>{store.modParts.offer.choices.carried.dropped.join(", ")}</code>.
       </p>
     {/if}
     {#each store.modParts.offer.choices.groups as group (group.label)}
@@ -694,7 +697,7 @@
         {#each group.options as part (part.id)}
           <!-- What this part waits on, by the name the manifest gave it, or nothing when it waits on none. -->
           {@const waits =
-            part.needs === undefined || chosen.includes(part.needs)
+            part.needs === null || chosen.includes(part.needs)
               ? null
               : partLabels(store.modParts.offer, [part.needs])[0]}
           <label class="part" class:blocked={waits !== null}>
@@ -780,7 +783,7 @@
       <li>
         Download: {megabytes(plan.download)}{#if plan.unpacked}, unpacking to {megabytes(plan.unpacked)}{/if}
       </li>
-      {#if plan.free !== undefined}<li>Free on this drive: {megabytes(plan.free)}</li>{/if}
+      {#if plan.free !== null}<li>Free on this drive: {megabytes(plan.free)}</li>{/if}
       {#if plan.route === "windows"}
         <!-- Said here because it is the one part of this install ZAX does not perform, and the user is about
            to be handed a window nothing on this screen led them to expect. What that window offers is the
@@ -805,7 +808,7 @@
     </p>
     <ul class="plan">
       <li>Download: {megabytes(plan.download)}, unpacking to {megabytes(plan.unpacked)}</li>
-      {#if plan.free !== undefined}<li>Free on this drive: {megabytes(plan.free)}</li>{/if}
+      {#if plan.free !== null}<li>Free on this drive: {megabytes(plan.free)}</li>{/if}
       {#each Object.entries(plan.inputs) as [id, folder] (id)}
         <li>
           {inputLabel(store.modPlan.offer, id)}: <code>{folder}</code>
@@ -837,11 +840,11 @@
         Parts: <code>{partLabels(store.modPlan.offer, plan.parts).join(", ")}</code>.
       </p>
     {/if}
-    {#if store.modPlan.offer.choices && store.modPlan.offer.choices.dropped.length > 0}
+    {#if store.modPlan.offer.choices && store.modPlan.offer.choices.carried.dropped.length > 0}
       <!-- Said before the install runs rather than left for the record to explain afterwards. -->
       <p class="plan-lead">
-        <code>{store.modPlan.offer.choices.dropped.join(", ")}</code>
-        {store.modPlan.offer.choices.dropped.length === 1 ? "is" : "are"} no longer offered, and will not be reinstalled.
+        <code>{store.modPlan.offer.choices.carried.dropped.join(", ")}</code>
+        {store.modPlan.offer.choices.carried.dropped.length === 1 ? "is" : "are"} no longer offered, and will not be reinstalled.
       </p>
     {/if}
     {#if plan.orderLines.length > 0}

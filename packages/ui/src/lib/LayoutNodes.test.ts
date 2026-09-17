@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { LAYOUT, SETTINGS } from "@zax/fallout2";
-import type { LayoutNode } from "@zax/fallout2";
+import type { LayoutNode } from "./bindings/LayoutNode";
+import type { SettingDef } from "./bindings/SettingDef";
 import LayoutNodes from "./LayoutNodes.svelte";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
@@ -12,10 +12,14 @@ import { store } from "./store.svelte.js";
   and stand in for whole blocks.
 */
 
-const setting = SETTINGS.find((one) => one.targets.length === 1 && one.targets[0]!.file === "ddraw.ini");
-if (!setting) throw new Error("the catalog no longer carries a plain ddraw.ini setting");
+let setting: SettingDef;
 
-beforeEach(reseedPreview);
+beforeEach(async () => {
+  await reseedPreview();
+  const found = store.catalog?.settings.find((one) => one.targets.length === 1 && one.targets[0]!.file === "ddraw.ini");
+  if (!found) throw new Error("the catalog no longer carries a plain ddraw.ini setting");
+  setting = found;
+});
 afterEach(unmountAll);
 
 const draw = (items: readonly LayoutNode[], group?: string) =>
@@ -54,7 +58,7 @@ describe("a hidden setting", () => {
   });
 
   test("is drawn anyway where ZAX pins its value", () => {
-    const pinned = SETTINGS.find((one) => one.managed);
+    const pinned = store.catalog?.settings.find((one) => one.managed !== null);
     if (!pinned) throw new Error("no setting in this catalog is pinned - the state this case names is gone");
     const view = draw([{ kind: "setting", id: pinned.id, hidden: true }] as never);
     expect(view.text()).toContain(pinned.label);
@@ -90,7 +94,7 @@ describe("driven from the real layout", () => {
     so walking a real tab is what catches a node kind the walk has no arm for.
   */
   test("draws the first tab of the first group without dropping it to nothing", () => {
-    const first = LAYOUT[0];
+    const first = store.catalog?.layout[0];
     const tab = first?.tabs[0];
     if (!first || !tab) throw new Error("the generated layout no longer carries a group with a tab");
     const view = draw(tab.items, first.id);

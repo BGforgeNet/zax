@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { compareVersions } from "@zax/core";
-  import type { WipeTarget } from "@zax/fallout2";
   import Dialog from "./Dialog.svelte";
-  import { isPreview } from "./host.js";
-  import { store } from "./store.svelte.js";
-  import { BUILD, VERSION } from "./version.js";
+  import { isPreview } from "./invoke.js";
+  import { store, type OwnPlace } from "./store.svelte.js";
+  import { BUILD } from "./version.js";
 
   /*
     Version checks and opening a directory in the desktop's file manager both leave the page, which the browser
@@ -12,13 +10,13 @@
     build does instead of quietly omitting it. Wiping is a filesystem write, so it runs either way.
   */
   const OUTSIDE = "The browser preview has no machine to reach - this needs the desktop build";
-  const outdated = $derived(store.zaxLatest !== null && compareVersions(VERSION, store.zaxLatest) < 0);
+  const outdated = $derived(store.zaxOutdated);
 
   /*
     Wiping deletes files the user cannot get back from here, and the buttons sit beside an Open button they
     otherwise look like. One confirmation for all of them: a second copy would be a second wording.
   */
-  const WIPES: Record<WipeTarget, { title: string; what: string }> = {
+  const WIPES: Record<OwnPlace, { title: string; what: string }> = {
     backup: {
       title: "Backup directory",
       what: "Copies of what installing or removing a mod, an engine or sfall replaced in a game folder.",
@@ -48,7 +46,7 @@
     file: { ask: "Clear the log?", cost: "This deletes the file. ZAX cannot put it back.", confirm: "Clear it" },
   };
 
-  let confirming = $state<WipeTarget | null>(null);
+  let confirming = $state<OwnPlace | null>(null);
   const pending = $derived(confirming === null ? null : WIPES[confirming]);
   const words = $derived(confirming === "log" ? WORDS.file : WORDS.directory);
 

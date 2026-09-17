@@ -18,7 +18,8 @@ use std::sync::{Arc, Mutex};
 use serde::Deserialize;
 use zax_core::stamp::{LocalTime, Utc};
 use zax_fallout2::backend::{
-    Backend, ModInstallRequest, OpenTarget, OperationProgress, OrderEdit, Shell, WipeTarget,
+    Backend, ModInstallRequest, OpenTarget, OperationProgress, OrderEdit, SettingEdit, Shell,
+    WipeTarget,
 };
 use zax_fallout2::catalog_view::{catalog_view, search_settings};
 use zax_fallout2::engine_choice::BuildPick;
@@ -105,7 +106,6 @@ pub struct Preview {
     backend: Backend,
     shell: Arc<PreviewShell>,
     /// The machine itself, for a test that changes a file underneath the interface.
-    #[cfg(test)]
     platform: Arc<fixture::PreviewPlatform>,
 }
 
@@ -128,7 +128,7 @@ struct Arguments {
     engine_id: Option<String>,
     id: Option<String>,
     value: Option<String>,
-    percent: Option<f64>,
+    edits: Option<Vec<SettingEdit>>,
     ids: Option<Vec<String>>,
     all: Option<bool>,
     action_id: Option<String>,
@@ -148,6 +148,7 @@ struct Arguments {
     saves: Option<Vec<String>>,
     target: Option<OpenTarget>,
     which: Option<WipeTarget>,
+    what: Option<String>,
 }
 
 /// What a command answers with: the value as JSON, or the sentence the interface shows.
@@ -183,9 +184,32 @@ impl Preview {
         Ok(Self {
             backend: Backend::new(platform, Arc::clone(&shell) as Arc<dyn Shell>),
             shell,
-            #[cfg(test)]
             platform: machine,
         })
+    }
+
+    /// Writes a file on the in-memory disk, as something outside ZAX would - a text editor, an engine's
+    /// own first run. What the interface's tests change underneath it.
+    ///
+    /// # Errors
+    ///
+    /// Fails where the disk refuses the write.
+    pub fn write_file(&self, path: &str, bytes: &[u8]) -> Result<()> {
+        self.platform.fs().write(std::path::Path::new(path), bytes)
+    }
+
+    /// # Errors
+    ///
+    /// Fails where there is no such file.
+    pub fn read_file(&self, path: &str) -> Result<Vec<u8>> {
+        self.platform.fs().read(std::path::Path::new(path))
+    }
+
+    /// # Errors
+    ///
+    /// Fails where the disk refuses the removal.
+    pub fn remove_file(&self, path: &str) -> Result<()> {
+        self.platform.fs().remove(std::path::Path::new(path))
     }
 
     /// Adds a listener for a long operation's progress.
@@ -239,12 +263,7 @@ impl Preview {
                 answered(backend.accept_caution(&needed(held.engine_id, "engineId")?))
             }
             "scan" => answered(backend.scan()),
-            "set_setting" => answered(
-                backend.set_setting(&needed(held.id, "id")?, &needed(held.value, "value")?),
-            ),
-            "set_percent" => answered(
-                backend.set_percent(&needed(held.id, "id")?, needed(held.percent, "percent")?),
-            ),
+            "set_settings" => answered(backend.set_settings(&needed(held.edits, "edits")?)),
             "revert_settings" => answered(
                 backend.revert_settings(&held.ids.unwrap_or_default(), needed(held.all, "all")?),
             ),
@@ -315,6 +334,8 @@ impl Preview {
                 backend.cancel();
                 json(&())
             }
+            // A page has no window to close on an operation, so there is nothing to hold.
+            "set_busy" => json(&()),
             other => Err(format!("The preview does not answer \"{other}\".")),
         }
     }
@@ -337,8 +358,7 @@ pub const PREVIEW_COMMANDS: &[&str] = &[
     "set_autosave",
     "accept_caution",
     "scan",
-    "set_setting",
-    "set_percent",
+    "set_settings",
     "revert_settings",
     "apply_action",
     "satisfy_gate",
@@ -368,6 +388,7 @@ pub const PREVIEW_COMMANDS: &[&str] = &[
     "open",
     "wipe",
     "cancel",
+    "set_busy",
 ];
 
 #[cfg(target_arch = "wasm32")]
@@ -376,6 +397,7 @@ mod browser {
 
     /// The preview as the interface holds it: made once, then called by name.
     #[wasm_bindgen]
+    #[derive(Debug)]
     pub struct ZaxPreview {
         held: super::Preview,
     }
@@ -404,6 +426,45 @@ mod browser {
                 Ok(value) => Ok(value.to_string()),
                 Err(said) => Err(JsValue::from_str(&said)),
             }
+        }
+
+        /// Writes a file on the in-memory disk.
+        ///
+        /// # Errors
+        ///
+        /// Answers with the refusal.
+        #[wasm_bindgen(js_name = writeFile)]
+        pub fn write_file(&self, path: &str, bytes: &[u8]) -> Result<(), JsValue> {
+            self.held
+                .write_file(path, bytes)
+                .map_err(|err| JsValue::from_str(&err.to_string()))
+        }
+
+        /// # Errors
+        ///
+        /// Answers with the refusal.
+        #[wasm_bindgen(js_name = readFile)]
+        pub fn read_file(&self, path: &str) -> Result<Vec<u8>, JsValue> {
+            self.held
+                .read_file(path)
+                .map_err(|err| JsValue::from_str(&err.to_string()))
+        }
+
+        /// # Errors
+        ///
+        /// Answers with the refusal.
+        #[wasm_bindgen(js_name = removeFile)]
+        pub fn remove_file(&self, path: &str) -> Result<(), JsValue> {
+            self.held
+                .remove_file(path)
+                .map_err(|err| JsValue::from_str(&err.to_string()))
+        }
+
+        /// A library recording this file version, for a test that plants `ddraw.dll` or `f2_res.dll`.
+        #[wasm_bindgen(js_name = versionedLibrary)]
+        #[must_use]
+        pub fn versioned_library(version: &str) -> Vec<u8> {
+            zax_fallout2::pe_fixture::library(&[("FileVersion", version)])
         }
 
         /// Where a long operation's progress goes, as the JSON one message carries.

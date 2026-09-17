@@ -1,0 +1,4 @@
+# Read by ts-rs as it writes the interface's bindings. The values cross as JSON, which carries a number, and
+# every such value here is a byte count, a count or a revision well inside the range a number holds exactly.
+[env]
+TS_RS_LARGE_INT = "number"
