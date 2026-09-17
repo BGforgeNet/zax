@@ -28,44 +28,14 @@ function buildCommit(): string {
   }
 }
 
-/**
- * The interface loads its own bundle and reaches the machine over the preload bridge, never the network, so
- * everything else is denied. Styles stay inline-permitted because Svelte injects them at runtime; scripts do
- * not, which is the half that turns injected markup into code.
- */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'none'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join("; ");
-
-/**
- * Build only: the dev server needs inline scripts and a websocket to reload, and widening the policy far enough
- * to admit those would carry the slack into the shipped application.
- */
-const contentSecurityPolicy = {
-  name: "zax-content-security-policy",
-  apply: "build",
-  transformIndexHtml: () => [
-    {
-      tag: "meta",
-      attrs: { "http-equiv": "Content-Security-Policy", content: CONTENT_SECURITY_POLICY },
-      injectTo: "head-prepend",
-    },
-  ],
-} as const;
-
+// No content security policy here: the shell sets it (`crates/shell/tauri.conf.json`), as a header Tauri adds
+// its own script hashes to. A meta tag would be a second policy on top, and every request has to pass both - so
+// one without the shell's `connect-src ipc:` would push every command off Tauri's IPC protocol. The policy denies
+// everything but the bundle itself; styles stay inline-permitted because Svelte injects them at runtime.
 export default defineConfig({
-  // Relative asset URLs: the desktop build loads index.html from a file, where a root-absolute "/assets/..."
-  // resolves against the filesystem root rather than against the page.
-  base: "./",
   // Empty on a release build, which is the only kind whose version number names something a user can download.
   define: { __ZAX_COMMIT__: JSON.stringify(buildCommit()) },
-  plugins: [svelte(), contentSecurityPolicy],
+  plugins: [svelte()],
   // HOST and PORT are read from the environment so a machine that needs a specific bind address or port can
   // say so without editing this file.
   server: {

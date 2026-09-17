@@ -13,5 +13,8 @@ git diff --exit-code actions/mod-ini/wasm/
 
 # The committed icons are a rendering of zax.svg, not hand-authored - the runner image ships Chrome, which
 # gen-icons.mjs already looks for on PATH.
+#
+# All but the macOS icon: `tauri icon` writes a different `.icns` from the same rendering on every run, while
+# the PNGs and the `.ico` cut from that rendering stay byte-identical - and they are what this compares.
 node scripts/gen-icons.mjs
-git diff --exit-code packages/ui/public/zax.png packages/app/build/icon.png
+git diff --exit-code packages/ui/public/zax.png crates/shell/icons/ ':!crates/shell/icons/icon.icns'

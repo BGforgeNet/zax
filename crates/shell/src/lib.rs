@@ -7,6 +7,7 @@
 pub mod closing;
 pub mod commands;
 pub mod shell;
+pub mod window;
 
 use std::sync::{Arc, OnceLock};
 
@@ -116,6 +117,21 @@ fn download_note(
     }
 }
 
+/// A crash takes the window with it, and a release build aborts on panic, so this line in the log is the
+/// only trace a bug report can carry. The default hook still runs after it, for a terminal that is watching.
+fn log_panics(platform: Arc<dyn Platform>, clock: Arc<WindowShell>) {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        append_log(
+            platform.as_ref(),
+            LogLevel::Error,
+            &format!("panic: {info}"),
+            clock.utc(),
+        );
+        previous(info);
+    }));
+}
+
 /// Builds the application and runs it to completion.
 ///
 /// # Errors
@@ -124,7 +140,18 @@ fn download_note(
 /// with no WebView2 runtime, which is a user-fixable condition rather than a bug.
 pub fn run() -> tauri::Result<()> {
     tauri::Builder::default()
+        // First, so a second launch is turned away before it builds anything: one instance edits one set of
+        // files, and a second would let two windows disagree about what is on disk.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window(window::MAIN) {
+                // Best effort: the second launch has already been turned away, which is the part that matters.
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
+        // No menu is set. Tauri draws none on Windows and Linux, and its macOS default is the standard system
+        // bar menus with no devtools or zoom entries - its Edit menu being what Cmd-C and Cmd-V route through.
         .manage(closing::Busy::default())
         .on_window_event(closing::on_window_event)
         .setup(|app| {
@@ -139,6 +166,8 @@ pub fn run() -> tauri::Result<()> {
                 download_note(Arc::clone(&logging), Arc::clone(&window)),
             ))));
             let _ = logging.set(Arc::clone(&platform));
+            log_panics(Arc::clone(&platform), Arc::clone(&window));
+            crate::window::build(app, &platform, &window)?;
             app.manage(Arc::new(Backend::new(platform, window)));
             Ok(())
         })

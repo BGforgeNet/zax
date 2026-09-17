@@ -17,6 +17,7 @@ jiff = "0.2.37"
 serde = { version = "1.0.229", features = ["derive"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "^2"
+tauri-plugin-single-instance = "2.4.4"
 zax-core.workspace = true
 zax-fallout2.workspace = true
 zax-host.workspace = true
