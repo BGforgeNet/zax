@@ -135,6 +135,30 @@ describe("emptying a directory", () => {
   });
 });
 
+describe("scanning", () => {
+  // A scan only reads, so it runs in the preview too.
+  test("scans through the store", () => {
+    const scan = vi.spyOn(store, "scan").mockResolvedValue(undefined);
+    panel().control("Scan").click();
+    expect(scan).toHaveBeenCalledOnce();
+  });
+});
+
+describe("emptying the debug archives", () => {
+  test("names the debug directory, and empties that one when confirmed", () => {
+    const wipe = vi.spyOn(store, "wipe").mockResolvedValue(undefined);
+    const view = panel();
+    view
+      .all("button")
+      .filter((b) => b.textContent?.trim() === "Wipe")[2]!
+      .click();
+    view.settle();
+    expect(view.text()).toContain("The archives built for bug reports.");
+    view.control("Empty it").click();
+    expect(wipe).toHaveBeenCalledExactlyOnceWith("debug");
+  });
+});
+
 describe("the theme", () => {
   /* The only control here that needs nothing outside the page, so the only one that works in every host. */
   test("offers the three themes and writes the chosen one", () => {

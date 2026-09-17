@@ -27,6 +27,9 @@ export default defineConfig({
         // The component tests' own setup - the preview disk reseeded and a component mounted against it. Test
         // support rather than shipped code, and counting it would report on the harness, not the interface.
         "packages/ui/src/lib/preview-fixture.ts",
+        // wasm-bindgen's output for the preview: its loader is not the interface's code, and its declarations are
+        // not JavaScript the coverage remapper can parse.
+        "packages/ui/src/lib/preview-wasm/**",
         // The entry point: it mounts the root component and holds no decision of its own.
         "packages/ui/src/main.ts",
       ],

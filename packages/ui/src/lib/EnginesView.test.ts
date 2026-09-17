@@ -239,3 +239,72 @@ describe("the warnings", () => {
     expect(text).toContain("Quit the game before running or picking a different build");
   });
 });
+
+describe("with no game selected", () => {
+  test("draws no used-here slot, no per-build pick and no line about the game", () => {
+    vi.spyOn(store, "install", "get").mockReturnValue(undefined);
+    vi.spyOn(store, "engines", "get").mockReturnValue([
+      { ...TAGGED, versions: [{ release: "v1.0", published: "2026-01-01T00:00:00Z", commit: null }] },
+    ] as never);
+    const drawn = view();
+    expect(drawn.all(".slot")).toHaveLength(0);
+    expect(drawn.all("button.use")).toHaveLength(0);
+    expect(drawn.text()).not.toContain("This game");
+    // What the machine holds is the machine's, so it can still be dropped.
+    expect(drawn.control("Remove").hasAttribute("disabled")).toBe(false);
+  });
+});
+
+describe("what a row can show", () => {
+  test("a held build's commit, shortened, and a date that cannot be read shown as it was published", () => {
+    vi.spyOn(store, "engines", "get").mockReturnValue([
+      {
+        ...ROLLING,
+        versions: [{ release: "continuous", published: "not a date", commit: "0123456789abcdef" }],
+      },
+    ] as never);
+    const drawn = view();
+    expect(drawn.one(".held strong").textContent).toBe("not a date");
+    expect(drawn.one(".held .sha").textContent).toBe("0123456");
+  });
+
+  test("the game's own build carries its commit too", () => {
+    const held = { release: "continuous", published: "2026-08-01T00:00:00Z", commit: "fedcba9876543210" };
+    vi.spyOn(store, "engines", "get").mockReturnValue([{ ...ROLLING, versions: [held] }] as never);
+    vi.spyOn(store, "engineDeployed", "get").mockReturnValue({
+      fission: { id: "fission", ...held, complete: true, files: [], backup: null, pinned: true } as InstalledEngine,
+    });
+    expect(view().one(".this-game .sha").textContent).toBe("fedcba9");
+  });
+
+  test("an engine with no icon of its own is drawn without one rather than with a broken image", () => {
+    vi.spyOn(store, "engines", "get").mockReturnValue([{ ...TAGGED, id: "unknown-engine" }] as never);
+    expect(view().all("img")).toHaveLength(0);
+  });
+
+  test("no engines at all says nothing about running one", () => {
+    vi.spyOn(store, "engines", "get").mockReturnValue([]);
+    expect(view().text()).not.toContain("lowercased game folder");
+  });
+});
+
+describe("the caution before a first fetch", () => {
+  const CAUTIONED = { ...ROLLING, caution: "Fission does not read the sfall load order." };
+
+  test("names the engine and says its caution, and goes ahead or not on the user's word", () => {
+    const confirm = vi.spyOn(store, "confirmFetch").mockResolvedValue(undefined);
+    const dismiss = vi.spyOn(store, "dismissFetch");
+    store.pendingFetch = { engine: CAUTIONED as never, published: null };
+    const drawn = view();
+    const dialog = drawn.one("dialog[open]");
+    expect(dialog.textContent).toContain("Fetch Fallout Fission");
+    expect(dialog.textContent).toContain("Fallout Fission handles mods its own way");
+    expect(dialog.textContent).toContain("Fission does not read the sfall load order.");
+
+    drawn.control("Fetch anyway").click();
+    expect(confirm).toHaveBeenCalledOnce();
+    drawn.control("Cancel").click();
+    expect(dismiss).toHaveBeenCalledOnce();
+    store.pendingFetch = null;
+  });
+});

@@ -634,3 +634,393 @@ describe("the sentences an outcome is reported in", () => {
     expect(store.notice).toEqual({ kind: "done", text: expect.stringContaining("Set 2 settings") });
   });
 });
+
+describe("the mod order", () => {
+  const named = (name: string) => store.mods.find((one) => one.name === name);
+
+  test("forgets one entry naming something no longer in the folder, and leaves the others", async () => {
+    const missing = store.mods.filter((one) => one.kind === "missing").map((one) => one.name);
+    expect(missing.length, "the preview's order carries dead entries").toBeGreaterThan(1);
+    store.forgetMod(missing[0]!);
+    await store.idle();
+    expect(named(missing[0]!)).toBeUndefined();
+    expect(named(missing[1]!)).toBeDefined();
+  });
+
+  test("forgets every dead entry at once, keeping everything that is there", async () => {
+    const present = store.mods.filter((one) => one.kind !== "missing").map((one) => one.name);
+    store.forgetMissingMods();
+    await store.idle();
+    expect(store.mods.map((one) => one.name)).toEqual(present);
+  });
+
+  test("moves an entry one place and turns one off, each as an unsaved edit", async () => {
+    const [first, second] = store.mods.map((one) => one.name);
+    store.moveMod(first!, 1);
+    await store.idle();
+    expect(store.mods.slice(0, 2).map((one) => one.name)).toEqual([second, first]);
+
+    const on = store.mods.find((one) => one.enabled)!.name;
+    store.toggleMod(on);
+    await store.idle();
+    expect(named(on)?.enabled).toBe(false);
+    expect(store.modsChanged).toBe(true);
+  });
+});
+
+describe("renaming the selected install", () => {
+  test("opens the install tab with the search cleared, and asks the alias field for focus", async () => {
+    await store.setQuery("damage");
+    const asked = store.aliasRequest;
+    store.renameSelected();
+    await store.idle();
+    expect(store.settingsTab).toBe("install");
+    expect(store.query).toBe("");
+    expect(store.aliasRequest).toBe(asked + 1);
+  });
+});
+
+describe("a command that fails", () => {
+  test("a revert that could not be recorded is said, and the view read back", async () => {
+    vi.spyOn(commands, "revertSettings").mockRejectedValue(new Error("The revert could not be recorded: disk full"));
+    const view = vi.spyOn(commands, "view");
+    await store.revertAll();
+    expect(store.notice).toEqual({ kind: "problem", text: "The revert could not be recorded: disk full" });
+    expect(view).toHaveBeenCalled();
+  });
+
+  test("an action that could not be applied is said", async () => {
+    vi.spyOn(commands, "applyAction").mockRejectedValue(new Error("no such action"));
+    store.applyAction({ id: "enable_debug" } as never);
+    await expect.poll(() => store.notice).toEqual({ kind: "problem", text: "no such action" });
+  });
+
+  test("a switch of install that failed is said, and still clears the dialogs of the install left", async () => {
+    vi.spyOn(commands, "selectInstall").mockRejectedValue(new Error("the folder is gone"));
+    store.modPlan = { offer: {}, version: "1", plan: {} } as never;
+    expect(await store.selectInstall("fixtures/f2")).toBe(true);
+    expect(store.modPlan).toBeNull();
+    expect(store.notice).toEqual({ kind: "problem", text: "the folder is gone" });
+  });
+
+  test("a launch whose mod order could not be read holds nothing and starts nothing", async () => {
+    vi.spyOn(commands, "orderSwap").mockRejectedValue(new Error("the order file is unreadable"));
+    const launch = vi.spyOn(commands, "launch");
+    await store.play("fission");
+    expect(store.pendingLaunch).toBeNull();
+    expect(launch).not.toHaveBeenCalled();
+    expect(store.notice).toEqual({ kind: "problem", text: "the order file is unreadable" });
+  });
+});
+
+describe("more sentences an outcome is reported in", () => {
+  const found = (count: number) =>
+    vi.spyOn(commands, "scan").mockImplementation(async () => ({ view: await commands.view(), answer: count }));
+
+  test("a scan counts what it found, in words for one", async () => {
+    found(0);
+    await store.scan();
+    expect(store.notice?.text).toBe("Nothing found in the usual places.");
+    found(1);
+    await store.scan();
+    expect(store.notice?.text).toBe("Found one install.");
+    found(3);
+    await store.scan();
+    expect(store.notice?.text).toBe("Found 3 installs.");
+  });
+
+  const offer = { id: "fo2tweaks", name: "FO2tweaks" } as never;
+
+  test("removing and restoring a mod say what happened, and where the copies are", async () => {
+    vi.spyOn(commands, "removeMod").mockImplementation(async () => commands.view());
+    await store.removeMod(offer);
+    expect(store.notice?.text).toBe("FO2tweaks removed. Copies are in the backup folder.");
+
+    vi.spyOn(commands, "restoreMod").mockImplementation(async () => commands.view());
+    await store.restoreMod(offer);
+    expect(store.notice?.text).toBe("The install is back to what it was before FO2tweaks.");
+  });
+
+  test("an install that registered nothing says why, and one over edited settings counts what it kept", async () => {
+    const answer = (value: unknown) =>
+      vi
+        .spyOn(commands, "installMod")
+        .mockImplementation(async () => ({ view: await commands.view(), answer: value as never }));
+    const confirm = async () => {
+      store.modPlan = {
+        offer: { id: "fo2tweaks", name: "FO2tweaks", version: "14.8" },
+        version: "14.8",
+        plan: { kind: "stacking", fingerprint: "f", parts: ["head"] },
+      } as never;
+      await store.confirmModInstall();
+    };
+
+    answer({
+      outcome: { kind: "stacking", version: "14.8", conflicts: [] },
+      refusedRegistration: "It could not be listed.",
+    });
+    await confirm();
+    expect(store.notice).toEqual({ kind: "problem", text: "It could not be listed." });
+
+    const install = answer({
+      outcome: { kind: "stacking", version: "14.8", conflicts: [{}, {}] },
+      refusedRegistration: null,
+    });
+    await confirm();
+    expect(store.notice?.text).toBe(
+      "FO2tweaks 14.8 installed. 2 setting(s) you had changed were kept over the release's new defaults.",
+    );
+    expect(install).toHaveBeenLastCalledWith({
+      modId: "fo2tweaks",
+      fingerprint: "f",
+      choices: ["head"],
+      answers: {},
+      version: null,
+    });
+  });
+
+  test("opening a mod's own ini goes to the command with the file it names", async () => {
+    const opened = vi.spyOn(commands, "openModFile").mockResolvedValue(undefined);
+    await store.openModIni("fo2tweaks", "mods/fo2tweaks.ini");
+    expect(opened).toHaveBeenCalledWith("fo2tweaks", "mods/fo2tweaks.ini");
+    expect(store.notice).toBeNull();
+  });
+
+  test("fetching an engine says which build is ready", async () => {
+    vi.spyOn(commands, "fetchEngine").mockImplementation(async () => ({
+      view: await commands.view(),
+      answer: { release: "beta-0.9.6.9" } as never,
+    }));
+    await store.fetchEngine("fallout2-ce");
+    expect(store.notice?.text).toBe("Fallout II Community Edition beta-0.9.6.9 is ready to run.");
+  });
+});
+
+describe("engine operations", () => {
+  const told = () => vi.spyOn(commands, "setBusy");
+
+  test("checking, forgetting and putting a build in the folder each run under the engine's own name", async () => {
+    const busy = told();
+    vi.spyOn(commands, "checkEngine").mockImplementation(async () => commands.view());
+    vi.spyOn(commands, "forgetEngine").mockImplementation(async () => commands.view());
+    const used = vi.spyOn(commands, "useEngineBuild").mockImplementation(async () => commands.view());
+
+    await store.checkEngine("fallout2-ce");
+    await store.forgetEngine("fallout2-ce", "2026-07-01T00:00:00Z");
+    await store.useEngineBuild("fallout2-ce", { pick: "latest" });
+
+    expect(busy.mock.calls.map(([what]) => what).filter((what) => what !== null)).toEqual([
+      "Checking for a newer CE",
+      "Removing Fallout II Community Edition",
+      "Putting Fallout II Community Edition in this game",
+    ]);
+    expect(used).toHaveBeenCalledWith("fallout2-ce", { pick: "latest" });
+    expect(store.notice).toBeNull();
+  });
+
+  test("a fetch held behind a caution goes ahead when confirmed, and dismissing it fetches nothing", async () => {
+    const fetched = vi.spyOn(commands, "fetchEngine").mockRejectedValue(new Error("the preview reaches no network"));
+    const listing = store.engines.find((one) => one.id === "fission")!;
+    store.pendingFetch = { engine: listing, published: null };
+    store.dismissFetch();
+    await store.confirmFetch();
+    expect(fetched).not.toHaveBeenCalled();
+
+    store.pendingFetch = { engine: listing, published: "2026-08-01T00:00:00Z" };
+    await store.confirmFetch();
+    expect(store.pendingFetch).toBeNull();
+    expect(fetched).toHaveBeenCalledWith("fission", "2026-08-01T00:00:00Z");
+  });
+
+  test("the checks for ZAX and sfall run through the gate and report a failure", async () => {
+    vi.spyOn(commands, "checkZax").mockRejectedValue(new Error("offline"));
+    await store.checkZaxVersion();
+    expect(store.notice?.text).toBe("Checking for a newer ZAX failed: offline");
+    vi.spyOn(commands, "checkSfall").mockRejectedValue(new Error("offline"));
+    await store.checkSfallVersion();
+    expect(store.notice?.text).toBe("Checking for a newer sfall failed: offline");
+  });
+});
+
+describe("the mod dialogs", () => {
+  const offer = (asks: unknown[] = []) => ({ id: "fo1in2", name: "Fallout et tu", asks }) as never;
+
+  test("a folder picked for a question becomes its answer, and a cancelled picker changes nothing", async () => {
+    store.modInputs = {
+      offer: offer([{ id: "fallout1", label: "Folder", help: null, holds: "master.dat" }]),
+      chosen: [],
+      answers: {},
+    } as typeof store.modInputs;
+    const picker = vi.spyOn(commands, "chooseFolder").mockResolvedValue(null);
+    await store.browseForModInput("fallout1");
+    expect(picker).toHaveBeenCalledWith("master.dat");
+    expect(store.modInputs?.answers).toEqual({});
+
+    picker.mockResolvedValue("/games/fallout1");
+    await store.browseForModInput("fallout1");
+    expect(store.modInputs?.answers).toEqual({ fallout1: "/games/fallout1" });
+  });
+
+  test("an answer arriving after its dialog closed is dropped", async () => {
+    store.modInputs = { offer: offer(), chosen: [], answers: {} } as typeof store.modInputs;
+    let answer: (path: string) => void = () => {};
+    vi.spyOn(commands, "chooseFolder").mockImplementation(async () => new Promise((resolve) => (answer = resolve)));
+    const browsing = store.browseForModInput("fallout1");
+    store.dismissModInputs();
+    answer("/games/fallout1");
+    await browsing;
+    expect(store.modInputs).toBeNull();
+  });
+
+  test("each dialog closes on its own dismissal, and a part ticked after its dialog closed is dropped", async () => {
+    store.modParts = { offer: { id: "x", choices: { groups: [] } }, chosen: [], version: undefined } as never;
+    let answer: (chosen: string[]) => void = () => {};
+    vi.spyOn(commands, "toggleModPart").mockImplementation(async () => new Promise((resolve) => (answer = resolve)));
+    const ticking = store.setModPart("head", true);
+    store.dismissModParts();
+    answer(["head"]);
+    await ticking;
+    expect(store.modParts).toBeNull();
+
+    store.modPlan = { offer: offer(), version: "1", plan: {} } as never;
+    store.dismissModPlan();
+    expect(store.modPlan).toBeNull();
+    store.modVersionPick = { offer: offer(), versions: [], read: true } as never;
+    store.dismissModVersion();
+    expect(store.modVersionPick).toBeNull();
+  });
+});
+
+/*
+  A machine whose list of installs is empty, as on a first start. Nothing install-bound has anything to act on,
+  and what is pinned is that each such operation declines without reaching a command - rather than sending one
+  that can only fail, or failing in the store over a reading that is not there.
+*/
+describe("with no install selected", () => {
+  beforeEach(async () => {
+    disk().writeFile("preview/config/zax.yml", bytes("games: []\ntheme: system\nautosave: false\n"));
+    await store.start();
+  });
+
+  test("answers every question about the install with its empty default", () => {
+    expect(store.install).toBeUndefined();
+    expect(store.mods).toEqual([]);
+    expect(store.modsFormat).toBe("sfall");
+    expect(store.modsClosed).toBeNull();
+    expect(store.modifiedCount).toBe(0);
+    expect(store.settingsChanged).toBe(false);
+    expect(store.modsViewChanged).toBe(false);
+    expect(store.engineDeployed).toEqual({});
+    expect(store.engineOutdated("fallout2-ce")).toBe(false);
+    expect(store.discovered).toEqual([]);
+    expect(store.modSettings).toEqual([]);
+    expect(store.settingsChoices).toEqual([]);
+    expect(store.isAbsent(MUSIC)).toBe(true);
+    expect(store.isModified(MUSIC)).toBe(false);
+    expect(store.hasFile("fallout2.cfg")).toBe(false);
+    expect(store.valueOf(MUSIC)).toBeUndefined();
+    expect(store.address(MUSIC)).toBeUndefined();
+    expect(store.modifiedInGroup("fallout2.cfg")).toBe(0);
+    // Before any install is read there is no answer about engines, so only the game's own groups are offered.
+    expect(store.settingsGroups.every(({ group }) => group.engine === null)).toBe(true);
+    expect(store.settingsGroups.length).toBeGreaterThan(0);
+  });
+
+  test("declines every install-bound operation without sending a command", async () => {
+    const sent = [
+      "save",
+      "removeMod",
+      "restoreMod",
+      "openModFile",
+      "orderSwap",
+      "launch",
+      "changeSfall",
+      "useEngineBuild",
+      "listSaves",
+      "createDebugPackage",
+      "readModListing",
+      "installMod",
+    ].map((name) => vi.spyOn(commands, name as keyof typeof commands));
+    const offer = { id: "fo2tweaks", name: "FO2tweaks" } as never;
+
+    await store.save();
+    await store.removeMod(offer);
+    await store.restoreMod(offer);
+    await store.openModIni("fo2tweaks", "mods/fo2tweaks.ini");
+    await store.play();
+    await store.changeSfall("4.5");
+    await store.installSfall();
+    await store.useEngineBuild("fallout2-ce", { pick: "latest" });
+    expect(await store.saveSlots()).toEqual([]);
+    await store.createDebugPackage([]);
+    await store.loadModOffers(true);
+    store.modPlan = { offer, version: "1", plan: {} } as never;
+    await store.confirmModInstall();
+    const asked = store.aliasRequest;
+    store.renameSelected();
+
+    for (const spy of sent) expect(spy, spy.getMockName()).not.toHaveBeenCalled();
+    expect(store.modPlan).toBeNull();
+    expect(store.aliasRequest, "no alias field to focus").toBe(asked);
+    expect(store.notice).toBeNull();
+  });
+});
+
+describe("opening a place", () => {
+  test("names the log, the download and each of ZAX's directories the way the shell asks for them", async () => {
+    const opened = vi.spyOn(commands, "open").mockResolvedValue(undefined);
+    await store.open("log");
+    await store.open("download");
+    await store.open("packages");
+    await store.open({ what: "mod", id: "fo2tweaks", page: "forum" });
+    expect(opened.mock.calls.map(([target]) => target)).toEqual([
+      { what: "log" },
+      { what: "download" },
+      { what: "own", directory: "packages" },
+      { what: "mod", id: "fo2tweaks", page: "forum" },
+    ]);
+  });
+});
+
+describe("sfall's versions and updates", () => {
+  test("updates to the newest release only once one is known", async () => {
+    const changed = vi.spyOn(commands, "changeSfall").mockRejectedValue(new Error("offline"));
+    await store.updateSfall();
+    expect(changed).not.toHaveBeenCalled();
+
+    vi.spyOn(store, "sfallLatest", "get").mockReturnValue({ version: "4.5" } as never);
+    await store.updateSfall();
+    expect(changed).toHaveBeenCalledWith("4.5");
+  });
+
+  test("reads the list of versions once, and not again while it holds one", async () => {
+    const listed = vi.spyOn(commands, "listSfallVersions").mockResolvedValue(["4.5", "4.4"]);
+    await store.loadSfallVersions();
+    await store.loadSfallVersions();
+    expect(listed).toHaveBeenCalledOnce();
+    expect(store.sfallVersions).toEqual(["4.5", "4.4"]);
+  });
+});
+
+describe("an engine the listing does not name", () => {
+  test("is still reported, under a generic name rather than an empty one", async () => {
+    const busy = vi.spyOn(commands, "setBusy");
+    vi.spyOn(commands, "checkEngine").mockRejectedValue(new Error("no such engine"));
+    vi.spyOn(commands, "forgetEngine").mockRejectedValue(new Error("no such engine"));
+    vi.spyOn(commands, "useEngineBuild").mockRejectedValue(new Error("no such engine"));
+    vi.spyOn(commands, "fetchEngine").mockRejectedValue(new Error("no such engine"));
+
+    await store.checkEngine("nope");
+    await store.forgetEngine("nope", "x");
+    await store.useEngineBuild("nope", { pick: "latest" });
+    await store.fetchEngine("nope");
+
+    expect(busy.mock.calls.map(([what]) => what).filter((what) => what !== null)).toEqual([
+      "Checking for a newer engine",
+      "Removing the engine",
+      "Putting the engine in this game",
+      "Fetching the engine",
+    ]);
+    expect(store.notice?.text).toBe("Fetching the engine failed: no such engine");
+  });
+});

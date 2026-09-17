@@ -179,6 +179,53 @@ describe("the per-engine Run buttons", () => {
     The rows launch, so in a host that cannot start a program they are refused - and say why, which is what this
     file exists to catch. The chooser itself stays live: opening a list of what the machine holds costs nothing.
   */
+  test("name a tagged project's builds by their tag rather than by a date", () => {
+    const tagged = {
+      ...CE,
+      releases: "tagged",
+      versions: [
+        { release: "beta-0.9.6.8", published: "2026-08-01T00:00:00Z", commit: null },
+        { release: "beta-0.9.6.7", published: "2026-07-01T00:00:00Z", commit: null },
+      ],
+    };
+    vi.spyOn(store, "engines", "get").mockReturnValue([tagged] as never);
+    const view = render(SaveBar as never, {} as never);
+    view.control("Choose a CE build").click();
+    view.settle();
+    expect(view.all('[role="menuitem"]').map((one) => one.textContent?.trim())).toEqual([
+      "Latest",
+      "beta-0.9.6.8",
+      "beta-0.9.6.7",
+    ]);
+  });
+
+  // Anywhere outside closes it, which is the only way to dismiss a menu without picking from it.
+  test("close the chooser on a press outside it, and keep it open on a press inside", () => {
+    vi.spyOn(store, "engines", "get").mockReturnValue([CE] as never);
+    const view = render(SaveBar as never, {} as never);
+    view.control("Choose a CE build").click();
+    view.settle();
+
+    view.one('[role="menu"]').dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    view.settle();
+    expect(view.all('[role="menu"]')).toHaveLength(1);
+
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    view.settle();
+    expect(view.all('[role="menu"]')).toHaveLength(0);
+    expect(view.control("Choose a CE build").getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("close the chooser when its own button is pressed again", () => {
+    vi.spyOn(store, "engines", "get").mockReturnValue([CE] as never);
+    const view = render(SaveBar as never, {} as never);
+    view.control("Choose a CE build").click();
+    view.settle();
+    view.control("Choose a CE build").click();
+    view.settle();
+    expect(view.all('[role="menu"]')).toHaveLength(0);
+  });
+
   test("refuse each build with the reason, while the chooser itself still opens", () => {
     vi.spyOn(store, "engines", "get").mockReturnValue([CE] as never);
     const view = render(SaveBar as never, {} as never);
@@ -191,5 +238,121 @@ describe("the per-engine Run buttons", () => {
       expect(item.hasAttribute("disabled"), item.textContent ?? "").toBe(true);
       expect(item.getAttribute("title"), item.textContent ?? "").toMatch(/desktop build/i);
     }
+  });
+});
+
+/*
+  The dialog a launch waits behind. What it holds is set on the store directly: the preview cannot start a
+  program, so it never reaches the point where a real launch would be held - and what is under test here is what
+  the dialog says about whichever it was given.
+*/
+describe("the launch dialog", () => {
+  const FISSION = {
+    id: "fission",
+    name: "Fallout Fission",
+    short: "Fission",
+    page: "https://github.com/cambragol/fission-ce",
+    releases: "tagged",
+    build: null,
+    why: null,
+    caution: "Fission does not read the sfall load order.",
+    versions: [],
+  } as const;
+
+  const hold = (launch: Partial<NonNullable<typeof store.pendingLaunch>>) => {
+    store.pendingLaunch = { engine: null, caution: null, pick: null, missed: [], swap: null, ...launch } as never;
+  };
+
+  afterEach(() => {
+    store.pendingLaunch = null;
+  });
+
+  test("is titled after the engine the launch is for, or after the game where there is none", () => {
+    hold({ engine: FISSION as never, caution: FISSION.caution });
+    const view = render(SaveBar as never, {} as never);
+    expect(view.one("dialog[open]").textContent).toContain("Run in Fission");
+    store.pendingLaunch = null;
+    view.settle();
+    hold({ swap: { from: "fission", to: "sfall", losing: [], gaining: [] } });
+    view.settle();
+    expect(view.one("dialog[open]").textContent).toContain("Run the game");
+  });
+
+  test("says the caution, and records the box only when it was ticked", async () => {
+    const confirm = vi.spyOn(store, "confirmLaunch").mockResolvedValue(undefined);
+    hold({ engine: FISSION as never, caution: FISSION.caution });
+    const view = render(SaveBar as never, {} as never);
+    expect(view.text()).toContain("Fission does not read the sfall load order.");
+    expect(view.text()).toContain("Fallout Fission handles mods its own way");
+
+    view.control("Run anyway").click();
+    expect(confirm).toHaveBeenLastCalledWith(false);
+
+    view.one<HTMLInputElement>(".understood input").click();
+    view.settle();
+    view.control("Run anyway").click();
+    expect(confirm).toHaveBeenLastCalledWith(true);
+  });
+
+  test("offers no box to tick where nothing is cautioned", () => {
+    hold({ swap: { from: "sfall", to: "fission", losing: [], gaining: [] } });
+    const view = render(SaveBar as never, {} as never);
+    expect(view.all(".understood")).toHaveLength(0);
+  });
+
+  test("names the formats a swap moves between, and says so when the same mods load either way", () => {
+    hold({ engine: FISSION as never, swap: { from: "sfall", to: "fission", losing: [], gaining: [] } });
+    const view = render(SaveBar as never, {} as never);
+    expect(view.text()).toContain("This game was last set up for sfall. Running Fission swaps the mod order over");
+    expect(view.text()).toContain("puts Fission's back");
+    expect(view.text()).toContain("The same mods load either way.");
+  });
+
+  test("lists what a swap stops loading and what it starts, each under its own heading", () => {
+    hold({
+      engine: FISSION as never,
+      swap: { from: "sfall", to: "fission", losing: ["weapon_sounds.dat", "hero_appearance"], gaining: ["mod_x.dat"] },
+    });
+    const view = render(SaveBar as never, {} as never);
+    const columns = view.all(".swap-cols > div").map((column) => ({
+      head: column.querySelector(".swap-head")?.textContent?.trim(),
+      names: [...column.querySelectorAll(".missed-name")].map((name) => name.textContent?.trim()),
+    }));
+    expect(columns).toEqual([
+      { head: "No longer loads", names: ["weapon_sounds.dat", "hero_appearance"] },
+      { head: "Starts loading", names: ["mod_x.dat"] },
+    ]);
+    expect(view.text()).not.toContain("The same mods load either way.");
+  });
+
+  test("leaves out a column the swap has nothing for", () => {
+    hold({ swap: { from: "fission", to: "sfall", losing: [], gaining: ["weapon_sounds.dat"] } });
+    const view = render(SaveBar as never, {} as never);
+    expect(view.all(".swap-head").map((head) => head.textContent?.trim())).toEqual(["Starts loading"]);
+  });
+
+  test("counts and lists the entries that will not load at all, in the singular for one", () => {
+    const entry = (name: string) => ({ name, enabled: true, kind: "folder", owner: null });
+    hold({ engine: FISSION as never, caution: FISSION.caution, missed: [entry("hero_appearance")] as never });
+    const view = render(SaveBar as never, {} as never);
+    expect(view.text()).toContain("One entry in the mods folder will not load at all:");
+    store.pendingLaunch = null;
+    view.settle();
+
+    hold({ engine: FISSION as never, caution: FISSION.caution, missed: [entry("a"), entry("b")] as never });
+    view.settle();
+    expect(view.text()).toContain("2 entries in the mods folder will not load at all:");
+    expect(view.all("dialog[open] .missed-kind").map((kind) => kind.textContent)).toEqual(["folder", "folder"]);
+  });
+
+  test("goes away on Cancel without launching", () => {
+    const confirm = vi.spyOn(store, "confirmLaunch");
+    hold({ engine: FISSION as never, caution: FISSION.caution });
+    const view = render(SaveBar as never, {} as never);
+    view.control("Cancel").click();
+    view.settle();
+    expect(store.pendingLaunch).toBeNull();
+    expect(view.all("dialog[open]")).toHaveLength(0);
+    expect(confirm).not.toHaveBeenCalled();
   });
 });

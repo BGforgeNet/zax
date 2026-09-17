@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import SettingsView from "./SettingsView.svelte";
 import { render, reseedPreview, unmountAll } from "./preview-fixture.js";
 import { store } from "./store.svelte.js";
@@ -14,7 +14,10 @@ beforeEach(async () => {
   await reseedPreview();
   await store.setQuery("");
 });
-afterEach(unmountAll);
+afterEach(() => {
+  unmountAll();
+  vi.restoreAllMocks();
+});
 
 const view = () => render(SettingsView as never, {} as never);
 const tabs = (v: ReturnType<typeof view>) =>
@@ -179,5 +182,96 @@ describe("the All settings tab", () => {
     store.searchSettings();
     v.settle();
     expect(document.activeElement, "so the next keystroke replaces what is there").toBe(box);
+  });
+});
+
+describe("moving between tabs by clicking", () => {
+  test("a group tab, a sub-tab, Troubleshooting and All settings each open what they name", () => {
+    const v = view();
+    const group = store.settingsGroups.find((one) => one.group.tabs.length > 1)!.group;
+    v.control(group.label).click();
+    v.settle();
+    expect(store.settingsTab).toBe(group.id);
+
+    const second = group.tabs[1]!.title;
+    v.control(second).click();
+    v.settle();
+    expect(store.fileTab[group.id]).toBe(second);
+    expect(v.control(second).getAttribute("aria-selected")).toBe("true");
+
+    v.control("Troubleshooting").click();
+    v.settle();
+    expect(store.settingsTab).toBe("trouble");
+    v.control("All settings").click();
+    v.settle();
+    expect(store.settingsTab).toBe("all");
+  });
+
+  test("typing in the filter narrows through the store", async () => {
+    store.settingsTab = "all";
+    const v = view();
+    const box = v.one<HTMLInputElement>("input[type=search]");
+    box.value = "damage";
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    await expect.poll(() => store.query).toBe("damage");
+  });
+});
+
+describe("an engine's group tab", () => {
+  test("is titled with the engine's full name rather than its id, and with the id for an engine not listed", () => {
+    // The preview's install runs no engine's settings, so the group is offered here from the catalog's own layout.
+    const group = store.catalog!.layout.find((one) => one.engine === "fission");
+    if (!group) throw new Error("the catalog's layout no longer carries Fission's group");
+    const spy = vi.spyOn(store, "settingsGroups", "get").mockReturnValue([{ group, refusal: null }]);
+    const engine = store.engines.find((one) => one.id === "fission")!;
+    expect(view().control(group.label).getAttribute("title")).toBe(engine.name);
+    unmountAll();
+
+    vi.spyOn(store, "engines", "get").mockReturnValue([]);
+    expect(view().control(group.label).getAttribute("title")).toBe("fission");
+    spy.mockRestore();
+    vi.restoreAllMocks();
+  });
+});
+
+describe("a group whose rows refuse input", () => {
+  test("says why above the rows when the group gives a reason", () => {
+    const group = store.settingsGroups[0]!.group;
+    const offered = store.settingsGroups.map((one) =>
+      one.group.id === group.id ? { ...one, refusal: "Run the engine once first." } : one,
+    );
+    const spy = vi.spyOn(store, "settingsGroups", "get").mockReturnValue(offered);
+    store.settingsTab = group.id;
+    const v = view();
+    expect(v.text()).toContain("Run the engine once first.");
+    expect(v.control(group.label).getAttribute("title")).toBe("Run the engine once first.");
+    spy.mockRestore();
+  });
+
+  test("says what is missing when the install does not have the group's file", () => {
+    store.settingsTab = "fallout2.cfg";
+    const spy = vi.spyOn(store, "hasFile").mockReturnValue(false);
+    expect(view().text()).toContain("The game has not written its configuration file yet.");
+    spy.mockRestore();
+  });
+});
+
+describe("the hi-res patch's version", () => {
+  test("heads the first tab of f2_res.ini, and no other", () => {
+    store.settingsTab = "f2_res.ini";
+    expect(
+      view()
+        .all(".frame-title")
+        .map((title) => title.textContent),
+    ).toContain("Patch");
+    unmountAll();
+
+    const group = store.settingsGroups.find((one) => one.group.id === "f2_res.ini")!.group;
+    store.fileTab = { ...store.fileTab, "f2_res.ini": group.tabs[1]!.title };
+    expect(
+      view()
+        .all(".frame-title")
+        .map((title) => title.textContent),
+    ).not.toContain("Patch");
   });
 });
