@@ -1,3 +1,5 @@
+/* @ts-self-types="./zax_mod_tools.d.ts" */
+
 /**
  * `{ ok, said, complaints }`, the two lists being lines for standard output and standard error.
  *
@@ -8,7 +10,7 @@
  * @param {string} manifest_name
  * @param {string} match_
  * @param {Function} read
- * @returns {object}
+ * @returns {{ ok: boolean; said: string[]; complaints: string[] }}
  */
 export function checkModIni(manifest, manifest_name, match_, read) {
     try {
@@ -38,7 +40,7 @@ export function checkModIni(manifest, manifest_name, match_, read) {
  *
  * Throws the parser's refusal as an `Error`.
  * @param {Uint8Array} bytes
- * @returns {Array<any>}
+ * @returns {string[]}
  */
 export function describeManifest(bytes) {
     try {
@@ -66,7 +68,7 @@ export function describeManifest(bytes) {
  * Throws the parser's or the generator's refusal as an `Error`, and rethrows whatever the reader threw.
  * @param {Uint8Array} manifest
  * @param {Function} read
- * @returns {object}
+ * @returns {{ files: [string, Uint8Array][]; settings: number }}
  */
 export function generateModIni(manifest, read) {
     try {

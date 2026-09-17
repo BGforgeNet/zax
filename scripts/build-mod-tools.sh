@@ -22,10 +22,10 @@ RUSTFLAGS="--remap-path-prefix=$root=zax --remap-path-prefix=$cargo_home=cargo" 
   cargo build --release --locked --target wasm32-unknown-unknown --package zax-mod-tools
 
 # `web` for its `initSync`, which takes the module's bytes: the loader reads them from beside itself,
-# and Node's fetch cannot read a file URL, which the other entry point would need.
+# and Node's fetch cannot read a file URL, which the other entry point would need. The declarations come
+# along so the typecheck reads them rather than checking the generated JavaScript.
 wasm-bindgen \
   --target web \
-  --no-typescript \
   --out-dir "$out" \
   target/mod-tools/wasm32-unknown-unknown/release/zax_mod_tools.wasm
 

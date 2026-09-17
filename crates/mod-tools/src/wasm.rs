@@ -51,7 +51,7 @@ fn lines(held: &[String]) -> Array {
 /// # Errors
 ///
 /// Throws the parser's refusal as an `Error`.
-#[wasm_bindgen(js_name = describeManifest)]
+#[wasm_bindgen(js_name = describeManifest, unchecked_return_type = "string[]")]
 pub fn describe_manifest(bytes: &[u8]) -> Result<Array, JsValue> {
     crate::describe_manifest(bytes)
         .map(|held| lines(&held))
@@ -63,7 +63,10 @@ pub fn describe_manifest(bytes: &[u8]) -> Result<Array, JsValue> {
 /// # Errors
 ///
 /// Throws for a match other than `soft` or `hard`, and rethrows whatever the reader threw.
-#[wasm_bindgen(js_name = checkModIni)]
+#[wasm_bindgen(
+    js_name = checkModIni,
+    unchecked_return_type = "{ ok: boolean; said: string[]; complaints: string[] }"
+)]
 pub fn check_mod_ini(
     manifest: &[u8],
     manifest_name: &str,
@@ -91,7 +94,10 @@ pub fn check_mod_ini(
 /// # Errors
 ///
 /// Throws the parser's or the generator's refusal as an `Error`, and rethrows whatever the reader threw.
-#[wasm_bindgen(js_name = generateModIni)]
+#[wasm_bindgen(
+    js_name = generateModIni,
+    unchecked_return_type = "{ files: [string, Uint8Array][]; settings: number }"
+)]
 pub fn generate_mod_ini(manifest: &[u8], read: &Function) -> Result<Object, JsValue> {
     let reader = Reader::new(read);
     let generated = crate::generate_ini(manifest, &|name| reader.read(name));
