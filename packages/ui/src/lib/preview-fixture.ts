@@ -23,10 +23,6 @@ export const bytes = (text: string) => {
   return out;
 };
 
-/** The two mod files a test mutates, named here so a test asserting on one reaches it through the same path. */
-export const ORDER_FILE = `${PREVIEW_INSTALL}/mods/mods_order.txt`;
-export const MOD_INI = `${PREVIEW_INSTALL}/mods/fo2tweaks.ini`;
-
 let machine: PreviewMachine | null = null;
 
 /** The preview's disk, for a test that changes a file underneath the interface. */

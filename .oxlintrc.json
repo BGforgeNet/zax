@@ -7,14 +7,13 @@
   "categories": { "correctness": "error" },
   // Naming this field replaces the default set rather than adding to it, so the three that are on by default
   // are repeated here. `import` is the one addition: it resolves the module graph, which is the only thing in
-  // the toolchain that sees a cycle - `seam.test.ts` governs which packages may import which, not the shape of
-  // the graph inside one.
+  // the toolchain that sees a cycle - `imports.test.ts` governs what the interface may import, not the shape of
+  // the graph inside it.
   //
-  // `promise` and `node` were read and left off. `always-return`'s four sites are terminal voided chains, three
-  // of them inside a callback that has to stay synchronous - an Electron `close` handler, a Svelte `$effect`
-  // whose return value is its teardown - where a `return` would state the opposite of what is true. `no-sync`
-  // reports 63 sites: generators, workers, tests, and three in `platform-node` that are synchronous by design
-  // and say so, which is every site it finds.
+  // `promise` and `node` were read and left off. `always-return` reports terminal voided chains, some inside a
+  // callback that has to stay synchronous - a Svelte `$effect`, whose return value is its teardown - where a
+  // `return` would state the opposite of what is true. `no-sync` reports generators, scripts and tests, which
+  // are synchronous by design.
   "plugins": ["typescript", "unicorn", "oxc", "import"],
   "options": {
     // Reaches .ts only - a .svelte script block gets the syntactic set, as it did under eslint.
@@ -62,25 +61,19 @@
     "import/export": "error",
     "import/namespace": "error",
 
-    // Every site is a destructure of plain functions off an object or a module (`platform.paths`, `node:path`).
-    // They have no `this` to lose, and the rule cannot tell them from class methods.
-    "typescript/unbound-method": "off",
-    // Each spread here snapshots a collection the loop then mutates; dropping it is the bug the spread prevents.
+    // Each spread here snapshots a collection its loop body can change - a listener removing itself from the set
+    // it was called from - and dropping it is the bug the spread prevents.
     "unicorn/no-useless-spread": "off",
     // Off after reading the sites, so that turning on the categories these belong to does not reopen them.
-    // Sequential is the point: a directory walk recurses, an install writes its files in order, and a feed read
-    // is deliberately one request at a time. What the rule proposes is unbounded concurrency against a disk and
-    // someone else's server.
+    // Sequential is the point: the store's `idle` waits on its queue again for as long as waiting added to it,
+    // which is a loop over time rather than a batch to run at once.
     "eslint/no-await-in-loop": "off",
-    // The in-memory platform implements an async interface synchronously, which is what a test double is for.
-    // The `async` is the signature's, not a mistake in the body.
-    "typescript/require-await": "off",
     // Most of what it reports is not a per-element clone but a conditional field (`...(cond ? { k: v } : {})`)
     // or a fresh object built in the callback, and the collections that do clone hold tens of items. Avoiding
     // the spread means building objects imperatively, which costs more to read than the allocation costs to run.
     "oxc/no-map-spread": "off",
-    // A shadowed name here is a narrower value of the same thing - `platform` inside a helper that took one -
-    // and renaming it to satisfy the rule makes the two harder to relate, not easier.
+    // A shadowed name here is a narrower value of the same thing - a generator's `node` inside the walk over
+    // nodes - and renaming it to satisfy the rule makes the two harder to relate, not easier.
     "eslint/no-shadow": "off",
     // Helpers declared beside the code that uses them, which is where they read best; hoisting them to module
     // scope for the rule's sake would put the definition further from its one caller.
@@ -89,14 +82,11 @@
     // code has already bounded still types as possibly-undefined, and the assertion is how that is said. The
     // ones that were avoidable are gone - the helpers they sat in take an out-of-range lookup as an answer
     // now - and what remains is provable at its site, which is a review question rather than a lint one.
-    "typescript/no-non-null-assertion": "off",
-    // Every site is `fc.constantFrom`, `fc.property` and the like. fast-check publishes both a namespace
-    // default and the same names individually, and the namespace is the form its own documentation uses.
-    "import/no-named-as-default-member": "off"
+    "typescript/no-non-null-assertion": "off"
   },
   "overrides": [
     {
-      // The generator scripts and the workers are JavaScript, checked with `noImplicitAny` off, so every value
+      // The generator and action scripts are JavaScript, checked with `noImplicitAny` off, so every value
       // crossing an untyped boundary is `any` by construction. Here the family reports the tsconfig, not a
       // defect.
       "files": ["**/*.mjs", "**/*.cjs", "**/*.js"],
@@ -108,29 +98,11 @@
       }
     },
     {
-      // A test double is built by spreading a platform and replacing one capability. Nothing the doubles call
-      // lives on the prototype the rule protects, and production code stays covered.
       // The assertions are how a fixture states the shape it just built; the code they exercise stays covered.
       "files": ["**/*.test.ts"],
       "rules": {
-        "typescript/no-misused-spread": "off",
         "typescript/no-unsafe-type-assertion": "off"
       }
-    },
-    {
-      // The two halves of the process boundary. `BACKEND_METHODS` is a list of names with no types behind it by
-      // design - the preload must carry the names without the domain layer - so the bridge that turns that list
-      // into callers, and the dispatcher that looks one up by name, are untypeable at exactly one line each.
-      // `backend.test.ts` is what holds the list to the interface.
-      "files": ["packages/app/src/dispatch.ts", "packages/games-fallout2/src/backend-methods.ts"],
-      "rules": { "typescript/no-unsafe-type-assertion": "off" }
-    },
-    {
-      // Reading a field off a caught `unknown` - `error.code`, `error.cause.code`, `error.name`. The narrowing
-      // predicate that would replace these lives in `@zax/core`, which this package deliberately does not
-      // depend on: it implements the platform seam and sits outside the domain layer.
-      "files": ["packages/platform-node/src/*.ts"],
-      "rules": { "typescript/no-unsafe-type-assertion": "off" }
     },
     {
       // A component that renders a tree renders itself, and Svelte 5 has no way to say that but to import the

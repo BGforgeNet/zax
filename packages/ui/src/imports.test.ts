@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 const ALLOWED = ["svelte", "@tauri-apps/api/core", "@tauri-apps/api/event"];
 
 const SOURCES = dirname(fileURLToPath(import.meta.url));
-const GENERATED = [join(SOURCES, "lib", "bindings"), join(SOURCES, "lib", "preview-wasm")];
+const GENERATED = new Set([join(SOURCES, "lib", "bindings"), join(SOURCES, "lib", "preview-wasm")]);
 
 /** Asked of the runtime rather than written out, so the set cannot fall behind the Node the project runs on. */
 const BUILTINS = new Set(builtinModules);
@@ -33,7 +33,7 @@ function* sourcesOf(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const at = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!GENERATED.includes(at)) yield* sourcesOf(at);
+      if (!GENERATED.has(at)) yield* sourcesOf(at);
     } else if (/\.(ts|svelte)$/.test(entry.name) && !entry.name.endsWith(".test.ts")) yield at;
   }
 }

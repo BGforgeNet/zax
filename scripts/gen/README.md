@@ -1,14 +1,14 @@
 # Catalog and layout generation
 
-`packages/games-fallout2/src/catalog.ts` and `layout.ts` are generated modules, and
-`crates/fallout2/data/catalog.json` and `layout.json` are the same content as data, which the Rust build
-deserializes rather than compiling. Both pairs come out of one run; neither is edited by hand. Their sources:
+`crates/fallout2/data/catalog.json` and `layout.json` are generated, and the Rust build deserializes them
+rather than compiling them. Neither is edited by hand. Their sources:
 
 - `formats/*.yml` - the previous implementation's format definitions, copied verbatim from the `python` branch
   (`zax/formats/*.yml` there). They carry each setting's type, bounds, options, names and descriptions.
 - `added.yml` - settings ZAX carries that the previous implementation never had, in the same shape and read
   after the format definitions. Hand-authored, so this is where a new setting goes; each one also needs a row
-  in `gen-layout.mjs`'s `ADDED` table saying which tab and frame it joins, or `layout.test.ts` fails.
+  in `gen-layout.mjs`'s `ADDED` table saying which tab and frame it joins, or the tests in
+  `crates/fallout2/src/layout.rs` fail.
 - `py/*.py` - the previous implementation's layout modules, not committed here; materialize them when the
   extraction step needs re-running: `git show python:zax/layouts/<name>.py > scripts/gen/py/<name>.py` for
   `fallout2_cfg`, `f2_res_ini` and `ddraw_ini`.
@@ -36,7 +36,7 @@ Run from the repo root, in this order (each later step reads the earlier one's o
 
 To change how an existing setting is presented, edit the generators' hand-maintained tables - labels, help
 rewrites, bounds, gates, conflicts. To add a setting neither config format defines for us, edit `added.yml`
-and give it a row in `gen-layout.mjs`'s `ADDED`. Editing the generated modules directly is lost on the next
+and give it a row in `gen-layout.mjs`'s `ADDED`. Editing the generated files directly is lost on the next
 regeneration.
 
 `gen-catalog.mjs`'s `BINDINGS` joins the addresses an alternative engine keeps the same value under. Each row
@@ -50,5 +50,5 @@ already has becomes a second address on that existing row - derived automaticall
 key identically, and named in `ENGINE_BINDINGS` where they do not. `ENGINE_TABS` then says what to call the
 engine's tabs; a section with no entry there fails generation rather than appearing under its raw name.
 
-CI reruns steps 4 and 5 on every push and fails on any difference from the committed modules, so a hand edit of
+CI reruns steps 4 and 5 on every push and fails on any difference from the committed files, so a hand edit of
 generated output - or a generator change committed without its regeneration - cannot land quietly.

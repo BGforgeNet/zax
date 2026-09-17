@@ -20,7 +20,7 @@
     "mod-ini": "node actions/mod-ini/cli.mjs",
     "gen:icons": "node scripts/gen-icons.mjs",
     "verify:chokidar": "node scripts/verify-chokidar.mjs",
-    "desktop": "pnpm --filter @zax/app build && pnpm --filter @zax/app start"
+    "desktop": "tauri dev"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -30,7 +30,6 @@
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.9.1",
     "eslint-plugin-svelte": "^3.23.0",
-    "fast-check": "^4.9.0",
     "globals": "^17.11.0",
     "happy-dom": "^20.11.8",
     "jiti": "^2.7.0",
@@ -41,6 +40,7 @@
     "svelte": "^5.56.10",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "yaml": "2.9.0"
   }
 }

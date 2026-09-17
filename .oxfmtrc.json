@@ -8,10 +8,8 @@
   "svelte": true,
   // Everything git ignores is skipped already; these are the tracked paths whose bytes are not ours to reflow.
   "ignorePatterns": [
-    // Generated modules keep their generator's one-setting-per-line output; reformatting them is churn the next
-    // regeneration undoes. They stay linted - only formatting is excluded.
-    "packages/games-fallout2/src/catalog.ts",
-    "packages/games-fallout2/src/layout.ts",
+    // Generated data keeps its generator's one-setting-per-line output; reformatting it is churn the next
+    // regeneration undoes.
     "crates/fallout2/data/",
     // ts-rs writes one file per Rust type, from the Rust that defines it. Same rule: reformatting is
     // churn the next `cargo test` undoes.

@@ -1,16 +1,8 @@
 {
   "$schema": "./node_modules/knip/schema.json",
   // What knip reports that nothing else in the gate can see: an export nobody imports, a file nothing reaches,
-  // a dependency no source names. It infers entry points from the workspace manifests, which covers the six
-  // packages; what it cannot infer is named below.
-
-  // The generators own what these two export, and `check-generated.sh` fails on any difference from what they
-  // emit - so an unused export here is not something to act on in the file, and acting on it breaks that gate.
-  // Reported as issues rather than ignored as files, so their own imports and dependencies stay checked.
-  "ignoreIssues": {
-    "packages/games-fallout2/src/catalog.ts": ["exports", "types", "nsExports", "nsTypes"],
-    "packages/games-fallout2/src/layout.ts": ["exports", "types", "nsExports", "nsTypes"]
-  },
+  // a dependency no source names. It infers entry points from the workspace manifests; what it cannot infer is
+  // named below.
   "workspaces": {
     ".": {
       // Run by hand in the order scripts/gen/README.md gives, rather than imported or wired to a script. The
@@ -19,16 +11,10 @@
       // wasm-bindgen's loader, which exports what the Rust does whether or not a caller uses all of it.
       "ignore": ["actions/mod-ini/wasm/**"]
     },
-    "packages/app": {
-      // The preload is loaded by Electron by path, named in main.ts as a string rather than imported - it runs
-      // in its own process and must not pull the domain layer in behind it.
-      "entry": ["src/main.ts", "src/preload.ts"],
-      // Declared here, and production rather than dev, so electron-builder ships it: `electron-builder.yml`
-      // unpacks `**/node_modules/7z-wasm/**` from the archive because the module loads its `.wasm` from beside
-      // itself, and `build.mjs` marks it external for the same reason. No source in this package imports it.
-      "ignoreDependencies": ["7z-wasm"]
-    },
     "packages/ui": {
+      // ts-rs writes a binding for every Rust type that derives one, including the ones only other bindings
+      // name. Which of them the interface imports is the interface's business, not a defect in either side.
+      "ignore": ["src/lib/bindings/**"],
       // The root `check` script reaches it through `pnpm --filter @zax/ui exec`, which is not an import.
       "ignoreDependencies": ["svelte-check"]
     }

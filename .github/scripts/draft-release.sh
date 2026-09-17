@@ -5,7 +5,7 @@ set -euo pipefail
 
 # What a complete release carries, as a count per extension. Two zips because Windows and macOS each produce
 # one; everything else is a single file. Counted by extension rather than by filename so this does not depend
-# on electron-builder's name macros - only on a target having produced something.
+# on the version and architecture in each name - only on a target having produced something.
 #
 # The upload steps cannot answer this on their own. `if-no-files-found` asks whether a step found anything, and
 # a step that never runs - a matrix entry removed, an `if:` that no longer matches its runner - is not a

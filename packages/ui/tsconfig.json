@@ -1,6 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // The desktop draws in the system's own webview - WebKit on Linux and macOS, WebView2 on Windows - whose age
+    // follows the user's system rather than a runtime ZAX ships. ES2022 matches the syntax level Vite's default
+    // build target emits, so a newer built-in fails the check here rather than on a machine with an older one.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "svelte"],
     "noEmit": true
   },

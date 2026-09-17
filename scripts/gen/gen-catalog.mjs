@@ -1,19 +1,16 @@
 /**
- * Converts the previous implementation's format definitions into the typed catalog.
+ * Converts the previous implementation's format definitions into the catalog.
  * Run from the repo root: node scripts/gen/gen-catalog.mjs
  *
  * Also the source `gen-layout.mjs` reads the settings from, through the `SETTING_DEFS` export below: it places
- * an engine's rows by the addresses each setting holds, and reading those back out of the emitted TypeScript
- * meant a regex over generated source, which silently returned the wrong answer for a target whose optional
- * fields happened to be ordered differently.
+ * an engine's rows by the addresses each setting holds, and reading those back out of the emitted file would be
+ * a second derivation of what this module already holds.
  */
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
+import YAML from "yaml";
 import { idFor } from "./ids.mjs";
 import { ENGINE_BINDINGS, ENGINE_TABLES, STRICT_VANILLA, STRICT_VANILLA_GATES } from "./engine-settings.mjs";
-// yaml is @zax/core's dependency; the repo root carries none of its own, so resolve it through that package.
-const YAML = createRequire(new URL("../../packages/core/", import.meta.url))("yaml");
 
 const FILES = ["fallout2.cfg", "f2_res.ini", "ddraw.ini"];
 
@@ -743,33 +740,14 @@ const rank = (d) => {
 };
 defs.sort((a, b) => rank(a) - rank(b));
 
-// One setting per line: the file is read by diffing it against the previous generation, and a pretty-printed
-// object per setting would make a one-field change a twenty-line diff.
-const body = defs
-  .map(
-    (d) =>
-      "  " +
-      JSON.stringify(d)
-        .replace(/"([A-Za-z_][A-Za-z0-9_]*)":/g, "$1: ")
-        .replace(/,(?=[a-z])/g, ","),
-  )
-  .join(",\n");
-
 /** Every setting the catalog holds, as objects rather than as the text they are written out to. */
 export const SETTING_DEFS = defs;
 
 // Importing this module gives a reader the settings; only running it rewrites the catalog.
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
-  fs.writeFileSync(
-    "packages/games-fallout2/src/catalog.ts",
-    `// Generated from the previous implementation's format definitions by scripts/gen/gen-catalog.mjs. Do not edit by hand;\n` +
-      `// change the generator's tables and regenerate.\n\n` +
-      `import type { SettingDef } from "@zax/core";\n\n` +
-      `export const SETTINGS: readonly SettingDef[] = [\n${body},\n];\n`,
-  );
-
-  // The same settings as data, for the Rust build, which deserializes them rather than compiling one
-  // struct literal per setting. One setting per line for the same reason the module above is.
+  // Data rather than code: the Rust build deserializes it. One setting per line, because the file is read by
+  // diffing it against the previous generation, and a pretty-printed object per setting would make a one-field
+  // change a twenty-line diff.
   fs.writeFileSync(
     "crates/fallout2/data/catalog.json",
     `[\n${defs.map((d) => `  ${JSON.stringify(d)}`).join(",\n")}\n]\n`,

@@ -45,7 +45,7 @@ async function makePreview(): Promise<PreviewMachine> {
 }
 
 /** The preview's machine, made on first use. */
-export async function preview(): Promise<PreviewMachine> {
+async function preview(): Promise<PreviewMachine> {
   previewMachine ??= makePreview();
   return previewMachine;
 }

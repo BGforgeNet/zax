@@ -9,10 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.11.1",
-    "@zax/core": "workspace:*",
-    "@zax/fallout2": "workspace:*",
-    "@zax/platform": "workspace:*"
+    "@tauri-apps/api": "^2.11.1"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",

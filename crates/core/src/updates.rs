@@ -19,9 +19,9 @@ pub struct ZaxRelease {
 
 /// What a release asset is named for one host.
 ///
-/// These are the `os` macros and preferred portable targets in `electron-builder.yml`. Extension
-/// alone cannot distinguish the Windows and macOS zips, and the release also carries an SBOM that no
-/// machine can run.
+/// The endings `.github/scripts/package.sh` names each platform's preferred single-file build with.
+/// Extension alone cannot distinguish the Windows and macOS zips, and the release also carries an SBOM
+/// that no machine can run.
 fn asset_suffix(os: OperatingSystem, arch: Architecture) -> Option<String> {
     if arch == Architecture::Other {
         return None;

@@ -8,8 +8,9 @@
 # artifacts/ddraw.ini for the sfall keys, and fallout2-ce's src/game.cc for [debug] mode, which dispatches on
 # exactly the five strings listed here and treats anything else as no debug output.
 #
-# A setting added here also needs a placement in gen-layout.mjs, or layout.test.ts fails: the interface has
-# nowhere to draw it, and the previous implementation's extracted layout cannot know about it.
+# A setting added here also needs a placement in gen-layout.mjs, or the tests in crates/fallout2/src/layout.rs
+# fail: the interface has nowhere to draw it, and the previous implementation's extracted layout cannot know
+# about it.
 
 fallout2.cfg:
   debug:

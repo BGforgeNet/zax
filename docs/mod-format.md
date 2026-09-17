@@ -18,7 +18,7 @@ Everything under `mods/` in that archive is installed and everything else is ign
 (GitHub publishes one per asset) is required, and a download that does not match is discarded.
 
 `pnpm check-manifest <file>` from a ZAX checkout applies exactly the rules ZAX will, and
-`packages/games-fallout2/src/manifest.ts` is the implementation those rules live in.
+`crates/fallout2/src/manifest.rs` is the implementation those rules live in.
 
 ## The rest of the format
 
@@ -46,4 +46,4 @@ ZAX carries manifests for the mods that describe themselves nowhere - the base m
 be installed at all. Such a manifest is written by ZAX, ships in ZAX, and changes only with a ZAX release, which
 makes it a worse description of your mod than yours would be: it cannot know about a release until someone
 updates it. Publishing your own overrides it from the next release onward, with no coordination needed. The
-entry naming your mod is in `packages/games-fallout2/src/mod-vendored.ts`, and it is deleted once you publish.
+entry naming your mod is in `crates/fallout2/src/mod_vendored.rs`, and it is deleted once you publish.

@@ -1,7 +1,7 @@
 //! Every setting ZAX knows about, generated from the format definitions.
 //!
-//! The data is `data/catalog.json`, written by `scripts/gen/gen-catalog.mjs` from the same tables
-//! the TypeScript build reads. Editing that file is lost on the next regeneration; change the
+//! The data is `data/catalog.json`, written by `scripts/gen/gen-catalog.mjs` from the previous
+//! implementation's format definitions. Editing that file is lost on the next regeneration; change the
 //! generator instead.
 //!
 //! Deserialized rather than compiled: 227 settings as struct literals would be thousands of lines of

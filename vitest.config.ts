@@ -27,20 +27,8 @@ export default defineConfig({
         // The component tests' own setup - the preview disk reseeded and a component mounted against it. Test
         // support rather than shipped code, and counting it would report on the harness, not the interface.
         "packages/ui/src/lib/preview-fixture.ts",
-        // Generated data tables. They are one long literal each, counted as executed the moment they are
-        // imported, and eleven hundred such lines swamp the ratio for the code that has branches in it.
-        "packages/games-fallout2/src/catalog.ts",
-        "packages/games-fallout2/src/layout.ts",
-        // The three process entry points. Each one constructs the window, the bridge or the root component and
-        // holds no decision of its own - every decision that was in them lives in `dispatch`, `navigation` and
-        // `ipc-error`, which are covered. Measuring them would only report that Electron is not loaded here.
-        "packages/app/src/main.ts",
-        "packages/app/src/preload.ts",
+        // The entry point: it mounts the root component and holds no decision of its own.
         "packages/ui/src/main.ts",
-        // The names the two processes agree on, and nothing else - no branches to cover. Only the entry points
-        // above import it, so it is reported unexecuted whatever the suite does, and asserting a constant
-        // equals itself would be the only way to move the number.
-        "packages/app/src/channel.ts",
       ],
       // A floor that only rises, set a point or so below what the suite currently reaches so ordinary movement
       // does not trip it. It is here to make an untested path visible, not to be aimed at: pinning it to

@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::keys::{KEYS, key_name};
 
-/// The types here deserialize from what `scripts/gen/gen-catalog.mjs` emits, which is the same data
-/// the TypeScript build reads. Field names stay in that file's spelling rather than Rust's, so the
-/// generator has one output shape and not two.
+/// The types here deserialize from what `scripts/gen/gen-catalog.mjs` emits, and serialize to the
+/// interface in the same shape. Field names stay in that file's spelling rather than Rust's, so the
+/// generator and the interface share one shape and not two.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ts_rs::TS)]
 #[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct ChoiceOption {

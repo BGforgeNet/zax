@@ -5,7 +5,7 @@ set -euo pipefail
 
 node scripts/gen/gen-catalog.mjs
 node scripts/gen/gen-layout.mjs
-git diff --exit-code packages/games-fallout2/src/catalog.ts packages/games-fallout2/src/layout.ts
+git diff --exit-code crates/fallout2/data/
 
 # The mod-ini action runs its committed WebAssembly, not the Rust the tests read.
 scripts/build-mod-tools.sh

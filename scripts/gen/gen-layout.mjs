@@ -1,5 +1,5 @@
 /**
- * Turns the extracted previous-implementation layout into a typed module the interface renders directly.
+ * Turns the extracted previous-implementation layout into the tree the interface renders.
  *
  * Kept separate from the catalog generator: the catalog says what a setting IS, this says where it was shown.
  * A setting can lose its place in the layout without ceasing to exist, and the reverse would be a defect.
@@ -18,8 +18,8 @@ const ALSO_HIDDEN = new Set(["fallout2.cfg|system|free_space"]);
 
 /*
   Where a setting from added.yml joins the layout. The extracted trees cannot know about a setting the
-  previous implementation never had, and `layout.test.ts` holds every catalog setting to exactly one place -
-  so an addition without a row here fails the suite rather than rendering nowhere.
+  previous implementation never had, and the tests in `crates/fallout2/src/layout.rs` hold every catalog
+  setting to a place - so an addition without a row here fails the suite rather than rendering nowhere.
 
   `tab` is the tab's title on that file's own tab strip, `frame` the group inside it, created at the end of
   the tab where it does not exist yet. Position inside a frame is `after` a named setting, `first`, or - with
@@ -220,44 +220,8 @@ if (missing.length) {
   process.exit(1);
 }
 
-const out = `// Generated from the previous implementation's layout modules by scripts/gen/gen-layout.mjs. Do not edit by hand.
-//
-// The tab, frame and control order the previous interface presented, so a user coming from it finds every
-// setting where they left it. What each setting IS lives in the catalog; this only says where it was shown.
-
-/** The control the previous interface drew, which its catalog kind alone does not determine. */
-export type Control = "checkbox" | "slider" | "spin" | "dropdown" | "qinput" | "radio";
-
-/** A control, a titled group of them, or one of the few widgets that is not a single setting. */
-export type LayoutNode =
-  | { kind: "setting"; id: string; control: Control; hidden?: boolean }
-  | { kind: "frame"; title: string; items: readonly LayoutNode[] }
-  | { kind: "widget"; id: string };
-
-export interface LayoutTab {
-  title: string;
-  items: readonly LayoutNode[];
-}
-
-export interface LayoutFile {
-  /**
-   * What identifies this group of tabs and keys which of them is open: the config file's name for the game's
-   * own three, the engine's id for an engine's. An engine's tabs are not one file's - fallout2-ce shows both
-   * the keys it reads from the game's config and the ones a linked setting puts in the content patch.
-   */
-  id: string;
-  /** What the previous interface called it - the component, not the filename. */
-  label: string;
-  /** The engine whose settings these tabs show, absent for the game's own three. */
-  engine?: string;
-  tabs: readonly LayoutTab[];
-}
-
-export const LAYOUT: readonly LayoutFile[] = ${JSON.stringify(files, null, 1)};
-`;
-
-fs.writeFileSync("packages/games-fallout2/src/layout.ts", out);
-// The same tree as data, for the Rust build, which deserializes it rather than compiling it.
+// Data for the Rust build, which deserializes it rather than compiling it; `crates/fallout2/src/layout.rs` is
+// where its shape is declared.
 fs.writeFileSync("crates/fallout2/data/layout.json", `${JSON.stringify(files, null, 1)}\n`);
 console.log(
   `${files.length} groups, ${files.reduce((n, f) => n + f.tabs.length, 0)} tabs, ` +

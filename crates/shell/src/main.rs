@@ -1,5 +1,5 @@
-// The Electron main process' counterpart: it owns the window and registers one command per entry in
-// the backend surface. Nothing domain-shaped lives here.
+// The desktop application: it owns the window and registers one command per operation the interface
+// can ask for. Nothing domain-shaped lives here.
 
 use std::process::ExitCode;
 

@@ -24,7 +24,8 @@ function registered(): string[] {
 
 describe("the command surface", () => {
   it("names exactly what the shell registers", () => {
-    expect([...COMMANDS].toSorted()).toEqual(registered().toSorted());
+    // As sets: order is not part of either list's meaning, and a repeated name is the next test's to catch.
+    expect(new Set(COMMANDS)).toEqual(new Set(registered()));
   });
 
   it("has a wrapper for every name", () => {

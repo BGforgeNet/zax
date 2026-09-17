@@ -1,6 +1,6 @@
 //! Window lifecycle and the command surface.
 //!
-//! The Electron main process' counterpart. Nothing domain-shaped lives here: the window is built, the
+//! Nothing domain-shaped lives here: the window is built, the
 //! seam and the backend behind it are made once, and every operation the interface can ask for is
 //! registered as a command.
 

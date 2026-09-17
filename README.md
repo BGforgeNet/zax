@@ -20,7 +20,7 @@ pnpm install
 pnpm desktop
 ```
 
-`pnpm --filter @zax/app package` produces distributables for the platform you are on.
+`.github/scripts/package.sh` produces distributables for the platform you are on.
 
 The [releases page](https://github.com/BGforgeNet/zax/releases) carries the earlier Python versions, up to 0.7.
 

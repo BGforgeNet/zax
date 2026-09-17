@@ -89,8 +89,6 @@ export const COMMANDS = [
   "set_busy",
 ] as const;
 
-export type CommandName = (typeof COMMANDS)[number];
-
 export const commands = {
   start: async (version: string): Promise<Started> => invoke("start", { version }),
   view: async (): Promise<AppView> => invoke("view"),

@@ -9,7 +9,9 @@ import globals from "globals";
 // and nothing else. The overlap inside a script block is small and both linters agree on it; what only eslint
 // reaches is the svelte/* set, plus unused variables in a component - oxlint declines to report those, having no
 // view of the template that would use them.
-export default defineConfig(globalIgnores(["**/dist/", ".work/", "coverage/", "scripts/gen/formats/"]), {
+// eslint reads no .gitignore, so cargo's output - where Tauri keeps the bundle's compressed assets under `.js`
+// names - is ignored here by name.
+export default defineConfig(globalIgnores(["**/dist/", ".work/", "coverage/", "target/", "scripts/gen/formats/"]), {
   files: ["**/*.svelte", "**/*.svelte.ts"],
   extends: [js.configs.recommended, ts.configs.recommended, svelte.configs.recommended],
   languageOptions: {

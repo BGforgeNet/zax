@@ -16,9 +16,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The interface and everything checked in beside it. Its tests run against the domain compiled to
+  # WebAssembly, so the job builds that first, with the compiler rust-toolchain.toml names.
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,8 +32,16 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
-      # Install scripts only fetch the Electron and esbuild binaries, which the typecheck and the tests never
-      # run; skipping them keeps the job to the packages it actually loads.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - run: ./.github/scripts/install-wasm-bindgen.sh
+      # Install scripts only check esbuild's binary, which nothing in this job runs.
       - run: pnpm install --frozen-lockfile --ignore-scripts
       # The trust policy in pnpm-workspace.yaml judges a version's provenance at install time; nothing there
       # re-checks published advisories, which is what this reads the lockfile against.
@@ -39,6 +49,9 @@ jobs:
       # A second copy of a transitive package is not an install failure, so nothing else in the job would say
       # so: the lockfile simply grows a duplicate and every consumer of it resolves one version or the other.
       - run: pnpm dedupe --check
+      # The interface imports the preview's module and its declarations, so the typecheck needs it as much as
+      # the tests do.
+      - run: ./scripts/build-preview.sh
       - run: pnpm check
       - run: pnpm lint
       # Its own step rather than part of `pnpm lint`: what it reports is dead surface rather than a defect in
@@ -50,62 +63,19 @@ jobs:
       # The chokidar override puts svelte-check on a major its authors do not test against, and only watch mode
       # loads it - which the single-pass `pnpm check` above never enters.
       - run: pnpm verify:chokidar
-      # The mod-ini action's WebAssembly is rebuilt and compared, which takes the Rust toolchain
-      # rust-toolchain.toml names and the wasm-bindgen Cargo.lock pins.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/bin/wasm-bindgen
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - run: ./.github/scripts/install-wasm-bindgen.sh
       - run: ./.github/scripts/check-generated.sh
 
-  # The suite again on Windows, and only the suite. Everything else in `verify` reads the same bytes on any
-  # host, but `platform-node` is where the real filesystem, process launch and registry are - drive letters, a
-  # case-insensitive filesystem, `reg query`, and the separator the Linux runner never produces. The logic
-  # around those is written as pure functions of the platform name and is already covered on one host
-  # (`paths.test.ts`); what only a Windows runner exercises is the calls themselves.
-  #
-  # Its own job rather than a matrix over `verify`: the checks there are host-independent, and running them
-  # twice would double the slowest part of the gate to re-answer a question one host already settled.
-  test-windows:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
-          # later in the job - or an artifact made from the checkout - could carry it back out.
-          persist-credentials: false
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: package.json
-          cache: pnpm
-      # As in `verify`: the tests load neither Electron nor esbuild's binary.
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      # The plain run rather than the measured one - the floor is a property of the code, and `verify` gates it.
-      - run: pnpm test
-
-  # The Rust workspace, which the Tauri shell is being built in. Its own job for the same reason as
-  # `lint-workflows`: it shares no step with the Node gate, so the two run at once. Linux alone -
-  # nothing under `crates/` is host-specific yet, and the seam's own host implementations are what
-  # will earn a matrix when they land.
+  # The Rust workspace: formatting, lints on both targets, tests, and the bindings the tests write.
   rust:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Nothing here pushes, and the default leaves the job's token in .git/config where anything
           # later in the job - or an artifact made from the checkout - could carry it back out.
           persist-credentials: false
-      # What the webview binds against on Linux. The runner image carries the Rust toolchain already.
-      - run: sudo apt-get update
-      - run: sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libsoup-3.0-dev
+      - run: ./.github/scripts/install-linux-deps.sh
       # Keyed on the lockfile: the dependency tree is what the build time is, and it moves only when
       # that file does.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -114,8 +84,32 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - run: ./.github/scripts/rust-gate.sh
+
+  # The domain's tests again on Windows, and only those. `zax-host` is where the real filesystem, process
+  # launch and registry calls are - drive letters, a case-insensitive filesystem, `reg query` - and the logic
+  # around them is written as pure functions of the operating system and covered on one host already; this run
+  # is there for the calls themselves. Its own job rather than a matrix over `rust`, because formatting, lints
+  # and bindings read the same bytes on any host.
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      # The shell is left out: it holds no Windows-specific logic, and linking it would double the job.
+      - run: cargo test --locked --package zax-platform --package zax-host --package zax-core --package zax-fallout2
 
   # Separate from `verify` because it needs none of the Node install and shares nothing with it, so the two run
   # at once rather than one after the other.
@@ -131,20 +125,20 @@ jobs:
       - run: ./.github/scripts/lint-workflows.sh
       - run: ./.github/scripts/draft-release.test.sh
       - run: ./actions/pack-mod/scripts/pack.test.sh
-      # The committed bundle rather than its sources, on the runner's own Node, as a caller's job would run it.
+      # The committed WebAssembly rather than its sources, on the runner's own Node, as a caller's job would run it.
       - run: ./actions/mod-ini/scripts/action.test.sh
 
-  # Packaging is its own gate: the tests run the sources, and none of them would notice a file left out of the
-  # archive, a path that only resolves in a checkout, or a target that stopped building on one platform. Three
-  # runners because each produces a distributable only that platform can make.
+  # Packaging is its own gate: the tests run the sources, and none of them would notice a bundle that stopped
+  # building, a file left out, or a target that fails on one platform. Three runners because each produces a
+  # distributable only that platform can make.
   build:
-    needs: verify
+    needs: [verify, rust]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -156,58 +150,53 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
-      # The Electron runtime is a 130-200 MB download per platform, and it changes only when the pin does.
+      - if: runner.os == 'Linux'
+        run: ./.github/scripts/install-linux-deps.sh
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ runner.temp }}/electron-builder-cache
-          key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-      # Unlike the verify job this one runs install scripts: esbuild's binary is what builds the shell.
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-release-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - run: pnpm install --frozen-lockfile
-      # The cache stays outside the checkout: electron-builder downloads helper tools into it as CommonJS, and
-      # the root package.json's `type: module` governs the whole tree, so Node would load them as ESM and fail.
-      - run: pnpm --filter @zax/app package
-        env:
-          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
-      # One artifact per target rather than one per platform. Every platform builds the same application two
-      # ways - a directory you keep somewhere, and a single file you run - and nobody wants both: bundled, the
-      # download is twice the size it needs to be and the choice is made after unpacking instead of before.
-      #
-      # Each path names an extension rather than wildcarding the directory, so electron-builder's own metadata
-      # files stay out and a target that silently stopped producing anything fails its step instead of
-      # uploading nothing. That is also why there is no catch-all step: a new target has to be named here to
-      # ship, which is a line in a review rather than a file that quietly appears in someone's download.
+      - run: ./.github/scripts/package.sh
+        shell: bash
+      # One artifact per target rather than one per platform: each platform builds the application two ways,
+      # and nobody wants both. Each path names an extension rather than wildcarding the directory, so a target
+      # that silently stopped producing anything fails its step instead of uploading nothing.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: runner.os == 'Linux'
         with:
           name: zax-Linux-AppImage
-          path: packages/app/release/*.AppImage
+          path: release/*.AppImage
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: runner.os == 'Linux'
         with:
           name: zax-Linux-tar.gz
-          path: packages/app/release/*.tar.gz
+          path: release/*.tar.gz
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: runner.os == 'Windows'
         with:
           name: zax-Windows-zip
-          path: packages/app/release/*.zip
+          path: release/*.zip
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: runner.os == 'Windows'
         with:
           name: zax-Windows-exe
-          path: packages/app/release/*.exe
+          path: release/*.exe
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: runner.os == 'macOS'
         with:
           name: zax-macOS-zip
-          path: packages/app/release/*.zip
+          path: release/*.zip
           if-no-files-found: error
           retention-days: 7

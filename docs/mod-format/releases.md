@@ -40,6 +40,6 @@ a difference nobody can see.
 
 The feed list ships in ZAX's code and changes only with a ZAX release - installing a mod is trusting its
 publisher, and the list is where that trust is granted. Add the repository and id to `MOD_FEEDS` in
-`packages/games-fallout2/src/mod-feed.ts`. A mod that has to write outside `mods/` needs a second entry, in
-`MOD_GRANTS` in `packages/games-fallout2/src/mod-grants.ts`, naming the directory and why nothing packable would
+`crates/fallout2/src/mod_feed.rs`. A mod that has to write outside `mods/` needs a second entry, in
+`MOD_GRANTS` in `crates/fallout2/src/mod_grants.rs`, naming the directory and why nothing packable would
 do.

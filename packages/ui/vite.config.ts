@@ -32,10 +32,19 @@ function buildCommit(): string {
 // its own script hashes to. A meta tag would be a second policy on top, and every request has to pass both - so
 // one without the shell's `connect-src ipc:` would push every command off Tauri's IPC protocol. The policy denies
 // everything but the bundle itself; styles stay inline-permitted because Svelte injects them at runtime.
+/**
+ * Whether the shell's CLI is building this, which sets `TAURI_ENV_PLATFORM` for the build it runs. The desktop
+ * never loads the browser preview, so the preview's module stays out of that bundle rather than riding along
+ * as megabytes the application embeds and never reaches - and needs no WebAssembly built to produce it.
+ */
+const forShell = process.env.TAURI_ENV_PLATFORM !== undefined;
+const PREVIEW_MODULE = "./preview-wasm/zax_preview.js";
+
 export default defineConfig({
   // Empty on a release build, which is the only kind whose version number names something a user can download.
   define: { __ZAX_COMMIT__: JSON.stringify(buildCommit()) },
   plugins: [svelte()],
+  build: forShell ? { rolldownOptions: { external: [PREVIEW_MODULE] } } : {},
   // HOST and PORT are read from the environment so a machine that needs a specific bind address or port can
   // say so without editing this file.
   server: {

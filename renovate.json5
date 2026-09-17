@@ -16,9 +16,9 @@
 
   packageRules: [
     {
-      // These two decide what a distributable is built by and what it ships, and a packaging break surfaces
-      // only in the `build` job on three runners. Worth a person reading the release notes first.
-      matchPackageNames: ["electron", "electron-builder"],
+      // These decide what a distributable is built by and what it ships, and a packaging break surfaces only in
+      // the `build` job on three runners. Worth a person reading the release notes first.
+      matchPackageNames: ["@tauri-apps/cli", "tauri", "tauri-build"],
       dependencyDashboardApproval: true,
     },
     {
