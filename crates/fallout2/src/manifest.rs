@@ -121,6 +121,7 @@ pub struct DroppedSetting {
 /// Fires when every `present` path exists and every `absent` path does not. At least one list is
 /// non-empty.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct ConflictRule {
     pub present: Vec<String>,
     pub absent: Vec<String>,
@@ -161,6 +162,7 @@ pub enum Pick {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct ModPartGroup {
     pub label: String,
     pub pick: Pick,
@@ -183,6 +185,7 @@ pub enum ModType {
 /// The Windows half of a base mod's install: an installer program that takes the game directory as
 /// an argument.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize), serde(rename_all = "camelCase"))]
 pub struct WindowsInstaller {
     /// Absent where the release names it: upstream's installer assets carry the version in their
     /// names, which only the release knows.
@@ -194,6 +197,7 @@ pub struct WindowsInstaller {
 
 /// The other half: a payload extracted over the game with a script inside it that finishes the job.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct OtherInstaller {
     pub asset: Option<String>,
     /// What to run once the payload is extracted, relative to the install.
@@ -201,6 +205,7 @@ pub struct OtherInstaller {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct ModInstaller {
     pub windows: Option<WindowsInstaller>,
     pub other: Option<OtherInstaller>,
@@ -212,6 +217,7 @@ pub struct ModInstaller {
 /// holds nothing but `Fallout1in2/` - and it becomes the confinement bound for everything the install
 /// writes, exactly as `mods/` is for a stacking mod.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct ModCreates {
     pub directory: String,
 }
@@ -233,6 +239,7 @@ pub struct ModInput {
 /// `list` and `into` are read inside the created directory, so the response file that is used is the
 /// one the payload shipped and the extraction cannot aim anywhere else.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct ModExtractDat {
     /// The input whose `holds` file is unpacked.
     pub from: String,
@@ -250,12 +257,15 @@ pub struct ModExtractDat {
 /// Stated as override rather than position, because position is not what the file decides: order in
 /// `mods_order.txt` has no effect except which copy of a shared file the engine sees.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize), serde(rename_all = "camelCase"))]
 pub struct ModOrder {
     pub overrides: Vec<String>,
     pub overridden_by: Vec<String>,
 }
 
+/// Serialized under test only, for the corpus the specimens under `fixtures/manifests` are pinned in.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(serde::Serialize), serde(rename_all = "camelCase"))]
 pub struct ModManifest {
     pub id: String,
     pub name: String,
@@ -267,6 +277,7 @@ pub struct ModManifest {
     /// Where the mod is discussed and where it lives, which the interface offers to open.
     pub forum: Option<String>,
     pub homepage: Option<String>,
+    #[cfg_attr(test, serde(rename = "type"))]
     pub mod_type: ModType,
     /// Why the mod can never be uninstalled. Present exactly when the type is permanent.
     pub reason: Option<String>,
@@ -2430,5 +2441,165 @@ mod tests {
             !may_write("data/sound/music", &["data/sound/music"]),
             "a grant is one segment below, as mods/ is"
         );
+    }
+}
+
+/// One specimen per shape the manifest format takes, each pinned to what it parses to.
+///
+/// The format is append-only within a spec major, and this is what makes that a test rather than an
+/// intention: a change that alters what an already-published manifest means breaks a specimen here,
+/// whether or not a unit test covered that combination of fields. Only valid manifests are pinned - a
+/// refusal is not append-only, since a new field turns a text refused as unknown into one that parses.
+#[cfg(test)]
+mod corpus {
+    use std::path::{Path, PathBuf};
+
+    use serde_json::Value;
+
+    use super::*;
+
+    fn corpus() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/manifests")
+    }
+
+    /// The pins were written from the TypeScript parser, whose absent fields were left out rather than
+    /// null, and whose setting carried its definition's fields beside its default rather than under one
+    /// key. Both are spelling; neither changes what the manifest means.
+    fn as_pinned(value: Value) -> Value {
+        match value {
+            Value::Object(fields) => {
+                let mut out = serde_json::Map::new();
+                for (key, held) in fields {
+                    match (key.as_str(), held) {
+                        (_, Value::Null) => {}
+                        // A number with no sentinels carries an empty map here and nothing in the pins.
+                        ("sentinels", Value::Object(map)) if map.is_empty() => {}
+                        ("def", Value::Object(def)) => {
+                            for (inner, value) in def {
+                                if !value.is_null() {
+                                    out.insert(inner, as_pinned(value));
+                                }
+                            }
+                        }
+                        (_, held) => {
+                            out.insert(key, as_pinned(held));
+                        }
+                    }
+                }
+                Value::Object(out)
+            }
+            Value::Array(items) => Value::Array(items.into_iter().map(as_pinned).collect()),
+            scalar @ (Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_)) => scalar,
+        }
+    }
+
+    /// Where two values first part, and how - a whole manifest printed on one line hides the field.
+    fn first_difference(parsed: &Value, pinned: &Value, at: &str) -> Option<String> {
+        match (parsed, pinned) {
+            (Value::Object(ours), Value::Object(theirs)) => {
+                let keys: std::collections::BTreeSet<&String> =
+                    ours.keys().chain(theirs.keys()).collect();
+                keys.into_iter()
+                    .find_map(|key| match (ours.get(key), theirs.get(key)) {
+                        (Some(one), Some(other)) => {
+                            first_difference(one, other, &format!("{at}.{key}"))
+                        }
+                        (one, other) => {
+                            Some(format!("{at}.{key}: parsed {one:?}, pinned {other:?}"))
+                        }
+                    })
+            }
+            (Value::Array(ours), Value::Array(theirs)) if ours.len() == theirs.len() => ours
+                .iter()
+                .zip(theirs)
+                .enumerate()
+                .find_map(|(index, (one, other))| {
+                    first_difference(one, other, &format!("{at}[{index}]"))
+                }),
+            // JSON has one number type, and the pins were written where `10` and `10.0` are one value.
+            (Value::Number(one), Value::Number(other)) if one.as_f64() == other.as_f64() => None,
+            (one, other) if one == other => None,
+            (one, other) => Some(format!("{at}: parsed {one}, pinned {other}")),
+        }
+    }
+
+    fn string_at(pinned: &Value, key: &str) -> Option<String> {
+        pinned
+            .get("defaults")
+            .and_then(|defaults| defaults.get(key))
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    }
+
+    #[test]
+    fn covers_every_publishing_shape_the_format_has() {
+        let mut names: Vec<String> = std::fs::read_dir(corpus())
+            .expect("the corpus directory")
+            .filter_map(Result::ok)
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.ends_with(".yml"))
+            .collect();
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                "base.yml",
+                "creates.yml",
+                "entries.yml",
+                "full.yml",
+                "minimal.yml",
+                "parts.yml",
+                "settings.yml",
+                "tagged.yml",
+            ]
+        );
+    }
+
+    #[test]
+    fn every_specimen_reads_as_it_is_pinned() {
+        let mut read = 0;
+        for entry in std::fs::read_dir(corpus()).expect("the corpus directory") {
+            let path = entry.expect("a corpus entry").path();
+            if path.extension().is_none_or(|ext| ext != "yml") {
+                continue;
+            }
+            let pinned: Value = serde_json::from_slice(
+                &std::fs::read(path.with_extension("json")).expect("a pin beside the specimen"),
+            )
+            .expect("a pin is JSON");
+            let defaults = ManifestDefaults {
+                version: string_at(&pinned, "version"),
+                archive: string_at(&pinned, "archive"),
+            };
+            let manifest = parse_manifest(&std::fs::read(&path).expect("the specimen"), &defaults)
+                .unwrap_or_else(|err| panic!("{} should be read: {err}", path.display()));
+            let parsed = as_pinned(serde_json::to_value(&manifest).expect("a manifest serializes"));
+            assert_eq!(
+                first_difference(&parsed, &pinned["parses"], "parses"),
+                None,
+                "{}",
+                path.display()
+            );
+            read += 1;
+        }
+        // A moved corpus reads as nothing to compare, which the loop above would pass.
+        assert_eq!(read, 8);
+    }
+
+    #[test]
+    fn the_drafted_fo2tweaks_manifest_still_parses() {
+        // A full-sized schema for a real mod's ini, drafted here: FO2tweaks publishes no manifest by
+        // either route. The shapes are the specimens' job; this is that the whole of it still reads.
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/fo2tweaks/f2mod.yml");
+        let manifest = parse_manifest(
+            &std::fs::read(path).expect("the drafted manifest"),
+            &ManifestDefaults {
+                version: Some("14.7".to_owned()),
+                archive: None,
+            },
+        )
+        .unwrap_or_else(|err| panic!("the drafted manifest should be read: {err}"));
+        assert_eq!(manifest.id, "fo2tweaks");
+        assert!(!manifest.settings.is_empty());
     }
 }
