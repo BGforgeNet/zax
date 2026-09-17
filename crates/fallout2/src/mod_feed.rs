@@ -969,9 +969,9 @@ pub fn availability(release: &ModRelease, context: &ModContext<'_>) -> Availabil
     // release's defaults.
     //
     // Any of the three is that install being there: a record of it, a version stamped in it, or the
-    // directory itself.
+    // directory itself. A reading that found no stamp is not the second.
     if manifest.creates.is_some()
-        && (recorded.is_some() || context.base_version.is_some() || context.present)
+        && (recorded.is_some() || matches!(context.base_version, Some(Some(_))) || context.present)
     {
         let stamped = match &context.base_version {
             Some(Some(BaseVersion::Release { version })) => Some(version.clone()),
@@ -2026,6 +2026,25 @@ mod tests {
                 commit: "abc123".to_owned()
             }
         );
+    }
+
+    #[test]
+    fn a_created_install_read_with_no_version_stamped_is_not_one_that_is_there() {
+        // The reading ran and found nothing, which is the ordinary state of a game Fallout et tu was never
+        // unpacked into - only a stamped version, a record or the folder itself says it is there.
+        let text = "spec: 1\nid: fo1in2\nname: Fallout et tu\nversion: 1.0\ngame: fallout2\ntype: base\n\
+                    becomes: fo1in2\ncreates.directory: Fallout1in2\n";
+        let manifest = parse_manifest(text.as_bytes(), &ManifestDefaults::default())
+            .expect("a manifest the test writes");
+        let release = ModRelease {
+            manifest,
+            ..release_of("fo1in2", "1.0")
+        };
+        let record = record_with(Vec::new());
+        let install = Install::new("/games/f2", GameType::Fallout2Upu);
+        let mut held = context(&record, &install);
+        held.base_version = Some(None);
+        assert_eq!(availability(&release, &held), Availability::Install);
     }
 
     #[test]
