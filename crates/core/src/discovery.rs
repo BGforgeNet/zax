@@ -452,12 +452,17 @@ fn from_installs(scan: &mut Scan<'_>, installs: &[PathBuf]) -> Vec<Candidate> {
 
 /// Two spellings of one directory are one install, on the filesystems that do not distinguish them.
 fn dedupe_key(platform: &dyn Platform, path: &Path) -> String {
-    let at = path.to_string_lossy();
-    let trimmed = at.trim_end_matches(['/', '\\']);
+    // By component, so `C:/Games` and `C:\Games\` are one key where the host reads both as separators,
+    // while a Linux host keeps `\` as the file-name character it is there.
+    let at = path
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/");
     if platform.os() == OperatingSystem::Linux {
-        trimmed.to_owned()
+        at
     } else {
-        trimmed.to_lowercase()
+        at.to_lowercase()
     }
 }
 
@@ -565,6 +570,12 @@ mod tests {
         vec![(format!("{root}/fallout2.exe"), "MZ".to_owned())]
     }
 
+    /// Found paths as `Path`s, whose equality is the host's: a Windows host joins with `\` onto these
+    /// `/` fixtures, and reads the two as one path.
+    fn paths_of(found: &[Install]) -> Vec<&Path> {
+        found.iter().map(|i| Path::new(&i.path)).collect()
+    }
+
     fn platform_with(entries: Vec<(String, String)>, options: MemoryOptions) -> MemoryPlatform {
         let mut files: BTreeMap<String, Content> = entries
             .into_iter()
@@ -646,8 +657,8 @@ mod tests {
         );
         let found = scan_for_installs(&platform, &[], now(), None);
         assert_eq!(
-            found.iter().map(|i| i.path.as_str()).collect::<Vec<_>>(),
-            vec!["/home/tester/Games/Fallout 2"]
+            paths_of(&found),
+            vec![Path::new("/home/tester/Games/Fallout 2")]
         );
     }
 
@@ -660,8 +671,8 @@ mod tests {
         );
         let found = scan_for_installs(&platform, &[], now(), None);
         assert_eq!(
-            found.iter().map(|i| i.path.as_str()).collect::<Vec<_>>(),
-            vec!["/home/tester/games/FALLOUT 2"]
+            paths_of(&found),
+            vec![Path::new("/home/tester/games/FALLOUT 2")]
         );
     }
 
@@ -699,8 +710,8 @@ mod tests {
         );
         let found = scan_for_installs(&platform, &[], now(), None);
         assert_eq!(
-            found.iter().map(|i| i.path.as_str()).collect::<Vec<_>>(),
-            vec!["/home/tester/MyGames/Fallout2-GOG"]
+            paths_of(&found),
+            vec![Path::new("/home/tester/MyGames/Fallout2-GOG")]
         );
     }
 
@@ -727,10 +738,7 @@ mod tests {
 
         let known = vec![Install::new("/games/f2", GameType::Fallout2)];
         let found = scan_for_installs(&platform, &known, now(), None);
-        assert_eq!(
-            found.iter().map(|i| i.path.as_str()).collect::<Vec<_>>(),
-            vec!["/games/f2/Fallout1in2"]
-        );
+        assert_eq!(paths_of(&found), vec![Path::new("/games/f2/Fallout1in2")]);
         assert_eq!(found[0].game_type, GameType::Fo1In2);
     }
 
@@ -751,9 +759,8 @@ mod tests {
 
         let found = scan_for_installs(&platform, &[], now(), None);
         assert!(
-            found
-                .iter()
-                .any(|i| i.path == format!("{library}/steamapps/common/Fallout 2")),
+            found.iter().any(|i| Path::new(&i.path)
+                == Path::new(&format!("{library}/steamapps/common/Fallout 2"))),
             "{found:?}"
         );
     }
@@ -772,7 +779,7 @@ mod tests {
         assert!(
             found
                 .iter()
-                .any(|i| i.path == "/home/tester/EpicGames/Fallout 2"),
+                .any(|i| Path::new(&i.path) == Path::new("/home/tester/EpicGames/Fallout 2")),
             "{found:?}"
         );
     }
@@ -788,7 +795,7 @@ mod tests {
         assert!(
             found
                 .iter()
-                .any(|i| i.path == "/home/tester/Games/Fallout 2"),
+                .any(|i| Path::new(&i.path) == Path::new("/home/tester/Games/Fallout 2")),
             "the rest of the scan must survive: {found:?}"
         );
     }
@@ -807,7 +814,9 @@ mod tests {
         );
         let found = scan_for_installs(&platform, &[], now(), None);
         assert!(
-            found.iter().any(|i| i.path == "/games/GOG/Fallout 2"),
+            found
+                .iter()
+                .any(|i| Path::new(&i.path) == Path::new("/games/GOG/Fallout 2")),
             "{found:?}"
         );
     }

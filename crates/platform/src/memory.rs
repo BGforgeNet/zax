@@ -38,10 +38,14 @@ pub fn text(data: &[u8]) -> String {
 }
 
 /// Collapses repeated and trailing separators so two spellings of one path are one key.
+///
+/// `\` counts as a separator at every entry point, the `&str` helpers tests read through included:
+/// on a Windows host `Path::join` adds `\` to a `/` fixture path, and a helper that kept it would
+/// miss the file the domain wrote.
 fn normalize(path: &str) -> String {
-    let absolute = path.starts_with('/');
+    let absolute = path.starts_with(['/', '\\']);
     let mut parts: Vec<&str> = Vec::new();
-    for part in path.split('/') {
+    for part in path.split(['/', '\\']) {
         if part.is_empty() || part == "." {
             continue;
         }
@@ -60,7 +64,7 @@ fn normalize(path: &str) -> String {
 }
 
 fn normalize_path(path: &Path) -> String {
-    normalize(&path.to_string_lossy().replace('\\', "/"))
+    normalize(&path.to_string_lossy())
 }
 
 fn parent_of(path: &str) -> String {
@@ -949,6 +953,15 @@ mod tests {
                 .expect("the file was just written"),
             b"[sound]\n"
         );
+    }
+
+    #[test]
+    fn a_helper_reads_a_file_through_either_separator() {
+        // What a Windows host hands a test: the domain joins `\` onto a `/` fixture path.
+        let p = MemoryPlatform::default();
+        p.write(&at("/cache/zax/zax.log"), b"line\n")
+            .expect("writing to the memory platform cannot fail");
+        assert_eq!(p.text_at("/cache\\zax\\zax.log").as_deref(), Some("line\n"));
     }
 
     #[test]

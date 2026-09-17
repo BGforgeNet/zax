@@ -109,7 +109,11 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       # The shell is left out: it holds no Windows-specific logic, and linking it would double the job.
-      - run: cargo test --locked --package zax-platform --package zax-host --package zax-core --package zax-fallout2
+      # --no-fail-fast because this is the only place these run on Windows: stopping at the first failing crate
+      # hides whether the others pass until a second run.
+      - run: >-
+          cargo test --locked --no-fail-fast
+          --package zax-platform --package zax-host --package zax-core --package zax-fallout2
 
   # Separate from `verify` because it needs none of the Node install and shares nothing with it, so the two run
   # at once rather than one after the other.
