@@ -5,10 +5,11 @@
 
 use std::sync::OnceLock;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The control the previous interface drew, which a setting's catalog kind alone does not determine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum Control {
     Checkbox,
@@ -20,7 +21,8 @@ pub enum Control {
 }
 
 /// A control, a titled group of them, or one of the few widgets that is not a single setting.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum LayoutNode {
     Setting {
@@ -40,13 +42,15 @@ pub enum LayoutNode {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct LayoutTab {
     pub title: String,
     pub items: Vec<LayoutNode>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct LayoutFile {
     /// What identifies this group of tabs and keys which of them is open: the config file's name for
     /// the game's own three, the engine's id for an engine's. An engine's tabs are not one file's -

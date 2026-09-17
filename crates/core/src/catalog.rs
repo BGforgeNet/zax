@@ -118,11 +118,22 @@ pub struct Gate {
 /// id's source even where its file is absent. Holding it apart is what lets [`Targets::own`] answer
 /// without a fallible lookup, which is the guarantee the TypeScript got from a non-empty tuple type.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ts_rs::TS)]
-#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
-#[serde(try_from = "Vec<SettingTarget>")]
+#[ts(
+    export,
+    export_to = "../../../packages/ui/src/lib/bindings/",
+    as = "Vec<SettingTarget>"
+)]
+#[serde(try_from = "Vec<SettingTarget>", into = "Vec<SettingTarget>")]
 pub struct Targets {
     own: SettingTarget,
     others: Vec<SettingTarget>,
+}
+
+/// The array the generator writes, so what crosses the boundary reads the way the catalog does.
+impl From<Targets> for Vec<SettingTarget> {
+    fn from(targets: Targets) -> Self {
+        std::iter::once(targets.own).chain(targets.others).collect()
+    }
 }
 
 impl TryFrom<Vec<SettingTarget>> for Targets {

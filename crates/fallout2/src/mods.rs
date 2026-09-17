@@ -36,11 +36,22 @@ pub const MODS_ORDER_PATH: &str = "mods/mods_order.txt";
 /// sfall names a path per line; Fission writes pipe-separated records and skips every line without a
 /// pipe, so neither reader tolerates the other's file and each rewrites the whole thing into its own.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, ts_rs::TS,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    ts_rs::TS,
 )]
 #[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 #[serde(rename_all = "lowercase")]
 pub enum OrderFormat {
+    /// What a folder with no order file at all is in: sfall is the loader every install carries.
+    #[default]
     Sfall,
     Fission,
 }

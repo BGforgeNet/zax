@@ -14,23 +14,21 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use tauri::State;
-use zax_core::config_io::{ConfigFileContents, SaveOutcome, SaveRequest};
-use zax_core::install::{GameType, Install};
-use zax_core::state::{AppState, LoadedState};
-use zax_core::updates::ZaxRelease;
+use zax_core::install::{Theme, WineConfig};
 use zax_fallout2::backend::{
-    Backend, EngineListing, InstallOutcome, InstallPlan, MachineDescription, ModSettingsGroup,
-    OpenTarget, WipeTarget,
+    Answered, AppView, Backend, InstallPlan, InstallReport, ModInstallRequest, OpenTarget,
+    OrderEdit, SaveRefusal, Started, WipeTarget,
 };
+use zax_fallout2::catalog_view::{CatalogView, SearchResults, catalog_view, search_settings};
 use zax_fallout2::debug_package::DebugPackage;
 use zax_fallout2::engine_choice::BuildPick;
 use zax_fallout2::engine_release::EngineRelease;
-use zax_fallout2::mod_feed::{ModFeedListing, ModInstallState};
-use zax_fallout2::mod_install::ModRemoval;
-use zax_fallout2::mods::{ModsSaveRequest, ModsSnapshot, OrderSwap};
-use zax_fallout2::reconcile_settings::HeldTarget;
-use zax_fallout2::records::InstalledEngine;
-use zax_fallout2::sfall::{SfallRelease, SfallUpdate};
+use zax_fallout2::manifest::ModPart;
+use zax_fallout2::mod_choice::{ChoiceGroup, toggle_option};
+use zax_fallout2::mods::OrderSwap;
+use zax_fallout2::settings_session::Requirement;
+use zax_fallout2::sfall::SfallUpdate;
+use zax_platform::OperatingSystem;
 
 /// What a command answers with when the operation refused. The interface shows the sentence; the kind
 /// does not survive the channel, which is why every refusal in the domain is written for a reader.
@@ -68,11 +66,30 @@ where
     off_thread(backend, move |backend| Ok(work(backend))).await
 }
 
-// --- what the machine is ----------------------------------------------------------------------
+// --- the view -------------------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn describe(backend: Held<'_>) -> Answer<MachineDescription> {
-    off_thread_infallible(&backend, Backend::describe).await
+pub async fn start(backend: Held<'_>, version: String) -> Answer<Started> {
+    off_thread(&backend, move |backend| backend.start(&version)).await
+}
+
+#[tauri::command]
+pub async fn view(backend: Held<'_>) -> Answer<AppView> {
+    off_thread_infallible(&backend, Backend::view).await
+}
+
+/// Not off the thread: it answers from tables built once, and touches nothing.
+#[tauri::command]
+pub fn catalog() -> CatalogView {
+    catalog_view().clone()
+}
+
+#[tauri::command]
+pub async fn search(backend: Held<'_>, query: String) -> Answer<SearchResults> {
+    off_thread_infallible(&backend, move |backend| {
+        search_settings(&query, backend.describe().os != OperatingSystem::Windows)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -83,98 +100,157 @@ pub async fn choose_folder(backend: Held<'_>, holding: Option<String>) -> Answer
     .await
 }
 
-// --- the application's own state --------------------------------------------------------------
+// --- the list of installs -------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn load_state(backend: Held<'_>) -> Answer<LoadedState> {
-    off_thread(&backend, Backend::load_state).await
+pub async fn select_install(backend: Held<'_>, path: String) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.select_install(&path)).await
 }
 
 #[tauri::command]
-pub async fn save_state(backend: Held<'_>, state: AppState) -> Answer<()> {
-    off_thread(&backend, move |backend| backend.save_state(&state)).await
+pub async fn refresh(backend: Held<'_>) -> Answer<AppView> {
+    off_thread(&backend, Backend::refresh).await
 }
 
-// --- the game's config files --------------------------------------------------------------------
+#[tauri::command]
+pub async fn add_install(backend: Held<'_>, path: String) -> Answer<Answered<Option<String>>> {
+    off_thread(&backend, move |backend| backend.add_install(&path)).await
+}
 
 #[tauri::command]
-pub async fn load_config_files(
+pub async fn remove_install(backend: Held<'_>, path: String) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.remove_install(&path)).await
+}
+
+#[tauri::command]
+pub async fn set_alias(backend: Held<'_>, path: String, name: String) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.set_alias(&path, &name)).await
+}
+
+#[tauri::command]
+pub async fn set_wine(backend: Held<'_>, path: String, wine: WineConfig) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.set_wine(&path, &wine)).await
+}
+
+#[tauri::command]
+pub async fn set_theme(backend: Held<'_>, theme: Theme) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.set_theme(theme)).await
+}
+
+#[tauri::command]
+pub async fn set_autosave(backend: Held<'_>, on: bool) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.set_autosave(on)).await
+}
+
+#[tauri::command]
+pub async fn accept_caution(backend: Held<'_>, engine_id: String) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.accept_caution(&engine_id)).await
+}
+
+#[tauri::command]
+pub async fn scan(backend: Held<'_>) -> Answer<Answered<usize>> {
+    off_thread(&backend, Backend::scan).await
+}
+
+// --- editing the selected install -----------------------------------------------------------------
+
+#[tauri::command]
+pub async fn set_setting(backend: Held<'_>, id: String, value: String) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.set_setting(&id, &value)).await
+}
+
+#[tauri::command]
+pub async fn set_percent(backend: Held<'_>, id: String, percent: f64) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.set_percent(&id, percent)).await
+}
+
+#[tauri::command]
+pub async fn revert_settings(backend: Held<'_>, ids: Vec<String>, all: bool) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.revert_settings(&ids, all)).await
+}
+
+#[tauri::command]
+pub async fn apply_action(backend: Held<'_>, action_id: String) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.apply_action(&action_id)).await
+}
+
+#[tauri::command]
+pub async fn satisfy_gate(
     backend: Held<'_>,
-    install_path: String,
-) -> Answer<ConfigFileContents> {
+    id: String,
+    group: Option<String>,
+) -> Answer<Answered<Vec<Requirement>>> {
     off_thread(&backend, move |backend| {
-        backend.load_config_files(&install_path)
+        backend.satisfy_gate(&id, group.as_deref())
     })
     .await
 }
 
 #[tauri::command]
-pub async fn save_config_files(backend: Held<'_>, request: SaveRequest) -> Answer<SaveOutcome> {
-    off_thread(&backend, move |backend| backend.save_config_files(&request)).await
+pub async fn choose_linked(backend: Held<'_>, id: String, value: String) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.choose_linked(&id, &value)).await
 }
 
 #[tauri::command]
-pub async fn settings_base(
+pub async fn edit_order(backend: Held<'_>, edit: OrderEdit) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.edit_order(&edit)).await
+}
+
+#[tauri::command]
+pub async fn save(backend: Held<'_>) -> Answer<Answered<Option<SaveRefusal>>> {
+    off_thread(&backend, Backend::save).await
+}
+
+// --- what has been published ----------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn check_zax(backend: Held<'_>) -> Answer<AppView> {
+    off_thread(&backend, Backend::check_zax).await
+}
+
+#[tauri::command]
+pub async fn check_sfall(backend: Held<'_>) -> Answer<AppView> {
+    off_thread(&backend, Backend::check_sfall).await
+}
+
+#[tauri::command]
+pub async fn check_engine(backend: Held<'_>, engine_id: String) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.check_engine(&engine_id)).await
+}
+
+#[tauri::command]
+pub async fn list_sfall_versions(backend: Held<'_>) -> Answer<Vec<String>> {
+    off_thread(&backend, Backend::list_sfall_versions).await
+}
+
+#[tauri::command]
+pub async fn change_sfall(
     backend: Held<'_>,
-    install_path: String,
-) -> Answer<BTreeMap<String, String>> {
+    version: Option<String>,
+) -> Answer<Answered<SfallUpdate>> {
     off_thread(&backend, move |backend| {
-        backend.settings_base(&install_path)
+        backend.change_sfall(version.as_deref())
     })
     .await
 }
 
-#[tauri::command]
-pub async fn accept_settings_base(
-    backend: Held<'_>,
-    install_path: String,
-    at: Vec<HeldTarget>,
-) -> Answer<()> {
-    off_thread(&backend, move |backend| {
-        backend.accept_settings_base(&install_path, &at)
-    })
-    .await
-}
-
-// --- the mods folder ------------------------------------------------------------------------------
+// --- mods -----------------------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn load_mods(backend: Held<'_>, install: Install) -> Answer<ModsSnapshot> {
-    off_thread(&backend, move |backend| backend.load_mods(&install)).await
-}
-
-#[tauri::command]
-pub async fn save_mods(backend: Held<'_>, request: ModsSaveRequest) -> Answer<SaveOutcome> {
-    off_thread(&backend, move |backend| backend.save_mods(&request)).await
-}
-
-// --- the mods themselves --------------------------------------------------------------------------
-
-#[tauri::command]
-pub async fn published_mods(backend: Held<'_>, refresh: Option<bool>) -> Answer<ModFeedListing> {
-    off_thread_infallible(&backend, move |backend| {
-        backend.published_mods(refresh.unwrap_or(false))
-    })
-    .await
-}
-
-#[tauri::command]
-pub async fn mod_install_state(backend: Held<'_>, install: Install) -> Answer<ModInstallState> {
-    off_thread(&backend, move |backend| backend.mod_install_state(&install)).await
+pub async fn read_mod_listing(backend: Held<'_>, refresh: bool) -> Answer<AppView> {
+    off_thread(&backend, move |backend| backend.read_mod_listing(refresh)).await
 }
 
 #[tauri::command]
 pub async fn plan_mod(
     backend: Held<'_>,
-    install: Install,
     mod_id: String,
     choices: Option<Vec<String>>,
     answers: Option<BTreeMap<String, String>>,
     version: Option<String>,
 ) -> Answer<InstallPlan> {
     off_thread(&backend, move |backend| {
-        backend.plan_mod(
-            &install,
+        backend.plan_selected_mod(
             &mod_id,
             &choices.unwrap_or_default(),
             &answers.unwrap_or_default(),
@@ -187,22 +263,10 @@ pub async fn plan_mod(
 #[tauri::command]
 pub async fn install_mod(
     backend: Held<'_>,
-    install: Install,
-    mod_id: String,
-    fingerprint: String,
-    choices: Option<Vec<String>>,
-    answers: Option<BTreeMap<String, String>>,
-    version: Option<String>,
-) -> Answer<InstallOutcome> {
+    request: ModInstallRequest,
+) -> Answer<Answered<InstallReport>> {
     off_thread(&backend, move |backend| {
-        backend.install_mod(
-            &install,
-            &mod_id,
-            &fingerprint,
-            &choices.unwrap_or_default(),
-            &answers.unwrap_or_default(),
-            version.as_deref(),
-        )
+        backend.install_mod_and_read(&request)
     })
     .await
 }
@@ -220,119 +284,62 @@ pub async fn mod_versions(
 }
 
 #[tauri::command]
-pub async fn restore_mod(backend: Held<'_>, install: Install, mod_id: String) -> Answer<()> {
+pub async fn restore_mod(backend: Held<'_>, mod_id: String) -> Answer<AppView> {
     off_thread(&backend, move |backend| {
-        backend.restore_mod(&install, &mod_id)
+        backend.restore_mod_and_read(&mod_id)
     })
     .await
 }
 
 #[tauri::command]
-pub async fn remove_mod(backend: Held<'_>, install: Install, mod_id: String) -> Answer<ModRemoval> {
+pub async fn remove_mod(backend: Held<'_>, mod_id: String) -> Answer<AppView> {
     off_thread(&backend, move |backend| {
-        backend.remove_mod(&install, &mod_id)
+        backend.remove_mod_and_read(&mod_id)
     })
     .await
 }
 
 #[tauri::command]
-pub async fn mod_settings(backend: Held<'_>, install: Install) -> Answer<Vec<ModSettingsGroup>> {
-    off_thread(&backend, move |backend| backend.mod_settings(&install)).await
-}
-
-#[tauri::command]
-pub async fn open_mod_file(
-    backend: Held<'_>,
-    install: Install,
-    mod_id: String,
-    file: String,
-) -> Answer<()> {
+pub async fn open_mod_file(backend: Held<'_>, mod_id: String, file: String) -> Answer<()> {
     off_thread(&backend, move |backend| {
-        backend.open_mod_file(&install, &mod_id, &file)
+        backend.open_selected_mod_file(&mod_id, &file)
     })
     .await
 }
 
-// --- finding installs -----------------------------------------------------------------------------
-
+/// Not off the thread: a pure rule over what the caller already holds.
 #[tauri::command]
-pub async fn identify_install(backend: Held<'_>, path: String) -> Answer<Option<GameType>> {
-    off_thread_infallible(&backend, move |backend| backend.identify_install(&path)).await
-}
-
-#[tauri::command]
-pub async fn scan_for_installs(backend: Held<'_>, known: Vec<Install>) -> Answer<Vec<Install>> {
-    off_thread_infallible(&backend, move |backend| backend.scan_for_installs(&known)).await
-}
-
-// --- sfall ----------------------------------------------------------------------------------------
-
-#[tauri::command]
-pub async fn installed_sfall_version(
-    backend: Held<'_>,
-    install: Install,
-) -> Answer<Option<String>> {
-    off_thread(&backend, move |backend| {
-        backend.installed_sfall_version(&install)
-    })
-    .await
-}
-
-#[tauri::command]
-pub async fn latest_sfall(backend: Held<'_>) -> Answer<SfallRelease> {
-    off_thread(&backend, Backend::latest_sfall).await
-}
-
-#[tauri::command]
-pub async fn update_sfall(
-    backend: Held<'_>,
-    install: Install,
-    version: String,
-) -> Answer<SfallUpdate> {
-    off_thread(&backend, move |backend| {
-        backend.update_sfall(&install, &version)
-    })
-    .await
-}
-
-#[tauri::command]
-pub async fn list_sfall_versions(backend: Held<'_>) -> Answer<Vec<String>> {
-    off_thread(&backend, Backend::list_sfall_versions).await
+pub fn toggle_mod_part(
+    groups: Vec<ChoiceGroup<ModPart>>,
+    chosen: Vec<String>,
+    id: String,
+    on: bool,
+) -> Vec<String> {
+    toggle_option(&groups, &chosen, &id, on)
 }
 
 // --- the alternative engines ----------------------------------------------------------------------
-
-#[tauri::command]
-pub async fn machine_engines(backend: Held<'_>) -> Answer<Vec<EngineListing>> {
-    off_thread(&backend, Backend::machine_engines).await
-}
-
-#[tauri::command]
-pub async fn deployed_engines(backend: Held<'_>, install: Install) -> Answer<Vec<InstalledEngine>> {
-    off_thread(&backend, move |backend| backend.deployed_engines(&install)).await
-}
-
-#[tauri::command]
-pub async fn engine_releases(backend: Held<'_>, engine_id: String) -> Answer<Vec<EngineRelease>> {
-    off_thread(&backend, move |backend| backend.engine_releases(&engine_id)).await
-}
 
 #[tauri::command]
 pub async fn fetch_engine(
     backend: Held<'_>,
     engine_id: String,
     published: Option<String>,
-) -> Answer<EngineRelease> {
+) -> Answer<Answered<EngineRelease>> {
     off_thread(&backend, move |backend| {
-        backend.fetch_engine(&engine_id, published.as_deref())
+        backend.fetch_engine_and_list(&engine_id, published.as_deref())
     })
     .await
 }
 
 #[tauri::command]
-pub async fn forget_engine(backend: Held<'_>, engine_id: String, published: String) -> Answer<()> {
+pub async fn forget_engine(
+    backend: Held<'_>,
+    engine_id: String,
+    published: String,
+) -> Answer<AppView> {
     off_thread(&backend, move |backend| {
-        backend.forget_engine(&engine_id, &published)
+        backend.forget_engine_and_list(&engine_id, &published)
     })
     .await
 }
@@ -340,59 +347,19 @@ pub async fn forget_engine(backend: Held<'_>, engine_id: String, published: Stri
 #[tauri::command]
 pub async fn use_engine_build(
     backend: Held<'_>,
-    install: Install,
     engine_id: String,
     pick: BuildPick,
-) -> Answer<()> {
+) -> Answer<AppView> {
     off_thread(&backend, move |backend| {
-        backend.use_engine_build(&install, &engine_id, &pick)
-    })
-    .await
-}
-
-// --- the rest -------------------------------------------------------------------------------------
-
-#[tauri::command]
-pub async fn installed_hires_version(
-    backend: Held<'_>,
-    install: Install,
-) -> Answer<Option<String>> {
-    off_thread(&backend, move |backend| {
-        backend.installed_hires_version(&install)
+        backend.use_engine_build_here(&engine_id, &pick)
     })
     .await
 }
 
 #[tauri::command]
-pub async fn latest_zax(backend: Held<'_>) -> Answer<ZaxRelease> {
-    off_thread(&backend, Backend::latest_zax).await
-}
-
-#[tauri::command]
-pub async fn list_saves(backend: Held<'_>, install: Install) -> Answer<Vec<String>> {
-    off_thread(&backend, move |backend| backend.list_saves(&install)).await
-}
-
-#[tauri::command]
-pub async fn create_debug_package(
-    backend: Held<'_>,
-    install: Install,
-    saves: Vec<String>,
-) -> Answer<DebugPackage> {
+pub async fn order_swap(backend: Held<'_>, engine_id: Option<String>) -> Answer<Option<OrderSwap>> {
     off_thread(&backend, move |backend| {
-        backend.create_debug_package(&install, &saves)
-    })
-    .await
-}
-
-#[tauri::command]
-pub async fn order_swap(
-    backend: Held<'_>,
-    install: Install,
-    engine_id: Option<String>,
-) -> Answer<Option<OrderSwap>> {
-    off_thread(&backend, move |backend| {
-        backend.order_swap(&install, engine_id.as_deref())
+        backend.selected_order_swap(engine_id.as_deref())
     })
     .await
 }
@@ -400,18 +367,26 @@ pub async fn order_swap(
 #[tauri::command]
 pub async fn launch(
     backend: Held<'_>,
-    install: Install,
-    sfall_version: Option<String>,
     engine_id: Option<String>,
     pick: Option<BuildPick>,
-) -> Answer<()> {
+) -> Answer<AppView> {
     off_thread(&backend, move |backend| {
-        backend.launch(
-            &install,
-            sfall_version.as_deref(),
-            engine_id.as_deref(),
-            pick.as_ref(),
-        )
+        backend.launch_selected(engine_id.as_deref(), pick.as_ref())
+    })
+    .await
+}
+
+// --- the rest -------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn list_saves(backend: Held<'_>) -> Answer<Vec<String>> {
+    off_thread(&backend, Backend::selected_saves).await
+}
+
+#[tauri::command]
+pub async fn create_debug_package(backend: Held<'_>, saves: Vec<String>) -> Answer<DebugPackage> {
+    off_thread(&backend, move |backend| {
+        backend.selected_debug_package(&saves)
     })
     .await
 }

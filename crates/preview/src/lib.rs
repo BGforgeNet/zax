@@ -10,14 +10,20 @@
 //! Everything that only touches files works for real, against the seeded fixture.
 
 pub mod fixture;
+#[cfg(test)]
+mod session_tests;
 
 use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
 use zax_core::stamp::{LocalTime, Utc};
-use zax_fallout2::backend::{Backend, OpenTarget, OperationProgress, Shell, WipeTarget};
+use zax_fallout2::backend::{
+    Backend, ModInstallRequest, OpenTarget, OperationProgress, OrderEdit, Shell, WipeTarget,
+};
+use zax_fallout2::catalog_view::{catalog_view, search_settings};
 use zax_fallout2::engine_choice::BuildPick;
-use zax_fallout2::reconcile_settings::HeldTarget;
+use zax_fallout2::manifest::ModPart;
+use zax_fallout2::mod_choice::{ChoiceGroup, toggle_option};
 use zax_platform::{Platform, Result};
 
 use crate::fixture::{PREVIEW_REASON, preview_platform};
@@ -98,6 +104,9 @@ impl Shell for PreviewShell {
 pub struct Preview {
     backend: Backend,
     shell: Arc<PreviewShell>,
+    /// The machine itself, for a test that changes a file underneath the interface.
+    #[cfg(test)]
+    platform: Arc<fixture::PreviewPlatform>,
 }
 
 /// Every argument shape a command takes, read from the object the interface sends.
@@ -108,27 +117,35 @@ pub struct Preview {
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 struct Arguments {
+    version: Option<String>,
+    query: Option<String>,
     holding: Option<String>,
-    state: Option<zax_core::state::AppState>,
-    install_path: Option<String>,
-    request: Option<serde_json::Value>,
-    at: Option<Vec<HeldTarget>>,
-    install: Option<zax_core::install::Install>,
+    path: Option<String>,
+    name: Option<String>,
+    wine: Option<zax_core::install::WineConfig>,
+    theme: Option<zax_core::install::Theme>,
+    on: Option<bool>,
+    engine_id: Option<String>,
+    id: Option<String>,
+    value: Option<String>,
+    percent: Option<f64>,
+    ids: Option<Vec<String>>,
+    all: Option<bool>,
+    action_id: Option<String>,
+    group: Option<String>,
+    edit: Option<OrderEdit>,
     refresh: Option<bool>,
     mod_id: Option<String>,
     choices: Option<Vec<String>>,
     answers: Option<std::collections::BTreeMap<String, String>>,
-    version: Option<String>,
-    fingerprint: Option<String>,
+    request: Option<ModInstallRequest>,
     above: Option<String>,
     file: Option<String>,
-    path: Option<String>,
-    known: Option<Vec<zax_core::install::Install>>,
-    engine_id: Option<String>,
+    groups: Option<Vec<ChoiceGroup<ModPart>>>,
+    chosen: Option<Vec<String>>,
     published: Option<String>,
     pick: Option<BuildPick>,
     saves: Option<Vec<String>>,
-    sfall_version: Option<String>,
     target: Option<OpenTarget>,
     which: Option<WipeTarget>,
 }
@@ -144,6 +161,13 @@ fn needed<T>(held: Option<T>, name: &str) -> std::result::Result<T, String> {
     held.ok_or_else(|| format!("The preview was called without \"{name}\"."))
 }
 
+/// An operation's answer as JSON, or its refusal as the sentence the interface shows.
+fn answered<T: serde::Serialize>(outcome: Result<T>) -> Answer {
+    outcome
+        .map_err(|err| err.to_string())
+        .and_then(|value| json(&value))
+}
+
 impl Preview {
     /// A fresh machine, seeded.
     ///
@@ -154,10 +178,13 @@ impl Preview {
         let shell = Arc::new(PreviewShell {
             listeners: Mutex::new(Vec::new()),
         });
-        let platform: Arc<dyn Platform> = Arc::new(preview_platform()?);
+        let machine = Arc::new(preview_platform()?);
+        let platform: Arc<dyn Platform> = Arc::clone(&machine) as Arc<dyn Platform>;
         Ok(Self {
             backend: Backend::new(platform, Arc::clone(&shell) as Arc<dyn Shell>),
             shell,
+            #[cfg(test)]
+            platform: machine,
         })
     }
 
@@ -189,203 +216,101 @@ impl Preview {
                 .map_err(|err| format!("The preview could not read the arguments: {err}"))?
         };
         let backend = &self.backend;
-        let said = |err: zax_platform::Error| err.to_string();
+        let wine = backend.describe().os != zax_platform::OperatingSystem::Windows;
         match name {
-            "describe" => json(&backend.describe()),
-            "choose_folder" => backend
-                .choose_folder(held.holding.as_deref())
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "load_state" => backend.load_state().map_err(said).and_then(|at| json(&at)),
-            "save_state" => backend
-                .save_state(&needed(held.state, "state")?)
-                .map_err(said)
-                .and_then(|()| json(&())),
-            "load_config_files" => backend
-                .load_config_files(&needed(held.install_path, "installPath")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "save_config_files" => {
-                let request = serde_json::from_value(needed(held.request, "request")?)
-                    .map_err(|err| format!("The preview could not read the request: {err}"))?;
-                backend
-                    .save_config_files(&request)
-                    .map_err(said)
-                    .and_then(|at| json(&at))
+            "start" => answered(backend.start(&needed(held.version, "version")?)),
+            "view" => json(&backend.view()),
+            "catalog" => json(catalog_view()),
+            "search" => json(&search_settings(&needed(held.query, "query")?, wine)),
+            "choose_folder" => answered(backend.choose_folder(held.holding.as_deref())),
+            "select_install" => answered(backend.select_install(&needed(held.path, "path")?)),
+            "refresh" => answered(backend.refresh()),
+            "add_install" => answered(backend.add_install(&needed(held.path, "path")?)),
+            "remove_install" => answered(backend.remove_install(&needed(held.path, "path")?)),
+            "set_alias" => answered(
+                backend.set_alias(&needed(held.path, "path")?, &needed(held.name, "name")?),
+            ),
+            "set_wine" => {
+                answered(backend.set_wine(&needed(held.path, "path")?, &needed(held.wine, "wine")?))
             }
-            "settings_base" => backend
-                .settings_base(&needed(held.install_path, "installPath")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "accept_settings_base" => backend
-                .accept_settings_base(
-                    &needed(held.install_path, "installPath")?,
-                    &needed(held.at, "at")?,
-                )
-                .map_err(said)
-                .and_then(|()| json(&())),
-            "load_mods" => backend
-                .load_mods(&needed(held.install, "install")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "save_mods" => {
-                let request = serde_json::from_value(needed(held.request, "request")?)
-                    .map_err(|err| format!("The preview could not read the request: {err}"))?;
-                backend
-                    .save_mods(&request)
-                    .map_err(said)
-                    .and_then(|at| json(&at))
+            "set_theme" => answered(backend.set_theme(needed(held.theme, "theme")?)),
+            "set_autosave" => answered(backend.set_autosave(needed(held.on, "on")?)),
+            "accept_caution" => {
+                answered(backend.accept_caution(&needed(held.engine_id, "engineId")?))
             }
-            "published_mods" => json(&backend.published_mods(held.refresh.unwrap_or(false))),
-            "mod_install_state" => backend
-                .mod_install_state(&needed(held.install, "install")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "plan_mod" => backend
-                .plan_mod(
-                    &needed(held.install, "install")?,
-                    &needed(held.mod_id, "modId")?,
-                    &held.choices.unwrap_or_default(),
-                    &held.answers.unwrap_or_default(),
-                    held.version.as_deref(),
-                )
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "install_mod" => backend
-                .install_mod(
-                    &needed(held.install, "install")?,
-                    &needed(held.mod_id, "modId")?,
-                    &needed(held.fingerprint, "fingerprint")?,
-                    &held.choices.unwrap_or_default(),
-                    &held.answers.unwrap_or_default(),
-                    held.version.as_deref(),
-                )
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "mod_versions" => backend
-                .mod_versions(&needed(held.mod_id, "modId")?, held.above.as_deref())
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "restore_mod" => backend
-                .restore_mod(
-                    &needed(held.install, "install")?,
-                    &needed(held.mod_id, "modId")?,
-                )
-                .map_err(said)
-                .and_then(|()| json(&())),
-            "remove_mod" => backend
-                .remove_mod(
-                    &needed(held.install, "install")?,
-                    &needed(held.mod_id, "modId")?,
-                )
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "mod_settings" => backend
-                .mod_settings(&needed(held.install, "install")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "open_mod_file" => backend
-                .open_mod_file(
-                    &needed(held.install, "install")?,
-                    &needed(held.mod_id, "modId")?,
-                    &needed(held.file, "file")?,
-                )
-                .map_err(said)
-                .and_then(|()| json(&())),
-            "identify_install" => json(&backend.identify_install(&needed(held.path, "path")?)),
-            "scan_for_installs" => {
-                json(&backend.scan_for_installs(&held.known.unwrap_or_default()))
+            "scan" => answered(backend.scan()),
+            "set_setting" => answered(
+                backend.set_setting(&needed(held.id, "id")?, &needed(held.value, "value")?),
+            ),
+            "set_percent" => answered(
+                backend.set_percent(&needed(held.id, "id")?, needed(held.percent, "percent")?),
+            ),
+            "revert_settings" => answered(
+                backend.revert_settings(&held.ids.unwrap_or_default(), needed(held.all, "all")?),
+            ),
+            "apply_action" => answered(backend.apply_action(&needed(held.action_id, "actionId")?)),
+            "satisfy_gate" => {
+                answered(backend.satisfy_gate(&needed(held.id, "id")?, held.group.as_deref()))
             }
-            "installed_sfall_version" => backend
-                .installed_sfall_version(&needed(held.install, "install")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "latest_sfall" => backend
-                .latest_sfall()
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "update_sfall" => backend
-                .update_sfall(
-                    &needed(held.install, "install")?,
-                    &needed(held.version, "version")?,
-                )
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "list_sfall_versions" => backend
-                .list_sfall_versions()
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "machine_engines" => backend
-                .machine_engines()
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "deployed_engines" => backend
-                .deployed_engines(&needed(held.install, "install")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "engine_releases" => backend
-                .engine_releases(&needed(held.engine_id, "engineId")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "fetch_engine" => backend
-                .fetch_engine(
-                    &needed(held.engine_id, "engineId")?,
-                    held.published.as_deref(),
-                )
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "forget_engine" => backend
-                .forget_engine(
-                    &needed(held.engine_id, "engineId")?,
-                    &needed(held.published, "published")?,
-                )
-                .map_err(said)
-                .and_then(|()| json(&())),
-            "use_engine_build" => backend
-                .use_engine_build(
-                    &needed(held.install, "install")?,
-                    &needed(held.engine_id, "engineId")?,
-                    &needed(held.pick, "pick")?,
-                )
-                .map_err(said)
-                .and_then(|()| json(&())),
-            "installed_hires_version" => backend
-                .installed_hires_version(&needed(held.install, "install")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "latest_zax" => backend.latest_zax().map_err(said).and_then(|at| json(&at)),
-            "list_saves" => backend
-                .list_saves(&needed(held.install, "install")?)
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "create_debug_package" => backend
-                .create_debug_package(
-                    &needed(held.install, "install")?,
-                    &held.saves.unwrap_or_default(),
-                )
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "order_swap" => backend
-                .order_swap(&needed(held.install, "install")?, held.engine_id.as_deref())
-                .map_err(said)
-                .and_then(|at| json(&at)),
-            "launch" => backend
-                .launch(
-                    &needed(held.install, "install")?,
-                    held.sfall_version.as_deref(),
-                    held.engine_id.as_deref(),
-                    held.pick.as_ref(),
-                )
-                .map_err(said)
-                .and_then(|()| json(&())),
-            "open" => backend
-                .open(&needed(held.target, "target")?)
-                .map_err(said)
-                .and_then(|()| json(&())),
-            "wipe" => backend
-                .wipe(needed(held.which, "which")?)
-                .map_err(said)
-                .and_then(|()| json(&())),
+            "choose_linked" => answered(
+                backend.choose_linked(&needed(held.id, "id")?, &needed(held.value, "value")?),
+            ),
+            "edit_order" => answered(backend.edit_order(&needed(held.edit, "edit")?)),
+            "save" => answered(backend.save()),
+            "check_zax" => answered(backend.check_zax()),
+            "check_sfall" => answered(backend.check_sfall()),
+            "check_engine" => answered(backend.check_engine(&needed(held.engine_id, "engineId")?)),
+            "list_sfall_versions" => answered(backend.list_sfall_versions()),
+            "change_sfall" => answered(backend.change_sfall(held.version.as_deref())),
+            "read_mod_listing" => {
+                answered(backend.read_mod_listing(needed(held.refresh, "refresh")?))
+            }
+            "plan_mod" => answered(backend.plan_selected_mod(
+                &needed(held.mod_id, "modId")?,
+                &held.choices.unwrap_or_default(),
+                &held.answers.unwrap_or_default(),
+                held.version.as_deref(),
+            )),
+            "install_mod" => {
+                answered(backend.install_mod_and_read(&needed(held.request, "request")?))
+            }
+            "mod_versions" => answered(
+                backend.mod_versions(&needed(held.mod_id, "modId")?, held.above.as_deref()),
+            ),
+            "restore_mod" => answered(backend.restore_mod_and_read(&needed(held.mod_id, "modId")?)),
+            "remove_mod" => answered(backend.remove_mod_and_read(&needed(held.mod_id, "modId")?)),
+            "open_mod_file" => answered(backend.open_selected_mod_file(
+                &needed(held.mod_id, "modId")?,
+                &needed(held.file, "file")?,
+            )),
+            "toggle_mod_part" => json(&toggle_option(
+                &needed(held.groups, "groups")?,
+                &needed(held.chosen, "chosen")?,
+                &needed(held.id, "id")?,
+                needed(held.on, "on")?,
+            )),
+            "fetch_engine" => answered(backend.fetch_engine_and_list(
+                &needed(held.engine_id, "engineId")?,
+                held.published.as_deref(),
+            )),
+            "forget_engine" => answered(backend.forget_engine_and_list(
+                &needed(held.engine_id, "engineId")?,
+                &needed(held.published, "published")?,
+            )),
+            "use_engine_build" => answered(backend.use_engine_build_here(
+                &needed(held.engine_id, "engineId")?,
+                &needed(held.pick, "pick")?,
+            )),
+            "order_swap" => answered(backend.selected_order_swap(held.engine_id.as_deref())),
+            "launch" => {
+                answered(backend.launch_selected(held.engine_id.as_deref(), held.pick.as_ref()))
+            }
+            "list_saves" => answered(backend.selected_saves()),
+            "create_debug_package" => {
+                answered(backend.selected_debug_package(&held.saves.unwrap_or_default()))
+            }
+            "open" => answered(backend.open(&needed(held.target, "target")?)),
+            "wipe" => answered(backend.wipe(needed(held.which, "which")?)),
             "cancel" => {
                 backend.cancel();
                 json(&())
@@ -397,43 +322,49 @@ impl Preview {
 
 /// The names the dispatcher answers, which is what a test compares against the shell's own list.
 pub const PREVIEW_COMMANDS: &[&str] = &[
-    "describe",
+    "start",
+    "view",
+    "catalog",
+    "search",
     "choose_folder",
-    "load_state",
-    "save_state",
-    "load_config_files",
-    "save_config_files",
-    "settings_base",
-    "accept_settings_base",
-    "load_mods",
-    "save_mods",
-    "published_mods",
-    "mod_install_state",
+    "select_install",
+    "refresh",
+    "add_install",
+    "remove_install",
+    "set_alias",
+    "set_wine",
+    "set_theme",
+    "set_autosave",
+    "accept_caution",
+    "scan",
+    "set_setting",
+    "set_percent",
+    "revert_settings",
+    "apply_action",
+    "satisfy_gate",
+    "choose_linked",
+    "edit_order",
+    "save",
+    "check_zax",
+    "check_sfall",
+    "check_engine",
+    "list_sfall_versions",
+    "change_sfall",
+    "read_mod_listing",
     "plan_mod",
     "install_mod",
     "mod_versions",
     "restore_mod",
     "remove_mod",
-    "mod_settings",
     "open_mod_file",
-    "identify_install",
-    "scan_for_installs",
-    "installed_sfall_version",
-    "latest_sfall",
-    "update_sfall",
-    "list_sfall_versions",
-    "machine_engines",
-    "deployed_engines",
-    "engine_releases",
+    "toggle_mod_part",
     "fetch_engine",
     "forget_engine",
     "use_engine_build",
-    "installed_hires_version",
-    "latest_zax",
-    "list_saves",
-    "create_debug_package",
     "order_swap",
     "launch",
+    "list_saves",
+    "create_debug_package",
     "open",
     "wipe",
     "cancel",
@@ -499,7 +430,7 @@ mod tests {
 
     #[test]
     fn the_machine_describes_itself() {
-        let held = preview().invoke("describe", "").expect("an answer");
+        let held = preview().invoke("view", "").expect("an answer")["machine"].clone();
         assert_eq!(held["os"], "linux");
         assert!(
             held["logFile"]
@@ -509,13 +440,32 @@ mod tests {
         );
     }
 
+    /// A preview that has started, as the interface leaves it after its first call.
+    fn started() -> (Preview, serde_json::Value) {
+        let held = preview();
+        let view = held
+            .invoke("start", r#"{"version":"0.8.0"}"#)
+            .expect("a start")["view"]
+            .clone();
+        (held, view)
+    }
+
     #[test]
-    fn the_state_the_interface_opens_on_comes_back() {
-        let held = preview().invoke("load_state", "{}").expect("an answer");
-        let installs = held["state"]["installs"].as_array().expect("a list");
+    fn starting_opens_on_the_first_install_with_its_files_read() {
+        let (_, view) = started();
+        let installs = view["installs"].as_array().expect("a list");
         assert_eq!(installs.len(), 6);
-        assert_eq!(installs[0]["path"], fixture::PREVIEW_INSTALL);
+        assert_eq!(view["selected"], fixture::PREVIEW_INSTALL);
         assert_eq!(installs[0]["type"], "fallout2up");
+        let reading = &view["reading"];
+        assert_eq!(reading["path"], fixture::PREVIEW_INSTALL);
+        assert!(
+            reading["files"]
+                .as_array()
+                .is_some_and(|files| files.iter().any(|one| one == "ddraw.ini")),
+            "{reading}"
+        );
+        assert_eq!(reading["order"]["format"], "sfall");
     }
 
     #[test]
@@ -528,54 +478,30 @@ mod tests {
 
     #[test]
     fn an_argument_the_command_needs_is_named_when_it_is_missing() {
-        let err = preview().invoke("load_mods", "{}").expect_err("no install");
-        assert!(err.contains("\"install\""), "{err}");
+        let err = preview()
+            .invoke("select_install", "{}")
+            .expect_err("no path");
+        assert!(err.contains("\"path\""), "{err}");
     }
 
     #[test]
     fn an_argument_spelled_wrongly_fails_rather_than_arriving_as_nothing() {
         let err = preview()
-            .invoke("load_mods", r#"{"instal":{"path":"x","type":"fallout2"}}"#)
+            .invoke("select_install", r#"{"pth":"x"}"#)
             .expect_err("an unknown field");
         assert!(err.contains("could not read the arguments"), "{err}");
     }
 
     #[test]
-    fn the_mods_folder_is_read_for_real() {
-        let held = preview()
-            .invoke(
-                "load_mods",
-                &format!(
-                    r#"{{"install":{{"path":"{}","type":"fallout2up"}}}}"#,
-                    fixture::PREVIEW_INSTALL
-                ),
-            )
-            .expect("an answer");
-        assert_eq!(held["format"], "sfall");
-        assert!(
-            held["text"]
-                .as_str()
-                .is_some_and(|at| at.contains("fo2tweaks.dat"))
-        );
-    }
-
-    #[test]
     fn what_cannot_be_simulated_honestly_is_refused() {
         // A recorded launch that never happened reads as success.
-        let err = preview()
-            .invoke(
-                "launch",
-                &format!(
-                    r#"{{"install":{{"path":"{}","type":"fallout2up"}},"sfallVersion":null,"engineId":null,"pick":null}}"#,
-                    fixture::PREVIEW_INSTALL
-                ),
-            )
+        let (held, _) = started();
+        let err = held
+            .invoke("launch", r#"{"engineId":null,"pick":null}"#)
             .expect_err("nothing to start");
         assert!(!err.is_empty());
         // And so is a folder picker a browser does not have.
-        let err = preview()
-            .invoke("choose_folder", "{}")
-            .expect_err("no picker");
+        let err = held.invoke("choose_folder", "{}").expect_err("no picker");
         assert!(err.contains("browser preview"), "{err}");
     }
 
@@ -583,13 +509,21 @@ mod tests {
     fn the_feeds_are_read_for_real_from_the_captured_listings() {
         // A listing states what exists and does nothing with it, so a real capture of one is not the
         // invented version number the rest of this seam refuses to produce.
-        let held = preview().invoke("published_mods", "{}").expect("an answer");
-        let published = held["published"].as_array().expect("a list");
-        assert!(!published.is_empty(), "{held}");
-        assert!(
-            published.iter().any(|one| one["id"] == "fo2tweaks"),
-            "{held}"
-        );
+        let (held, _) = started();
+        let view = held
+            .invoke("read_mod_listing", r#"{"refresh":false}"#)
+            .expect("an answer");
+        let offers = view["reading"]["modListing"]["offers"]
+            .as_array()
+            .expect("a listing");
+        assert!(offers.iter().any(|one| one["id"] == "fo2tweaks"), "{view}");
+    }
+
+    #[test]
+    fn a_later_answer_carries_a_higher_revision() {
+        let (held, first) = started();
+        let second = held.invoke("view", "{}").expect("a view");
+        assert!(second["revision"].as_u64() > first["revision"].as_u64());
     }
 
     #[test]

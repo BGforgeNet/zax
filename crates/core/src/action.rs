@@ -8,7 +8,11 @@ use std::collections::BTreeMap;
 /// Declared on the action rather than listed by the panel that shows it: a panel holding its own
 /// list of ids silently drops any action added afterwards, which is how one of these came to exist
 /// in the catalog and appear nowhere in the interface.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, ts_rs::TS,
+)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
+#[serde(rename_all = "lowercase")]
 pub enum ActionGroup {
     Report,
     Fix,
@@ -18,12 +22,15 @@ pub enum ActionGroup {
 ///
 /// It belongs to the install's own record rather than to a config file, so it is written at once
 /// where the targets stay pending.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
 pub struct WineSetting {
     pub debug: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
+#[serde(rename_all = "camelCase")]
 pub struct Action {
     pub id: String,
     pub label: String,

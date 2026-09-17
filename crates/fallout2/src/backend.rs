@@ -68,6 +68,13 @@ use crate::mods::{
 };
 use crate::reconcile_settings::{HeldTarget, address, address_of};
 use crate::records::{InstalledEngine, load_record, reconcile_record, save_record};
+mod app;
+
+pub use app::{
+    Answered, AppView, InstallReport, ModInstallRequest, OrderEdit, ReadingView, SaveRefusal,
+    Started,
+};
+
 use crate::sfall::{
     SfallProgress, SfallRelease, SfallUpdate, installed_sfall_version, latest_sfall,
     list_sfall_versions, update_sfall,
@@ -387,6 +394,8 @@ pub struct Backend {
     /// while one runs, and cleared as it is used so a click that arrives late cannot reach whatever
     /// started next.
     running: Mutex<Option<Arc<ReportState>>>,
+    /// What the interface is showing and editing - see `app`.
+    held: Mutex<app::Held>,
 }
 
 impl std::fmt::Debug for Backend {
@@ -419,6 +428,7 @@ impl Backend {
             shell,
             feeds: Mutex::new(None),
             running: Mutex::new(None),
+            held: Mutex::new(app::Held::default()),
         }
     }
 
@@ -470,6 +480,15 @@ impl Backend {
         let read = HeldFeeds { listing, releases };
         *held = Some(read.clone());
         read
+    }
+
+    /// The feeds where something has read them, and nothing otherwise - for a reading of an install,
+    /// which must not reach the network on its own initiative.
+    fn feeds_if_read(&self) -> Option<HeldFeeds> {
+        self.feeds
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// The same, for the two callers asking after the feeds themselves rather than needing a release

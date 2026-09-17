@@ -119,9 +119,91 @@ pub fn choose_from<'a, T: ChoiceOption>(
         .collect())
 }
 
+/// A selection with one option ticked or unticked. A one-of group's other options go off with it, which
+/// is what makes it one, and so does anything that needs what was just unticked: a selection the install
+/// would only refuse is not a state for the dialog to sit in.
+#[must_use]
+pub fn toggle_option<T: ChoiceOption>(
+    groups: &[ChoiceGroup<T>],
+    chosen: &[String],
+    id: &str,
+    on: bool,
+) -> Vec<String> {
+    let Some(group) = groups
+        .iter()
+        .find(|group| group.options.iter().any(|option| option.id() == id))
+    else {
+        return chosen.to_vec();
+    };
+    let cleared: Vec<&str> = if group.pick == Pick::One {
+        group.options.iter().map(ChoiceOption::id).collect()
+    } else {
+        vec![id]
+    };
+    let mut out: Vec<String> = chosen
+        .iter()
+        .filter(|picked| !cleared.contains(&picked.as_str()))
+        .cloned()
+        .collect();
+    if on {
+        out.push(id.to_owned());
+    }
+    let options: Vec<&T> = groups.iter().flat_map(|group| &group.options).collect();
+    loop {
+        let kept: Vec<String> = out
+            .iter()
+            .filter(|picked| {
+                options
+                    .iter()
+                    .find(|option| option.id() == picked.as_str())
+                    .and_then(|option| option.needs())
+                    .is_none_or(|needed| out.iter().any(|held| held == needed))
+            })
+            .cloned()
+            .collect();
+        if kept.len() == out.len() {
+            return out;
+        }
+        out = kept;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unticking_a_part_takes_what_needs_it_and_a_one_of_group_stays_at_one() {
+        let option = |id: &str, needs: Option<&str>| Option_ {
+            id: id.to_owned(),
+            label: id.to_owned(),
+            needs: needs.map(str::to_owned),
+        };
+        let groups = vec![
+            ChoiceGroup {
+                label: "Head".to_owned(),
+                pick: Pick::One,
+                options: vec![option("a", None), option("b", None)],
+            },
+            ChoiceGroup {
+                label: "Extras".to_owned(),
+                pick: Pick::Any,
+                options: vec![
+                    option("voices", Some("a")),
+                    option("deeper", Some("voices")),
+                ],
+            },
+        ];
+        let held = |ids: &[&str]| ids.iter().map(|one| (*one).to_owned()).collect::<Vec<_>>();
+        assert_eq!(
+            toggle_option(&groups, &held(&["a", "voices", "deeper"]), "b", true),
+            held(&["b"])
+        );
+        assert_eq!(
+            toggle_option(&groups, &held(&["a"]), "voices", true),
+            held(&["a", "voices"])
+        );
+    }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct Option_ {

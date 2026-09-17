@@ -34,9 +34,22 @@ pub fn settings() -> &'static [SettingDef] {
 }
 
 /// One setting by id, or `None` where nothing carries it.
+///
+/// Indexed once: the interface's rows ask for a setting several times each, for every row, on every
+/// edit, and a scan per ask multiplied out to most of the time an edit took.
 #[must_use]
 pub fn setting(id: &str) -> Option<&'static SettingDef> {
-    settings().iter().find(|def| def.id == id)
+    static BY_ID: OnceLock<std::collections::HashMap<&'static str, &'static SettingDef>> =
+        OnceLock::new();
+    BY_ID
+        .get_or_init(|| {
+            settings()
+                .iter()
+                .map(|def| (def.id.as_str(), def))
+                .collect()
+        })
+        .get(id)
+        .copied()
 }
 
 #[cfg(test)]

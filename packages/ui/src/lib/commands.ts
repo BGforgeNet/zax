@@ -8,77 +8,81 @@
  *
  * `invoke` takes its arguments as an object and converts each key from camelCase to the snake_case the
  * Rust parameter is named, which is why the objects below read the way they do.
+ *
+ * The state the interface draws lives on the other side. Most commands answer the whole view, or the
+ * rows of it that changed, and the store is what lays that answer over the view it holds.
  */
 
 import { invoke } from "./invoke.js";
 
-import type { AppState } from "./bindings/AppState";
+import type { Answered } from "./bindings/Answered";
+import type { AppView } from "./bindings/AppView";
 import type { BuildPick } from "./bindings/BuildPick";
+import type { CatalogView } from "./bindings/CatalogView";
+import type { ChoiceGroup } from "./bindings/ChoiceGroup";
 import type { DebugPackage } from "./bindings/DebugPackage";
-import type { EngineListing } from "./bindings/EngineListing";
 import type { EngineRelease } from "./bindings/EngineRelease";
-import type { GameType } from "./bindings/GameType";
-import type { HeldTarget } from "./bindings/HeldTarget";
-import type { Install } from "./bindings/Install";
-import type { InstallOutcome } from "./bindings/InstallOutcome";
 import type { InstallPlan } from "./bindings/InstallPlan";
-import type { InstalledEngine } from "./bindings/InstalledEngine";
-import type { LoadedState } from "./bindings/LoadedState";
-import type { MachineDescription } from "./bindings/MachineDescription";
-import type { ModFeedListing } from "./bindings/ModFeedListing";
-import type { ModInstallState } from "./bindings/ModInstallState";
-import type { ModRemoval } from "./bindings/ModRemoval";
-import type { ModSettingsGroup } from "./bindings/ModSettingsGroup";
-import type { ModsSaveRequest } from "./bindings/ModsSaveRequest";
-import type { ModsSnapshot } from "./bindings/ModsSnapshot";
+import type { InstallReport } from "./bindings/InstallReport";
+import type { ModInstallRequest } from "./bindings/ModInstallRequest";
+import type { ModPart } from "./bindings/ModPart";
 import type { OpenTarget } from "./bindings/OpenTarget";
+import type { OrderEdit } from "./bindings/OrderEdit";
 import type { OrderSwap } from "./bindings/OrderSwap";
-import type { SaveOutcome } from "./bindings/SaveOutcome";
-import type { SaveRequest } from "./bindings/SaveRequest";
-import type { SfallRelease } from "./bindings/SfallRelease";
+import type { Requirement } from "./bindings/Requirement";
+import type { SaveRefusal } from "./bindings/SaveRefusal";
+import type { SearchResults } from "./bindings/SearchResults";
 import type { SfallUpdate } from "./bindings/SfallUpdate";
+import type { Started } from "./bindings/Started";
+import type { Theme } from "./bindings/Theme";
+import type { WineConfig } from "./bindings/WineConfig";
 import type { WipeTarget } from "./bindings/WipeTarget";
-import type { ZaxRelease } from "./bindings/ZaxRelease";
 
 /** Every command name, which is what the guard test compares against the shell's own list. */
 export const COMMANDS = [
-  "describe",
+  "start",
+  "view",
+  "catalog",
+  "search",
   "choose_folder",
-  "load_state",
-  "save_state",
-  "load_config_files",
-  "save_config_files",
-  "settings_base",
-  "accept_settings_base",
-  "load_mods",
-  "save_mods",
-  "published_mods",
-  "mod_install_state",
+  "select_install",
+  "refresh",
+  "add_install",
+  "remove_install",
+  "set_alias",
+  "set_wine",
+  "set_theme",
+  "set_autosave",
+  "accept_caution",
+  "scan",
+  "set_setting",
+  "set_percent",
+  "revert_settings",
+  "apply_action",
+  "satisfy_gate",
+  "choose_linked",
+  "edit_order",
+  "save",
+  "check_zax",
+  "check_sfall",
+  "check_engine",
+  "list_sfall_versions",
+  "change_sfall",
+  "read_mod_listing",
   "plan_mod",
   "install_mod",
   "mod_versions",
   "restore_mod",
   "remove_mod",
-  "mod_settings",
   "open_mod_file",
-  "identify_install",
-  "scan_for_installs",
-  "installed_sfall_version",
-  "latest_sfall",
-  "update_sfall",
-  "list_sfall_versions",
-  "machine_engines",
-  "deployed_engines",
-  "engine_releases",
+  "toggle_mod_part",
   "fetch_engine",
   "forget_engine",
   "use_engine_build",
-  "installed_hires_version",
-  "latest_zax",
-  "list_saves",
-  "create_debug_package",
   "order_swap",
   "launch",
+  "list_saves",
+  "create_debug_package",
   "open",
   "wipe",
   "cancel",
@@ -86,86 +90,72 @@ export const COMMANDS = [
 
 export type CommandName = (typeof COMMANDS)[number];
 
-/** Contents by file name, as the bytes the seam carries. `null` is a file that is not there. */
-export type ConfigFileContents = Readonly<Record<string, number[] | null>>;
-
 export const commands = {
-  describe: (): Promise<MachineDescription> => invoke("describe"),
+  start: (version: string): Promise<Started> => invoke("start", { version }),
+  view: (): Promise<AppView> => invoke("view"),
+  catalog: (): Promise<CatalogView> => invoke("catalog"),
+  search: (query: string): Promise<SearchResults> => invoke("search", { query }),
   chooseFolder: (holding?: string): Promise<string | null> => invoke("choose_folder", { holding }),
 
-  loadState: (): Promise<LoadedState> => invoke("load_state"),
-  saveState: (state: AppState): Promise<void> => invoke("save_state", { state }),
+  selectInstall: (path: string): Promise<AppView> => invoke("select_install", { path }),
+  refresh: (): Promise<AppView> => invoke("refresh"),
+  addInstall: (path: string): Promise<Answered<string | null>> => invoke("add_install", { path }),
+  removeInstall: (path: string): Promise<AppView> => invoke("remove_install", { path }),
+  setAlias: (path: string, name: string): Promise<AppView> => invoke("set_alias", { path, name }),
+  setWine: (path: string, wine: WineConfig): Promise<AppView> => invoke("set_wine", { path, wine }),
+  setTheme: (theme: Theme): Promise<AppView> => invoke("set_theme", { theme }),
+  setAutosave: (on: boolean): Promise<AppView> => invoke("set_autosave", { on }),
+  acceptCaution: (engineId: string): Promise<AppView> => invoke("accept_caution", { engineId }),
+  scan: (): Promise<Answered<number>> => invoke("scan"),
 
-  loadConfigFiles: (installPath: string): Promise<ConfigFileContents> =>
-    invoke("load_config_files", { installPath }),
-  saveConfigFiles: (request: SaveRequest): Promise<SaveOutcome> => invoke("save_config_files", { request }),
-  settingsBase: (installPath: string): Promise<Readonly<Record<string, string>>> =>
-    invoke("settings_base", { installPath }),
-  acceptSettingsBase: (installPath: string, at: readonly HeldTarget[]): Promise<void> =>
-    invoke("accept_settings_base", { installPath, at }),
+  setSetting: (id: string, value: string): Promise<AppView> => invoke("set_setting", { id, value }),
+  setPercent: (id: string, percent: number): Promise<AppView> => invoke("set_percent", { id, percent }),
+  revertSettings: (ids: readonly string[], all: boolean): Promise<AppView> =>
+    invoke("revert_settings", { ids, all }),
+  applyAction: (actionId: string): Promise<AppView> => invoke("apply_action", { actionId }),
+  satisfyGate: (id: string, group: string | null): Promise<Answered<Requirement[]>> =>
+    invoke("satisfy_gate", { id, group }),
+  chooseLinked: (id: string, value: string): Promise<AppView> => invoke("choose_linked", { id, value }),
+  editOrder: (edit: OrderEdit): Promise<AppView> => invoke("edit_order", { edit }),
+  save: (): Promise<Answered<SaveRefusal | null>> => invoke("save"),
 
-  loadMods: (install: Install): Promise<ModsSnapshot> => invoke("load_mods", { install }),
-  saveMods: (request: ModsSaveRequest): Promise<SaveOutcome> => invoke("save_mods", { request }),
-
-  publishedMods: (refresh?: boolean): Promise<ModFeedListing> => invoke("published_mods", { refresh }),
-  modInstallState: (install: Install): Promise<ModInstallState> => invoke("mod_install_state", { install }),
-  planMod: (
-    install: Install,
-    modId: string,
-    choices?: readonly string[],
-    answers?: Readonly<Record<string, string>>,
-    version?: string,
-  ): Promise<InstallPlan> => invoke("plan_mod", { install, modId, choices, answers, version }),
-  installMod: (
-    install: Install,
-    modId: string,
-    fingerprint: string,
-    choices?: readonly string[],
-    answers?: Readonly<Record<string, string>>,
-    version?: string,
-  ): Promise<InstallOutcome> => invoke("install_mod", { install, modId, fingerprint, choices, answers, version }),
-  modVersions: (modId: string, above?: string): Promise<string[]> => invoke("mod_versions", { modId, above }),
-  restoreMod: (install: Install, modId: string): Promise<void> => invoke("restore_mod", { install, modId }),
-  removeMod: (install: Install, modId: string): Promise<ModRemoval> => invoke("remove_mod", { install, modId }),
-  modSettings: (install: Install): Promise<ModSettingsGroup[]> => invoke("mod_settings", { install }),
-  openModFile: (install: Install, modId: string, file: string): Promise<void> =>
-    invoke("open_mod_file", { install, modId, file }),
-
-  identifyInstall: (path: string): Promise<GameType | null> => invoke("identify_install", { path }),
-  scanForInstalls: (known: readonly Install[]): Promise<Install[]> => invoke("scan_for_installs", { known }),
-
-  installedSfallVersion: (install: Install): Promise<string | null> =>
-    invoke("installed_sfall_version", { install }),
-  latestSfall: (): Promise<SfallRelease> => invoke("latest_sfall"),
-  updateSfall: (install: Install, version: string): Promise<SfallUpdate> =>
-    invoke("update_sfall", { install, version }),
+  checkZax: (): Promise<AppView> => invoke("check_zax"),
+  checkSfall: (): Promise<AppView> => invoke("check_sfall"),
+  checkEngine: (engineId: string): Promise<AppView> => invoke("check_engine", { engineId }),
   listSfallVersions: (): Promise<string[]> => invoke("list_sfall_versions"),
+  changeSfall: (version: string | null): Promise<Answered<SfallUpdate>> => invoke("change_sfall", { version }),
 
-  machineEngines: (): Promise<EngineListing[]> => invoke("machine_engines"),
-  deployedEngines: (install: Install): Promise<InstalledEngine[]> => invoke("deployed_engines", { install }),
-  engineReleases: (engineId: string): Promise<EngineRelease[]> => invoke("engine_releases", { engineId }),
-  fetchEngine: (engineId: string, published: string | null): Promise<EngineRelease> =>
+  readModListing: (refresh: boolean): Promise<AppView> => invoke("read_mod_listing", { refresh }),
+  planMod: (
+    modId: string,
+    choices?: readonly string[],
+    answers?: Readonly<Record<string, string>>,
+    version?: string,
+  ): Promise<InstallPlan> => invoke("plan_mod", { modId, choices, answers, version }),
+  installMod: (request: ModInstallRequest): Promise<Answered<InstallReport>> => invoke("install_mod", { request }),
+  modVersions: (modId: string, above?: string): Promise<string[]> => invoke("mod_versions", { modId, above }),
+  restoreMod: (modId: string): Promise<AppView> => invoke("restore_mod", { modId }),
+  removeMod: (modId: string): Promise<AppView> => invoke("remove_mod", { modId }),
+  openModFile: (modId: string, file: string): Promise<void> => invoke("open_mod_file", { modId, file }),
+  toggleModPart: (
+    groups: readonly ChoiceGroup<ModPart>[],
+    chosen: readonly string[],
+    id: string,
+    on: boolean,
+  ): Promise<string[]> => invoke("toggle_mod_part", { groups, chosen, id, on }),
+
+  fetchEngine: (engineId: string, published: string | null): Promise<Answered<EngineRelease>> =>
     invoke("fetch_engine", { engineId, published }),
-  forgetEngine: (engineId: string, published: string): Promise<void> =>
+  forgetEngine: (engineId: string, published: string): Promise<AppView> =>
     invoke("forget_engine", { engineId, published }),
-  useEngineBuild: (install: Install, engineId: string, pick: BuildPick): Promise<void> =>
-    invoke("use_engine_build", { install, engineId, pick }),
+  useEngineBuild: (engineId: string, pick: BuildPick): Promise<AppView> =>
+    invoke("use_engine_build", { engineId, pick }),
+  orderSwap: (engineId: string | null): Promise<OrderSwap | null> => invoke("order_swap", { engineId }),
+  launch: (engineId: string | null, pick: BuildPick | null): Promise<AppView> =>
+    invoke("launch", { engineId, pick }),
 
-  installedHiresVersion: (install: Install): Promise<string | null> =>
-    invoke("installed_hires_version", { install }),
-  latestZax: (): Promise<ZaxRelease> => invoke("latest_zax"),
-  listSaves: (install: Install): Promise<string[]> => invoke("list_saves", { install }),
-  createDebugPackage: (install: Install, saves: readonly string[]): Promise<DebugPackage> =>
-    invoke("create_debug_package", { install, saves }),
-
-  orderSwap: (install: Install, engineId: string | null): Promise<OrderSwap | null> =>
-    invoke("order_swap", { install, engineId }),
-  launch: (
-    install: Install,
-    sfallVersion: string | null,
-    engineId: string | null,
-    pick: BuildPick | null,
-  ): Promise<void> => invoke("launch", { install, sfallVersion, engineId, pick }),
+  listSaves: (): Promise<string[]> => invoke("list_saves"),
+  createDebugPackage: (saves: readonly string[]): Promise<DebugPackage> => invoke("create_debug_package", { saves }),
   open: (target: OpenTarget): Promise<void> => invoke("open", { target }),
   wipe: (which: WipeTarget): Promise<void> => invoke("wipe", { which }),
   cancel: (): Promise<void> => invoke("cancel"),

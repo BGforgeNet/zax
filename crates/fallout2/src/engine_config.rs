@@ -8,6 +8,8 @@
 //! on finding exactly the file or section an early write would create, so writing first would silently
 //! suppress them.
 
+use std::collections::BTreeSet;
+
 use zax_core::catalog::{SettingDef, SettingTarget};
 use zax_core::config_io::{ConfigFileContents, ConfigFilePaths};
 use zax_core::ini::IniDocument;
@@ -98,14 +100,33 @@ pub fn live_targets<'a>(
     def: &'a SettingDef,
     contents: &ConfigFileContents,
 ) -> Vec<&'a SettingTarget> {
+    live_targets_among(def, &minted_engines(contents))
+}
+
+/// The engines that have written their own settings into these files, by id. What a caller asking
+/// about many settings at once works out a single time: each answer parses the engine's config file.
+#[must_use]
+pub fn minted_engines(contents: &ConfigFileContents) -> BTreeSet<&'static str> {
+    ENGINES
+        .iter()
+        .filter(|engine| has_minted_settings(engine, contents))
+        .map(|engine| engine.id)
+        .collect()
+}
+
+/// [`live_targets`], given which engines have written their settings.
+#[must_use]
+pub fn live_targets_among<'a>(
+    def: &'a SettingDef,
+    minted: &BTreeSet<&'static str>,
+) -> Vec<&'a SettingTarget> {
     def.targets
         .iter()
-        .filter(|target| match &target.engine {
-            None => true,
-            Some(id) => ENGINES
-                .iter()
-                .find(|one| one.id == id)
-                .is_some_and(|engine| has_minted_settings(engine, contents)),
+        .filter(|target| {
+            target
+                .engine
+                .as_deref()
+                .is_none_or(|id| minted.contains(id))
         })
         .collect()
 }

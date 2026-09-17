@@ -18,7 +18,7 @@ use zax_core::config_io::ConfigFileContents;
 use zax_core::ini::IniDocument;
 use zax_core::text::latin1;
 
-use crate::engine_config::live_targets;
+use crate::engine_config::{live_targets_among, minted_engines};
 
 /// How a base is keyed. Unique across the catalog, which the catalog's own test asserts from the other
 /// side.
@@ -77,12 +77,13 @@ pub fn reconcile_settings(
     // Parsed once per file rather than once per address: a config file carries many settings, and every
     // linked one would otherwise re-parse it.
     let mut documents: HashMap<&str, Option<IniDocument>> = HashMap::new();
+    let minted = minted_engines(contents);
     let mut out = Vec::new();
     for def in settings {
         if def.targets.len() < 2 {
             continue;
         }
-        let stated: Vec<HeldTarget> = live_targets(def, contents)
+        let stated: Vec<HeldTarget> = live_targets_among(def, &minted)
             .into_iter()
             .filter_map(|target| {
                 let document = documents.entry(target.file.as_str()).or_insert_with(|| {
