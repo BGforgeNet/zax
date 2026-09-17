@@ -1,7 +1,6 @@
 /**
  * `pnpm mod-ini`: checks a mod's ini files against the settings its f2mod.yml describes, or writes them from it.
- * For mod authors before a release; `actions/mod-ini` runs the same thing in their CI. Under jiti because the
- * parser lives in TypeScript source.
+ * For mod authors before a release; `actions/mod-ini` runs the same thing in their CI.
  */
 
 import { parseArgs } from "node:util";

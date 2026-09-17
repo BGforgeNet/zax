@@ -1,5 +1,5 @@
 # Checks a mod's ini files against the settings its f2mod.yml describes, or writes them from it and pushes the
-# result. The same judgement as `pnpm mod-ini`, from one bundled file, since a caller has no ZAX checkout.
+# result. The same judgement as `pnpm mod-ini`, from the committed WebAssembly, since a caller has no install.
 #
 # A JavaScript action rather than a composite one so the runner supplies the Node it runs on; a composite step
 # would take whatever `node` the caller's PATH holds, or none.
@@ -24,4 +24,4 @@ outputs:
 
 runs:
   using: node24
-  main: dist/action.mjs
+  main: action.mjs

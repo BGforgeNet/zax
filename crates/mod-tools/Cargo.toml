@@ -1,0 +1,21 @@
+[package]
+name = "zax-mod-tools"
+description = "What a mod author checks before a release - the manifest and its ini files - as WebAssembly for the mod-ini action"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+# `cdylib` is what wasm-bindgen links; `rlib` is what the crate's own tests build against.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+zax-fallout2.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3.81"
+wasm-bindgen = "0.2.128"

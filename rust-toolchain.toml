@@ -1,0 +1,7 @@
+# One compiler for everyone, because the mod-ini action's WebAssembly is committed and checked against a
+# rebuild: the standard library's source paths name the compiler's commit, so another version builds other
+# bytes. Moving it means rebuilding that file in the same change (scripts/build-mod-tools.sh).
+[toolchain]
+channel = "1.98.1"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]

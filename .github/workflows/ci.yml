@@ -50,6 +50,17 @@ jobs:
       # The chokidar override puts svelte-check on a major its authors do not test against, and only watch mode
       # loads it - which the single-pass `pnpm check` above never enters.
       - run: pnpm verify:chokidar
+      # The mod-ini action's WebAssembly is rebuilt and compared, which takes the Rust toolchain
+      # rust-toolchain.toml names and the wasm-bindgen Cargo.lock pins.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - run: ./.github/scripts/install-wasm-bindgen.sh
       - run: ./.github/scripts/check-generated.sh
 
   # The suite again on Windows, and only the suite. Everything else in `verify` reads the same bytes on any

@@ -16,8 +16,8 @@
     "lint": "oxlint --type-aware && eslint . && oxfmt --check",
     "knip": "knip",
     "format": "oxfmt --write",
-    "check-manifest": "jiti scripts/check-manifest.mjs",
-    "mod-ini": "jiti scripts/mod-ini/cli.mjs",
+    "check-manifest": "node scripts/check-manifest.mjs",
+    "mod-ini": "node actions/mod-ini/cli.mjs",
     "gen:icons": "node scripts/gen-icons.mjs",
     "verify:chokidar": "node scripts/verify-chokidar.mjs",
     "desktop": "pnpm --filter @zax/app build && pnpm --filter @zax/app start"
@@ -27,7 +27,6 @@
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@types/node": "^24.13.3",
     "@vitest/coverage-v8": "^4.1.11",
-    "esbuild": "0.28.2",
     "eslint": "^10.9.1",
     "eslint-plugin-svelte": "^3.23.0",
     "fast-check": "^4.9.0",

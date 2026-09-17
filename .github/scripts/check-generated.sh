@@ -7,9 +7,9 @@ node scripts/gen/gen-catalog.mjs
 node scripts/gen/gen-layout.mjs
 git diff --exit-code packages/games-fallout2/src/catalog.ts packages/games-fallout2/src/layout.ts
 
-# The mod-ini action runs its committed bundle, not the sources the tests read.
-node scripts/mod-ini/build.mjs
-git diff --exit-code actions/mod-ini/dist/action.mjs
+# The mod-ini action runs its committed WebAssembly, not the Rust the tests read.
+scripts/build-mod-tools.sh
+git diff --exit-code actions/mod-ini/wasm/
 
 # The committed icons are a rendering of zax.svg, not hand-authored - the runner image ships Chrome, which
 # gen-icons.mjs already looks for on PATH.

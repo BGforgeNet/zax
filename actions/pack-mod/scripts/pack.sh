@@ -23,7 +23,7 @@ if [ ! -f f2mod.yml ]; then
   exit 1
 fi
 
-# The same check as the mod-ini action, from its bundle beside this one. A composite action has no runtime of its
+# The same check as the mod-ini action, from the action beside this one. A composite action has no runtime of its
 # own, so this takes the runner's `node`, and says so rather than failing on a syntax error from an old one.
 case "${CHECK_INI:-}" in
   "") ;;
@@ -37,7 +37,7 @@ case "${CHECK_INI:-}" in
       echo "check-ini runs on Node 20 or later, and this runner's is $major - add actions/setup-node first." >&2
       exit 1
     fi
-    INPUT_MODE=check INPUT_MATCH="$CHECK_INI" INPUT_DIRECTORY="$DIRECTORY" node "$ACTION_PATH/../mod-ini/dist/action.mjs"
+    INPUT_MODE=check INPUT_MATCH="$CHECK_INI" INPUT_DIRECTORY="$DIRECTORY" node "$ACTION_PATH/../mod-ini/action.mjs"
     ;;
   *)
     echo "check-ini is \"$CHECK_INI\"; it takes soft, hard, or nothing to skip the check." >&2

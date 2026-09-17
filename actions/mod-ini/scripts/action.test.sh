@@ -1,11 +1,11 @@
 #!/bin/bash
-# Runs the committed bundle the way the runner does - inputs as INPUT_* variables, a checkout as the working
-# directory - so what is tested is the file callers get, not the sources it was built from.
+# Runs the action the way the runner does - inputs as INPUT_* variables, a checkout as the working directory -
+# so what is tested is the committed WebAssembly callers get, not the Rust it was built from.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 readonly ROOT
-readonly BUNDLE="${ROOT}/actions/mod-ini/dist/action.mjs"
+readonly BUNDLE="${ROOT}/actions/mod-ini/action.mjs"
 scratch=$(mktemp -d)
 trap 'rm -rf "${scratch}"' EXIT
 

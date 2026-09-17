@@ -1,7 +1,6 @@
 /**
- * The entry point `actions/mod-ini` runs, bundled into `actions/mod-ini/dist/action.mjs` by `build.mjs` - the
- * action's caller has no ZAX checkout and no install, so it gets the parser and its dependencies in one file.
- * Inputs arrive as `INPUT_*` variables, the runner's own convention, which `pack-mod` reuses to run a check.
+ * The entry point `actions/mod-ini` runs. The caller has no install, so it imports nothing but Node's own modules
+ * and the committed WebAssembly beside it. Inputs arrive as `INPUT_*` variables, the runner's own convention, which `pack-mod` reuses to run a check.
  */
 
 import { spawnSync } from "node:child_process";

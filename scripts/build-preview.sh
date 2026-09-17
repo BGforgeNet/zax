@@ -2,9 +2,8 @@
 # Builds the browser preview's WebAssembly: the domain and the in-memory machine, for the host that has
 # no machine to reach. The desktop build does not use it and does not carry it.
 #
-# Needs the wasm32-unknown-unknown target and wasm-bindgen-cli at the version the workspace pins:
-#   rustup target add wasm32-unknown-unknown
-#   cargo install wasm-bindgen-cli --version "$(<the version in Cargo.lock>)" --locked
+# Needs the wasm32-unknown-unknown target, which rust-toolchain.toml brings along under rustup, and
+# wasm-bindgen-cli at the version Cargo.lock pins, which .github/scripts/install-wasm-bindgen.sh installs.
 
 set -euo pipefail
 
