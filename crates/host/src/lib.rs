@@ -79,7 +79,7 @@ impl HostPlatform {
         Self {
             os,
             arch: architecture(),
-            paths: HostPaths::of_this_machine(),
+            paths: HostPaths::of_this_machine(os),
             fs: HostFileSystem,
             process: HostProcess::new(os),
             net: HostNetwork::new(DownloadPolicy::default(), note),
