@@ -98,9 +98,12 @@ impl FileSystem for HostFileSystem {
     }
 
     fn stat(&self, path: &Path) -> Result<Option<FileStat>> {
-        // `symlink_metadata`, so a link pointing at nothing reads as something rather than as absent -
-        // what a caller about to write there has to know.
-        match fs::symlink_metadata(path) {
+        // Through the link first: a game folder reached by one is the folder it points at, and reading
+        // the link itself reports `Other`, which every caller asking "is this a directory" refuses.
+        //
+        // `symlink_metadata` second, so a link pointing at nothing still reads as something rather than
+        // as absent - what a caller about to write there has to know.
+        match fs::metadata(path).or_else(|_| fs::symlink_metadata(path)) {
             Ok(held) => Ok(Some(FileStat {
                 kind: kind_of(&held.file_type()),
                 size: held.len(),
@@ -247,6 +250,41 @@ mod tests {
             HostFileSystem.stat(&scratch.at("nothing")).expect("a read"),
             None
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_directory_reached_by_a_link_is_a_directory() {
+        // What a game folder kept elsewhere and linked into place looks like: reading the link itself
+        // answers `Other`, and every gate asking for a directory then refuses the install.
+        let scratch = Scratch::new("stat-link");
+        let real = scratch.at("real");
+        fs::create_dir_all(&real).expect("a directory");
+        fs::write(real.join("fallout2.exe"), b"MZ").expect("a file");
+        let link = scratch.at("linked");
+        std::os::unix::fs::symlink(&real, &link).expect("a link");
+
+        let held = HostFileSystem.stat(&link).expect("a read").expect("a stat");
+        assert_eq!(held.kind, FileKind::Dir);
+        let names: Vec<String> = HostFileSystem
+            .list(&link)
+            .expect("a listing")
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+        assert_eq!(names, ["fallout2.exe"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_pointing_at_nothing_is_still_something() {
+        // Absent would tell a caller about to write there that the path is free, and the write then
+        // lands wherever the link points.
+        let scratch = Scratch::new("stat-dangling");
+        let link = scratch.at("dangling");
+        std::os::unix::fs::symlink(scratch.at("gone"), &link).expect("a link");
+        let held = HostFileSystem.stat(&link).expect("a read");
+        assert_eq!(held.map(|stat| stat.kind), Some(FileKind::Other));
     }
 
     #[test]
