@@ -895,7 +895,10 @@ mod tests {
         let err = applied(&platform, &script_release(&platform)).expect_err("a failure");
         let said = format!("{err}");
         assert!(said.contains("stopped with code 3"), "{said}");
-        assert!(said.contains("/games/f2/backup"), "{said}");
+        // Joined rather than spelled out: the message carries the path the host built, and a Windows
+        // host builds it with `\`.
+        let backup = std::path::Path::new("/games/f2").join("backup");
+        assert!(said.contains(&backup.display().to_string()), "{said}");
         assert!(said.contains("could not write data/"), "{said}");
         // Reported, not unwound - and the unfinished record says a run started here.
         let held = recorded(&platform).expect("a record entry");

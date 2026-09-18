@@ -172,6 +172,11 @@ impl FileSystem for HostFileSystem {
 /// A path that is not there says nothing about the disk, and neither does a host that will not answer -
 /// both read as "cannot say", which every caller already treats as a check that did not run.
 fn free_space_at(path: &Path) -> Option<u64> {
+    // Asked of the path itself, because Windows answers for the whole volume where the path is not
+    // there at all - which reads as a measurement of a directory that does not exist yet.
+    if !fs::exists(path).unwrap_or(false) {
+        return None;
+    }
     fs4::available_space(path).ok()
 }
 
