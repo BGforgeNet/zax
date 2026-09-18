@@ -27,6 +27,19 @@ fn kind_of(held: &fs::FileType) -> FileKind {
     }
 }
 
+/// What a linked entry counts as while walking a tree: the file it points at, or nothing to walk.
+///
+/// A linked file is its contents, which is what a copy, a backup and a debug package have to carry. A
+/// linked directory stays `Other` and is not descended: a link pointing back up its own tree would be
+/// copied once per level down to the walk's depth bound, and a game folder that keeps a directory
+/// elsewhere is rare enough not to buy that.
+fn through_link(path: &Path) -> FileKind {
+    match fs::metadata(path) {
+        Ok(held) if held.is_file() => FileKind::File,
+        _ => FileKind::Other,
+    }
+}
+
 /// Milliseconds since the epoch, or zero where the host cannot say. A modification time nobody can read
 /// makes a cached listing look ancient, which costs a request rather than correctness.
 fn modified_millis(held: &fs::Metadata) -> i64 {
@@ -118,9 +131,11 @@ impl FileSystem for HostFileSystem {
         let mut out = Vec::new();
         for entry in fs::read_dir(path).map_err(|err| failed("list", path, err))? {
             let entry = entry.map_err(|err| failed("list", path, err))?;
-            let kind = entry
-                .file_type()
-                .map_or(FileKind::Other, |held| kind_of(&held));
+            let kind = match entry.file_type() {
+                Ok(held) if held.is_symlink() => through_link(&entry.path()),
+                Ok(held) => kind_of(&held),
+                Err(_) => FileKind::Other,
+            };
             out.push(DirEntry {
                 name: entry.file_name().to_string_lossy().into_owned(),
                 kind,
@@ -273,6 +288,32 @@ mod tests {
             .map(|entry| entry.name)
             .collect();
         assert_eq!(names, ["fallout2.exe"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_listing_counts_a_linked_file_as_a_file_and_a_linked_directory_as_neither() {
+        // A backup that skipped the linked file would carry a game folder missing a file that is in it.
+        let scratch = Scratch::new("list-links");
+        let store = scratch.at("store");
+        fs::create_dir_all(store.join("inner")).expect("a directory");
+        fs::write(store.join("patch000.dat"), b"dat").expect("a file");
+        let game = scratch.at("game");
+        fs::create_dir_all(&game).expect("a directory");
+        std::os::unix::fs::symlink(store.join("patch000.dat"), game.join("patch000.dat"))
+            .expect("a link");
+        std::os::unix::fs::symlink(store.join("inner"), game.join("data")).expect("a link");
+        std::os::unix::fs::symlink(scratch.at("gone"), game.join("dangling")).expect("a link");
+
+        let kinds: std::collections::BTreeMap<String, FileKind> = HostFileSystem
+            .list(&game)
+            .expect("a listing")
+            .into_iter()
+            .map(|entry| (entry.name, entry.kind))
+            .collect();
+        assert_eq!(kinds["patch000.dat"], FileKind::File);
+        assert_eq!(kinds["data"], FileKind::Other);
+        assert_eq!(kinds["dangling"], FileKind::Other);
     }
 
     #[cfg(unix)]
