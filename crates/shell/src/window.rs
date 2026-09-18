@@ -84,11 +84,13 @@ pub fn build(
 
     WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html".into()))
         .title("ZAX")
-        .inner_size(1280.0, 860.0)
-        // Two things want a floor, and this clears the higher one. The interface drops the sidebar below 820
-        // viewport pixels, and with it the only way to switch installs; above that the Settings tab strip
-        // needs about 890 to lay its tabs out. The window is a little wider than its viewport.
-        .min_inner_size(900.0, 520.0)
+        // At default text size the columns stop growing near 1240 and the rest is margin; `--col` in app.css is in
+        // rem, so larger text raises that cap, and this default is sized for it.
+        .inner_size(1440.0, 900.0)
+        // The game list, every tab strip and the save bar fit on one line from about 970 pixels at default text
+        // size, and below that the tab strips scroll their tabs out of sight; the floor leaves a fifth over it for
+        // fonts wider than the ones it was measured with.
+        .min_inner_size(1180.0, 640.0)
         // A settings row gives every surplus pixel to its trailing track, so a wider window shows nothing
         // more - it only pushes each revert link further from its setting. Resizing still works.
         .maximizable(false)

@@ -50,10 +50,6 @@
     padding-inline: var(--tab-inset);
   }
 
-  /* Below this the settings pane is at its own minimum and the column has to go, or the two would overlap. */
-  @media (max-width: 820px) {
-    .sidebar {
-      display: none;
-    }
-  }
+  /* Never dropped at a narrow width: it is the only way to switch installs. The window's minimum size in
+     `crates/shell/src/window.rs` is what keeps it and the settings pane from overlapping. */
 </style>

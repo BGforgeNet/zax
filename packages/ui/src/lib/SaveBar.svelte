@@ -322,12 +322,15 @@
     flex: 0 0 auto;
   }
 
+  /* One line whatever the width: a label broken over two rows reads as two controls. The window's minimum size is
+     what guarantees the room. */
   .footer button {
     background: var(--panel-alt);
     border: 1px solid var(--border-strong);
     border-radius: 6px;
     padding: 4px 16px;
     color: var(--text);
+    white-space: nowrap;
   }
 
   /* Floored at the width of "Saving...", the wider of the two labels: unfloored the button grew by 31px the
