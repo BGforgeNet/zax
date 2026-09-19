@@ -36,7 +36,7 @@ const RELEASE_LIST: &str = "https://sourceforge.net/projects/sfall/rss?path=/sfa
 
 /// sfall's own settings file, which is both what the merge works on and the only file a base is read
 /// from.
-const DDRAW_INI: &str = "ddraw.ini";
+pub const DDRAW_INI: &str = "ddraw.ini";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]

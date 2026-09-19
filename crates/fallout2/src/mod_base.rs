@@ -21,6 +21,7 @@ use zax_core::ini_merge::MergeConflict;
 use zax_core::install::{GameType, Install};
 use zax_core::stamp::{LocalTime, stamp};
 use zax_platform::archive::ExtractOptions;
+use zax_platform::net::DownloadOptions;
 use zax_platform::process::LaunchOptions;
 use zax_platform::{Error, Platform, Result};
 
@@ -35,6 +36,7 @@ use crate::mod_install::conflict_for;
 use crate::mod_state::{hold_user_files, merge_user_files};
 use crate::mod_transaction::mod_work_directory;
 use crate::records::{InstallRecord, InstalledMod, assert_usable, load_record, save_record};
+use crate::sfall::{DDRAW_INI, SfallProgress, installed_sfall_version, sfall_defaults};
 
 /// What installing a base mod would do, as far as anything but the installer can say. Thinner than a
 /// stacking mod's plan on purpose, and the plan says so: the installer decides what lands, so naming
@@ -364,17 +366,22 @@ fn install_under_lock(
     let here = hold_user_files(platform, root, &declared, &backup)?;
     // A retry after an installer that never returned finds that installer's copies in the folder, so
     // the files the first attempt held are the user's, not these.
-    let mine = match record
+    let unfinished = record
         .mods
         .iter()
-        .find(|held| held.id == manifest.id && !held.complete && !held.before.is_empty())
-    {
-        Some(unfinished) => unfinished
-            .before
-            .iter()
-            .map(|(path, text)| (path.clone(), zax_core::text::latin1_bytes(text)))
-            .collect(),
+        .find(|held| held.id == manifest.id && !held.complete && !held.before.is_empty());
+    let mine = match unfinished {
+        Some(unfinished) => latin1_bytes(&unfinished.before),
         None => here,
+    };
+    // With no release recorded there is no base, and then every value the user holds wins - the ones
+    // they never chose too, which is most of a `ddraw.ini` and includes what the mod sets for its own
+    // scripts. What their sfall shipped stands in, read before the installer replaces sfall; a retry
+    // takes it from the unfinished record, since the sfall in the folder may by then be the installer's.
+    let stand_in = match (&previous, unfinished) {
+        (Some(_), _) => BTreeMap::new(),
+        (None, Some(unfinished)) => latin1_bytes(&unfinished.shipped),
+        (None, None) => sfall_base(platform, install, options)?,
     };
 
     // Before the payload lands, and on a first install only: what arrives with the mod is spelled the
@@ -398,11 +405,9 @@ fn install_under_lock(
         entries: Vec::new(),
         parts: Vec::new(),
         manifest: release.manifest_text.clone(),
-        shipped: BTreeMap::new(),
-        before: mine
-            .iter()
-            .map(|(path, bytes)| (path.clone(), zax_core::text::latin1(bytes)))
-            .collect(),
+        // The stand-in base until the install finishes and records what it shipped in its place.
+        shipped: latin1_texts(&stand_in),
+        before: latin1_texts(&mine),
         carried: BTreeMap::new(),
     };
     save_record(platform, &with_base(&record, &pending))?;
@@ -513,22 +518,15 @@ fn install_under_lock(
     // them.
     // The record holds what the last release shipped as latin1 text, which is the encoding the game's
     // own files are read in; the merge works on bytes.
-    let base = previous.as_ref().map(|held| {
-        held.shipped
-            .iter()
-            .map(|(path, text)| (path.clone(), zax_core::text::latin1_bytes(text)))
-            .collect::<BTreeMap<String, Vec<u8>>>()
-    });
-    let merged = merge_user_files(platform, root, &declared, &mine, base.as_ref())?;
+    let base = previous
+        .as_ref()
+        .map_or(stand_in, |held| latin1_bytes(&held.shipped));
+    let merged = merge_user_files(platform, root, &declared, &mine, Some(&base))?;
 
     let written = load_record(platform, &install.path)?;
     let done = InstalledMod {
         complete: true,
-        shipped: merged
-            .shipped
-            .iter()
-            .map(|(path, bytes)| (path.clone(), zax_core::text::latin1(bytes)))
-            .collect(),
+        shipped: latin1_texts(&merged.shipped),
         before: BTreeMap::new(),
         ..pending
     };
@@ -541,6 +539,55 @@ fn install_under_lock(
         conflicts: merged.conflicts,
         backup: installer_backup,
     })
+}
+
+/// What the installed sfall shipped as its `ddraw.ini`, keyed as the merge reads it - or nothing, where
+/// there is no sfall or its release cannot be had, which leaves the merge carrying every value across.
+fn sfall_base(
+    platform: &dyn Platform,
+    install: &Install,
+    options: &ModProgress<'_>,
+) -> Result<BTreeMap<String, Vec<u8>>> {
+    let Some(version) = installed_sfall_version(platform, install)? else {
+        return Ok(BTreeMap::new());
+    };
+    options.step(&format!(
+        "Reading the settings sfall {version} shipped with"
+    ));
+    let progress = SfallProgress {
+        download: DownloadOptions {
+            on_progress: options.download.on_progress,
+            cancel: options.download.cancel,
+        },
+        on_step: options.on_step,
+    };
+    let shipped = sfall_defaults(platform, &version, &progress)?;
+    // The fetch reads a cancelled download as a missing base, and a cancelled install must not go on.
+    if options
+        .download
+        .cancel
+        .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::SeqCst))
+    {
+        return Err(Error::Cancelled);
+    }
+    Ok(shipped
+        .map(|held| BTreeMap::from([(DDRAW_INI.to_owned(), held.to_bytes())]))
+        .unwrap_or_default())
+}
+
+/// The record's latin1 text as the bytes the files hold, and back.
+fn latin1_bytes(texts: &BTreeMap<String, String>) -> BTreeMap<String, Vec<u8>> {
+    texts
+        .iter()
+        .map(|(path, text)| (path.clone(), zax_core::text::latin1_bytes(text)))
+        .collect()
+}
+
+fn latin1_texts(bytes: &BTreeMap<String, Vec<u8>>) -> BTreeMap<String, String> {
+    bytes
+        .iter()
+        .map(|(path, held)| (path.clone(), zax_core::text::latin1(held)))
+        .collect()
 }
 
 /// The record with this mod's entry replaced. The rest is carried, so the entries this version could
@@ -939,6 +986,122 @@ mod tests {
         );
         // The rest is still the user's.
         assert!(after.contains("A=1"), "{after}");
+    }
+
+    /// The kept copy of what an sfall release shipped, which the update path writes and reads back.
+    fn sfall_defaults_at(version: &str) -> String {
+        format!("/home/tester/.cache/zax/packages/defaults/ddraw-{version}.ini")
+    }
+
+    /// A host with sfall 4.5 installed and its shipped `ddraw.ini` already kept, whose installer lays
+    /// down `ddraw.ini` and, where given, its own `ddraw.dll`.
+    fn sfall_host(
+        user_ini: &str,
+        mod_ini: &str,
+        mod_dll: Option<&str>,
+        code: i32,
+    ) -> MemoryOptions {
+        let mut options = host_options(&[], Some(code), "");
+        options.files = BTreeMap::from([
+            (
+                "/games/f2/ddraw.dll".to_owned(),
+                Content::from(crate::pe_fixture::library(&[("FileVersion", "4.5")])),
+            ),
+            ("/games/f2/ddraw.ini".to_owned(), Content::from(user_ini)),
+            (
+                sfall_defaults_at("4.5"),
+                Content::from("[Misc]\nWorldMapSlots=0\nA=0\n"),
+            ),
+        ]);
+        let mut payload = BTreeMap::from([
+            ("upu-install.sh".to_owned(), Content::from("#!/bin/sh\n")),
+            ("ddraw.ini".to_owned(), Content::from(mod_ini)),
+        ]);
+        if let Some(version) = mod_dll {
+            payload.insert(
+                "ddraw.dll".to_owned(),
+                Content::from(crate::pe_fixture::library(&[("FileVersion", version)])),
+            );
+        }
+        options.archives = BTreeMap::from([("payload".to_owned(), payload)]);
+        options
+    }
+
+    #[test]
+    fn a_first_install_keeps_the_mods_values_where_the_user_had_what_sfall_shipped() {
+        // Nothing records a previous release, so what the user's sfall shipped is the base: 0 was never
+        // chosen and the mod's 21 stands, while A=1 was chosen and wins over the mod's A=0.
+        let platform = MemoryPlatform::new(sfall_host(
+            "[Misc]\nWorldMapSlots=0\nA=1\n",
+            "[Misc]\nWorldMapSlots=21\nA=0\n",
+            None,
+            0,
+        ));
+        applied(&platform, &script_release(&platform)).expect("an install");
+        assert_eq!(
+            platform.text_at("/games/f2/ddraw.ini").as_deref(),
+            Some("[Misc]\nWorldMapSlots=21\nA=1\n")
+        );
+        assert!(
+            platform.records().downloaded.len() == 1,
+            "the kept copy answers, so only the mod itself is downloaded"
+        );
+    }
+
+    #[test]
+    fn a_cancel_while_reading_what_sfall_shipped_stops_the_install_before_it_runs() {
+        let platform = MemoryPlatform::new(sfall_host("[Misc]\nA=1\n", "[Misc]\nA=0\n", None, 0));
+        let release = script_release(&platform);
+        plan_base_install(&platform, &install(), &release, &ModProgress::default())
+            .expect("a plan");
+        let cancel = std::sync::atomic::AtomicBool::new(true);
+        let options = ModProgress {
+            download: DownloadOptions {
+                cancel: Some(&cancel),
+                ..DownloadOptions::default()
+            },
+            ..ModProgress::default()
+        };
+        let err = apply_base_install(&platform, &install(), &release, &options, now(), 0)
+            .expect_err("cancelled");
+        assert!(matches!(err, Error::Cancelled), "{err}");
+        assert!(
+            platform.records().ran.is_empty(),
+            "the installer must not run"
+        );
+        assert!(
+            recorded(&platform).is_none(),
+            "nothing began, so nothing is recorded"
+        );
+    }
+
+    #[test]
+    fn a_retry_merges_against_the_sfall_that_was_there_before_the_first_attempt() {
+        // The first attempt stops after its payload replaced sfall with a version nothing has kept a copy
+        // of, so the base has to come from what that attempt recorded rather than from the folder.
+        let first = MemoryPlatform::new(sfall_host(
+            "[Misc]\nWorldMapSlots=0\nA=1\n",
+            "[Misc]\nWorldMapSlots=21\nA=0\n",
+            Some("4.6"),
+            3,
+        ));
+        applied(&first, &script_release(&first)).expect_err("a failure");
+
+        let mut carried = sfall_host("", "[Misc]\nWorldMapSlots=21\nA=0\n", Some("4.6"), 0);
+        carried.files = first
+            .all_files()
+            .into_iter()
+            .map(|path| {
+                let bytes = first.fs().read(Path::new(&path)).expect("a file");
+                (path, Content::Binary(bytes))
+            })
+            .collect();
+        let retry = MemoryPlatform::new(carried);
+        applied(&retry, &script_release(&retry)).expect("the retry");
+        assert_eq!(
+            retry.text_at("/games/f2/ddraw.ini").as_deref(),
+            Some("[Misc]\nWorldMapSlots=21\nA=1\n")
+        );
     }
 
     #[test]

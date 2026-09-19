@@ -63,7 +63,8 @@ pub struct InstalledMod {
     pub manifest: String,
     /// State files as that release shipped them, latin1 text - the base an upgrade's merge compares
     /// against. Text rather than bytes because that is what the YAML file holds; a caller merging
-    /// against them encodes back to latin1 at the boundary.
+    /// against them encodes back to latin1 at the boundary. While a base install is unfinished, it holds
+    /// the stand-in base that install merges against, which a retry could no longer read from the folder.
     pub shipped: BTreeMap<String, String>,
     /// A base install's state files as they were before its installer first ran, latin1 text, held
     /// while the install is unfinished. An interrupted installer leaves its own copies in the folder,

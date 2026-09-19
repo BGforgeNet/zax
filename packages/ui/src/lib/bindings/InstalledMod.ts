@@ -43,6 +43,7 @@ manifest: string,
 /**
  * State files as that release shipped them, latin1 text - the base an upgrade's merge compares
  * against. Text rather than bytes because that is what the YAML file holds; a caller merging
- * against them encodes back to latin1 at the boundary.
+ * against them encodes back to latin1 at the boundary. While a base install is unfinished, it holds
+ * the stand-in base that install merges against, which a retry could no longer read from the folder.
  */
 shipped: { [key in string]: string }, };
