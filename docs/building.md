@@ -51,9 +51,10 @@ pnpm test:coverage              # the same, measured against a floor
 pnpm drive                      # the release build driven through its own window, over WebDriver
 ```
 
-`pnpm drive` needs a release build in `target/release` (`pnpm exec tauri build --no-bundle`), `tauri-driver` on
-`PATH` (`cargo install tauri-driver --locked`), and the platform's native driver: `WebKitWebDriver` on Linux, with
-a display, or on Windows the Edge driver matching the installed WebView2. macOS has no driver for its webview.
+`pnpm drive` needs a release build in `target/release` (`pnpm exec tauri build --no-bundle`), or `ZAX_PROGRAM`
+naming a program elsewhere, `tauri-driver` on `PATH` (`cargo install tauri-driver --locked`), and the platform's
+native driver: `WebKitWebDriver` on Linux, with a display, or on Windows the Edge driver matching the installed
+WebView2. macOS has no driver for its webview.
 `.github/scripts/install-drive-tools.sh` is what CI installs them with.
 
 The scripts are checked as JavaScript through `tsconfig.scripts.json`, which turns off `noImplicitAny` and

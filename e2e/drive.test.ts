@@ -71,7 +71,9 @@ beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), "zax-drive-"));
   const copy = join(scratch, "ZAX");
   mkdirSync(join(copy, "data", "config"), { recursive: true });
-  copyFileSync(join(ROOT, "target", "release", PROGRAM), join(copy, PROGRAM));
+  // ZAX_PROGRAM names a distributable's copy instead, for a runner that drives a build it did not make.
+  const built = process.env.ZAX_PROGRAM ?? join(ROOT, "target", "release", PROGRAM);
+  copyFileSync(resolve(built), join(copy, PROGRAM));
 
   // Real configuration files, and the executable an install is recognised by, which is never read.
   game = join(scratch, "game");
