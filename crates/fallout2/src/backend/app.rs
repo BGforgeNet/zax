@@ -990,7 +990,8 @@ impl Backend {
         Ok(())
     }
 
-    /// The one refusal every mod flow starts with: nothing runs over unsaved edits. Broader than the files
+    /// The one refusal every mod flow starts with: nothing runs over unsaved edits, or under a game ZAX
+    /// started that is still running. The edits half is broader than the files
     /// a plan touches, on purpose - a flow rewrites the order file and may merge inis, and "save or revert
     /// first" is a clearer contract than a per-file argument about which edit was safe.
     fn refuse_over_edits(&self) -> Result<Install> {
@@ -1002,6 +1003,12 @@ impl Backend {
         if !reading.settings.overrides.is_empty() || reading.order.changed() {
             return Err(Error::Unsupported(
                 "There are unsaved edits - save or revert them before changing mods.".to_owned(),
+            ));
+        }
+        // A running game holds its files open, and on Windows an install over them fails part way.
+        if self.game_running(&reading.install)? {
+            return Err(Error::Unsupported(
+                "The game is running - close it before changing mods.".to_owned(),
             ));
         }
         Ok(reading.install.clone())

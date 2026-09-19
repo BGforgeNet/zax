@@ -45,7 +45,8 @@ use crate::engine_release::{
 use crate::engines::{ENGINES, ReleaseModel, build_for};
 use crate::files::CONFIG_FILES;
 use crate::hires::installed_hires_version;
-use crate::launch::plan_launch;
+use crate::install_lock::still_running;
+use crate::launch::{game_program, plan_launch};
 use crate::manifest::{DroppedSetting, ManifestDefaults, ModSetting, may_write, parse_manifest};
 use crate::mod_asset::ModProgress;
 use crate::mod_base::{BaseInstallOutcome, BaseInstallPlan, apply_base_install, plan_base_install};
@@ -396,6 +397,9 @@ pub struct Backend {
     running: Mutex<Option<Arc<ReportState>>>,
     /// What the interface is showing and editing - see `app`.
     held: Mutex<app::Held>,
+    /// The game each install last started, by path: its process id and the program it runs as. A game
+    /// started any other way is not here, and an install over it fails on the files it holds instead.
+    games: Mutex<BTreeMap<String, (u32, String)>>,
 }
 
 impl std::fmt::Debug for Backend {
@@ -429,6 +433,7 @@ impl Backend {
             feeds: Mutex::new(None),
             running: Mutex::new(None),
             held: Mutex::new(app::Held::default()),
+            games: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -1282,7 +1287,15 @@ impl Backend {
         // Before the program starts, never after it exits: the seam's `launch` answers once the game is
         // up, and a swap owed to a session ZAX did not see the end of is a swap that never happens.
         swap_order_to(self.platform(), Path::new(&install.path), wanted)?;
+        let runs_as = game_program(program).to_owned();
         let plan = plan_launch(self.platform().os(), install, sfall_version, program);
+        let games = &self.games;
+        let started = |pid: u32| {
+            games
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .insert(install.path.clone(), (pid, runs_as.clone()));
+        };
         self.platform().process().launch(
             Path::new(&plan.program),
             &plan.args,
@@ -1290,9 +1303,31 @@ impl Backend {
                 cwd: Some(std::path::PathBuf::from(plan.cwd)),
                 env: plan.env,
                 log: plan.log.map(std::path::PathBuf::from),
-                on_start: None,
+                on_start: Some(&started),
             },
         )
+    }
+
+    /// Whether the game ZAX last started for this install is still running.
+    ///
+    /// # Errors
+    ///
+    /// Fails where the host cannot be asked about the process.
+    pub fn game_running(&self, install: &Install) -> Result<bool> {
+        let mut games = self
+            .games
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some((pid, runs_as)) = games.get(&install.path).cloned() else {
+            return Ok(false);
+        };
+        if self.platform().process().alive(pid)? && still_running(self.platform(), pid, &runs_as)? {
+            return Ok(true);
+        }
+        // Gone, or its id now someone else's: forgotten, so a later program given the same id is never
+        // taken for the game.
+        games.remove(&install.path);
+        Ok(false)
     }
 
     /// # Errors
@@ -1485,6 +1520,46 @@ mod tests {
             Arc::new(TestShell::default()),
         );
         (backend, platform)
+    }
+
+    /// What removing a mod answers after the game was started, on a host that reports the game's id
+    /// (the first the memory host hands out) as `live`, running `command` where one is given.
+    fn removal_after_play(live: bool, command: Option<&str>) -> Result<AppView> {
+        let platform = Arc::new(MemoryPlatform::new(MemoryOptions {
+            files: BTreeMap::from([("/games/f2/fallout2.exe".to_owned(), Content::from("MZ"))]),
+            dirs: vec!["/games/f2".to_owned()],
+            live_pids: if live { vec![1000] } else { Vec::new() },
+            commands: command
+                .map(|held| BTreeMap::from([(1000, held.to_owned())]))
+                .unwrap_or_default(),
+            ..MemoryOptions::default()
+        }));
+        let backend = Backend::new(
+            Arc::clone(&platform) as Arc<dyn Platform>,
+            Arc::new(TestShell::default()),
+        );
+        backend.add_install("/games/f2")?;
+        backend.select_install("/games/f2")?;
+        backend.launch_selected(None, None)?;
+        backend.remove_mod_and_read("ecco")
+    }
+
+    #[test]
+    fn a_mod_flow_waits_for_the_game_zax_started_to_close() {
+        let err = removal_after_play(true, None).expect_err("refused");
+        assert!(format!("{err}").contains("The game is running"), "{err}");
+        let err =
+            removal_after_play(true, Some("Z:\\games\\f2\\fallout2.exe")).expect_err("refused");
+        assert!(format!("{err}").contains("The game is running"), "{err}");
+    }
+
+    #[test]
+    fn a_game_that_has_exited_or_whose_id_moved_on_refuses_nothing() {
+        // Past the guard, the removal answers for itself: there is no such mod here.
+        for (live, command) in [(false, None), (true, Some("/usr/bin/bash"))] {
+            let err = removal_after_play(live, command).expect_err("nothing to remove");
+            assert!(format!("{err}").contains("Nothing of"), "{err}");
+        }
     }
 
     #[test]

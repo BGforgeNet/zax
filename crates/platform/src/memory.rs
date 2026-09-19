@@ -369,6 +369,20 @@ impl MemoryPlatform {
         self.options.archives.get(&text(&held))
     }
 
+    /// Hands a started program the next id, as the real host does once the process exists - whether
+    /// it is waited for or left running.
+    fn started(&self, options: &LaunchOptions<'_>) {
+        if let Some(on_start) = options.on_start {
+            let pid = {
+                let mut state = self.state();
+                let pid = state.next_pid;
+                state.next_pid += 1;
+                pid
+            };
+            on_start(pid);
+        }
+    }
+
     fn canned_run(&self, program: &str, args: &[String]) -> Option<&RunOutcome> {
         let first = args.first().map_or("", String::as_str);
         let with_sub = format!("{program} {first}");
@@ -648,6 +662,7 @@ impl ProcessLauncher for MemoryPlatform {
             .records
             .launched
             .push(record_of(program, args, options));
+        self.started(options);
         Ok(())
     }
 
@@ -668,15 +683,7 @@ impl ProcessLauncher for MemoryPlatform {
             .ok_or_else(|| missing("run", &name))?;
         // Before the answer rather than after it: the id is what a caller writes down while the
         // program is running, and a test that only ever saw it afterwards would not exercise that.
-        if let Some(on_start) = options.on_start {
-            let pid = {
-                let mut state = self.state();
-                let pid = state.next_pid;
-                state.next_pid += 1;
-                pid
-            };
-            on_start(pid);
-        }
+        self.started(options);
         Ok(canned)
     }
 

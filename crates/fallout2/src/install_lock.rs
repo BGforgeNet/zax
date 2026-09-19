@@ -178,26 +178,32 @@ pub fn take_install_lock(
     claim_again(platform, at, mine)
 }
 
-/// Whether a live id is still the program the claim was handed to, rather than a number the system
-/// has since given to something else.
-///
-/// Only a positive disagreement counts: a host that cannot say what an id is running answers `None`,
-/// and treating that as a mismatch would break claims on every host without the answer.
-///
-/// A claim that never reached an installer names no command, and the id in it is ZAX's own - alive
-/// means another ZAX, which is a refusal on its own terms.
+/// Whether a live id is still the program the claim was handed to. A claim that never reached an
+/// installer names no command, and the id in it is ZAX's own - alive means another ZAX, which is a
+/// refusal on its own terms.
 fn still_it(platform: &dyn Platform, existing: &LockRecord) -> Result<bool> {
     let Some(command) = &existing.command else {
         return Ok(true);
     };
-    let Some(running) = platform.process().command_of(existing.pid)? else {
+    still_running(platform, existing.pid, command)
+}
+
+/// Whether a live id is still running `program`, rather than a number the system has since given to
+/// something else.
+///
+/// Only a positive disagreement counts: a host that cannot say what an id is running answers `None`,
+/// and treating that as a mismatch would break the check on every host without the answer.
+///
+/// # Errors
+///
+/// Fails where the host cannot be asked.
+pub fn still_running(platform: &dyn Platform, pid: u32, program: &str) -> Result<bool> {
+    let Some(running) = platform.process().command_of(pid)? else {
         return Ok(true);
     };
-    let name = Path::new(command)
+    let name = Path::new(program)
         .file_name()
-        .map_or(command.as_str(), |name| {
-            name.to_str().unwrap_or(command.as_str())
-        });
+        .map_or(program, |name| name.to_str().unwrap_or(program));
     Ok(running.contains(name))
 }
 

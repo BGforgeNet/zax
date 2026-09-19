@@ -13,6 +13,13 @@ use zax_platform::OperatingSystem;
 
 const EXECUTABLE: &str = "fallout2.exe";
 
+/// The program a started game runs as: an engine's own, or the game's executable - which Wine runs
+/// under its own name too, so the launcher that started it is not what the process shows.
+#[must_use]
+pub fn game_program(engine_program: Option<&str>) -> &str {
+    engine_program.unwrap_or(EXECUTABLE)
+}
+
 /// Where Wine's own output is kept.
 ///
 /// Beside the game's `debug.log` because that is where a user looks for one, and it is per install
