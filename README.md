@@ -24,6 +24,22 @@ pnpm desktop
 
 The [releases page](https://github.com/BGforgeNet/zax/releases) carries the earlier Python versions, up to 0.7.
 
+### Blank window or crash on Linux
+
+ZAX draws in WebKitGTK, whose accelerated rendering fails on some drivers, most often NVIDIA's proprietary one
+under Wayland: the window stays white, or the program quits with `Error 71 (Protocol error)`. Start it with one
+of these set, in this order: the first costs nothing, and each after it gives up more of the fast drawing path.
+`ZAX.AppImage` stands for the file you downloaded.
+
+```bash
+__NV_DISABLE_EXPLICIT_SYNC=1 ./ZAX.AppImage        # NVIDIA only
+WEBKIT_DISABLE_DMABUF_RENDERER=1 ./ZAX.AppImage
+WEBKIT_DISABLE_COMPOSITING_MODE=1 ./ZAX.AppImage   # no accelerated compositing at all
+```
+
+The same works for the program from the tarball. Tauri's
+[Linux graphics notes](https://v2.tauri.app/develop/debug/linux-graphics/) cover the symptoms in more detail.
+
 ### Info
 
 - [Forums](https://forums.bgforge.net/viewforum.php?f=34)
