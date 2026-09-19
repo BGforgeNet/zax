@@ -12,6 +12,7 @@
     "build": "pnpm --filter @zax/ui build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "drive": "vitest run --config vitest.e2e.config.ts",
     "check": "tsc -p tsconfig.json && tsc -p tsconfig.scripts.json && pnpm --filter @zax/ui exec svelte-check --tsconfig ./tsconfig.json",
     "lint": "oxlint --type-aware && eslint . && oxfmt --check",
     "knip": "knip",

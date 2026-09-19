@@ -204,3 +204,13 @@ jobs:
           path: release/*.zip
           if-no-files-found: error
           retention-days: 7
+      # The program just built, driven through its own window against a game folder on this runner's disk: the only
+      # run of the real shell and webview on Windows. After the uploads, so a failing drive still leaves the build to
+      # download. macOS has no WebDriver for its webview.
+      - if: runner.os != 'macOS'
+        run: ./.github/scripts/install-drive-tools.sh
+        shell: bash
+      - if: runner.os == 'Linux'
+        run: xvfb-run pnpm drive
+      - if: runner.os == 'Windows'
+        run: pnpm drive
