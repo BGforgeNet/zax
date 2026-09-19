@@ -909,6 +909,39 @@ mod tests {
     }
 
     #[test]
+    fn the_version_the_installer_stamps_stands_over_the_one_it_replaced() {
+        // An install ZAX has no record of - one upstream's own installer made - has no base to merge
+        // against, so without this the user's copy would put the old release's stamp back.
+        let mut options = host_options(
+            &[(
+                "/games/f2/ddraw.ini",
+                "[Misc]\nVersionString=FALLOUT II 1.02.33\nA=1\n",
+            )],
+            Some(0),
+            "",
+        );
+        options.archives = BTreeMap::from([(
+            "payload".to_owned(),
+            BTreeMap::from([
+                ("upu-install.sh".to_owned(), Content::from("#!/bin/sh\n")),
+                (
+                    "ddraw.ini".to_owned(),
+                    Content::from("[Misc]\nVersionString=FALLOUT II 1.02.34\nA=0\n"),
+                ),
+            ]),
+        )]);
+        let platform = MemoryPlatform::new(options);
+        applied(&platform, &script_release(&platform)).expect("an install");
+        let after = platform.text_at("/games/f2/ddraw.ini").expect("a file");
+        assert!(
+            after.contains("VersionString=FALLOUT II 1.02.34"),
+            "{after}"
+        );
+        // The rest is still the user's.
+        assert!(after.contains("A=1"), "{after}");
+    }
+
+    #[test]
     fn an_installer_that_stops_says_how_far_it_got_and_where_the_backup_is() {
         let platform = script_host(&[], Some(3), "could not write data/\n");
         let err = applied(&platform, &script_release(&platform)).expect_err("a failure");

@@ -6,7 +6,8 @@
 //! settings tabs.
 //!
 //! The order is hold, let the install write, merge back - the user's values winning over the
-//! release's new defaults, with the previous release's copy as the base where a record holds one.
+//! release's new defaults, with the previous release's copy as the base where a record holds one. The
+//! version stamp is the release's alone.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -15,6 +16,17 @@ use zax_core::ini::IniDocument;
 use zax_core::ini_merge::{MergeConflict, merge_ini};
 use zax_platform::fs::FileKind;
 use zax_platform::{Platform, Result};
+
+use crate::base_version::{STAMP_FILE, STAMP_KEY, STAMP_SECTION};
+
+/// Whether a declared path is a base mod's version stamp - at the root, or inside an install a mod
+/// created.
+fn is_stamp_file(relative: &str) -> bool {
+    relative
+        .rsplit('/')
+        .next()
+        .is_some_and(|name| name.eq_ignore_ascii_case(STAMP_FILE))
+}
 
 fn inside(root: &Path, relative: &str) -> PathBuf {
     let mut at = root.to_path_buf();
@@ -109,11 +121,20 @@ pub fn merge_user_files(
         let base = previous
             .and_then(|held| held.get(path))
             .map(|bytes| IniDocument::parse(bytes));
-        let merged = merge_ini(
-            IniDocument::parse(&shipped),
-            &IniDocument::parse(mine),
-            base.as_ref(),
-        );
+        let theirs = IniDocument::parse(&shipped);
+        let stamp = is_stamp_file(path)
+            .then(|| theirs.get(STAMP_SECTION, STAMP_KEY).map(<[u8]>::to_vec))
+            .flatten();
+        let mut merged = merge_ini(theirs, &IniDocument::parse(mine), base.as_ref());
+        // The stamp names the release now installed, and the user's copy names the one it replaced;
+        // with no record to merge against, the user's would otherwise win and the install read as old.
+        if let Some(stamp) = stamp {
+            merged.document.set(STAMP_SECTION, STAMP_KEY, &stamp);
+            merged.conflicts.retain(|one| {
+                !(one.section.eq_ignore_ascii_case(STAMP_SECTION)
+                    && one.key.eq_ignore_ascii_case(STAMP_KEY))
+            });
+        }
         platform.fs().write(&target, &merged.document.to_bytes())?;
         out.conflicts.extend(merged.conflicts);
     }
@@ -307,5 +328,40 @@ mod tests {
             platform.text_at("/game/ddraw.ini").as_deref(),
             Some("[Misc]\nA=9\n")
         );
+    }
+
+    #[test]
+    fn the_releases_version_stamp_stands_and_is_no_conflict_even_where_the_user_edited_it() {
+        let platform = platform_with(&[("/game/ddraw.ini", "[Misc]\nVersionString=mine\n")]);
+        let held = hold_user_files(
+            &platform,
+            Path::new("/game"),
+            &declared(),
+            Path::new("/backup"),
+        )
+        .expect("hold");
+        platform
+            .fs()
+            .write(Path::new("/game/ddraw.ini"), b"[Misc]\nVersionString=new\n")
+            .expect("the install writes");
+
+        let previous = BTreeMap::from([(
+            "ddraw.ini".to_owned(),
+            b"[Misc]\nVersionString=old\n".to_vec(),
+        )]);
+        let merged = merge_user_files(
+            &platform,
+            Path::new("/game"),
+            &declared(),
+            &held,
+            Some(&previous),
+        )
+        .expect("merge");
+
+        assert_eq!(
+            platform.text_at("/game/ddraw.ini").as_deref(),
+            Some("[Misc]\nVersionString=new\n")
+        );
+        assert!(merged.conflicts.is_empty(), "{:?}", merged.conflicts);
     }
 }

@@ -932,7 +932,7 @@ pub fn availability(release: &ModRelease, context: &ModContext<'_>) -> Availabil
     }
 
     if let Some(recorded) = recorded {
-        match compare_versions(&manifest.version, &recorded.version) {
+        match compare_in_line(release.line.as_ref(), &manifest.version, &recorded.version) {
             Ordering::Less => {
                 return Availability::Downgrade {
                     from: recorded.version.clone(),
@@ -1879,6 +1879,24 @@ mod tests {
             availability(&release_of("fo2tweaks", "2.0"), &context(&ahead, &install)),
             Availability::Downgrade {
                 from: "3.0".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn a_record_from_before_a_lines_split_is_behind_the_lines_release() {
+        // Component by component `30` is newer than `2.3.34`, which would offer the update as a downgrade.
+        let record = record_with(vec![installed("fo2tweaks", "30", true)]);
+        let install = install();
+        let mut release = release_of("fo2tweaks", "2.3.34");
+        release.line = Some(ModLine {
+            prefix: "2.3.",
+            counter: true,
+        });
+        assert_eq!(
+            availability(&release, &context(&record, &install)),
+            Availability::Upgrade {
+                from: "30".to_owned()
             }
         );
     }

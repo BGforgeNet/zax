@@ -74,6 +74,11 @@ fn shapes() -> &'static Shapes {
     })
 }
 
+/// Where a base mod stamps its version: the file, relative to the install, then section and key.
+pub const STAMP_FILE: &str = "ddraw.ini";
+pub const STAMP_SECTION: &str = "Misc";
+pub const STAMP_KEY: &str = "VersionString";
+
 /// The release a `VersionString` names, or `None` where it names none - a vanilla install with sfall
 /// has the field too, and it says nothing about a base mod.
 #[must_use]
@@ -128,13 +133,13 @@ pub fn base_version_of(text: &str) -> Option<BaseVersion> {
 ///
 /// Fails when the file is there but cannot be read.
 pub fn installed_base_version(platform: &dyn Platform, root: &Path) -> Result<Option<BaseVersion>> {
-    let at = root.join("ddraw.ini");
+    let at = root.join(STAMP_FILE);
     if platform.fs().stat(&at)?.map(|s| s.kind) != Some(FileKind::File) {
         return Ok(None);
     }
     let document = IniDocument::parse(&platform.fs().read(&at)?);
     Ok(document
-        .get_str("Misc", "VersionString")
+        .get_str(STAMP_SECTION, STAMP_KEY)
         .as_deref()
         .and_then(base_version_of))
 }
