@@ -530,6 +530,7 @@ pub fn apply_create_install(
         parts: Vec::new(),
         manifest: release.manifest_text.clone(),
         shipped: BTreeMap::new(),
+        before: BTreeMap::new(),
         carried: BTreeMap::new(),
     };
     save_record(platform, &with_mod(&record, &pending))?;
@@ -989,6 +990,7 @@ extract-dat.into: data
                     parts: Vec::new(),
                     manifest: MANIFEST.to_owned(),
                     shipped: BTreeMap::new(),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
             ),
@@ -1028,6 +1030,7 @@ extract-dat.into: data
                     parts: Vec::new(),
                     manifest: MANIFEST.to_owned(),
                     shipped: BTreeMap::new(),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
             ),

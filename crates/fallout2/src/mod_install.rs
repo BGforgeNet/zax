@@ -693,6 +693,7 @@ pub fn apply_mod_install(
         },
         manifest: release.manifest_text.clone(),
         shipped: BTreeMap::new(),
+        before: BTreeMap::new(),
         carried: BTreeMap::new(),
     };
     save_record(platform, &with_mod(&record, &pending))?;
@@ -1589,6 +1590,7 @@ mod tests {
                     parts: Vec::new(),
                     manifest: release.manifest_text.clone(),
                     shipped: BTreeMap::new(),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
             ),
@@ -1639,6 +1641,7 @@ mod tests {
                     parts: Vec::new(),
                     manifest: release.manifest_text.clone(),
                     shipped: BTreeMap::new(),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
             ),
@@ -1740,6 +1743,7 @@ mod tests {
                     parts: Vec::new(),
                     manifest: manifest_text(""),
                     shipped: BTreeMap::new(),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
             ),
@@ -1774,6 +1778,7 @@ mod tests {
                                installer.other.run: upu-install.sh\n"
                         .to_owned(),
                     shipped: BTreeMap::new(),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
             ),
@@ -1806,6 +1811,7 @@ mod tests {
                                creates.directory: Fallout1in2\n"
                         .to_owned(),
                     shipped: BTreeMap::new(),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
             ),
@@ -1829,6 +1835,7 @@ mod tests {
             parts: Vec::new(),
             manifest: "spec: 99\n".to_owned(),
             shipped: BTreeMap::new(),
+            before: BTreeMap::new(),
             carried: BTreeMap::new(),
         };
         let err = refuse_removal(&recorded).expect_err("refused");
@@ -1848,6 +1855,7 @@ mod tests {
             parts: Vec::new(),
             manifest: manifest_text(""),
             shipped: BTreeMap::new(),
+            before: BTreeMap::new(),
             carried: BTreeMap::new(),
         };
         assert!(refuse_removal(&recorded).is_ok());

@@ -361,7 +361,21 @@ fn install_under_lock(
     // settings tabs.
     let backup = backup_directory(platform).join(stamp(now));
     let declared: Vec<String> = CONFIG_FILES.iter().map(|one| (*one).to_owned()).collect();
-    let mine = hold_user_files(platform, root, &declared, &backup)?;
+    let here = hold_user_files(platform, root, &declared, &backup)?;
+    // A retry after an installer that never returned finds that installer's copies in the folder, so
+    // the files the first attempt held are the user's, not these.
+    let mine = match record
+        .mods
+        .iter()
+        .find(|held| held.id == manifest.id && !held.complete && !held.before.is_empty())
+    {
+        Some(unfinished) => unfinished
+            .before
+            .iter()
+            .map(|(path, text)| (path.clone(), zax_core::text::latin1_bytes(text)))
+            .collect(),
+        None => here,
+    };
 
     // Before the payload lands, and on a first install only: what arrives with the mod is spelled the
     // way the mod spells it, and `mods/AmmoGlovz.ini` is upstream's file rather than something to
@@ -385,6 +399,10 @@ fn install_under_lock(
         parts: Vec::new(),
         manifest: release.manifest_text.clone(),
         shipped: BTreeMap::new(),
+        before: mine
+            .iter()
+            .map(|(path, bytes)| (path.clone(), zax_core::text::latin1(bytes)))
+            .collect(),
         carried: BTreeMap::new(),
     };
     save_record(platform, &with_base(&record, &pending))?;
@@ -511,6 +529,7 @@ fn install_under_lock(
             .iter()
             .map(|(path, bytes)| (path.clone(), zax_core::text::latin1(bytes)))
             .collect(),
+        before: BTreeMap::new(),
         ..pending
     };
     save_record(platform, &with_base(&written, &done))?;
@@ -903,6 +922,41 @@ mod tests {
         // Reported, not unwound - and the unfinished record says a run started here.
         let held = recorded(&platform).expect("a record entry");
         assert!(!held.complete);
+    }
+
+    #[test]
+    fn a_retry_puts_back_the_settings_from_before_the_first_attempt() {
+        // The first attempt stops part way and leaves the installer's own `ddraw.ini` behind, which is
+        // also what a relaunch finds after ZAX was closed while its installer ran.
+        let first = script_host(&[("/games/f2/ddraw.ini", "[Misc]\nA=1\n")], Some(3), "");
+        applied(&first, &script_release(&first)).expect_err("a failure");
+        let files: Vec<(String, String)> = first
+            .all_files()
+            .into_iter()
+            .map(|path| {
+                let text = if path == "/games/f2/ddraw.ini" {
+                    "[Misc]\nA=0\n".to_owned()
+                } else {
+                    first.text_at(&path).unwrap_or_default()
+                };
+                (path, text)
+            })
+            .collect();
+        let carried: Vec<(&str, &str)> = files
+            .iter()
+            .map(|(path, text)| (path.as_str(), text.as_str()))
+            .collect();
+
+        let retry = script_host(&carried, Some(0), "");
+        applied(&retry, &script_release(&retry)).expect("the retry");
+        let after = retry.text_at("/games/f2/ddraw.ini").expect("a file");
+        assert!(after.contains("A=1"), "{after}");
+        let held = recorded(&retry).expect("a record entry");
+        assert!(held.complete);
+        assert!(
+            held.before.is_empty(),
+            "a finished install holds nothing back"
+        );
     }
 
     #[test]

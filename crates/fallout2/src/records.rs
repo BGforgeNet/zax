@@ -65,6 +65,13 @@ pub struct InstalledMod {
     /// against. Text rather than bytes because that is what the YAML file holds; a caller merging
     /// against them encodes back to latin1 at the boundary.
     pub shipped: BTreeMap<String, String>,
+    /// A base install's state files as they were before its installer first ran, latin1 text, held
+    /// while the install is unfinished. An interrupted installer leaves its own copies in the folder,
+    /// so a retry that read the folder instead would put those back as the user's settings.
+    ///
+    /// Not sent across the command boundary, for the reason `carried` is not.
+    #[serde(skip)]
+    pub before: BTreeMap<String, String>,
     /// Fields this version has no rule for, kept as read and written back unchanged.
     ///
     /// A later ZAX may record more per mod than this one knows, and rewriting the file for an
@@ -230,7 +237,7 @@ fn field<'a>(fields: &'a yaml_rust2::yaml::Hash, name: &str) -> Option<&'a Yaml>
 /// What this version writes per mod - everything else in an entry is carried rather than understood.
 const MOD_FIELDS: &[&str] = &[
     "id", "version", "type", "reason", "complete", "files", "entries", "parts", "manifest",
-    "shipped",
+    "shipped", "before",
 ];
 
 /// One recorded mod, or `None` when the entry cannot be trusted.
@@ -317,17 +324,22 @@ fn read_mod(entry: &Yaml) -> Option<InstalledMod> {
         parts.push(part);
     }
 
-    let mut shipped = BTreeMap::new();
-    if let Some(held) = field(fields, "shipped").and_then(Yaml::as_hash) {
-        for (path, content) in held {
-            let path = as_text(Some(path))?;
-            let text = as_text(Some(content))?;
-            if !writable(&path) {
-                return None;
+    let texts = |name: &str| -> Option<BTreeMap<String, String>> {
+        let mut out = BTreeMap::new();
+        if let Some(held) = field(fields, name).and_then(Yaml::as_hash) {
+            for (path, content) in held {
+                let path = as_text(Some(path))?;
+                let text = as_text(Some(content))?;
+                if !writable(&path) {
+                    return None;
+                }
+                out.insert(path, text);
             }
-            shipped.insert(path, text);
         }
-    }
+        Some(out)
+    };
+    let shipped = texts("shipped")?;
+    let before = texts("before")?;
 
     // Anything this version has no rule for rides along untouched rather than being lost on the next
     // write.
@@ -352,6 +364,7 @@ fn read_mod(entry: &Yaml) -> Option<InstalledMod> {
         parts,
         manifest,
         shipped,
+        before,
         carried,
     })
 }
@@ -526,6 +539,13 @@ fn mod_entry(held: &InstalledMod) -> Yaml {
         shipped.insert(yaml_text(path), yaml_text(content));
     }
     fields.insert(yaml_text("shipped"), Yaml::Hash(shipped));
+    if !held.before.is_empty() {
+        let mut before = yaml_rust2::yaml::Hash::new();
+        for (path, content) in &held.before {
+            before.insert(yaml_text(path), yaml_text(content));
+        }
+        fields.insert(yaml_text("before"), Yaml::Hash(before));
+    }
     Yaml::Hash(fields)
 }
 
@@ -744,6 +764,7 @@ mod tests {
             parts: Vec::new(),
             manifest: manifest_text(id),
             shipped: Map::new(),
+            before: Map::new(),
             carried: Map::new(),
         }
     }

@@ -1584,6 +1584,7 @@ mod tests {
             parts: Vec::new(),
             manifest: manifest_text(id),
             shipped: BTreeMap::new(),
+            before: BTreeMap::new(),
             carried: BTreeMap::new(),
         }
     }

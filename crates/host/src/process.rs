@@ -3,6 +3,8 @@
 use std::io::Read as _;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use zax_platform::process::{LaunchOptions, ProcessIdentity, ProcessLauncher, RunOutcome};
@@ -155,10 +157,32 @@ impl StreamOf {
     }
 }
 
+/// How many programs `run` is waiting on right now. A mod's installer is the one such program, and a
+/// close has something particular to say about it: closing ZAX does not wait for it.
+#[derive(Debug, Clone, Default)]
+pub struct Running(Arc<AtomicUsize>);
+
+impl Running {
+    #[must_use]
+    pub fn any(&self) -> bool {
+        self.0.load(Ordering::SeqCst) > 0
+    }
+}
+
+/// Counts one program for as long as it is held, whichever way `run` returns.
+struct Waiting<'a>(&'a AtomicUsize);
+
+impl Drop for Waiting<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 #[derive(Debug)]
 pub struct HostProcess {
     os: OperatingSystem,
     identity: ProcessIdentity,
+    running: Running,
 }
 
 impl HostProcess {
@@ -170,7 +194,14 @@ impl HostProcess {
                 host: hostname(),
                 pid: std::process::id(),
             },
+            running: Running::default(),
         }
+    }
+
+    /// A handle on the count of programs being waited on, which stays live as the count moves.
+    #[must_use]
+    pub fn running(&self) -> Running {
+        self.running.clone()
     }
 
     /// A command with the caller's working directory and environment applied. The environment is added
@@ -256,6 +287,8 @@ impl ProcessLauncher for HostProcess {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         let mut child = command.spawn().map_err(|err| failed("run", program, err))?;
+        self.running.0.fetch_add(1, Ordering::SeqCst);
+        let _waiting = Waiting(&self.running.0);
         // On the id the system actually gave it, which a spawn that failed has none of.
         if let Some(on_start) = options.on_start {
             on_start(child.id());
@@ -494,6 +527,27 @@ mod tests {
             .clone();
         assert_eq!(held.len(), 1);
         assert!(held[0] > 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_program_is_counted_as_running_until_it_has_been_waited_for() {
+        let process = host();
+        let running = process.running();
+        let during = std::sync::atomic::AtomicBool::new(false);
+        let note = |_pid: u32| during.store(running.any(), Ordering::SeqCst);
+        process
+            .run(
+                Path::new("/bin/sh"),
+                &["-c".to_owned(), "exit 4".to_owned()],
+                &LaunchOptions {
+                    on_start: Some(&note),
+                    ..LaunchOptions::default()
+                },
+            )
+            .expect("a program that ran");
+        assert!(during.load(Ordering::SeqCst), "counted while it ran");
+        assert!(!running.any(), "and not once it was waited for");
     }
 
     #[cfg(unix)]

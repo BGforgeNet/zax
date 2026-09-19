@@ -355,6 +355,7 @@ fn seed_record(platform: &MemoryPlatform) -> Result<()> {
                         "mods/fo2tweaks.ini".to_owned(),
                         FO2TWEAKS_INI.to_owned(),
                     )]),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
                 // A mod ZAX installed that no feed follows any more - an id retired from the list, or
@@ -376,6 +377,7 @@ fn seed_record(platform: &MemoryPlatform) -> Result<()> {
                     parts: Vec::new(),
                     manifest: WEAPON_SOUNDS_MANIFEST.to_owned(),
                     shipped: BTreeMap::new(),
+                    before: BTreeMap::new(),
                     carried: BTreeMap::new(),
                 },
             ],

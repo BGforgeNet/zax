@@ -233,6 +233,8 @@ pub fn read_transaction(
             parts: held.parts,
             manifest: held.manifest,
             shipped: held.shipped,
+            // Only an unfinished base install holds these, and a base install opens no transaction.
+            before: BTreeMap::new(),
             carried: carried_from(&held.carried),
         }),
         order: journal.order,
@@ -392,6 +394,7 @@ mod tests {
             parts: vec!["wide".to_owned()],
             manifest: MANIFEST.to_owned(),
             shipped: BTreeMap::from([("ddraw.ini".to_owned(), "[Misc]\n".to_owned())]),
+            before: BTreeMap::new(),
             carried,
         };
         let before = ModTransaction {

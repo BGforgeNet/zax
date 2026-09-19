@@ -88,6 +88,12 @@ impl HostPlatform {
             registry: HostRegistry::new(os),
         }
     }
+
+    /// The count of programs the platform is waiting on - what a close asks about.
+    #[must_use]
+    pub fn running(&self) -> crate::process::Running {
+        self.process.running()
+    }
 }
 
 impl Platform for HostPlatform {

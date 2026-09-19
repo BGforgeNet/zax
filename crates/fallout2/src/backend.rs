@@ -1580,6 +1580,7 @@ mod tests {
                        kind: int\n    label: Speed\n    default: '5'\n"
                 .to_owned(),
             shipped: BTreeMap::new(),
+            before: BTreeMap::new(),
             carried: BTreeMap::new(),
         }
     }

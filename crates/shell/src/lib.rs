@@ -162,9 +162,13 @@ pub fn run() -> tauri::Result<()> {
             // is being built - so the sink is handed the platform once it exists. Nothing can download
             // before the window is up, so no note can arrive before it is filled.
             let logging: Arc<OnceLock<Arc<dyn Platform>>> = Arc::new(OnceLock::new());
-            let platform: Arc<dyn Platform> = Arc::new(HostPlatform::new(Some(Box::new(
-                download_note(Arc::clone(&logging), Arc::clone(&window)),
+            let host = HostPlatform::new(Some(Box::new(download_note(
+                Arc::clone(&logging),
+                Arc::clone(&window),
             ))));
+            // Before the window exists, since its close is what reads it.
+            app.manage(host.running());
+            let platform: Arc<dyn Platform> = Arc::new(host);
             let _ = logging.set(Arc::clone(&platform));
             log_panics(Arc::clone(&platform), Arc::clone(&window));
             crate::window::build(app, &platform, &window)?;
