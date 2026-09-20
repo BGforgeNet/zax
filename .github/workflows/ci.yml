@@ -167,7 +167,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: cargo-release-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          # Keyed on the image rather than the operating system: a target directory holds paths into the
+          # image it was built on, so two Linux images sharing one entry restore each other's build and
+          # cargo then skips compiling a dependency whose library is not there.
+          key: cargo-release-${{ matrix.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - run: pnpm install --frozen-lockfile
       - run: ./.github/scripts/package.sh
         shell: bash
