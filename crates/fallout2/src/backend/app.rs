@@ -1005,13 +1005,19 @@ impl Backend {
                 "There are unsaved edits - save or revert them before changing mods.".to_owned(),
             ));
         }
-        // A running game holds its files open, and on Windows an install over them fails part way.
-        if self.game_running(&reading.install)? {
+        self.refuse_while_running(&reading.install)?;
+        Ok(reading.install.clone())
+    }
+
+    /// Shared by the mod flows and the sfall update, which both replace files in the folder.
+    fn refuse_while_running(&self, install: &Install) -> Result<()> {
+        // A running game holds its files open, and on Windows a write over them fails part way.
+        if self.game_running(install)? {
             return Err(Error::Unsupported(
-                "The game is running - close it before changing mods.".to_owned(),
+                "The game is running - close it before changing its files.".to_owned(),
             ));
         }
-        Ok(reading.install.clone())
+        Ok(())
     }
 
     fn selected_install(&self) -> Result<Install> {
@@ -1054,12 +1060,13 @@ impl Backend {
     ///
     /// # Errors
     ///
-    /// Fails for every reason the update does.
+    /// Refuses while the game ZAX started is running, and fails for every reason the update does.
     pub fn change_sfall(
         &self,
         version: Option<&str>,
     ) -> Result<Answered<crate::sfall::SfallUpdate>> {
         let install = self.selected_install()?;
+        self.refuse_while_running(&install)?;
         let version = match version {
             Some(version) => version.to_owned(),
             None => {

@@ -1522,9 +1522,13 @@ mod tests {
         (backend, platform)
     }
 
-    /// What removing a mod answers after the game was started, on a host that reports the game's id
-    /// (the first the memory host hands out) as `live`, running `command` where one is given.
-    fn removal_after_play(live: bool, command: Option<&str>) -> Result<AppView> {
+    /// What `then` answers after the game was started, on a host that reports the game's id (the first
+    /// the memory host hands out) as `live`, running `command` where one is given.
+    fn after_play<T>(
+        live: bool,
+        command: Option<&str>,
+        then: impl Fn(&Backend) -> Result<T>,
+    ) -> Result<T> {
         let platform = Arc::new(MemoryPlatform::new(MemoryOptions {
             files: BTreeMap::from([("/games/f2/fallout2.exe".to_owned(), Content::from("MZ"))]),
             dirs: vec!["/games/f2".to_owned()],
@@ -1541,7 +1545,11 @@ mod tests {
         backend.add_install("/games/f2")?;
         backend.select_install("/games/f2")?;
         backend.launch_selected(None, None)?;
-        backend.remove_mod_and_read("ecco")
+        then(&backend)
+    }
+
+    fn removal_after_play(live: bool, command: Option<&str>) -> Result<AppView> {
+        after_play(live, command, |backend| backend.remove_mod_and_read("ecco"))
     }
 
     #[test]
@@ -1551,6 +1559,17 @@ mod tests {
         let err =
             removal_after_play(true, Some("Z:\\games\\f2\\fallout2.exe")).expect_err("refused");
         assert!(format!("{err}").contains("The game is running"), "{err}");
+    }
+
+    #[test]
+    fn the_sfall_update_waits_for_the_game_zax_started_to_close() {
+        let update = |live| after_play(live, None, |backend| backend.change_sfall(Some("4.5")));
+        let err = update(true).expect_err("refused");
+        assert!(format!("{err}").contains("The game is running"), "{err}");
+        // With the game closed the update runs on and fails at the download this host cannot make,
+        // which is what says the refusal above came from the guard.
+        let err = update(false).expect_err("no network here");
+        assert!(!format!("{err}").contains("The game is running"), "{err}");
     }
 
     #[test]
