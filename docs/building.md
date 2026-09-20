@@ -75,6 +75,11 @@ Windows and macOS. The domain's tests run a second time on Windows, on their own
 filesystem, process launch and registry calls are, and drive letters, a case-insensitive filesystem and
 `reg query` have no equivalent on the Linux runner.
 
+Each build is then run: `pnpm drive` on Linux and Windows, and on macOS, where it cannot,
+`.github/scripts/launch-macos.sh` - which unpacks the bundle, checks it carries a build for the machine, starts
+it and requires it to stay up without panicking. What that misses is a window that opens empty, and Gatekeeper,
+which lets a bundle built on the runner through because nothing marked it as downloaded.
+
 The shell scripts, the workflows and the composite action are checked by `shellcheck`, `actionlint` and
 `zizmor` in a job of their own - `.github/scripts/lint-workflows.sh`, which fetches the two the runner does
 not carry. It is not part of `pnpm lint`: none of the three is a Node dependency, and requiring them on every
