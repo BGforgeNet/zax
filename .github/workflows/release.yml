@@ -19,11 +19,13 @@ concurrency:
   group: release-${{ github.ref }}
 
 jobs:
+  # Linux builds on the oldest image GitHub offers, for the glibc floor the AppImage and the portable copy
+  # inherit from it - neither carries a glibc of its own. ci.yml's build job says what a newer image costs.
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-22.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:

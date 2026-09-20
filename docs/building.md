@@ -112,6 +112,11 @@ a start menu entry and cost administrator rights. The Windows program is one fil
 and runs where it lies. The AppImage carries its own webview libraries and is mounted rather than unpacked; the
 tarball's program uses the system's WebKitGTK 4.1.
 
+Neither Linux artifact carries a glibc, so the one the runner builds against is the oldest release the program
+starts on - an older one refuses at the loader, before `main`. CI packages Linux on the oldest image GitHub
+offers for that reason, which puts the floor at Ubuntu 22.04 and Debian 12. Reading it off a build:
+`readelf -V <program> | grep GLIBC_` names the versions it needs, and the highest is the floor.
+
 ## First run on Windows and macOS
 
 Nothing ZAX ships is code-signed, so both systems warn once. Neither warning means the download is damaged.

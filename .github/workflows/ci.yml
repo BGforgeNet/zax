@@ -135,12 +135,17 @@ jobs:
   # Packaging is its own gate: the tests run the sources, and none of them would notice a bundle that stopped
   # building, a file left out, or a target that fails on one platform. Three runners because each produces a
   # distributable only that platform can make.
+  #
+  # Linux packages on the oldest image GitHub offers, because the glibc it builds against is the oldest the
+  # program will start on and neither bundle carries one: on 24.04 the standard library links pidfd_spawnp,
+  # which records a need for glibc 2.39 and leaves the program refusing to start on Debian 12, Ubuntu 22.04
+  # and RHEL 9. That image's WebKitGTK is a release behind 24.04's rather than a generation.
   build:
     needs: [verify, rust]
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-22.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     steps:
