@@ -1009,7 +1009,8 @@ impl Backend {
         Ok(reading.install.clone())
     }
 
-    /// Shared by the mod flows and the sfall update, which both replace files in the folder.
+    /// Shared by every flow that replaces program files in the folder: the mod flows, the sfall update
+    /// and putting an engine build there.
     fn refuse_while_running(&self, install: &Install) -> Result<()> {
         // A running game holds its files open, and on Windows a write over them fails part way.
         if self.game_running(install)? {
@@ -1119,13 +1120,15 @@ impl Backend {
     ///
     /// # Errors
     ///
-    /// Fails where the machine holds no build to put there.
+    /// Refuses while the game ZAX started is running, and fails where the machine holds no build to
+    /// put there.
     pub fn use_engine_build_here(
         &self,
         engine_id: &str,
         pick: &crate::engine_choice::BuildPick,
     ) -> Result<AppView> {
         let install = self.selected_install()?;
+        self.refuse_while_running(&install)?;
         self.use_engine_build(&install, engine_id, pick)?;
         self.redeployed(&install)
     }

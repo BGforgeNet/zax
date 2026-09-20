@@ -1573,6 +1573,20 @@ mod tests {
     }
 
     #[test]
+    fn putting_an_engine_build_there_waits_for_the_game_zax_started_to_close() {
+        let deploy = |live| {
+            after_play(live, None, |backend| {
+                backend.use_engine_build_here("fallout2-ce", &BuildPick::Latest)
+            })
+        };
+        let err = deploy(true).expect_err("refused");
+        assert!(format!("{err}").contains("The game is running"), "{err}");
+        // Closed, it runs on to the cache, which holds no build here.
+        let err = deploy(false).expect_err("no build cached");
+        assert!(!format!("{err}").contains("The game is running"), "{err}");
+    }
+
+    #[test]
     fn a_game_that_has_exited_or_whose_id_moved_on_refuses_nothing() {
         // Past the guard, the removal answers for itself: there is no such mod here.
         for (live, command) in [(false, None), (true, Some("/usr/bin/bash"))] {
