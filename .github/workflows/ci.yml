@@ -219,6 +219,10 @@ jobs:
         run: ./.github/scripts/install-drive-tools.sh
       - if: runner.os == 'Linux'
         run: xvfb-run pnpm drive
+      # macOS has no driver for its webview, so its build is started and left up instead: short of driving it,
+      # that is what says the bundle this platform ships opens at all.
+      - if: runner.os == 'macOS'
+        run: ./.github/scripts/launch-macos.sh
 
   # The Windows zip the build uploaded, driven through its own window: the only run of the real shell and webview on
   # Windows. Its own job on windows-2022 because on the 2025 image WebView2 never opens its DevTools port to the Edge
