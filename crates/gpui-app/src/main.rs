@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use gpui_kit::{AppContext as _, WindowOptions};
+use gpui_kit::{AppContext as _, Bounds, WindowBounds, WindowOptions, px, size};
 use zax_gpui::ZaxWindow;
 use zax_gpui::state::Zax;
 
@@ -60,9 +60,19 @@ fn main() {
     gpui_kit::application().run(move |cx| {
         gpui_kit::init(cx);
         cx.set_global(zax);
-        if let Err(err) =
-            gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| cx.new(|_| ZaxWindow))
-        {
+        // The size the Svelte window opens at, so the two compare at one width.
+        let options = WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
+                None,
+                size(px(1280.), px(800.)),
+                cx,
+            ))),
+            window_min_size: Some(size(px(960.), px(600.))),
+            ..WindowOptions::default()
+        };
+        if let Err(err) = gpui_kit::open_window(options, cx, |window, cx| {
+            cx.new(|cx| ZaxWindow::new(window, cx))
+        }) {
             eprintln!("zax-gpui: no window: {err}");
             cx.quit();
         }

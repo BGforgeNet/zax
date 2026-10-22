@@ -1,5 +1,5 @@
 //! The backend's view of the host window: no folder picker and nowhere to show progress, which this spike's
-//! one tab never asks for. The clocks are the Tauri shell's, copied: a native shell that stayed would share
+//! settings tabs never ask for. The clocks are the Tauri shell's, copied: a native shell that stayed would share
 //! them with it rather than keep a second copy.
 
 use jiff::{Timestamp, Zoned};

@@ -106,11 +106,7 @@ impl Zax {
             Ok(_) => SharedString::default(),
             Err(err) => format!("{id}: {err}").into(),
         };
-        let view = backend.view();
-        let zax = cx.global_mut::<Self>();
-        zax.view = view;
-        zax.status = status;
-        cx.refresh_windows();
+        Self::refresh(cx, &backend, status);
     }
 
     pub fn save(cx: &mut App) {
@@ -122,10 +118,40 @@ impl Zax {
             },
             Err(err) => format!("Not saved: {err}").into(),
         };
+        Self::refresh(cx, &backend, status);
+    }
+
+    /// Drops the pending edit of one setting, or of every setting with `None`.
+    pub fn revert(cx: &mut App, id: Option<&str>) {
+        let backend = Arc::clone(&Self::global(cx).backend);
+        let ids: Vec<String> = id.map(str::to_owned).into_iter().collect();
+        let status = match backend.revert_settings(&ids, id.is_none()) {
+            Ok(_) => SharedString::default(),
+            Err(err) => format!("Not reverted: {err}").into(),
+        };
+        Self::refresh(cx, &backend, status);
+    }
+
+    fn refresh(cx: &mut App, backend: &Backend, status: SharedString) {
         let view = backend.view();
         let zax = cx.global_mut::<Self>();
         zax.view = view;
         zax.status = status;
         cx.refresh_windows();
+    }
+
+    pub fn view(&self) -> &AppView {
+        &self.view
+    }
+
+    /// Pending edits among the rows a group of tabs owns, for the dot on its tab.
+    pub fn modified_in(&self, group: &str) -> usize {
+        self.view.reading.as_ref().map_or(0, |reading| {
+            reading
+                .rows
+                .values()
+                .filter(|row| row.modified && row.own_group == group)
+                .count()
+        })
     }
 }

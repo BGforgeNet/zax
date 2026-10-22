@@ -1,5 +1,5 @@
-//! The native window over a real install's files: every tab of `fallout2.cfg` lays out headlessly, and an edit
-//! through it saves as exactly one changed line. The backend runs on the in-memory platform, seeded with the
+//! The native window over a real install's files: it lays out headlessly, and an edit through it saves as
+//! exactly one changed line. The backend runs on the in-memory platform, seeded with the
 //! real config files from `fixtures/f2up`, so nothing touches the machine's files or config directory.
 
 use std::collections::BTreeMap;
@@ -58,7 +58,7 @@ fn an_edit_through_the_window_saves_as_one_line(cx: &mut TestAppContext) {
         cx.set_global(zax);
     });
     let (_root, cx) = cx.add_window_view(|window, cx| {
-        let view = cx.new(|_| ZaxWindow);
+        let view = cx.new(|cx| ZaxWindow::new(window, cx));
         Root::new(view, window, cx)
     });
     cx.run_until_parked();
