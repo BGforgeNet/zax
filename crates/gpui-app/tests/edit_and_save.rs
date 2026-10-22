@@ -1,45 +1,58 @@
 //! The native window over a real install's files: every tab of `fallout2.cfg` lays out headlessly, and an edit
-//! through it saves as exactly one changed line. Run with `ZAX_DATA_DIR` naming a scratch directory, so the
-//! backend's own state stays out of the user's config.
+//! through it saves as exactly one changed line. The backend runs on the in-memory platform, seeded with the
+//! real config files from `fixtures/f2up`, so nothing touches the machine's files or config directory.
 
-use std::fs;
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use gpui_kit::component::Root;
 use gpui_kit::{AppContext as _, TestAppContext};
 use zax_fallout2::backend::SettingValue;
 use zax_gpui::ZaxWindow;
 use zax_gpui::state::Zax;
+use zax_platform::Platform;
+use zax_platform::memory::{Content, MemoryOptions, MemoryPlatform};
 
-/// A game folder holding the real config files from `fixtures/f2up`, and an executable stub so it reads as one.
-/// Removed on drop, so a failed assertion does not leave it behind.
-struct Game(PathBuf);
+const GAME: &str = "/games/f2";
 
-impl Drop for Game {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
+fn fixture(name: &str) -> Vec<u8> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/f2up")
+        .join(name);
+    std::fs::read(&path).unwrap_or_else(|err| panic!("reading {}: {err}", path.display()))
 }
 
-fn game() -> Game {
-    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/f2up");
-    let dir = std::env::temp_dir().join(format!("zax-gpui-game-{}", std::process::id()));
-    fs::create_dir_all(&dir).unwrap_or_else(|err| panic!("creating {}: {err}", dir.display()));
-    for name in ["fallout2.cfg", "f2_res.ini", "ddraw.ini"] {
-        fs::copy(fixtures.join(name), dir.join(name))
-            .unwrap_or_else(|err| panic!("copying {name}: {err}"));
-    }
-    fs::write(dir.join("fallout2.exe"), b"MZ")
-        .unwrap_or_else(|err| panic!("writing the executable stub: {err}"));
-    Game(dir)
+/// A game folder holding the fixtures and an executable stub, so it reads as an install.
+fn platform() -> Arc<MemoryPlatform> {
+    let mut files: BTreeMap<String, Content> = ["fallout2.cfg", "f2_res.ini", "ddraw.ini"]
+        .into_iter()
+        .map(|name| (format!("{GAME}/{name}"), Content::Binary(fixture(name))))
+        .collect();
+    files.insert(format!("{GAME}/fallout2.exe"), Content::from("MZ"));
+    Arc::new(MemoryPlatform::new(MemoryOptions {
+        files,
+        dirs: vec![GAME.to_owned()],
+        ..MemoryOptions::default()
+    }))
+}
+
+/// The config file as text, one byte per character, the way the backend reads it.
+fn config(platform: &MemoryPlatform) -> String {
+    let path = format!("{GAME}/fallout2.cfg");
+    let bytes = platform
+        .fs()
+        .read(Path::new(&path))
+        .unwrap_or_else(|err| panic!("reading {path}: {err}"));
+    bytes.iter().map(|&byte| char::from(byte)).collect()
 }
 
 #[gpui_kit::test]
 fn an_edit_through_the_window_saves_as_one_line(cx: &mut TestAppContext) {
-    let game = game();
-    let dir = &game.0;
-    let before = fs::read_to_string(dir.join("fallout2.cfg")).expect("the copy reads");
-    let zax = Zax::open(dir.to_str().expect("a UTF-8 scratch path")).expect("the install opens");
+    let platform = platform();
+    let before = config(&platform);
+    let zax =
+        Zax::open_on(Arc::clone(&platform) as Arc<dyn Platform>, GAME).expect("the install opens");
     cx.update(|cx| {
         gpui_kit::init(cx);
         cx.set_global(zax);
@@ -61,7 +74,7 @@ fn an_edit_through_the_window_saves_as_one_line(cx: &mut TestAppContext) {
     cx.update(|_, cx| Zax::save(cx));
     cx.run_until_parked();
 
-    let after = fs::read_to_string(dir.join("fallout2.cfg")).expect("the saved file reads");
+    let after = config(&platform);
     let changed: Vec<(&str, &str)> = before
         .lines()
         .zip(after.lines())

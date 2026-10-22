@@ -29,9 +29,14 @@ impl std::fmt::Debug for Zax {
 }
 
 impl Zax {
-    /// Registers the folder unless the saved state already lists it, then selects it.
+    /// Opens the folder on the real machine.
     pub fn open(path: &str) -> Result<Self> {
-        let platform: Arc<dyn Platform> = Arc::new(HostPlatform::new(None));
+        Self::open_on(Arc::new(HostPlatform::new(None)), path)
+    }
+
+    /// Registers the folder unless the saved state already lists it, then selects it. The platform is the
+    /// caller's so a test can hand in the in-memory one, whose state stays out of any real config directory.
+    pub fn open_on(platform: Arc<dyn Platform>, path: &str) -> Result<Self> {
         let backend = Arc::new(Backend::new(platform, Arc::new(SpikeShell)));
         backend.start(env!("CARGO_PKG_VERSION"))?;
         let listed = backend
