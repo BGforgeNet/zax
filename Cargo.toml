@@ -3,6 +3,7 @@ resolver = "3"
 members = [
   "crates/core",
   "crates/fallout2",
+  "crates/gpui-app",
   "crates/host",
   "crates/mod-tools",
   "crates/platform",

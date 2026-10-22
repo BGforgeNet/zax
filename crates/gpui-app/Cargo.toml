@@ -1,0 +1,21 @@
+[package]
+name = "zax-gpui"
+description = "Spike: the settings interface drawn natively with GPUI Kit instead of a webview"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+gpui-kit = "=0.7.3"
+jiff = "0.2.37"
+zax-core.workspace = true
+zax-fallout2.workspace = true
+zax-host.workspace = true
+zax-platform.workspace = true
+
+[dev-dependencies]
+gpui-kit = { version = "=0.7.3", features = ["test-support"] }
