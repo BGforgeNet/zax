@@ -151,6 +151,23 @@ mod tests {
     }
 
     #[test]
+    fn every_carried_document_belongs_to_a_followed_base_mod() {
+        // The copy is looked up by the feed row's id, so one under an id no row follows is never read.
+        // Not the reverse: a row outlives its copy once upstream publishes a manifest of its own.
+        for entry in VENDORED_MANIFESTS {
+            let row = crate::mod_feed::MOD_FEEDS
+                .iter()
+                .find(|feed| feed.id == entry.id)
+                .unwrap_or_else(|| panic!("no feed row follows {}", entry.id));
+            assert!(
+                row.base,
+                "{} is carried as a base mod on a stacking row",
+                entry.id
+            );
+        }
+    }
+
+    #[test]
     fn no_id_is_carried_twice() {
         let mut seen = BTreeSet::new();
         for entry in VENDORED_MANIFESTS {
