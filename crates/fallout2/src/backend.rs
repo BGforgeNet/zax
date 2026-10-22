@@ -1573,6 +1573,26 @@ mod tests {
     }
 
     #[test]
+    fn running_again_waits_for_the_game_zax_started_to_close() {
+        // A run puts the engine's build in place and swaps the order file before it starts anything.
+        let engine = |live| {
+            after_play(live, None, |backend| {
+                backend.launch_selected(Some("fallout2-ce"), Some(&BuildPick::Latest))
+            })
+        };
+        let err = engine(true).expect_err("refused");
+        assert!(format!("{err}").contains("The game is running"), "{err}");
+        // Closed, it runs on to the cache, which holds no build here.
+        let err = engine(false).expect_err("no build cached");
+        assert!(!format!("{err}").contains("The game is running"), "{err}");
+
+        let own = |live| after_play(live, None, |backend| backend.launch_selected(None, None));
+        let err = own(true).expect_err("refused");
+        assert!(format!("{err}").contains("The game is running"), "{err}");
+        own(false).expect("the game's own executable starts once the first run has closed");
+    }
+
+    #[test]
     fn putting_an_engine_build_there_waits_for_the_game_zax_started_to_close() {
         let deploy = |live| {
             after_play(live, None, |backend| {

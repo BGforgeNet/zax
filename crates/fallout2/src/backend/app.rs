@@ -1009,8 +1009,8 @@ impl Backend {
         Ok(reading.install.clone())
     }
 
-    /// Shared by every flow that replaces program files in the folder: the mod flows, the sfall update
-    /// and putting an engine build there.
+    /// Shared by every flow that replaces program files in the folder: the mod flows, the sfall update,
+    /// putting an engine build there, and a run, which may put one there and swaps the order file first.
     fn refuse_while_running(&self, install: &Install) -> Result<()> {
         // A running game holds its files open, and on Windows a write over them fails part way.
         if self.game_running(install)? {
@@ -1154,7 +1154,8 @@ impl Backend {
     ///
     /// # Errors
     ///
-    /// Fails where the machine holds no build to run, or the program cannot be started.
+    /// Refuses while the game ZAX started is running, fails where the machine holds no build to run,
+    /// or the program cannot be started.
     pub fn launch_selected(
         &self,
         engine_id: Option<&str>,
@@ -1168,6 +1169,7 @@ impl Backend {
                 .ok_or_else(|| Error::Unsupported("No game is selected.".to_owned()))?;
             (reading.install.clone(), reading.sfall.clone())
         };
+        self.refuse_while_running(&install)?;
         self.launch(&install, sfall.as_deref(), engine_id, pick)?;
         if engine_id.is_none() {
             return Ok(self.view());
