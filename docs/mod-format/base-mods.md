@@ -96,12 +96,12 @@ order** (`mods/mods_order.txt`) is put back exactly as it was instead: it is a l
 a merge would find nothing of the user's in it and keep the release's copy.
 
 Each entry of `inputs` is a folder ZAX asks the user for, checked by the file it `holds`. `extract-dat` unpacks
-one input's archive into the created install: `from` names the input, `list` is the response file the payload
-ships - one path per line, as the archive spells them - and `into` is where they land. Both paths are read
-inside the created directory.
+one input's archive, a Fallout 1 DAT, into the created install: `from` names the input, `list` is the response
+file the payload ships - one path per line, as the archive spells them - and `into` is where they land. Both
+paths are read inside the created directory.
 
 A list is written against one edition of the archive and run against whichever the user owns, so a path the
 user's copy does not hold is skipped and named in the result rather than failing the extraction. How many are
 missing decides nothing: 8.3 collision suffixes are assigned in archive order, so another edition renumbers
-hundreds of them at once. What is checked before anything is downloaded is that the folder holds an archive the
-tool can read at all.
+hundreds of them at once. What is checked before anything is downloaded is that the folder holds a readable
+archive in Fallout 1's format: Fallout 2's `master.dat` shares many of the names, so it is refused by format.

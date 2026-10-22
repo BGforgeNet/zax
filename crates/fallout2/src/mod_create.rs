@@ -174,6 +174,21 @@ fn source_archive<'a>(
     archives.get(&manifest.extract_dat.as_ref()?.from)
 }
 
+/// The user's archive, read and held to Fallout 1's format, which is all `extract-dat` unpacks. Parsing
+/// alone does not tell the games apart: Fallout 2's `master.dat` parses too and shares many of the names.
+fn open_source(platform: &dyn Platform, source: &Path) -> Result<DatSource> {
+    let owned = DatSource::open(platform, source).map_err(|err| {
+        Error::Unsupported(format!("ZAX cannot read {}: {err}", source.display()))
+    })?;
+    if owned.format() != dat3_core::ArchiveFormat::Dat1 {
+        return Err(Error::Unsupported(format!(
+            "{} is not a Fallout 1 archive - choose the folder holding Fallout 1's MASTER.DAT.",
+            source.display()
+        )));
+    }
+    Ok(owned)
+}
+
 /// Where the payload's own copy of the extraction list is put, out of the archive rather than off the
 /// disk.
 fn list_directory(work: &Path) -> PathBuf {
@@ -353,11 +368,7 @@ pub fn plan_create_install(
     // the game the mod asked for is the likeliest thing to be wrong.
     let archives = archives_for(platform, held.manifest, answers)?;
     if let Some(source) = source_archive(held.manifest, &archives) {
-        // Parsing it at all is the check: what the user pointed at either reads as a Fallout archive
-        // or does not.
-        DatSource::open(platform, source).map_err(|err| {
-            Error::Unsupported(format!("ZAX cannot read {}: {err}", source.display()))
-        })?;
+        open_source(platform, source)?;
     }
 
     // Where the install would be. Either way a directory that is there is one this does not write into:
@@ -566,7 +577,7 @@ pub fn apply_create_install(
         // The extraction is what discovers a path this edition of the archive spells differently: it
         // is told to skip those and says which they were. The count reported has to lose them too, or
         // it names files that never landed.
-        let owned = DatSource::open(platform, &source)?;
+        let owned = open_source(platform, &source)?;
         skipped =
             owned.extract_listed(platform, &list.bytes, &inside_path(&created, &extract.into))?;
         extracted = list.entries.saturating_sub(skipped.len());
@@ -689,9 +700,13 @@ extract-dat.into: data
     /// A Fallout 1 archive the user owns, built by the same library that reads it rather than
     /// hand-typed. Case-sensitively, so the name lands exactly as written.
     fn master_dat() -> Vec<u8> {
+        dat_in(dat3_core::ArchiveFormat::Dat1)
+    }
+
+    fn dat_in(format: dat3_core::ArchiveFormat) -> Vec<u8> {
+        use dat3_core::DatArchive;
         use dat3_core::common::{CaseMode, CompressionLevel};
-        use dat3_core::{ArchiveFormat, DatArchive};
-        let mut archive = DatArchive::new(ArchiveFormat::Dat1);
+        let mut archive = DatArchive::new(format);
         archive
             .insert(
                 "art/critters/hero.frm",
@@ -812,8 +827,34 @@ extract-dat.into: data
     }
 
     #[test]
+    fn a_folder_holding_another_games_archive_is_refused() {
+        // Fallout 2's `master.dat` parses, and holds many of the same names, so nothing but the format
+        // tells it from Fallout 1's.
+        let platform = host(&payload(), &[]);
+        platform
+            .fs()
+            .write(
+                Path::new("/games/fallout2/master.dat"),
+                &dat_in(dat3_core::ArchiveFormat::Dat2),
+            )
+            .expect("the test writes the archive");
+        let wrong = BTreeMap::from([("fallout1".to_owned(), "/games/fallout2".to_owned())]);
+        let err = plan_create_install(
+            &platform,
+            &install(),
+            &release_of(&platform, MANIFEST),
+            &wrong,
+            &ModProgress::default(),
+        )
+        .expect_err("not Fallout 1's");
+        assert!(
+            format!("{err}").contains("not a Fallout 1 archive"),
+            "{err}"
+        );
+    }
+
+    #[test]
     fn a_folder_holding_something_that_is_not_an_archive_is_refused() {
-        // Parsing it at all is what refuses a user who pointed at the wrong game.
         let platform = host(
             &payload(),
             &[("/games/notgame/master.dat", "not an archive at all")],

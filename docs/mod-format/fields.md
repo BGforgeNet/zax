@@ -35,7 +35,7 @@ last part is a name you choose, as in `settings.sections.main`, is one field per
 | `installer.other.asset`        | no                 | The payload. Absent takes the release's sole archive.                                  |
 | `creates.directory`            | one of the two     | The install this one makes beside the host, as one folder name.                        |
 | `inputs`                       | with `creates`     | What ZAX asks the user for before installing, each with the file that checks it.       |
-| `extract-dat.from`             | no                 | Which input's archive is unpacked into the created install.                            |
+| `extract-dat.from`             | no                 | Which input's archive, a Fallout 1 DAT, is unpacked into the created install.          |
 | `extract-dat.list`             | with `from`        | The response file naming what to lift out of it, one path per line.                    |
 | `extract-dat.into`             | with `from`        | Where those files land inside the created install.                                     |
 | `conflicts`                    | no                 | When installing refuses; see below.                                                    |

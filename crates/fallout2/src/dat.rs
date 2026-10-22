@@ -81,6 +81,12 @@ impl DatSource {
         })
     }
 
+    /// Which game's format the archive is in, as detected from its bytes.
+    #[must_use]
+    pub fn format(&self) -> dat3_core::ArchiveFormat {
+        self.archive.format()
+    }
+
     /// How many entries the archive holds.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -99,7 +105,7 @@ impl DatSource {
     /// of the archive and run against whichever the user owns. Nothing here judges how many are
     /// absent either: the 8.3 collision suffixes (`LI3ACD~5.TXT`) are assigned in archive order, so
     /// another edition renumbers hundreds of them at once and no count separates that from a user
-    /// who pointed at Fallout 2's `master.dat`. Parsing the archive at all is what refuses that.
+    /// who pointed at Fallout 2's `master.dat`. The caller's format check is what refuses that.
     ///
     /// # Errors
     ///
