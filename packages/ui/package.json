@@ -12,10 +12,10 @@
     "@tauri-apps/api": "^2.11.1"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^7.3.0",
-    "@types/node": "^24.13.3",
-    "svelte": "^5.56.10",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^24.19.2",
+    "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
-    "vite": "^8.2.2"
+    "vite": "^8.3.4"
   }
 }
