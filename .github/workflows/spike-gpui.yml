@@ -1,0 +1,51 @@
+name: spike-gpui
+
+# Builds the GPUI spike's binary on the three platforms, for trying it by hand. Branch-scoped: nothing else
+# carries the crate.
+on:
+  push:
+    branches: ["spike/gpui-kit"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            binary: zax-gpui
+          - os: windows-latest
+            binary: zax-gpui.exe
+          - os: macos-latest
+            binary: zax-gpui
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - if: runner.os == 'Linux'
+        run: ./.github/scripts/install-linux-deps.sh
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-gpui-${{ matrix.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - run: cargo build --release --locked --package zax-gpui
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zax-gpui-${{ runner.os }}
+          path: target/release/${{ matrix.binary }}
+          if-no-files-found: error
+          retention-days: 7
