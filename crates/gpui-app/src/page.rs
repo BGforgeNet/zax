@@ -1,6 +1,5 @@
-//! One tab of a layout file as rows, laid out the way `packages/ui/src/app.css` lays out `.list .row` and
-//! `.frame`: three fixed tracks (label, control, notes), zebra striping that restarts in every group, banded
-//! group headings, and an amber edge on a changed row.
+//! One tab of a layout file as rows: three tracks (label, control, notes) on hairline separators, a group
+//! heading set off by weight and space above it, and an amber edge on a changed row.
 
 use std::collections::BTreeMap;
 
@@ -17,8 +16,7 @@ use crate::control;
 use crate::state::Zax;
 use crate::theme::Palette;
 
-const LABEL: f32 = 304.;
-const NOTES: f32 = 352.;
+const LABEL: f32 = 240.;
 /// The slot the Svelte row reserves for its linked-setting marker, kept so labels start at the same x.
 const MARK: f32 = 18.;
 const INDENT: f32 = 16.;
@@ -53,15 +51,12 @@ impl Page<'_> {
         cx: &mut App,
     ) {
         let indent = depth.map_or(0., |depth| INDENT * (depth as f32 + 1.));
-        let mut stripe = 0;
         for node in nodes {
             match node {
                 LayoutNode::Frame { title, items } => {
                     let inner = depth.map_or(0, |depth| depth + 1);
                     out.push(self.heading(title, inner, cx));
                     self.walk(items, Some(inner), out, window, cx);
-                    // A heading breaks the run, so the stripes after it start over.
-                    stripe = 0;
                 }
                 LayoutNode::Setting {
                     id,
@@ -75,8 +70,7 @@ impl Page<'_> {
                     if *hidden && def.managed.is_none() {
                         continue;
                     }
-                    out.push(self.row(def, *control, indent, stripe % 2 == 1, window, cx));
-                    stripe += 1;
+                    out.push(self.row(def, *control, indent, window, cx));
                 }
                 LayoutNode::Widget { id } => {
                     let palette = Palette::global(cx);
@@ -101,40 +95,22 @@ impl Page<'_> {
     fn heading(&self, title: &str, depth: usize, cx: &App) -> AnyElement {
         let palette = Palette::global(cx);
         let nested = depth > 0;
+        // Set off by space and weight rather than a filled band, so the rows stay the loudest thing on the page.
         div()
-            .relative()
-            .py(px(9.))
+            .pt(px(if nested { 14. } else { 22. }))
+            .pb(px(6.))
             .pr(px(self.gutter))
-            .pl(px(self.gutter + INDENT * depth as f32))
-            .border_t_1()
+            .pl(px(self.gutter + INDENT * depth as f32 + MARK))
             .border_b_1()
+            .border_color(palette.border_strong)
+            .font_weight(FontWeight::SEMIBOLD)
             .when(nested, |this| {
-                this.border_color(palette.border)
-                    .bg(palette.band.opacity(0.6))
-                    .text_size(px(12.))
+                this.text_size(px(12.5)).text_color(palette.text_dim)
             })
             .when(!nested, |this| {
-                this.border_color(palette.border_strong)
-                    .bg(palette.band)
-                    .text_size(px(13.))
+                this.text_size(px(14.)).text_color(palette.text)
             })
-            // The accent bar: GPUI has one border colour per element, so it is a strip over the left edge.
-            .child(
-                div()
-                    .absolute()
-                    .left_0()
-                    .top_0()
-                    .bottom_0()
-                    .w(px(3.))
-                    .bg(if nested {
-                        palette.accent.opacity(0.45)
-                    } else {
-                        palette.accent
-                    }),
-            )
-            .font_weight(FontWeight::BOLD)
-            .text_color(palette.text)
-            .child(title.to_uppercase())
+            .child(title.to_owned())
             .into_any_element()
     }
 
@@ -143,7 +119,6 @@ impl Page<'_> {
         def: &SettingDef,
         control: Control,
         indent: f32,
-        even: bool,
         window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
@@ -220,7 +195,6 @@ impl Page<'_> {
             .px(px(self.gutter))
             .border_b_1()
             .border_color(palette.border)
-            .when(even, |this| this.bg(palette.band.opacity(0.4)))
             .hover(|this| this.bg(palette.panel_alt))
             .when(modified, |this| {
                 // The changed-row edge, a strip over the left edge so it never shifts the tracks.
@@ -251,8 +225,8 @@ impl Page<'_> {
             )
             .child(
                 v_flex()
-                    .flex_none()
-                    .w(px(NOTES))
+                    .flex_1()
+                    .min_w_0()
                     .text_size(px(12.))
                     .gap(px(1.))
                     .children(notes.into_iter().map(|(text, color, italic)| {
@@ -262,7 +236,7 @@ impl Page<'_> {
                             .child(text)
                     })),
             )
-            .child(h_flex().flex_1().justify_end().when(modified, |this| {
+            .child(h_flex().flex_none().when(modified, |this| {
                 this.child(
                     div()
                         .id(SharedString::from(format!("revert-{id}")))

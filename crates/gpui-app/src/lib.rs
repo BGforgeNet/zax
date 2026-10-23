@@ -1,8 +1,8 @@
 //! Spike: ZAX's settings drawn natively with GPUI Kit, over the same backend the Tauri shell calls.
 //!
 //! The game's own three config files, each a strip of tabs built from the generated catalog and layout, edited
-//! through `Backend::set_settings` and written through `Backend::save`. The window copies the Svelte
-//! interface's shell, palette and row layout, so the two can be judged side by side; GPUI Kit supplies only the
+//! through `Backend::set_settings` and written through `Backend::save`. The window keeps the Svelte interface's
+//! palette and sidebar-plus-tabs shell, so the two can be judged side by side; GPUI Kit supplies only the
 //! controls inside a row.
 
 mod control;
@@ -148,15 +148,26 @@ impl ZaxWindow {
             .border_l_1()
             .border_r_1()
             .border_color(palette.border)
+            // A heading, not a tab: the sidebar has nothing to switch to.
             .child(
-                strip(palette, 8.).child(
-                    tab("games", true, palette).child("Games").child(
+                h_flex()
+                    .flex_none()
+                    .gap(px(6.))
+                    .px(px(16.))
+                    .pt(px(14.))
+                    .pb(px(6.))
+                    .child(
                         div()
-                            .text_size(px(11.5))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_size(px(13.))
+                            .child("Games"),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(12.))
                             .text_color(palette.text_faint)
                             .child(installs.len().to_string()),
                     ),
-                ),
             )
             .child(
                 v_flex()
@@ -368,18 +379,6 @@ impl Render for ZaxWindow {
             .bg(palette.bg)
             .border_r_1()
             .border_color(palette.border)
-            .child(
-                strip(&palette, GUTTER)
-                    .justify_between()
-                    .child(tab("settings", true, &palette).child("Settings"))
-                    .child(
-                        div()
-                            .pb(px(6.))
-                            .text_size(px(12.))
-                            .text_color(palette.text_faint)
-                            .child("GPUI Kit spike"),
-                    ),
-            )
             .child(groups)
             .child(subtabs)
             .child(
