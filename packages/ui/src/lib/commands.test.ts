@@ -58,6 +58,7 @@ describe("each wrapper, sent to the preview", () => {
     chooseFolder: async () => commands.chooseFolder("master.dat"),
     selectInstall: async () => commands.selectInstall(PREVIEW_INSTALL),
     refresh: async () => commands.refresh(),
+    gameClosed: async () => commands.gameClosed(),
     addInstall: async () => commands.addInstall("fixtures/f2"),
     removeInstall: async () => commands.removeInstall(PREVIEW_INSTALL),
     setAlias: async () => commands.setAlias(PREVIEW_INSTALL, "Mine"),

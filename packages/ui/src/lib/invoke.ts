@@ -95,5 +95,12 @@ export async function onProgress(listener: (progress: OperationProgress) => void
   progressListeners.push(listener);
 }
 
+/** Where a game ZAX started says it has exited. Only the desktop build starts games. */
+export async function onGameClosed(listener: () => void): Promise<void> {
+  if (!onDesktop) return;
+  const { listen } = await import("@tauri-apps/api/event");
+  await listen("zax://game-closed", () => listener());
+}
+
 /** Whether this is the browser preview, which several surfaces say out loud. */
 export const isPreview = !onDesktop;

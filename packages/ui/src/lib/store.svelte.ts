@@ -9,7 +9,7 @@
  */
 
 import { commands } from "./commands.js";
-import { onProgress } from "./invoke.js";
+import { onGameClosed, onProgress } from "./invoke.js";
 import { VERSION } from "./version.js";
 
 import type { Action } from "./bindings/Action";
@@ -401,6 +401,7 @@ class Store {
       // call failed - would otherwise sit under an idle interface saying work was going on.
       if (this.busy !== null) this.progress = progress;
     });
+    await onGameClosed(() => void this.gameClosed());
     this.catalog ??= await commands.catalog();
     const started = await commands.start(VERSION);
     // A restart is a new sequence of views, numbered from the start again.
@@ -1402,6 +1403,15 @@ class Store {
 
   dismissLaunch(): void {
     this.pendingLaunch = null;
+  }
+
+  /** The game rewrites its config as it quits; the backend reads the install again unless edits are unsaved. */
+  private async gameClosed(): Promise<void> {
+    try {
+      await this.change(commands.gameClosed);
+    } catch (error) {
+      this.notice = { kind: "problem", text: reasonOf(error) };
+    }
   }
 
   private async startGame(engineId: string | null, pick: BuildPick | null): Promise<void> {

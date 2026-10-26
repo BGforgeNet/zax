@@ -29,6 +29,9 @@ pub struct LaunchOptions<'a> {
     /// install still in progress from one whose ZAX died half way. Not a return value, because
     /// `run` answers only once the program has exited, which is exactly the window this is about.
     pub on_start: Option<&'a (dyn Fn(u32) + Send + Sync)>,
+    /// Called once a program [`ProcessLauncher::launch`] started has exited, from another thread. Owned
+    /// rather than borrowed because it outlives the call that started the program.
+    pub on_exit: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl std::fmt::Debug for LaunchOptions<'_> {
@@ -38,6 +41,7 @@ impl std::fmt::Debug for LaunchOptions<'_> {
             .field("env", &self.env)
             .field("log", &self.log)
             .field("on_start", &self.on_start.map(|_| "<callback>"))
+            .field("on_exit", &self.on_exit.as_ref().map(|_| "<callback>"))
             .finish()
     }
 }

@@ -36,6 +36,7 @@ macro_rules! zax_commands {
             commands::choose_folder,
             commands::select_install,
             commands::refresh,
+            commands::game_closed,
             commands::add_install,
             commands::remove_install,
             commands::set_alias,

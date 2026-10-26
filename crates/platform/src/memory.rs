@@ -11,7 +11,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use md5::Md5;
 use sha2::{Digest, Sha256};
@@ -266,6 +266,17 @@ pub struct MemoryPlatform {
     identity: ProcessIdentity,
     options: MemoryOptions,
     state: Mutex<State>,
+    /// What each launched program asked to be told on exit, until a test ends it.
+    exits: Mutex<Vec<OnExit>>,
+}
+
+/// A launched program's exit callback, which has nothing to show in a test's failure output.
+struct OnExit(Arc<dyn Fn() + Send + Sync>);
+
+impl std::fmt::Debug for OnExit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<callback>")
+    }
 }
 
 impl Default for MemoryPlatform {
@@ -322,6 +333,16 @@ impl MemoryPlatform {
             },
             options,
             state: Mutex::new(state),
+            exits: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Ends every program launched so far, as a user quitting the game would: each one's exit is
+    /// reported in launch order.
+    pub fn end_launched(&self) {
+        let ended = std::mem::take(&mut *self.exits.lock().unwrap_or_else(PoisonError::into_inner));
+        for OnExit(on_exit) in ended {
+            on_exit();
         }
     }
 
@@ -663,6 +684,12 @@ impl ProcessLauncher for MemoryPlatform {
             .launched
             .push(record_of(program, args, options));
         self.started(options);
+        if let Some(on_exit) = &options.on_exit {
+            self.exits
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(OnExit(Arc::clone(on_exit)));
+        }
         Ok(())
     }
 

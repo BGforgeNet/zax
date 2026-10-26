@@ -499,6 +499,24 @@ impl Backend {
         Ok(self.view_of(&mut held))
     }
 
+    /// What a game ZAX started exiting asks for: the game rewrites its config as it quits, so the
+    /// selected install is read again. Not over unsaved edits, which a read would drop; a save merges
+    /// them onto what the game wrote instead.
+    ///
+    /// # Errors
+    ///
+    /// Fails where the install cannot be read.
+    pub fn game_closed(&self) -> Result<AppView> {
+        let mut held = self.held();
+        let edited = held.reading.as_ref().is_some_and(|reading| {
+            !reading.settings.overrides.is_empty() || reading.order.changed()
+        });
+        if !edited {
+            self.reread(&mut held)?;
+        }
+        Ok(self.view_of(&mut held))
+    }
+
     /// Applies edits in the order given. Several at once because the interface sends what piled up while
     /// the previous answer was on its way: sent one by one, two edits can reach this lock in either order,
     /// and a slider would settle on whichever value arrived last rather than the one it was left at.
@@ -694,7 +712,8 @@ impl Backend {
         let reading = Self::reading_mut(&mut held)?;
         let outcome = self.write_values(&reading.settings, &reading.settings.overrides)?;
         if let SaveOutcome::Stale(changed) = outcome {
-            // Rereading would silently drop the edits; the user decides, so the files stay as they are.
+            // Something else changed a setting this save writes; rereading would silently drop the
+            // edits, so the user decides and the files stay as they are.
             let mods = if saved_mods {
                 " The mod order was saved."
             } else {
@@ -704,7 +723,8 @@ impl Backend {
                 view: self.view_of(&mut held),
                 answer: Some(SaveRefusal {
                     text: format!(
-                        "{} changed on disk since it was read. Nothing was written.{mods}",
+                        "{} changed on disk since it was read, in a setting this save writes. Nothing was \
+                         written.{mods}",
                         changed.join(" and ")
                     ),
                 }),

@@ -48,6 +48,7 @@ export const COMMANDS = [
   "choose_folder",
   "select_install",
   "refresh",
+  "game_closed",
   "add_install",
   "remove_install",
   "set_alias",
@@ -98,6 +99,7 @@ export const commands = {
 
   selectInstall: async (path: string): Promise<AppView> => invoke("select_install", { path }),
   refresh: async (): Promise<AppView> => invoke("refresh"),
+  gameClosed: async (): Promise<AppView> => invoke("game_closed"),
   addInstall: async (path: string): Promise<Answered<string | null>> => invoke("add_install", { path }),
   removeInstall: async (path: string): Promise<AppView> => invoke("remove_install", { path }),
   setAlias: async (path: string, name: string): Promise<AppView> => invoke("set_alias", { path, name }),

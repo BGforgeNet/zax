@@ -263,15 +263,24 @@ impl ProcessLauncher for HostProcess {
                 command.stdout(Stdio::null()).stderr(Stdio::null());
             }
         }
-        let child = command
+        let mut child = command
             .spawn()
             .map_err(|err| failed("launch", program, err))?;
         if let Some(on_start) = options.on_start {
             on_start(child.id());
         }
-        // Not waited on: the game outlives the click that launched it. Dropping the handle leaves the
-        // child running, which is the whole point.
-        drop(child);
+        // Waited on by its own thread, never by this call: the game outlives the click that launched
+        // it, and ZAX quitting first ends the thread and leaves the game running. Waited on always: an
+        // exited child nobody waits for stays a zombie, whose `/proc` entry reads as still running.
+        let on_exit = options.on_exit.clone();
+        std::thread::spawn(move || {
+            // A wait that fails still means nothing more can be learned about the program, and the
+            // callback only asks for a fresh read.
+            let _ = child.wait();
+            if let Some(on_exit) = on_exit {
+                on_exit();
+            }
+        });
         Ok(())
     }
 
@@ -577,6 +586,61 @@ mod tests {
             )
             .expect("a launch");
         assert!(started.elapsed() < Duration::from_secs(2), "it waited");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_launched_program_that_exited_is_not_taken_for_running() {
+        // Asked with no exit callback, which is the case that once left the game a zombie.
+        let pid = std::sync::Mutex::new(0);
+        let note = |given: u32| {
+            *pid.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = given;
+        };
+        let process = host();
+        process
+            .launch(
+                Path::new("/bin/sh"),
+                &["-c".to_owned(), "exit 0".to_owned()],
+                &LaunchOptions {
+                    on_start: Some(&note),
+                    ..LaunchOptions::default()
+                },
+            )
+            .expect("a launch");
+        let pid = *pid
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while process.alive(pid).expect("asked") {
+            assert!(Instant::now() < deadline, "{pid} still reads as running");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_launched_program_says_when_it_has_exited() {
+        let (send, receive) = std::sync::mpsc::channel();
+        let send = std::sync::Mutex::new(send);
+        host()
+            .launch(
+                Path::new("/bin/sh"),
+                &["-c".to_owned(), "exit 0".to_owned()],
+                &LaunchOptions {
+                    on_exit: Some(std::sync::Arc::new(move || {
+                        let _ = send
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .send(());
+                    })),
+                    ..LaunchOptions::default()
+                },
+            )
+            .expect("a launch");
+        receive
+            .recv_timeout(Duration::from_secs(5))
+            .expect("the exit, reported");
     }
 
     #[cfg(unix)]

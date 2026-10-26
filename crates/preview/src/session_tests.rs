@@ -810,6 +810,87 @@ mod saving {
         }
     }
 
+    fn cfg() -> String {
+        install_file("fallout2.cfg")
+    }
+
+    /// What the game does to its config as it quits: its own value for a preference it keeps.
+    fn game_rewrites(held: &Machine) {
+        let rewritten = held
+            .read(&cfg())
+            .replace("\r\nmaster_volume=22281\r\n", "\r\nmaster_volume=11111\r\n");
+        assert_ne!(
+            rewritten,
+            held.read(&cfg()),
+            "the fixture's volume line moved"
+        );
+        held.write(&cfg(), &rewritten);
+    }
+
+    /// The fallout2.cfg text with the music line set to `to`.
+    fn with_music(held: &Machine, to: &str) -> String {
+        let now = held.value_of(MUSIC).expect("the music setting");
+        let text = held.read(&cfg());
+        // The fixture came off an install, with that install's CRLF line ends.
+        let changed = text.replace(
+            &format!("\r\nmusic={now}\r\n"),
+            &format!("\r\nmusic={to}\r\n"),
+        );
+        assert_ne!(changed, text, "the fixture's music line moved");
+        changed
+    }
+
+    #[test]
+    fn reads_what_the_game_wrote_once_it_has_closed() {
+        let mut held = Machine::started();
+        let wanted = flipped(&held);
+        held.write(&cfg(), &with_music(&held, wanted));
+        held.act("game_closed", &json!({}));
+        assert_eq!(held.value_of(MUSIC), Some(wanted));
+        assert!(!held.modified(MUSIC));
+    }
+
+    #[test]
+    fn keeps_unsaved_edits_when_the_game_closes_and_saves_them_onto_what_it_wrote() {
+        let mut held = Machine::started();
+        let wanted = flipped(&held);
+        held.set(MUSIC, wanted);
+        game_rewrites(&held);
+        held.act("game_closed", &json!({}));
+        assert!(held.modified(MUSIC), "the edit survives the game closing");
+        assert_eq!(held.save(), Value::Null);
+        let saved = held.read(&cfg());
+        assert!(
+            saved.contains(&format!("\r\nmusic={wanted}\r\n")),
+            "{saved}"
+        );
+        assert!(
+            saved.contains("\r\nmaster_volume=11111\r\n"),
+            "the game's own value survives: {saved}"
+        );
+    }
+
+    #[test]
+    fn refuses_where_something_else_changed_the_setting_being_saved() {
+        let mut held = Machine::started();
+        let wanted = flipped(&held);
+        let theirs = with_music(&held, "7");
+        held.set(MUSIC, wanted);
+        held.write(&cfg(), &theirs);
+        let refusal = held.save();
+        assert!(
+            refusal["text"]
+                .as_str()
+                .is_some_and(|said| said.contains("fallout2.cfg changed on disk")),
+            "{refusal}"
+        );
+        assert!(
+            held.modified(MUSIC),
+            "the edit is kept so the user can decide"
+        );
+        assert_eq!(held.read(&cfg()), theirs);
+    }
+
     #[test]
     fn writes_the_pending_edits_to_the_installs_own_files_and_clears_them() {
         let mut held = Machine::started();
@@ -837,31 +918,6 @@ mod saving {
             .collect();
         assert_eq!(changed.len(), 1, "{changed:?}");
         assert!(changed[0].starts_with("music="));
-    }
-
-    #[test]
-    fn refuses_and_writes_nothing_when_the_file_changed_underneath() {
-        let mut held = Machine::started();
-        held.set(MUSIC, flipped(&held));
-        held.write(
-            &install_file("fallout2.cfg"),
-            &format!("{FALLOUT2_CFG}\n; edited elsewhere\n"),
-        );
-        let refusal = held.save();
-        assert!(
-            refusal["text"]
-                .as_str()
-                .is_some_and(|said| said.contains("fallout2.cfg")),
-            "{refusal}"
-        );
-        assert!(
-            held.modified(MUSIC),
-            "the edit is kept so the user can decide"
-        );
-        assert!(
-            held.read(&install_file("fallout2.cfg"))
-                .contains("; edited elsewhere")
-        );
     }
 
     #[test]

@@ -1,7 +1,8 @@
 //! Reading and writing a game's config files.
 //!
 //! What makes this more than a write: the files are the user's and are routinely hand-edited, so a
-//! file that changed underneath the open window is reported rather than overwritten.
+//! file that changed underneath the open window, in a key the save would write, is reported rather
+//! than overwritten.
 //!
 //! No copy is taken aside: a save rewrites one line per changed key, and doing it on every change
 //! filled the backup directory with copies nothing ever pointed at. Backups belong to the paths that
@@ -81,9 +82,9 @@ pub fn load_config_files(
 #[serde(rename_all = "camelCase")]
 pub enum SaveOutcome {
     Written(Vec<String>),
-    /// Files that changed on disk since they were read. Nothing is written: applying half a save and
-    /// reporting the other half would leave the user with settings from two different intentions and
-    /// no way to tell which.
+    /// Files that changed on disk since they were read, in a key the save writes or by coming or going.
+    /// Nothing is written: applying half a save and reporting the other half would leave the user with
+    /// settings from two different intentions and no way to tell which.
     Stale(Vec<String>),
 }
 
@@ -98,6 +99,27 @@ pub struct SaveRequest {
     /// The same map [`load_config_files`] was given, so a save writes where the read read.
     #[serde(default)]
     pub paths: ConfigFilePaths,
+}
+
+/// Whether a file that changed on disk still holds, for every key the save writes to it, the value the
+/// edits were made against. The game rewrites its config on exit, so a run between reading and saving
+/// is routine; the edits then land on what it wrote. A file that came or went is never this case.
+fn only_other_keys_moved(
+    before: Option<&[u8]>,
+    found: Option<&[u8]>,
+    file: &str,
+    changes: &[ConfigChange],
+) -> bool {
+    let (Some(before), Some(found)) = (before, found) else {
+        return false;
+    };
+    let (before, found) = (IniDocument::parse(before), IniDocument::parse(found));
+    changes
+        .iter()
+        .filter(|change| change.file == file)
+        .all(|change| {
+            before.get(&change.section, &change.key) == found.get(&change.section, &change.key)
+        })
 }
 
 /// Writes the changed keys back, one line each, leaving every other line of the file exactly as it
@@ -125,7 +147,9 @@ pub fn save_config_files(platform: &dyn Platform, request: &SaveRequest) -> Resu
         let found = read_if_file(platform, &at)?;
         // A name the caller never loaded reads as absent on both sides, which is what it was.
         let before = request.original.get(file).cloned().unwrap_or(None);
-        if found != before {
+        if found != before
+            && !only_other_keys_moved(before.as_deref(), found.as_deref(), file, &request.changes)
+        {
             stale.push(file.clone());
         }
         current.insert(file.clone(), found);
@@ -275,6 +299,53 @@ mod tests {
             Some("[sound]\nA=9\n"),
             "the hand edit must survive"
         );
+    }
+
+    #[test]
+    fn edits_land_on_a_file_that_changed_only_in_keys_they_do_not_touch() {
+        // The game rewrites its config on exit, in its own layout and with its own values for the
+        // preferences it keeps; an edit to another key is no reason to refuse.
+        let platform = platform_with(&[("/game/fallout2.cfg", "; a note\n[sound]\nA=1\nB=1\n")]);
+        let request = request(&platform, vec![change("fallout2.cfg", "sound", "A", "2")]);
+
+        platform
+            .fs()
+            .write(Path::new("/game/fallout2.cfg"), b"[sound]\nA = 1\nB=7\n")
+            .expect("the game's rewrite");
+
+        assert_eq!(
+            save_config_files(&platform, &request).expect("save"),
+            SaveOutcome::Written(names(&["fallout2.cfg"]))
+        );
+        let saved = IniDocument::parse(
+            platform
+                .text_at("/game/fallout2.cfg")
+                .expect("the saved file")
+                .as_bytes(),
+        );
+        assert_eq!(saved.get_str("sound", "A").as_deref(), Some("2"));
+        assert_eq!(
+            saved.get_str("sound", "B").as_deref(),
+            Some("7"),
+            "the other writer's change must survive"
+        );
+    }
+
+    #[test]
+    fn a_file_that_went_away_underneath_the_window_is_reported() {
+        let platform = platform_with(&[("/game/fallout2.cfg", "[sound]\nA=1\n")]);
+        let request = request(&platform, vec![change("fallout2.cfg", "sound", "B", "2")]);
+
+        platform
+            .fs()
+            .remove(Path::new("/game/fallout2.cfg"))
+            .expect("a removal");
+
+        assert_eq!(
+            save_config_files(&platform, &request).expect("save"),
+            SaveOutcome::Stale(names(&["fallout2.cfg"]))
+        );
+        assert_eq!(platform.text_at("/game/fallout2.cfg"), None);
     }
 
     #[test]

@@ -113,6 +113,11 @@ pub async fn refresh(backend: Held<'_>) -> Answer<AppView> {
 }
 
 #[tauri::command]
+pub async fn game_closed(backend: Held<'_>) -> Answer<AppView> {
+    off_thread(&backend, Backend::game_closed).await
+}
+
+#[tauri::command]
 pub async fn add_install(backend: Held<'_>, path: String) -> Answer<Answered<Option<String>>> {
     off_thread(&backend, move |backend| backend.add_install(&path)).await
 }

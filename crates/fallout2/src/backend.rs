@@ -273,6 +273,10 @@ pub trait Shell: Send + Sync {
     /// runs.
     fn report(&self, progress: &OperationProgress);
 
+    /// A game ZAX started has exited. Called from the thread that waited for it; the interface answers
+    /// by asking for [`Backend::game_closed`]. A host that starts no games does nothing here.
+    fn game_closed(&self);
+
     /// Local wall-clock time, broken down by whoever owns the timezone. What a stamped directory is
     /// named after, since the user reads that name in their own time.
     fn now(&self) -> LocalTime;
@@ -1304,6 +1308,11 @@ impl Backend {
                 env: plan.env,
                 log: plan.log.map(std::path::PathBuf::from),
                 on_start: Some(&started),
+                // The game rewrites its config as it quits, and the window should show what it wrote.
+                on_exit: Some({
+                    let shell = Arc::clone(&self.shell);
+                    Arc::new(move || shell.game_closed())
+                }),
             },
         )
     }
@@ -1460,6 +1469,8 @@ mod tests {
     struct TestShell {
         folder: Option<String>,
         said: StdMutex<Vec<OperationProgress>>,
+        /// How many games ZAX started have been reported closed.
+        closed: std::sync::atomic::AtomicUsize,
     }
 
     impl Shell for TestShell {
@@ -1472,6 +1483,11 @@ mod tests {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .push(progress.clone());
+        }
+
+        fn game_closed(&self) {
+            self.closed
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
 
         fn now(&self) -> LocalTime {
@@ -1550,6 +1566,27 @@ mod tests {
 
     fn removal_after_play(live: bool, command: Option<&str>) -> Result<AppView> {
         after_play(live, command, |backend| backend.remove_mod_and_read("ecco"))
+    }
+
+    #[test]
+    fn the_shell_hears_when_the_game_zax_started_closes() {
+        let platform = Arc::new(MemoryPlatform::new(MemoryOptions {
+            files: BTreeMap::from([("/games/f2/fallout2.exe".to_owned(), Content::from("MZ"))]),
+            dirs: vec!["/games/f2".to_owned()],
+            ..MemoryOptions::default()
+        }));
+        let shell = Arc::new(TestShell::default());
+        let backend = Backend::new(
+            Arc::clone(&platform) as Arc<dyn Platform>,
+            Arc::clone(&shell) as Arc<dyn Shell>,
+        );
+        backend.add_install("/games/f2").expect("an install");
+        backend.select_install("/games/f2").expect("selected");
+        backend.launch_selected(None, None).expect("started");
+        let closed = || shell.closed.load(std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(closed(), 0, "not while it runs");
+        platform.end_launched();
+        assert_eq!(closed(), 1);
     }
 
     #[test]
@@ -1906,7 +1943,7 @@ mod tests {
         let platform = Arc::new(MemoryPlatform::new(MemoryOptions::default()));
         let shell = TestShell {
             folder: Some("/games/f2".to_owned()),
-            said: StdMutex::new(Vec::new()),
+            ..TestShell::default()
         };
         let backend = Backend::new(platform as Arc<dyn Platform>, Arc::new(shell));
         assert_eq!(

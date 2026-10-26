@@ -17,6 +17,10 @@ use zax_platform::{Error, Result};
 /// operation at a time.
 pub const PROGRESS_EVENT: &str = "zax://progress";
 
+/// The event a game ZAX started exiting arrives on, carrying nothing: the interface answers it with the
+/// `game_closed` command, which decides what to read again.
+pub const GAME_CLOSED_EVENT: &str = "zax://game-closed";
+
 #[derive(Debug)]
 pub struct WindowShell {
     app: AppHandle,
@@ -89,6 +93,11 @@ impl Shell for WindowShell {
         // on and its result is what the caller acts on.
         // The domain's own shape, whose binding is what the interface reads the message as.
         let _ = self.app.emit(PROGRESS_EVENT, progress);
+    }
+
+    fn game_closed(&self) {
+        // A window that has gone has nothing to show the fresh read in.
+        let _ = self.app.emit(GAME_CLOSED_EVENT, ());
     }
 
     fn now(&self) -> LocalTime {

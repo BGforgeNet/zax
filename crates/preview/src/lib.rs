@@ -95,6 +95,10 @@ impl Shell for PreviewShell {
         }
     }
 
+    fn game_closed(&self) {
+        // Never called: the preview starts no games.
+    }
+
     fn millis(&self) -> i64 {
         PREVIEW_MILLIS
     }
@@ -249,6 +253,7 @@ impl Preview {
             "choose_folder" => answered(backend.choose_folder(held.holding.as_deref())),
             "select_install" => answered(backend.select_install(&needed(held.path, "path")?)),
             "refresh" => answered(backend.refresh()),
+            "game_closed" => answered(backend.game_closed()),
             "add_install" => answered(backend.add_install(&needed(held.path, "path")?)),
             "remove_install" => answered(backend.remove_install(&needed(held.path, "path")?)),
             "set_alias" => answered(
@@ -350,6 +355,7 @@ pub const PREVIEW_COMMANDS: &[&str] = &[
     "choose_folder",
     "select_install",
     "refresh",
+    "game_closed",
     "add_install",
     "remove_install",
     "set_alias",
