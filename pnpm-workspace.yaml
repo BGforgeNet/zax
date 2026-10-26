@@ -18,3 +18,9 @@ overrides:
   # will never be re-released; 5.0.0 restores it. Its one break is being ESM-only, which svelte-check loads
   # fine.
   chokidar: ^5.0.0
+
+auditConfig:
+  ignoreGhsas:
+    # happy-dom, a test-only dependency that only runs our own code: fixed only in 21.0.4, a major still inside
+    # the 7-day release-age window until 2026-10-27. Drop this entry with that bump.
+    - GHSA-834v-8h66-3h79
