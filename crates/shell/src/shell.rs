@@ -35,6 +35,26 @@ impl WindowShell {
 
 /// One broken-down instant as `stamp` wants it. The fields are already in range by construction - the
 /// date-time they come from is a calendar one - so the conversions below cannot narrow anything away.
+/// An extension in every upper- and lower-case spelling. GTK matches a file filter's pattern case-sensitively, and
+/// the files ZAX asks for come in both (a GOG `MASTER.DAT`, an unpacked `master.dat`), so `*.dat` alone hides one.
+fn every_case(extension: &str) -> Vec<String> {
+    let mut spellings = vec![String::new()];
+    for letter in extension.chars() {
+        let (lower, upper) = (letter.to_ascii_lowercase(), letter.to_ascii_uppercase());
+        spellings = spellings
+            .into_iter()
+            .flat_map(|held| {
+                if lower == upper {
+                    vec![format!("{held}{letter}")]
+                } else {
+                    vec![format!("{held}{lower}"), format!("{held}{upper}")]
+                }
+            })
+            .collect();
+    }
+    spellings
+}
+
 fn broken_down(held: jiff::civil::DateTime) -> LocalTime {
     LocalTime {
         year: i32::from(held.year()),
@@ -61,10 +81,12 @@ impl Shell for WindowShell {
             // recognise it by name alone - and the one thing that would settle it is the file they are
             // not allowed to see. Asking for the file and answering with its folder shows it to them.
             Some(named) => {
+                let spellings = every_case(named.rsplit('.').next().unwrap_or(named));
+                let extensions: Vec<&str> = spellings.iter().map(String::as_str).collect();
                 dialog
                     .file()
                     .set_title(format!("Choose the folder holding {named}"))
-                    .add_filter(named, &[named.rsplit('.').next().unwrap_or(named)])
+                    .add_filter(named, &extensions)
                     .pick_file(move |held| {
                         let _ = send.send(held.and_then(|at| {
                             at.into_path().ok().and_then(|at| {
@@ -128,6 +150,20 @@ impl Shell for WindowShell {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_picked_file_is_listed_whatever_case_its_extension_is_in() {
+        let spellings = every_case("dat");
+        assert_eq!(spellings.len(), 8, "{spellings:?}");
+        for seen in ["dat", "DAT", "Dat", "dAt"] {
+            assert!(
+                spellings.iter().any(|held| held == seen),
+                "{seen} missing from {spellings:?}"
+            );
+        }
+        // A digit has one case, so it does not double the list.
+        assert_eq!(every_case("7z"), ["7z", "7Z"]);
+    }
 
     #[test]
     fn the_local_clock_answers_a_plausible_wall_time() {
