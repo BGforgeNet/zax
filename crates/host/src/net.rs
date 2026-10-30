@@ -97,6 +97,7 @@ fn human_reason(kind: NetworkFailure, url: &str, detail: &str) -> String {
             format!("{host} closed the connection before the file was complete.")
         }
         NetworkFailure::Status => format!("{host} answered with {detail}."),
+        NetworkFailure::Transport => format!("The connection to {host} failed: {detail}."),
     }
 }
 
@@ -109,32 +110,38 @@ fn network(kind: NetworkFailure, url: &str, detail: &str, status: Option<u16>) -
     })
 }
 
-/// Whether the transport never reached the host at all, as opposed to reaching it and losing it part
-/// way. Telling a user to check their network connection when the mirror actually dropped a connection
-/// mid-file sends them looking in the wrong place.
+/// What a request that got no response ran into. A status the server did answer with arrives as a
+/// response, however unwelcome, so it is never one of these.
+///
+/// Telling a user to check their network connection is right only for a host that was never reached: a
+/// connection the mirror dropped, or a certificate the transport refused, sends them looking in the wrong
+/// place.
 #[expect(
     clippy::wildcard_enum_match_arm,
-    reason = "the transport's error enum is the library's and grows with it; everything this does \
-              not name is a request that reached the host, which is the other answer"
+    reason = "the transport's error enum is the library's and grows with it; what this does not name is \
+              the transport's own failure, which it describes in its message"
 )]
-fn unreachable(err: &ureq::Error) -> bool {
+fn failure_of(err: &ureq::Error) -> NetworkFailure {
     match err {
-        ureq::Error::Io(held) => matches!(
-            held.kind(),
-            std::io::ErrorKind::ConnectionRefused
-                | std::io::ErrorKind::HostUnreachable
-                | std::io::ErrorKind::NetworkUnreachable
-                | std::io::ErrorKind::NotConnected
-        ),
-        // A name that does not resolve, and a connection to a host that is not there.
-        ureq::Error::HostNotFound | ureq::Error::ConnectionFailed => true,
-        _ => false,
+        ureq::Error::Timeout(_) => NetworkFailure::Timeout,
+        ureq::Error::Io(held) => match held.kind() {
+            std::io::ErrorKind::TimedOut => NetworkFailure::Timeout,
+            std::io::ErrorKind::ConnectionReset
+            | std::io::ErrorKind::ConnectionAborted
+            | std::io::ErrorKind::BrokenPipe
+            | std::io::ErrorKind::UnexpectedEof => NetworkFailure::Incomplete,
+            // TLS: a certificate refused or a handshake gone wrong reaches here as the TLS library's error
+            // wrapped in an io error of this kind, not as the transport's own TLS variant.
+            std::io::ErrorKind::InvalidData => NetworkFailure::Transport,
+            // Refused, unreachable, and a name lookup that failed: the last arrives as a kind the standard
+            // library does not name on stable, so it is this arm rather than one of its own.
+            _ => NetworkFailure::Offline,
+        },
+        // A name that resolves to nothing, and a connection to a host that is not there.
+        ureq::Error::HostNotFound | ureq::Error::ConnectionFailed => NetworkFailure::Offline,
+        // The protocol, a proxy, the TLS setup: each a variant of its own, named in its message.
+        _ => NetworkFailure::Transport,
     }
-}
-
-fn timed_out(err: &ureq::Error) -> bool {
-    matches!(err, ureq::Error::Timeout(_))
-        || matches!(err, ureq::Error::Io(held) if held.kind() == std::io::ErrorKind::TimedOut)
 }
 
 fn failed(operation: &'static str, path: &Path, source: std::io::Error) -> Error {
@@ -217,16 +224,7 @@ fn attempt(
             if cancelled() {
                 return Err(Error::Cancelled);
             }
-            // A status the server did answer with arrives as a response, however unwelcome; what
-            // reaches here is a request that got none.
-            let kind = if timed_out(&err) {
-                NetworkFailure::Timeout
-            } else if unreachable(&err) {
-                NetworkFailure::Offline
-            } else {
-                NetworkFailure::Incomplete
-            };
-            return Err(network(kind, url, "", None));
+            return Err(network(failure_of(&err), url, &err.to_string(), None));
         }
     };
 
@@ -387,17 +385,13 @@ impl Network for HostNetwork {
         let response = match self.agent.get(url).call() {
             Ok(response) => response,
             Err(err) => {
-                let kind = if timed_out(&err) {
-                    NetworkFailure::Timeout
-                } else {
-                    NetworkFailure::Offline
-                };
+                let kind = failure_of(&err);
                 // A feed that went quiet says something different from one that was never reached, and
                 // the download's own wording is about a transfer rather than a request.
                 let message = if kind == NetworkFailure::Timeout {
                     format!("{} did not answer in time.", host_of(url))
                 } else {
-                    human_reason(NetworkFailure::Offline, url, "")
+                    human_reason(kind, url, &err.to_string())
                 };
                 return Err(Error::Network(NetworkError {
                     kind,
@@ -509,11 +503,14 @@ impl Network for HostNetwork {
                         discard_partial(&partial, &identity);
                     }
 
+                    // A transport failure is retried as it was when it counted as incomplete: a protocol
+                    // error part way can pass, and a certificate refusal costs only the same message again.
                     let retryable = match kind {
                         Some(
                             NetworkFailure::Timeout
                             | NetworkFailure::Incomplete
-                            | NetworkFailure::Offline,
+                            | NetworkFailure::Offline
+                            | NetworkFailure::Transport,
                         ) => true,
                         Some(NetworkFailure::Status) => {
                             status.is_some_and(|held| RETRYABLE_STATUS.contains(&held))
@@ -556,18 +553,20 @@ mod tests {
 
     #[test]
     fn each_failure_says_something_different_to_the_user() {
-        // One word for all four is what this taxonomy exists to avoid.
+        // One word for all of them is what this taxonomy exists to avoid.
         let said = |kind| human_reason(kind, "https://example.com/x", "500 Server Error");
         let all = [
             said(NetworkFailure::Offline),
             said(NetworkFailure::Timeout),
             said(NetworkFailure::Incomplete),
             said(NetworkFailure::Status),
+            said(NetworkFailure::Transport),
         ];
         let unique: std::collections::BTreeSet<&String> = all.iter().collect();
-        assert_eq!(unique.len(), 4, "{all:?}");
+        assert_eq!(unique.len(), all.len(), "{all:?}");
         assert!(all[0].contains("check the network connection"), "{all:?}");
         assert!(all[3].contains("500 Server Error"), "{all:?}");
+        assert!(all[4].contains("500 Server Error"), "{all:?}");
     }
 
     #[test]
@@ -712,6 +711,30 @@ mod tests {
         assert_eq!(
             (held.kind, held.status),
             (NetworkFailure::Status, Some(404)),
+            "{held:?}"
+        );
+    }
+
+    #[test]
+    fn a_connection_the_transport_refuses_says_why_rather_than_blaming_the_network() {
+        // TLS spoken to a plain HTTP server: a host that answers, and a handshake that fails. Told to check
+        // their network connection, a user with a certificate problem would look in the wrong place.
+        let (url, _) = answering("200 OK");
+        let url = url.replacen("http://", "https://", 1);
+        let err = HostNetwork::default()
+            .fetch_text(&url)
+            .expect_err("no TLS there");
+        let Error::Network(held) = err else {
+            panic!("{err:?}");
+        };
+        assert_eq!(held.kind, NetworkFailure::Transport, "{held:?}");
+        assert!(
+            held.message
+                .starts_with("The connection to 127.0.0.1 failed: "),
+            "{held:?}"
+        );
+        assert!(
+            !held.message.contains("check the network connection"),
             "{held:?}"
         );
     }

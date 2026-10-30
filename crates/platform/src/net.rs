@@ -17,6 +17,9 @@ pub enum NetworkFailure {
     Status,
     /// The body ended before the length the server declared.
     Incomplete,
+    /// The transport failed for a reason of its own, which it names: a certificate it would not accept, a
+    /// protocol error, a proxy.
+    Transport,
 }
 
 /// A network failure with its cause named. The message is written for the user, because it is the
