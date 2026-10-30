@@ -18,3 +18,9 @@ overrides:
   # will never be re-released; 5.0.0 restores it. Its one break is being ESM-only, which svelte-check loads
   # fine.
   chokidar: ^5.0.0
+
+auditConfig:
+  ignoreGhsas:
+    # deepmerge, which @sveltejs/vite-plugin-svelte uses to merge our own Svelte config at build time: no release
+    # fixes it. Drop this entry once a plugin release with sveltejs/vite-plugin-svelte#1415 is a week old.
+    - GHSA-gcqx-w48m-w2h4
