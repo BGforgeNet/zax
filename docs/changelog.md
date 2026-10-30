@@ -21,7 +21,9 @@ mods as well as settings.
   Windows that installer's own window opens, where you pick your language and anything else it offers. ZAX
   points it at the right folder, waits, and takes over again when it finishes - and says so if you close it
   rather than treating that as a failure. The Restoration Project's 2.3 and 2.4 lines are two entries
-  rather than one: each updates within its own line, and only one of them installs on any game. Fallout et tu
+  rather than one: each updates within its own line, and only one of them installs on any game. Once
+  installed, their own options - Goris's de-robing speed, merchant restocks, Marcus's armor and the rest - are
+  edited like any other setting. Fallout et tu
   builds a second game beside this one out of your own copy of Fallout 1, and joins the game list when it is
   done. It is installed once and never updated in place: where one is already there - a folder in this game, or
   a Fallout et tu installation on the list - the row says so rather than offering to unpack a release over it,

@@ -12,6 +12,11 @@ describing the settings that ini actually holds. The preview and the settings te
 keeps the surface honest about the mod even though the document is ours - but it is not evidence of what the
 format looks like in the wild, and it moves when the mod's own arrives.
 
+`upu/mods/upu.ini` and `rpu/mods/rpu.ini` are the inis UPU v34 and RPU v2.4.34 ship, verbatim, read out of
+their release archives. UPU's is also the one both RPU lines ship, and RPU's is the same in 2.3.34. The
+manifests ZAX carries for those mods (`crates/fallout2/src/mod_vendored.rs`) describe them, and a test holds
+each description to these files.
+
 `manifests/` is the odd one out: not copies of anything but specimens written here, one per shape the mod
 manifest format takes, each with a `.json` sibling holding what it must parse to. They are what makes the
 format's append-only promise a test - a change that alters what an already-published manifest means fails one

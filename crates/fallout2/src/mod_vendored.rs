@@ -17,7 +17,7 @@
 //! would most likely pick anyway - with the release line appended where a repository publishes two,
 //! since one id per line is what makes them two mods rather than one with a branch. If one picks
 //! differently, their feed row stops matching and the mod reads as unfollowed until a ZAX release
-//! corrects the row - the whole cost, because these three name no setting and put nothing in `mods/`.
+//! corrects the row.
 //!
 //! No document names an installer asset. Both BGforge assets carry the version in their names, and
 //! the release is what knows it: the Windows route resolves to the release's sole `.exe` and the
@@ -37,7 +37,81 @@ pub struct VendoredManifest {
     pub text: &'static str,
 }
 
-const RPU23: &str = "spec: 1
+/// `mods/upu.ini` as UPU v34 ships it, which both RPU lines ship unchanged inside their own releases: one
+/// description for the three documents that install the file. Each entry names its file, since an RPU
+/// document's own default would be `mods/rpu23.ini`. UPU's next release adds `caverns_reduce_mobs`, which
+/// joins here with it. `fixtures/upu/` holds the shipped file the tests hold this to.
+macro_rules! upu_settings {
+    () => {
+        "  main.goris_derobing_speed:
+    file: mods/upu.ini
+    kind: int
+    min: 16
+    max: 100
+    unit: fps
+    sentinels: { 0: \"Off\" }
+    default: 50
+    label: Goris de-robing speed
+    help: How fast Goris takes off his robe. The original game plays it at 16. No effect if the alternative low FPS Goris de-robing is installed.
+  main.critters_walk_faster:
+    file: mods/upu.ini
+    kind: bool
+    default: 1
+    label: Faster walking for slow critters
+    help: Robots, various guards and a few other critters walk much slower than everyone else; this speeds them up a little. Cosmetic only. No effect if the alternative low FPS walk speed fix is installed.
+  main.wipe_inventory:
+    file: mods/upu.ini
+    kind: bool
+    default: 0
+    label: Fresh merchant stock on each restock
+    help: Off, merchants keep every item you ever sold them, on top of their restocks. On, each restock gives them fresh inventory. Quest items are always kept. Can be changed mid-game.
+  ncr.repeatable_brahmin_drive:
+    file: mods/upu.ini
+    kind: bool
+    default: 1
+    label: Repeatable NCR brahmin drive
+    help: The NCR to Redding brahmin drive can be done again, as Duppo says. The drives end if Hal dies.
+"
+    };
+}
+
+/// `mods/rpu.ini`, the same file in both release lines (2.3.34 and 2.4.34). `fixtures/rpu/` holds it.
+macro_rules! rpu_settings {
+    () => {
+        "  main.marcus_armor:
+    file: mods/rpu.ini
+    kind: bool
+    default: 1
+    label: Mutant armor for Marcus
+  main.dogmeat_armor:
+    file: mods/rpu.ini
+    kind: bool
+    default: 1
+    label: Kevlar armor for Dogmeat
+  main.smoking:
+    file: mods/rpu.ini
+    kind: bool
+    default: 1
+    label: Smoking animation
+    help: The player character's smoking animation.
+  main.lenny_new_look:
+    file: mods/rpu.ini
+    kind: bool
+    default: 1
+    label: New look for Lenny
+    help: Gives Lenny a different ghoul sprite.
+  main.vault_boxer:
+    file: mods/rpu.ini
+    kind: bool
+    default: 1
+    label: Vault boxer in the ring
+    help: Use the unique vault boxer model when fighting in the ring.
+"
+    };
+}
+
+const RPU23: &str = concat!(
+    "spec: 1
 id: rpu23
 name: Restoration Project Updated 2.3
 game: fallout2
@@ -45,9 +119,14 @@ type: base
 becomes: fallout2rpu
 installer.windows.built-with: inno
 installer.other.run: rpu-install.sh
-";
+settings:
+",
+    rpu_settings!(),
+    upu_settings!()
+);
 
-const RPU24: &str = "spec: 1
+const RPU24: &str = concat!(
+    "spec: 1
 id: rpu24
 name: Restoration Project Updated 2.4
 game: fallout2
@@ -55,9 +134,14 @@ type: base
 becomes: fallout2rpu
 installer.windows.built-with: inno
 installer.other.run: rpu-install.sh
-";
+settings:
+",
+    rpu_settings!(),
+    upu_settings!()
+);
 
-const UPU: &str = "spec: 1
+const UPU: &str = concat!(
+    "spec: 1
 id: upu
 name: Unofficial Patch Updated
 game: fallout2
@@ -65,7 +149,10 @@ type: base
 becomes: fallout2upu
 installer.windows.built-with: inno
 installer.other.run: upu-install.sh
-";
+settings:
+",
+    upu_settings!()
+);
 
 /// Fallout et tu, whose asset name carries no version: one top-level `Fallout1in2/` in the payload,
 /// `undat_files.txt` inside it, and Fallout 1's `master.dat` the file the folder it asks for must
@@ -232,6 +319,51 @@ mod tests {
         assert_eq!(inputs[0].holds, "master.dat");
         let extract = manifest.extract_dat.as_ref().expect("it unpacks a DAT");
         assert_eq!(extract.from, inputs[0].id);
+    }
+
+    /// What each base mod's release ships under `mods/`, verbatim.
+    fn shipped(file: &str) -> Option<Vec<u8>> {
+        let at = match file {
+            "mods/upu.ini" => "../../fixtures/upu/mods/upu.ini",
+            "mods/rpu.ini" => "../../fixtures/rpu/mods/rpu.ini",
+            _ => return None,
+        };
+        std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(at)).ok()
+    }
+
+    #[test]
+    fn every_described_setting_matches_the_ini_its_release_ships() {
+        // Nothing at install compares the two, so a key described here and missing from the release would
+        // be a control writing a line the mod never reads. Hard: every key the files carry is described.
+        for entry in VENDORED_MANIFESTS {
+            let manifest = parse_manifest(entry.text.as_bytes(), &defaults()).expect("parses");
+            if manifest.settings.is_empty() {
+                continue;
+            }
+            let report =
+                crate::mod_ini::check_mod_ini(&manifest, &shipped, crate::mod_ini::IniMatch::Hard);
+            assert!(
+                report.mismatches.is_empty() && report.undescribed == 0,
+                "{}: {report:?}",
+                entry.id
+            );
+        }
+    }
+
+    #[test]
+    fn rpu_describes_both_files_it_ships_and_upu_its_own() {
+        let files = |text: &str| {
+            let manifest = parse_manifest(text.as_bytes(), &defaults()).expect("parses");
+            manifest
+                .settings
+                .iter()
+                .map(|setting| setting.def.targets.own().file.clone())
+                .collect::<BTreeSet<_>>()
+        };
+        let both: BTreeSet<String> = ["mods/rpu.ini", "mods/upu.ini"].map(str::to_owned).into();
+        assert_eq!(files(RPU23), both);
+        assert_eq!(files(RPU24), both);
+        assert_eq!(files(UPU), ["mods/upu.ini".to_owned()].into());
     }
 
     #[test]
