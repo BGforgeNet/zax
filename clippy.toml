@@ -1,0 +1,4 @@
+# A panicking `expect` in a test IS the test failing, with the message as its report, so the
+# unwrap/expect ban applies to shipped code only. Everywhere else the lint table in Cargo.toml holds.
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true

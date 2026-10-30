@@ -1,0 +1,312 @@
+<script lang="ts">
+  import type { Install } from "./bindings/Install";
+  import Dialog from "./Dialog.svelte";
+  import { isPreview, PREVIEW_REASON } from "./invoke.js";
+  import { GAME_ICON } from "./icons.js";
+  import { store } from "./store.svelte.js";
+
+  const current = $derived(store.install);
+
+  let adding = $state(false);
+  let candidate = $state("");
+
+  /*
+    The button sits beside Add game and says Remove, which is what an uninstall looks like from here, so the
+    confirmation exists to say what it does not do. The install is held rather than re-read on confirm: what
+    the dialog names is what it removes.
+  */
+  let confirming = $state<Install | null>(null);
+
+  function remove(): void {
+    const install = confirming;
+    confirming = null;
+    if (install) void store.removeInstall(install.path);
+  }
+
+  function submit() {
+    void store.addInstall(candidate).then(() => {
+      candidate = "";
+      adding = false;
+    });
+  }
+
+  /**
+   * Renaming a row means selecting it first, so the field that opens belongs to the row you asked about - and
+   * only where that selection took, since a refused switch would open the field on somebody else's row.
+   */
+  function rename(path: string) {
+    void store.selectInstall(path).then((took) => took && store.renameSelected());
+  }
+</script>
+
+<div class="panel">
+  <ul class="installs">
+    {#each store.installs as install (install.path)}
+      {@const type = store.gameType(install.type)}
+      <li>
+        <!--
+          Right-click renames, which is what a list of named things is expected to do; F2 is handled for the
+          window, so it works without the row holding focus. Neither is discoverable, so the tooltip says so.
+        -->
+        <!--
+          Greyed out while an operation runs, because switching install re-reads it and a read writes. The
+          store refuses either way; this is so the list says so before the click rather than after it.
+        -->
+        <button
+          class="install"
+          class:selected={install.path === store.selectedInstall}
+          aria-pressed={install.path === store.selectedInstall}
+          disabled={store.busy !== null && install.path !== store.selectedInstall}
+          title={store.busyReason ?? `${type.label} at ${install.path}\nRight-click or press F2 to rename`}
+          onclick={() => void store.selectInstall(install.path)}
+          oncontextmenu={(event) => {
+            event.preventDefault();
+            rename(install.path);
+          }}
+        >
+          <img class="icon" src={GAME_ICON[install.type]} alt={type.label} width="32" height="32" />
+          <span class="text">
+            <span class="top">
+              <!-- The path below is what tells two installs of one type apart; the name says what the game is. -->
+              <span class="name">{store.nameOf(install)}</span>
+              <span class="badge">{type.badge}</span>
+            </span>
+            <span class="path">{install.path}</span>
+          </span>
+        </button>
+      </li>
+    {:else}
+      <li class="empty">No installs yet.</li>
+    {/each}
+  </ul>
+
+  {#if isPreview}
+    <!-- Says which install the preview is actually editing, rather than letting one entry imply a real scan. -->
+    <p class="note">The bundled fixture, edited in memory. Nothing here reaches a real game folder.</p>
+  {/if}
+
+  {#if adding}
+    <!-- Typing stays alongside the picker: a browser has no picker, and a path can be pasted from elsewhere. -->
+    <form
+      class="form"
+      onsubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <input aria-label="Path to the game folder" placeholder="Path to the game folder" bind:value={candidate} />
+      <div class="buttons">
+        <button type="submit" disabled={candidate.trim() === ""}>Add</button>
+        <!-- The picker belongs to the desktop shell; typing a path is what a browser is left with. -->
+        <button
+          type="button"
+          disabled={isPreview}
+          title={isPreview ? PREVIEW_REASON : null}
+          onclick={() => void store.browseForInstall().then(() => (adding = false))}
+        >
+          Browse...
+        </button>
+        <button type="button" onclick={() => (adding = false)}>Cancel</button>
+      </div>
+    </form>
+  {:else}
+    <div class="buttons">
+      <button onclick={() => (adding = true)}>Add game</button>
+      <button
+        class="remove"
+        disabled={!current || store.busy !== null}
+        title={store.busyReason}
+        onclick={() => (confirming = current ?? null)}
+      >
+        Remove from list
+      </button>
+    </div>
+  {/if}
+</div>
+
+<Dialog open={confirming !== null} title="Remove from the list?" dismiss={() => (confirming = null)}>
+  {#if confirming}
+    <p class="ask"><strong>{store.nameOf(confirming)}</strong></p>
+    <p class="ask path">{confirming.path}</p>
+    <p class="ask">
+      ZAX forgets this installation: it drops off the list, along with what ZAX recorded about it. Nothing in the game
+      folder is touched - no files are deleted, and the game stays playable. Adding the folder again brings it back.
+    </p>
+  {/if}
+  {#snippet footer()}
+    <button onclick={() => (confirming = null)}>Cancel</button>
+    <!-- Not "Remove from list" again: two controls of that name are on screen at once, and the one that acts
+         should not be the one the user has already pressed. -->
+    <button class="danger" onclick={remove}>Remove it</button>
+  {/snippet}
+</Dialog>
+
+<style>
+  .panel {
+    padding: 10px;
+  }
+
+  .installs {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .install {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+
+  .icon {
+    flex: 0 0 auto;
+    border-radius: 4px;
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    /* Takes the rest of the row so the badge has an edge to sit against, and the path has the full width. */
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Enabled only: a refused row that still lit up under the pointer would read as a click going unanswered. */
+  .install:enabled:hover {
+    background: var(--panel-alt);
+  }
+
+  /* The row keeps its place in the list, so the grey has to be what says it cannot be switched to. */
+  .install:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .install.selected {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .install .top {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .name {
+    font-weight: 550;
+    font-size: 12.5px;
+  }
+
+  .badge {
+    /* Against the far edge rather than beside the name, which read as part of it however long the name was. */
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0 4px;
+    color: var(--text-dim);
+  }
+
+  /*
+    Wrapped rather than truncated. Ellipsis from the left would hide the part that distinguishes two installs,
+    and `direction: rtl` - which does keep the tail - reorders the leading slash to the end, so the path renders
+    as something the user does not have.
+  */
+  .path {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    overflow-wrap: anywhere;
+  }
+
+  .note {
+    margin: 0 0 8px;
+    font-size: 11px;
+    color: var(--text-faint);
+    line-height: 1.4;
+  }
+
+  .empty {
+    color: var(--text-faint);
+    font-size: 12.5px;
+    padding: 6px 8px;
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  /* Monospaced because the only field here holds a path. */
+  .form input {
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    padding: 3px 7px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    min-width: 0;
+  }
+
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .buttons button {
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 3px 10px;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  .buttons button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .ask {
+    margin: 0 0 8px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  .ask:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Compound, so the path keeps the rows' quiet mono against .ask's paragraph type whatever the source order. */
+  .ask.path {
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  /* The clothes the wipe confirmations wear, since this is the same kind of button in the same kind of footer. */
+  .danger {
+    background: var(--panel);
+    border: 1px solid var(--invalid);
+    border-radius: 6px;
+    padding: 3px 10px;
+    color: var(--invalid);
+    font-size: 12px;
+  }
+</style>

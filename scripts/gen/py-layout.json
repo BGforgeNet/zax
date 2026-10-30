@@ -1,0 +1,1120 @@
+[
+ {
+  "file": "fallout2.cfg",
+  "label": "Game",
+  "tabs": [
+   {
+    "title": "Preferences",
+    "items": [
+     {
+      "kind": "slider",
+      "section": "preferences",
+      "key": "brightness"
+     },
+     {
+      "kind": "radio",
+      "section": "preferences",
+      "key": "game_difficulty"
+     },
+     {
+      "kind": "checkbox",
+      "section": "preferences",
+      "key": "item_highlight"
+     },
+     {
+      "kind": "checkbox",
+      "section": "preferences",
+      "key": "language_filter"
+     },
+     {
+      "kind": "slider",
+      "section": "preferences",
+      "key": "mouse_sensitivity"
+     },
+     {
+      "kind": "checkbox",
+      "section": "preferences",
+      "key": "running"
+     },
+     {
+      "kind": "checkbox",
+      "section": "preferences",
+      "key": "subtitles"
+     },
+     {
+      "kind": "slider",
+      "section": "preferences",
+      "key": "text_base_delay"
+     },
+     {
+      "kind": "slider",
+      "section": "preferences",
+      "key": "text_line_delay",
+      "hidden": true
+     },
+     {
+      "kind": "frame",
+      "title": "Sound volume",
+      "items": [
+       {
+        "kind": "slider",
+        "section": "sound",
+        "key": "master_volume"
+       },
+       {
+        "kind": "slider",
+        "section": "sound",
+        "key": "music_volume"
+       },
+       {
+        "kind": "slider",
+        "section": "sound",
+        "key": "sndfx_volume"
+       },
+       {
+        "kind": "slider",
+        "section": "sound",
+        "key": "speech_volume"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Combat",
+    "items": [
+     {
+      "kind": "radio",
+      "section": "preferences",
+      "key": "combat_difficulty"
+     },
+     {
+      "kind": "frame",
+      "title": "Speed",
+      "items": [
+       {
+        "kind": "slider",
+        "section": "preferences",
+        "key": "combat_speed"
+       },
+       {
+        "kind": "checkbox",
+        "section": "preferences",
+        "key": "player_speedup"
+       }
+      ]
+     },
+     {
+      "kind": "checkbox",
+      "section": "preferences",
+      "key": "combat_looks"
+     },
+     {
+      "kind": "radio",
+      "section": "preferences",
+      "key": "combat_messages"
+     },
+     {
+      "kind": "checkbox",
+      "section": "preferences",
+      "key": "combat_taunts"
+     },
+     {
+      "kind": "radio",
+      "section": "preferences",
+      "key": "target_highlight"
+     },
+     {
+      "kind": "dropdown",
+      "section": "preferences",
+      "key": "violence_level"
+     }
+    ]
+   },
+   {
+    "title": "Advanced",
+    "items": [
+     {
+      "kind": "frame",
+      "title": "System",
+      "items": [
+       {
+        "kind": "spin",
+        "section": "system",
+        "key": "art_cache_size"
+       },
+       {
+        "kind": "checkbox",
+        "section": "system",
+        "key": "color_cycling"
+       },
+       {
+        "kind": "qinput",
+        "section": "system",
+        "key": "critter_dat"
+       },
+       {
+        "kind": "qinput",
+        "section": "system",
+        "key": "critter_patches"
+       },
+       {
+        "kind": "spin",
+        "section": "system",
+        "key": "cycle_speed_factor"
+       },
+       {
+        "kind": "qinput",
+        "section": "system",
+        "key": "executable"
+       },
+       {
+        "kind": "spin",
+        "section": "system",
+        "key": "free_space"
+       },
+       {
+        "kind": "checkbox",
+        "section": "system",
+        "key": "hashing"
+       },
+       {
+        "kind": "checkbox",
+        "section": "system",
+        "key": "interrupt_walk"
+       },
+       {
+        "kind": "qinput",
+        "section": "system",
+        "key": "language"
+       },
+       {
+        "kind": "qinput",
+        "section": "system",
+        "key": "master_dat"
+       },
+       {
+        "kind": "qinput",
+        "section": "system",
+        "key": "master_patches"
+       },
+       {
+        "kind": "checkbox",
+        "section": "system",
+        "key": "scroll_lock"
+       },
+       {
+        "kind": "spin",
+        "section": "system",
+        "key": "splash"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Sound",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "sound",
+        "key": "music"
+       },
+       {
+        "kind": "checkbox",
+        "section": "sound",
+        "key": "sounds"
+       },
+       {
+        "kind": "checkbox",
+        "section": "sound",
+        "key": "speech"
+       },
+       {
+        "kind": "qinput",
+        "section": "sound",
+        "key": "music_path1"
+       },
+       {
+        "kind": "qinput",
+        "section": "sound",
+        "key": "music_path2"
+       },
+       {
+        "kind": "spin",
+        "section": "sound",
+        "key": "cache_size"
+       },
+       {
+        "kind": "dropdown",
+        "section": "sound",
+        "key": "device"
+       },
+       {
+        "kind": "qinput",
+        "section": "sound",
+        "key": "dma"
+       },
+       {
+        "kind": "checkbox",
+        "section": "sound",
+        "key": "initialize"
+       },
+       {
+        "kind": "qinput",
+        "section": "sound",
+        "key": "irq"
+       },
+       {
+        "kind": "qinput",
+        "section": "sound",
+        "key": "port"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Debug",
+    "items": [
+     {
+      "kind": "frame",
+      "title": "Main",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "debug",
+        "key": "output_map_data_info"
+       },
+       {
+        "kind": "checkbox",
+        "section": "debug",
+        "key": "show_load_info"
+       },
+       {
+        "kind": "checkbox",
+        "section": "debug",
+        "key": "show_script_messages"
+       },
+       {
+        "kind": "checkbox",
+        "section": "debug",
+        "key": "show_tile_num"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Sound",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "sound",
+        "key": "debug"
+       },
+       {
+        "kind": "checkbox",
+        "section": "sound",
+        "key": "debug_sfxc"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "file": "f2_res.ini",
+  "label": "HiRes",
+  "tabs": [
+   {
+    "title": "Main",
+    "items": [
+     {
+      "kind": "frame",
+      "title": "Graphics",
+      "items": [
+       {
+        "kind": "dropdown",
+        "section": "MAIN",
+        "key": "GRAPHICS_MODE"
+       },
+       {
+        "kind": "checkbox",
+        "section": "MAIN",
+        "key": "SCALE_2X"
+       },
+       {
+        "kind": "checkbox",
+        "section": "EFFECTS",
+        "key": "IS_GRAY_SCALE"
+       },
+       {
+        "kind": "radio",
+        "section": "MAIN",
+        "key": "WINDOWED"
+       },
+       {
+        "kind": "checkbox",
+        "section": "MAIN",
+        "key": "WINDOWED_FULLSCREEN"
+       },
+       {
+        "kind": "frame",
+        "title": "Fullscreen",
+        "items": [
+         {
+          "kind": "dropdown",
+          "section": "MAIN",
+          "key": "COLOUR_BITS"
+         },
+         {
+          "kind": "spin",
+          "section": "MAIN",
+          "key": "REFRESH_RATE"
+         }
+        ]
+       },
+       {
+        "kind": "frame",
+        "title": "Resolution",
+        "items": [
+         {
+          "kind": "widget",
+          "element": "Combo",
+          "id": "f2_res.ini-resolution"
+         },
+         {
+          "kind": "raw",
+          "element": "Spin",
+          "section": "MAIN",
+          "key": "SCR_WIDTH"
+         },
+         {
+          "kind": "raw",
+          "element": "Spin",
+          "section": "MAIN",
+          "key": "SCR_HEIGHT"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Maps",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "MAPS",
+        "key": "EDGE_CLIPPING_ON"
+       },
+       {
+        "kind": "checkbox",
+        "section": "MAPS",
+        "key": "IGNORE_MAP_EDGES"
+       },
+       {
+        "kind": "checkbox",
+        "section": "MAPS",
+        "key": "IGNORE_PLAYER_SCROLL_LIMITS"
+       },
+       {
+        "kind": "qinput",
+        "section": "MAPS",
+        "key": "SCROLL_DIST_X"
+       },
+       {
+        "kind": "qinput",
+        "section": "MAPS",
+        "key": "SCROLL_DIST_Y"
+       }
+      ]
+     },
+     {
+      "kind": "spin",
+      "section": "MAPS",
+      "key": "NumPathNodes"
+     },
+     {
+      "kind": "frame",
+      "title": "Fog of war",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "MAPS",
+        "key": "FOG_OF_WAR"
+       },
+       {
+        "kind": "spin",
+        "section": "MAPS",
+        "key": "FOG_LIGHT_LEVEL"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Delays",
+      "items": [
+       {
+        "kind": "spin",
+        "section": "OTHER_SETTINGS",
+        "key": "SPLASH_SCRN_TIME"
+       },
+       {
+        "kind": "spin",
+        "section": "OTHER_SETTINGS",
+        "key": "FADE_TIME_MODIFIER"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Scaling",
+    "items": [
+     {
+      "kind": "radio",
+      "section": "MOVIES",
+      "key": "MOVIE_SIZE"
+     },
+     {
+      "kind": "radio",
+      "section": "MAINMENU",
+      "key": "MAIN_MENU_SIZE"
+     },
+     {
+      "kind": "frame",
+      "title": "HiRes menu backgronud",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "MAINMENU",
+        "key": "USE_HIRES_IMAGES"
+       },
+       {
+        "kind": "spin",
+        "section": "MAINMENU",
+        "key": "MENU_BG_OFFSET_X"
+       },
+       {
+        "kind": "spin",
+        "section": "MAINMENU",
+        "key": "MENU_BG_OFFSET_Y"
+       },
+       {
+        "kind": "checkbox",
+        "section": "MAINMENU",
+        "key": "SCALE_BUTTONS_AND_TEXT_MENU"
+       }
+      ]
+     },
+     {
+      "kind": "radio",
+      "section": "STATIC_SCREENS",
+      "key": "DEATH_SCRN_SIZE"
+     },
+     {
+      "kind": "radio",
+      "section": "STATIC_SCREENS",
+      "key": "END_SLIDE_SIZE"
+     },
+     {
+      "kind": "radio",
+      "section": "STATIC_SCREENS",
+      "key": "HELP_SCRN_SIZE"
+     },
+     {
+      "kind": "radio",
+      "section": "STATIC_SCREENS",
+      "key": "SPLASH_SCRN_SIZE"
+     }
+    ]
+   },
+   {
+    "title": "Interface",
+    "items": [
+     {
+      "kind": "frame",
+      "title": "Interface bar",
+      "items": [
+       {
+        "kind": "radio",
+        "section": "IFACE",
+        "key": "IFACE_BAR_MODE"
+       },
+       {
+        "kind": "dropdown",
+        "section": "IFACE",
+        "key": "IFACE_BAR_SIDE_ART"
+       },
+       {
+        "kind": "dropdown",
+        "section": "IFACE",
+        "key": "IFACE_BAR_SIDES_ORI"
+       },
+       {
+        "kind": "spin",
+        "section": "IFACE",
+        "key": "IFACE_BAR_WIDTH"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Dialog and barter",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "OTHER_SETTINGS",
+        "key": "DIALOG_SCRN_BACKGROUND"
+       },
+       {
+        "kind": "checkbox",
+        "section": "OTHER_SETTINGS",
+        "key": "DIALOG_SCRN_ART_FIX"
+       },
+       {
+        "kind": "checkbox",
+        "section": "OTHER_SETTINGS",
+        "key": "BARTER_PC_INV_DROP_FIX"
+       },
+       {
+        "kind": "checkbox",
+        "section": "INPUT",
+        "key": "SCROLLWHEEL_FOCUS_PRIMARY_MENU"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Alternate ammo metre",
+      "items": [
+       {
+        "kind": "dropdown",
+        "section": "IFACE",
+        "key": "ALTERNATE_AMMO_METRE"
+       },
+       {
+        "kind": "qinput",
+        "section": "IFACE",
+        "key": "ALTERNATE_AMMO_LIGHT"
+       },
+       {
+        "kind": "qinput",
+        "section": "IFACE",
+        "key": "ALTERNATE_AMMO_DARK"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Advanced",
+    "items": [
+     {
+      "kind": "checkbox",
+      "section": "OTHER_SETTINGS",
+      "key": "CD_CHECK"
+     },
+     {
+      "kind": "frame",
+      "title": "Troubleshooting",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "INPUT",
+        "key": "ALT_MOUSE_INPUT"
+       },
+       {
+        "kind": "checkbox",
+        "section": "INPUT",
+        "key": "EXTRA_WIN_MSG_CHECKS"
+       },
+       {
+        "kind": "checkbox",
+        "section": "OTHER_SETTINGS",
+        "key": "CPU_USAGE_FIX"
+       },
+       {
+        "kind": "checkbox",
+        "section": "OTHER_SETTINGS",
+        "key": "FADE_TIME_RECALCULATE_ON_FADE"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "System",
+      "items": [
+       {
+        "kind": "qinput",
+        "section": "MAIN",
+        "key": "f2_res_dat"
+       },
+       {
+        "kind": "qinput",
+        "section": "MAIN",
+        "key": "f2_res_patches"
+       },
+       {
+        "kind": "checkbox",
+        "section": "MAIN",
+        "key": "UAC_AWARE",
+        "hidden": true,
+        "disabled": true
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "file": "ddraw.ini",
+  "label": "Sfall",
+  "tabs": [
+   {
+    "title": "Main",
+    "items": [
+     {
+      "kind": "frame",
+      "title": "Manage",
+      "items": [
+       {
+        "kind": "widget",
+        "element": "InputText",
+        "id": "txt_sfall_current"
+       },
+       {
+        "kind": "widget",
+        "element": "Button",
+        "id": "btn_sfall_update"
+       },
+       {
+        "kind": "widget",
+        "element": "InputText",
+        "id": "txt_sfall_latest"
+       },
+       {
+        "kind": "widget",
+        "element": "Button",
+        "id": "btn_sfall_check"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Speed",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "Speed",
+        "key": "Enable"
+       },
+       {
+        "kind": "spin",
+        "section": "Speed",
+        "key": "SpeedMultiInitial"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Graphics",
+      "items": [
+       {
+        "kind": "dropdown",
+        "section": "Graphics",
+        "key": "Mode"
+       },
+       {
+        "kind": "spin",
+        "section": "Graphics",
+        "key": "GraphicsWidth"
+       },
+       {
+        "kind": "spin",
+        "section": "Graphics",
+        "key": "GraphicsHeight"
+       },
+       {
+        "kind": "dropdown",
+        "section": "Graphics",
+        "key": "GPUBlt"
+       },
+       {
+        "kind": "dropdown",
+        "section": "Graphics",
+        "key": "AllowDShowMovies"
+       },
+       {
+        "kind": "spin",
+        "section": "Graphics",
+        "key": "FadeMultiplier"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Combat",
+      "items": [
+       {
+        "kind": "dropdown",
+        "section": "Misc",
+        "key": "DamageFormula"
+       },
+       {
+        "kind": "dropdown",
+        "section": "Misc",
+        "key": "SaveInCombatFix"
+       },
+       {
+        "kind": "dropdown",
+        "section": "Misc",
+        "key": "FastShotFix"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "InventoryApCost"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "QuickPocketsApCostReduction"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Misc",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "UseFileSystemOverride"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "NPCAutoLevel"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "SingleCore"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "PlayIdleAnimOnReload"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "CorpseDeleteTime"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "ProcessorIdle"
+       },
+       {
+        "kind": "dropdown",
+        "section": "Misc",
+        "key": "SkipOpeningMovies"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "SuperStimExploitFix"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "ExplosionsEmitLight"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "DontTurnOffSneakIfYouRun"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "UseWalkDistance"
+       },
+       {
+        "kind": "dropdown",
+        "section": "Misc",
+        "key": "SkipLoadingGameSettings"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Interface",
+    "items": [
+     {
+      "kind": "checkbox",
+      "section": "Interface",
+      "key": "ActionPointsBar"
+     },
+     {
+      "kind": "frame",
+      "title": "Input",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "Input",
+        "key": "UseScrollWheel"
+       },
+       {
+        "kind": "qinput",
+        "section": "Input",
+        "key": "MiddleMouse"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Input",
+        "key": "ReverseMouseButtons"
+       },
+       {
+        "kind": "qinput",
+        "section": "Input",
+        "key": "ReloadWeaponKey"
+       },
+       {
+        "kind": "qinput",
+        "section": "Input",
+        "key": "ItemFastMoveKey"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Input",
+        "key": "FastMoveFromContainer"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Animation speed",
+      "items": [
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "CombatPanelAnimDelay"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "DialogPanelAnimDelay"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "PipboyTimeAnimDelay"
+       },
+       {
+        "kind": "dropdown",
+        "section": "Misc",
+        "key": "SpeedInterfaceCounterAnims"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "InstantWeaponEquip"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Dialog",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "NumbersInDialogue"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "EnableMusicInDialogue"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "PartyMemberExtraInfo"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Inventory",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "StackEmptyWeapons"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "ReloadReserve"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "ItemCounterDefaultMax"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "DisplayBonusDamage"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Barter",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "FullItemDescInBarter"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "Saves",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "ExtraSaveSlots"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "AutoQuickSave"
+       },
+       {
+        "kind": "spin",
+        "section": "Misc",
+        "key": "AutoQuickSavePage"
+       }
+      ]
+     },
+     {
+      "kind": "frame",
+      "title": "PDA",
+      "items": [
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "DisplaySwiftLearnerExp"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "ActiveGeigerMsgs"
+       },
+       {
+        "kind": "checkbox",
+        "section": "Misc",
+        "key": "DisplayKarmaChanges"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "title": "Worldmap",
+    "items": [
+     {
+      "kind": "dropdown",
+      "section": "Interface",
+      "key": "ExpandWorldMap"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Interface",
+      "key": "WorldMapTravelMarkers"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Interface",
+      "key": "WorldMapTerrainInfo"
+     },
+     {
+      "kind": "spin",
+      "section": "Misc",
+      "key": "WorldMapTimeMod"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Misc",
+      "key": "WorldMapFPSPatch"
+     },
+     {
+      "kind": "spin",
+      "section": "Misc",
+      "key": "WorldMapDelay2"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Misc",
+      "key": "WorldMapEncounterFix"
+     },
+     {
+      "kind": "spin",
+      "section": "Misc",
+      "key": "WorldMapEncounterRate"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Misc",
+      "key": "WorldMapFontPatch"
+     }
+    ]
+   },
+   {
+    "title": "Debug",
+    "items": [
+     {
+      "kind": "dropdown",
+      "section": "Debugging",
+      "key": "DebugMode"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Debugging",
+      "key": "Init"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Debugging",
+      "key": "Hook"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Debugging",
+      "key": "Script"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Debugging",
+      "key": "Criticals"
+     },
+     {
+      "kind": "checkbox",
+      "section": "Debugging",
+      "key": "Fixes"
+     }
+    ]
+   }
+  ]
+ }
+]

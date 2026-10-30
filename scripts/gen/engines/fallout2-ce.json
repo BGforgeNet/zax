@@ -1,0 +1,641 @@
+{
+  "engine": "fallout2-ce",
+  "commit": "19ecca12afe10ec0e40ba9ebeb1429b337dcc980",
+  "keys": [
+    {
+      "section": "system",
+      "key": "executable",
+      "kind": "text",
+      "default": "game"
+    },
+    {
+      "section": "system",
+      "key": "master_dat",
+      "kind": "path",
+      "default": "master.dat"
+    },
+    {
+      "section": "system",
+      "key": "master_patches",
+      "kind": "path",
+      "default": "data"
+    },
+    {
+      "section": "system",
+      "key": "f2_res_dat",
+      "kind": "path"
+    },
+    {
+      "section": "system",
+      "key": "critter_dat",
+      "kind": "path",
+      "default": "critter.dat"
+    },
+    {
+      "section": "system",
+      "key": "critter_patches",
+      "kind": "path",
+      "default": "data"
+    },
+    {
+      "section": "system",
+      "key": "language",
+      "kind": "text",
+      "default": "english"
+    },
+    {
+      "section": "system",
+      "key": "scroll_lock",
+      "kind": "number",
+      "default": "0"
+    },
+    {
+      "section": "system",
+      "key": "interrupt_walk",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "system",
+      "key": "art_cache_size",
+      "kind": "number",
+      "min": 16,
+      "max": 512,
+      "default": "32",
+      "help": "Original installer set this to 50% of system ram, up to a max of 512 (mb). There's no reason to make this higher than 256. Value is capped to 512 with a minimum of 8"
+    },
+    {
+      "section": "system",
+      "key": "color_cycling",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "system",
+      "key": "cycle_speed_factor",
+      "kind": "number",
+      "default": "1"
+    },
+    {
+      "section": "system",
+      "key": "hashing",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "system",
+      "key": "splash",
+      "kind": "number",
+      "default": "5"
+    },
+    {
+      "section": "system",
+      "key": "free_space",
+      "kind": "number",
+      "default": "20480",
+      "help": "Path to the High Resolution Patch data archive. Can be changed for mods that ship their own archive, e.g. mods\\f2_res.dat. f2_res_dat=f2_res.dat"
+    },
+    {
+      "section": "system",
+      "key": "screenshots_format",
+      "kind": "text",
+      "default": "png"
+    },
+    {
+      "section": "screen",
+      "key": "resolution_x",
+      "kind": "number",
+      "min": 640,
+      "max": 7680,
+      "default": "800",
+      "help": "Physical screen resolution of the full screen or window."
+    },
+    {
+      "section": "screen",
+      "key": "resolution_y",
+      "kind": "number",
+      "min": 480,
+      "max": 4320,
+      "default": "480"
+    },
+    {
+      "section": "screen",
+      "key": "windowed",
+      "kind": "number",
+      "clamp": "WindowMode::Fullscreen, WindowMode::WindowedFullscreen",
+      "default": "1",
+      "help": "Set to 0 to run the game in fullscreen mode. Set to 1 to run the game in windowed mode. Set to 2 to run in borderless windowed (windowed fullscreen) mode."
+    },
+    {
+      "section": "screen",
+      "key": "mouse_lock",
+      "kind": "bool",
+      "default": "0",
+      "help": "Set to 1 to lock the mouse to the game window in windowed or windowed fullscreen mode. Set to 0 to use the OS cursor normally. Mouse is always locked in non-windowed fullscreen mode."
+    },
+    {
+      "section": "screen",
+      "key": "scale",
+      "kind": "number",
+      "min": 1,
+      "max": 4,
+      "default": "1",
+      "help": "Scale of physical pixels to logical pixels.  For instance, if x/y is 1280 x 960 and scale is 2, the game will be rendered at 640 x 480 and then scaled up to 1280 x 960.  This is useful for windowed mode on high DPI displays."
+    },
+    {
+      "section": "ui",
+      "key": "main_menu_scale_mode",
+      "kind": "number",
+      "min": 0,
+      "max": 2,
+      "default": "1",
+      "help": "Set to 0 to keep the main menu art and controls at native size. Set to 1 to scale only the main menu background image to fit the screen while maintaining aspect ratio. Set to 2 to also scale the main menu button panel, red buttons, and button labels with the menu art."
+    },
+    {
+      "section": "ui",
+      "key": "in_game_menu_help",
+      "kind": "bool",
+      "default": "1",
+      "help": "Set to 1 to show a Help option in the in-game options menu which opens the F1 help screen."
+    },
+    {
+      "section": "ui",
+      "key": "iface_bar_mode",
+      "kind": "bool",
+      "default": "0",
+      "help": "if iface_bar_mode=0 - the bottom of the map view window sits at the top of the IFACE Bar. if iface_bar_mode=1 - the bottom of the map view window extends to the base of the screen and is overlapped by the IFACE Bar."
+    },
+    {
+      "section": "ui",
+      "key": "perks_progress_bar",
+      "kind": "bool"
+    },
+    {
+      "section": "ui",
+      "key": "iface_bar_width",
+      "kind": "number",
+      "min": 640,
+      "max": 4320,
+      "default": "800",
+      "help": "Set to 640 to use the original interface bar width, or 800 to use the 800pix wide asset from f2_res.dat."
+    },
+    {
+      "section": "ui",
+      "key": "iface_bar_side_art",
+      "kind": "number",
+      "min": 0,
+      "max": 999,
+      "default": "2",
+      "help": "0 = no side art, 1 = metal, 2 = leather, 3-6 = alternative metal, 7 = alternative leather, 8 = brown metal"
+    },
+    {
+      "section": "ui",
+      "key": "iface_bar_sides_ori",
+      "kind": "bool",
+      "default": "0",
+      "help": "0 = Iface-bar side graphics extend from the Iface-Bar to the Screen edges. 1 = Iface-bar side graphics extend from the Screen edges to the Iface-Bar"
+    },
+    {
+      "section": "ui",
+      "key": "alternate_ammo_meter",
+      "kind": "number",
+      "min": 0,
+      "max": 2,
+      "default": "1",
+      "help": "Set to 1 to use the HRP-style alternate ammo meter with burst segments, or 2 to also segment single-shot firearms with up to 6 shots."
+    },
+    {
+      "section": "ui",
+      "key": "splash_screen_size",
+      "kind": "number",
+      "min": 0,
+      "max": 2,
+      "default": "1",
+      "help": "Set to 1 to scale the splash screen to fit the screen while preserving aspect ratio. Set to 2 to fill the screen"
+    },
+    {
+      "section": "ui",
+      "key": "movie_aspect_fit",
+      "kind": "bool",
+      "default": "1",
+      "help": "Set to 1 to scale movies to fit the screen while preserving aspect ratio. Set to 0 to keep movies at their native size, centered on screen."
+    },
+    {
+      "section": "ui",
+      "key": "edg_support",
+      "kind": "bool",
+      "default": "1",
+      "help": "Whether to load EDG files (HRP format) when loading maps. If loaded, they override default edge clipping and scroll blocking behavior."
+    },
+    {
+      "section": "ui",
+      "key": "ignore_scroll_limit",
+      "kind": "bool",
+      "default": "0",
+      "help": "Set to 1 to ignore the player-centered map scroll limit."
+    },
+    {
+      "section": "ui",
+      "key": "ignore_map_edges",
+      "kind": "bool",
+      "default": "0"
+    },
+    {
+      "section": "ui",
+      "key": "quick_toolbar_visible",
+      "kind": "bool"
+    },
+    {
+      "section": "ui",
+      "key": "anim_speed",
+      "kind": "real",
+      "min": 0.1,
+      "max": 100,
+      "default": "2.000000",
+      "help": "Speed up or slow down all UI animations such as screen fade, dialog window show/hide, AC numbers roll, etc."
+    },
+    {
+      "section": "ui",
+      "key": "skip_opening_movies",
+      "kind": "number",
+      "min": 0,
+      "max": 2,
+      "default": "0",
+      "help": "Set to 1 to skip the 3 opening movies Set to 2 to also skip the splash screen"
+    },
+    {
+      "section": "ui",
+      "key": "display_karma_changes",
+      "kind": "bool",
+      "default": "0",
+      "help": "Set to 1 to get notification of karma changes in the notification window"
+    },
+    {
+      "section": "ui",
+      "key": "display_bonus_damage",
+      "kind": "bool",
+      "default": "1",
+      "help": "Set to 1 to display additional points of damage from Bonus HtH/Ranged Damage perks in the inventory"
+    },
+    {
+      "section": "ui",
+      "key": "numbers_in_dialogue",
+      "kind": "bool",
+      "default": "0",
+      "help": "Set to 1 to display numbered dialogue options"
+    },
+    {
+      "section": "ui",
+      "key": "dialog_border",
+      "kind": "bool",
+      "default": "1",
+      "help": "Set to 1 to use the hi-res dialog border/background at resolutions above 640x480. Requires art\\intrface\\HR_ALLTLK.FRM (for example from f2_res.dat)"
+    },
+    {
+      "section": "ui",
+      "key": "auto_quick_save",
+      "kind": "number",
+      "min": 0,
+      "max": 10,
+      "default": "3",
+      "help": "To use more than one save slot for quick saving (F6 key) without picking a slot beforehand Quick save will cyclically overwrite saves from the first slot on the specified page to the last slot on the n-th page auto_quick_save sets how many pages you want to use for quick saving (valid range: 1..10) Set to 0 to disable"
+    },
+    {
+      "section": "ui",
+      "key": "enable_high_resolution_stencil",
+      "kind": "bool",
+      "default": "1",
+      "help": "Set to one to hide areas outside map bounds when using higher than 640x480 resolution, and to zero to disable"
+    },
+    {
+      "section": "ui",
+      "key": "extend_ap_bar",
+      "kind": "bool",
+      "default": "1",
+      "help": "Set to 1 to extend the action points bar to show up to 16 AP instead of 10 (requires iface_apbar_e.frm)"
+    },
+    {
+      "section": "ui",
+      "key": "expand_barter_window",
+      "kind": "bool",
+      "default": "1",
+      "help": "Set to 1 to expand the barter/trade window vertically, adding a 4th item slot per side (requires barter_e.frm, trade_e.frm, and a screen height of at least 528 pixels)"
+    },
+    {
+      "section": "ui",
+      "key": "inventory_columns",
+      "kind": "number",
+      "min": 1,
+      "max": 2,
+      "default": "2",
+      "help": "Maximum number of columns shown in the main inventory and loot/steal windows (valid range: 1..2) 2-column Loot/steal window requires minimum screen width of 673px. This also enables npc equipment management on the loot screen"
+    },
+    {
+      "section": "ui",
+      "key": "loot_weight_indicator",
+      "kind": "number",
+      "min": 0,
+      "max": 3,
+      "default": "1",
+      "help": "Weight/size indicator for PC, critters and containers Set to 0 for vanilla behavior (no weight indicator) Set to 1 to show a simple weight indicator; works with all inventory_columns values Set to 2 to show a detailed weight indicator; works with inventory_columns > 1 only Set to 3 to show container size as XX/YY without the Wt. label"
+    },
+    {
+      "section": "ui",
+      "key": "loot_container_size_indicator_threshold",
+      "kind": "number",
+      "min": 0,
+      "max": 100,
+      "default": "50",
+      "help": "Set to 0 to show container indicator at all times Set to XX to show container indicator when size reaches XX% Set to 100 to show container indicator when full"
+    },
+    {
+      "section": "gameplay",
+      "key": "perk_carryover",
+      "kind": "number",
+      "clamp": "PERK_CARRY_OVER_MODE_OFF, PERK_CARRY_OVER_MODE_SFALL"
+    },
+    {
+      "section": "preferences",
+      "key": "game_difficulty",
+      "kind": "number",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_difficulty",
+      "kind": "number",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "violence_level",
+      "kind": "number",
+      "default": "3"
+    },
+    {
+      "section": "preferences",
+      "key": "target_highlight",
+      "kind": "number",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "item_highlight",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_looks",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_messages",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_taunts",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "language_filter",
+      "kind": "bool",
+      "default": "0"
+    },
+    {
+      "section": "preferences",
+      "key": "running",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "subtitles",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_speed",
+      "kind": "number",
+      "default": "50"
+    },
+    {
+      "section": "preferences",
+      "key": "player_speedup",
+      "kind": "bool",
+      "default": "0"
+    },
+    {
+      "section": "preferences",
+      "key": "text_base_delay",
+      "kind": "real",
+      "default": "6.000000"
+    },
+    {
+      "section": "preferences",
+      "key": "text_line_delay",
+      "kind": "real",
+      "default": "2.000000"
+    },
+    {
+      "section": "preferences",
+      "key": "brightness",
+      "kind": "real",
+      "default": "1.000000"
+    },
+    {
+      "section": "preferences",
+      "key": "mouse_sensitivity",
+      "kind": "real",
+      "default": "1.000000"
+    },
+    {
+      "section": "preferences",
+      "key": "running_burning_guy",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "sound",
+      "key": "initialize",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "sound",
+      "key": "debug",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "sound",
+      "key": "debug_sfxc",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "sound",
+      "key": "sounds",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "sound",
+      "key": "music",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "sound",
+      "key": "speech",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "sound",
+      "key": "master_volume",
+      "kind": "number",
+      "default": "22281"
+    },
+    {
+      "section": "sound",
+      "key": "music_volume",
+      "kind": "number",
+      "default": "22281"
+    },
+    {
+      "section": "sound",
+      "key": "sndfx_volume",
+      "kind": "number",
+      "default": "22281"
+    },
+    {
+      "section": "sound",
+      "key": "speech_volume",
+      "kind": "number",
+      "default": "22281"
+    },
+    {
+      "section": "sound",
+      "key": "cache_size",
+      "kind": "number",
+      "default": "448"
+    },
+    {
+      "section": "sound",
+      "key": "music_path1",
+      "kind": "text",
+      "default": "data\\sound\\music\\"
+    },
+    {
+      "section": "sound",
+      "key": "music_path2",
+      "kind": "text",
+      "default": "sound\\music\\"
+    },
+    {
+      "section": "sound",
+      "key": "gapless_music",
+      "kind": "number",
+      "default": "1",
+      "help": "Set to 1 to avoid restarting music when changing maps when the music is the same track."
+    },
+    {
+      "section": "debug",
+      "key": "mode",
+      "kind": "text",
+      "default": "log"
+    },
+    {
+      "section": "debug",
+      "key": "show_fps",
+      "kind": "bool",
+      "default": "0",
+      "help": "Set to 1 to show an FPS counter in the top-left corner during gameplay and worldmap."
+    },
+    {
+      "section": "debug",
+      "key": "show_tile_num",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "debug",
+      "key": "show_script_messages",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "debug",
+      "key": "show_load_info",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "debug",
+      "key": "output_map_data_info",
+      "kind": "bool",
+      "default": "1"
+    },
+    {
+      "section": "debug",
+      "key": "window_width",
+      "kind": "number",
+      "min": 200,
+      "max": 1920,
+      "default": "300"
+    },
+    {
+      "section": "debug",
+      "key": "window_height",
+      "kind": "number",
+      "min": 100,
+      "max": 1080,
+      "default": "192"
+    },
+    {
+      "section": "debug",
+      "key": "console_output_path",
+      "kind": "text",
+      "default": "",
+      "help": "Set this to a valid path to save a copy of the console contents"
+    },
+    {
+      "section": "qol",
+      "key": "use_walk_distance",
+      "kind": "number",
+      "min": 0,
+      "max": 100,
+      "default": "3",
+      "help": "Overrides distance at which walk animation is used when using an object.  0 disables walking This is the number of empty tiles between the player and the target.  3 is the default"
+    },
+    {
+      "section": "qol",
+      "key": "auto_open_doors",
+      "kind": "bool",
+      "default": "0",
+      "help": "Automatically open doors that are unlocked and has no script attached."
+    },
+    {
+      "section": "qol",
+      "key": "party_trade_from_menu",
+      "kind": "bool",
+      "default": "1",
+      "help": "Allow opening party member inventory from the long-press context menu."
+    },
+    {
+      "section": "qol",
+      "key": "party_loot_and_barter",
+      "kind": "bool",
+      "default": "1",
+      "help": "Allow switching to companions' inventories in loot screens (and barter, in the future)"
+    }
+  ]
+}

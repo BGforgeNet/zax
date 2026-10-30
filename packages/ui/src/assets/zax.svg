@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"
+     role="img" aria-label="ZAX">
+  <!--
+    The source the icon PNGs are generated from - see docs/building.md. A lens in an open panel: the housing is
+    chamfered rather than round so the silhouette is not another circle in a taskbar full of them, and it is drawn
+    as an outline rather than a filled tile so whatever sits behind shows through.
+    Three shapes on one stroke weight: 13 units lands on a pixel and a half at 32px, and anything beyond the
+    frame, the ring and the core is lost at the size the icon is actually seen.
+  -->
+  <path d="M36 10 H220 L246 36 V220 L220 246 H36 L10 220 V36 Z" fill="none" stroke="#5B644F" stroke-width="13"
+    stroke-linejoin="round" />
+  <circle cx="128" cy="128" r="62" fill="none" stroke="#5B644F" stroke-width="13" />
+  <circle cx="128" cy="128" r="24" fill="#EFB44A" />
+</svg>

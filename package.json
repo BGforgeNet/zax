@@ -1,0 +1,47 @@
+{
+  "name": "zax",
+  "version": "0.8.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": "24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @zax/ui dev",
+    "build": "pnpm --filter @zax/ui build",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "drive": "vitest run --config vitest.e2e.config.ts",
+    "check": "tsc -p tsconfig.json && tsc -p tsconfig.scripts.json && pnpm --filter @zax/ui exec svelte-check --tsconfig ./tsconfig.json",
+    "lint": "oxlint --type-aware && eslint . && oxfmt --check",
+    "knip": "knip",
+    "format": "oxfmt --write",
+    "check-manifest": "node scripts/check-manifest.mjs",
+    "mod-ini": "node actions/mod-ini/cli.mjs",
+    "gen:icons": "node scripts/gen-icons.mjs",
+    "verify:chokidar": "node scripts/verify-chokidar.mjs",
+    "desktop": "tauri dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tauri-apps/cli": "2.11.4",
+    "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "^4.1.12",
+    "eslint": "^10.12.0",
+    "eslint-plugin-svelte": "^3.23.1",
+    "globals": "^17.13.0",
+    "happy-dom": "^21.0.4",
+    "jiti": "^2.7.0",
+    "knip": "6.41.0",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
+    "oxlint-tsgolint": "^7.0.2004",
+    "svelte": "^5.57.2",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^4.1.12",
+    "yaml": "2.9.1"
+  }
+}

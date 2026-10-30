@@ -1,0 +1,256 @@
+name: ci
+
+on:
+  push:
+    # Naming branches leaves tags out. A release tag runs the release workflow, which builds the same three
+    # platforms itself, and the commit a tag points at ran this workflow when its branch was pushed - so the
+    # unfiltered trigger only ever built every release twice.
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The interface and everything checked in beside it. Its tests run against the domain compiled to
+  # WebAssembly, so the job builds that first, with the compiler rust-toolchain.toml names.
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - run: ./.github/scripts/install-wasm-bindgen.sh
+      # Install scripts only check esbuild's binary, which nothing in this job runs.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      # The trust policy in pnpm-workspace.yaml judges a version's provenance at install time; nothing there
+      # re-checks published advisories, which is what this reads the lockfile against.
+      - run: pnpm audit
+      # A second copy of a transitive package is not an install failure, so nothing else in the job would say
+      # so: the lockfile simply grows a duplicate and every consumer of it resolves one version or the other.
+      - run: pnpm dedupe --check
+      # The interface imports the preview's module and its declarations, so the typecheck needs it as much as
+      # the tests do.
+      - run: ./scripts/build-preview.sh
+      - run: pnpm check
+      - run: pnpm lint
+      # Its own step rather than part of `pnpm lint`: what it reports is dead surface rather than a defect in
+      # the code, and it walks the whole module graph, which the linters do not.
+      - run: pnpm knip
+      # Coverage rather than a plain run: the threshold is a gate rather than a local habit, so it is
+      # checked where a change has to pass rather than where it slows every run down.
+      - run: pnpm test:coverage
+      # The chokidar override puts svelte-check on a major its authors do not test against, and only watch mode
+      # loads it - which the single-pass `pnpm check` above never enters.
+      - run: pnpm verify:chokidar
+      - run: ./.github/scripts/check-generated.sh
+
+  # The Rust workspace: formatting, lints on both targets, tests, and the bindings the tests write.
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - run: ./.github/scripts/install-linux-deps.sh
+      # Keyed on the lockfile: the dependency tree is what the build time is, and it moves only when
+      # that file does.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - run: ./.github/scripts/rust-gate.sh
+
+  # The domain's tests again on Windows, and only those. `zax-host` is where the real filesystem, process
+  # launch and registry calls are - drive letters, a case-insensitive filesystem, `reg query` - and the logic
+  # around them is written as pure functions of the operating system and covered on one host already; this run
+  # is there for the calls themselves. Its own job rather than a matrix over `rust`, because formatting, lints
+  # and bindings read the same bytes on any host.
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      # The shell is left out: it holds no Windows-specific logic, and linking it would double the job.
+      # --no-fail-fast because this is the only place these run on Windows: stopping at the first failing crate
+      # hides whether the others pass until a second run.
+      - run: >-
+          cargo test --locked --no-fail-fast
+          --package zax-platform --package zax-host --package zax-core --package zax-fallout2
+
+  # Separate from `verify` because it needs none of the Node install and shares nothing with it, so the two run
+  # at once rather than one after the other.
+  lint-workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - run: ./.github/scripts/lint-workflows.sh
+      - run: ./.github/scripts/draft-release.test.sh
+      - run: ./actions/pack-mod/scripts/pack.test.sh
+      # The committed WebAssembly rather than its sources, on the runner's own Node, as a caller's job would run it.
+      - run: ./actions/mod-ini/scripts/action.test.sh
+
+  # Packaging is its own gate: the tests run the sources, and none of them would notice a bundle that stopped
+  # building, a file left out, or a target that fails on one platform. Three runners because each produces a
+  # distributable only that platform can make.
+  #
+  # Linux packages on the oldest image GitHub offers, because the glibc it builds against is the oldest the
+  # program will start on and neither bundle carries one: on 24.04 the standard library links pidfd_spawnp,
+  # which records a need for glibc 2.39 and leaves the program refusing to start on Debian 12, Ubuntu 22.04
+  # and RHEL 9. That image's WebKitGTK is a release behind 24.04's rather than a generation.
+  build:
+    needs: [verify, rust]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - if: runner.os == 'Linux'
+        run: ./.github/scripts/install-linux-deps.sh
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          # Keyed on the image rather than the operating system: a target directory holds paths into the
+          # image it was built on, so two Linux images sharing one entry restore each other's build and
+          # cargo then skips compiling a dependency whose library is not there.
+          key: cargo-release-${{ matrix.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - run: pnpm install --frozen-lockfile
+      - run: ./.github/scripts/package.sh
+        shell: bash
+      # One artifact per target rather than one per platform: each platform builds the application two ways,
+      # and nobody wants both. Each path names an extension rather than wildcarding the directory, so a target
+      # that silently stopped producing anything fails its step instead of uploading nothing.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Linux'
+        with:
+          name: zax-Linux-AppImage
+          path: release/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Linux'
+        with:
+          name: zax-Linux-tar.gz
+          path: release/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Windows'
+        with:
+          name: zax-Windows-zip
+          path: release/*.zip
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Windows'
+        with:
+          name: zax-Windows-exe
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'macOS'
+        with:
+          name: zax-macOS-zip
+          path: release/*.zip
+          if-no-files-found: error
+          retention-days: 7
+      # The program just built, driven through its own window against a game folder on this runner's disk. After
+      # the uploads, so a failing drive still leaves the build to download. Windows is driven in `drive-windows`,
+      # and macOS has no WebDriver for its webview.
+      - if: runner.os == 'Linux'
+        run: ./.github/scripts/install-drive-tools.sh
+      - if: runner.os == 'Linux'
+        run: xvfb-run pnpm drive
+      # macOS has no driver for its webview, so its build is started and left up instead: short of driving it,
+      # that is what says the bundle this platform ships opens at all.
+      - if: runner.os == 'macOS'
+        run: ./.github/scripts/launch-macos.sh
+
+  # The Windows zip the build uploaded, driven through its own window: the only run of the real shell and webview on
+  # Windows. Its own job on windows-2022 because on the 2025 image WebView2 never opens its DevTools port to the Edge
+  # driver, so no session starts (actions/runner-images#14738); the build stays on the image the release uses.
+  drive-windows:
+    needs: [build]
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and the default leaves the job's token in .git/config where anything
+          # later in the job - or an artifact made from the checkout - could carry it back out.
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: zax-Windows-zip
+          path: dist
+      - run: ./.github/scripts/install-drive-tools.sh
+        shell: bash
+      - run: |
+          7z x -y -bso0 -odist dist/*.zip
+          program=(dist/ZAX-*/zax.exe)
+          ZAX_PROGRAM="${program[0]}" pnpm drive
+        shell: bash

@@ -1,0 +1,114 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // wasm-bindgen's loader for the mod tools. Not linted, unlike the generated catalog and layout: nothing in it
+  // is ours, and its source is the Rust the workspace lints.
+  "ignorePatterns": ["actions/mod-ini/wasm/"],
+  // oxlint reports correctness findings as warnings and still exits 0; the gate needs them to fail.
+  "categories": { "correctness": "error" },
+  // Naming this field replaces the default set rather than adding to it, so the three that are on by default
+  // are repeated here. `import` is the one addition: it resolves the module graph, which is the only thing in
+  // the toolchain that sees a cycle - `imports.test.ts` governs what the interface may import, not the shape of
+  // the graph inside it.
+  //
+  // `promise` and `node` were read and left off. `always-return` reports terminal voided chains, some inside a
+  // callback that has to stay synchronous - a Svelte `$effect`, whose return value is its teardown - where a
+  // `return` would state the opposite of what is true. `no-sync` reports generators, scripts and tests, which
+  // are synchronous by design.
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "options": {
+    // Reaches .ts only - a .svelte script block gets the syntactic set, as it did under eslint.
+    "typeAware": true
+  },
+  "rules": {
+    // The two rules the type-aware pass is here for. `typeAware` alone does not enable them: a type-aware rule
+    // left unnamed reports nothing, and the config still parses, so the gate would look enforced and be silent.
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+
+    // Beyond the correctness set, and each already at zero across the repo - a floor, not a target. The rules
+    // still under triage are the ones the codebase currently violates; they are not listed here yet.
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/non-nullable-type-assertion-style": "error",
+    "typescript/no-unnecessary-type-conversion": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-namespace": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/prefer-as-const": "error",
+    "unicorn/prefer-set-has": "error",
+    "unicorn/no-array-sort": "error",
+    "typescript/promise-function-async": "error",
+    "typescript/no-unsafe-type-assertion": "error",
+    "eslint/no-empty": "error",
+
+    // The module graph. `no-cycle` ignores type-only edges by default, which is what makes a cycle it reports
+    // a real one: the modules genuinely evaluate each other at load time. The rest were at zero when the
+    // plugin went on and are here to keep them there.
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/no-duplicates": "error",
+    "import/no-mutable-exports": "error",
+    "import/no-absolute-path": "error",
+    "import/no-empty-named-blocks": "error",
+    "import/named": "error",
+    "import/default": "error",
+    "import/export": "error",
+    "import/namespace": "error",
+
+    // Each spread here snapshots a collection its loop body can change - a listener removing itself from the set
+    // it was called from - and dropping it is the bug the spread prevents.
+    "unicorn/no-useless-spread": "off",
+    // Off after reading the sites, so that turning on the categories these belong to does not reopen them.
+    // Sequential is the point: the store's `idle` waits on its queue again for as long as waiting added to it,
+    // which is a loop over time rather than a batch to run at once.
+    "eslint/no-await-in-loop": "off",
+    // Most of what it reports is not a per-element clone but a conditional field (`...(cond ? { k: v } : {})`)
+    // or a fresh object built in the callback, and the collections that do clone hold tens of items. Avoiding
+    // the spread means building objects imperatively, which costs more to read than the allocation costs to run.
+    "oxc/no-map-spread": "off",
+    // A shadowed name here is a narrower value of the same thing - a generator's `node` inside the walk over
+    // nodes - and renaming it to satisfy the rule makes the two harder to relate, not easier.
+    "eslint/no-shadow": "off",
+    // Helpers declared beside the code that uses them, which is where they read best; hoisting them to module
+    // scope for the rule's sake would put the definition further from its one caller.
+    "unicorn/consistent-function-scoping": "off",
+    // In direct tension with `noUncheckedIndexedAccess`, which this project keeps: an index the surrounding
+    // code has already bounded still types as possibly-undefined, and the assertion is how that is said. The
+    // ones that were avoidable are gone - the helpers they sat in take an out-of-range lookup as an answer
+    // now - and what remains is provable at its site, which is a review question rather than a lint one.
+    "typescript/no-non-null-assertion": "off"
+  },
+  "overrides": [
+    {
+      // The generator and action scripts are JavaScript, checked with `noImplicitAny` off, so every value
+      // crossing an untyped boundary is `any` by construction. Here the family reports the tsconfig, not a
+      // defect.
+      "files": ["**/*.mjs", "**/*.cjs", "**/*.js"],
+      "rules": {
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-return": "off"
+      }
+    },
+    {
+      // The assertions are how a fixture states the shape it just built; the code they exercise stays covered.
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      // A component that renders a tree renders itself, and Svelte 5 has no way to say that but to import the
+      // file by name. The cycle is the recursion, and it terminates on the data rather than on the graph.
+      "files": ["packages/ui/src/lib/LayoutNodes.svelte"],
+      "rules": { "import/no-cycle": "off", "import/no-self-import": "off" }
+    }
+  ]
+}

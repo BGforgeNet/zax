@@ -1,0 +1,481 @@
+/*
+  One palette rather than two: `light-dark()` picks its arm from the used `color-scheme`, so the theme picker
+  narrows that below and every token follows. Two blocks under a `prefers-color-scheme` query would each need
+  an override for the picker, which is where a pair of palettes drifts apart.
+*/
+:root {
+  color-scheme: light dark;
+
+  --bg: light-dark(#f6f7f9, #16191d);
+  --panel: light-dark(#ffffff, #1d2126);
+  --panel-alt: light-dark(#fbfbfd, #21262c);
+  /* A header band, dark enough to read as one against `--bg` rather than as a slightly-off row. */
+  --band: light-dark(#d9e0e9, #2f3843);
+  --border: light-dark(#dfe3e8, #2e343c);
+  --border-strong: light-dark(#c6ccd4, #3d454f);
+  --text: light-dark(#1c2127, #e4e8ed);
+  --text-dim: light-dark(#5c6773, #a3adb9);
+  --text-faint: light-dark(#8b95a1, #78828e);
+  --accent: light-dark(#2f6fb5, #6fa8e0);
+  --accent-soft: light-dark(#e7f0fa, #22303e);
+  --modified: light-dark(#b26a00, #e0a458);
+  --modified-soft: light-dark(#fdf3e3, #33291a);
+  --invalid: light-dark(#c0392b, #ff8a7a);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /*
+    The settings column stops at what its row actually needs - three tracks of 19rem, 16rem and 22rem, plus the
+    two gaps and the pane's own inset - so no width is left over to render as blank space on the right.
+  */
+  --col: calc(57rem + 60px);
+  --sidebar: 264px;
+
+  /* How far the sidebar's tab strip sits inside its own border: the shared strip's gutter is a pane's, and
+     too wide for a 264px column. */
+  --tab-inset: 8px;
+
+  /*
+    Both columns are centred as one block, so the surplus width becomes margin at the window's two edges rather
+    than a gap opening between them. Measured against the shell, which is what holds both.
+  */
+  --gutter: max(16px, calc((100cqi - var(--sidebar) - var(--col)) / 2));
+}
+
+/* The theme picker's only job: narrowing the used scheme, which is what every token above reads. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font:
+    14px/1.5 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100vh;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
+/* The shell every view is built from: a fixed strip over one scrolling list. */
+.pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pane main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pane .list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.pane .empty {
+  padding: 28px var(--gutter);
+  color: var(--text-faint);
+}
+
+/*
+  Tab strip, shared by both views so they cannot drift apart.
+
+  The strip scrolls sideways when the tabs outgrow the window, and `overflow-x: auto` alone would compute the
+  other axis to `auto` as well - so the 1px by which the active tab overlaps the separator would turn the strip
+  into a vertical scroller. Hence the explicit `overflow-y: hidden`, with the separator moved out to `.tabbar`
+  and the overlap done by the scroller's own negative margin, where clipping cannot reach it.
+*/
+.tabbar {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px var(--gutter) 0;
+  margin-bottom: -1px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 7px 13px 8px;
+  color: var(--text-dim);
+}
+
+.tab:hover {
+  background: var(--panel-alt);
+}
+
+/*
+  Selection changes no metric. A heavier weight is wider than the same text at regular, so selecting a tab
+  resized it and shifted every tab after it along the strip. The background, border and text colour carry the
+  state on their own.
+*/
+.tab[aria-selected="true"] {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.tab .count {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Second-level tab strip, shared by the views that have one so the two cannot drift apart. */
+.subtabs {
+  display: flex;
+  gap: 14px;
+  padding: 0 var(--gutter);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 0 0 auto;
+}
+
+.subtab {
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 7px 1px 6px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.subtab:hover {
+  color: var(--text-dim);
+}
+
+/* Colour and the underline carry it, for the same reason the tab above changes no metric. */
+.subtab[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/*
+  Setting rows, shared by every row-shaped control so they cannot drift apart.
+
+  Three fixed tracks rather than label-left/control-right: pushing the control to the far edge grew the gap
+  between a label and its own value with the window - past 900px on a wide monitor - which reads as two
+  unrelated columns. Fixed tracks keep that gap constant and spend the remaining width on the help text, which
+  otherwise needed a line of its own under every row.
+*/
+.list .row {
+  display: grid;
+  /* The notes track is bounded rather than 1fr: as a fraction it absorbed every surplus pixel, which on a tab
+     whose settings carry no help text left the row's whole right half blank. The surplus goes to the last
+     track instead, which is what carries the revert link to the row's right edge. */
+  grid-template-columns: minmax(0, 19rem) minmax(0, 16rem) minmax(0, 22rem) 1fr;
+  column-gap: 16px;
+  align-items: baseline;
+  padding: 6px var(--gutter);
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid transparent;
+}
+
+/*
+  Zebra, so the eye can carry a value back to its label across the row's three tracks. Counted among sibling
+  rows, which restarts inside each group - the group's own heading already breaks the run, so a stripe carried
+  across it would read as arbitrary.
+*/
+.list .row:nth-of-type(even) {
+  background: color-mix(in srgb, var(--band) 40%, transparent);
+}
+
+.list .row:hover {
+  background: var(--panel-alt);
+}
+
+.list .row.modified {
+  border-left-color: var(--modified);
+  background: var(--modified-soft);
+}
+
+/*
+  A left rule plus an indented label, so the dependency on the row above is visible without reading the note.
+  The indent is applied to the label alone - indenting the row would shift its control and notes tracks out of
+  line with every unnested row.
+*/
+.list .row.nested {
+  border-left-color: var(--border);
+}
+
+.list .row.nested .label {
+  padding-left: calc(var(--row-indent, 0px) + 20px);
+}
+
+.list .row.nested.modified {
+  border-left-color: var(--modified);
+}
+
+.list .row .label {
+  /*
+    Set by an enclosing group; ungrouped rows inherit nothing and sit flush. The extra 18px is the marker's
+    gutter, reserved on every row so the labels all start at one x whether or not the row carries one.
+  */
+  padding-left: calc(var(--row-indent, 0px) + 18px);
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/*
+  Out of the flex flow rather than a first item in it: this row wraps its items, and a wrapping container
+  wraps before it shrinks, so a marker sharing the line pushed any label too long to sit beside it onto a
+  flex line of its own and stranded the marker above it.
+*/
+.list .row .label .mark {
+  position: absolute;
+  left: var(--row-indent, 0px);
+  top: 3px;
+  line-height: 0;
+}
+
+/* Not emphasised: the group titles above carry the hierarchy, and bolding every row flattened it again. */
+.list .row .name {
+  font-weight: 400;
+}
+
+.list .row .control {
+  justify-self: stretch;
+  min-width: 0;
+}
+
+.list .row .notes {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 64ch;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Dimmed rather than disabled: the value is still editable and still written, it simply has no effect yet. */
+.list .row.inert .name,
+.list .row.inert .control {
+  opacity: 0.55;
+}
+
+.list .row .badge {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/*
+  Pinned to the last track of the first line. Auto-placement would not do it: the notes span the full width
+  below 950px, so a link declared after them lands on a line of its own and makes an edited row taller than
+  every other. `-2 / -1` is the last track whether there are three of them or four.
+*/
+.list .row .revert {
+  grid-row: 1;
+  grid-column: -2 / -1;
+  justify-self: end;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.list .row .help {
+  color: var(--text-dim);
+}
+
+.list .row .note,
+.list .row .absent,
+.list .row .sentinel {
+  color: var(--text-faint);
+}
+
+.list .row .sentinel {
+  font-style: italic;
+}
+
+/* The accent the notice reporting the whole set uses, so a row and that banner read as one event. */
+.list .row .carried {
+  color: var(--accent);
+}
+
+/*
+  Both warn that a value will not behave as read, so they share the amber; red stays for a value that is itself
+  invalid. The opening word separates them, since colour alone must not carry the difference.
+*/
+.list .row .gate,
+.list .row .clash {
+  color: var(--modified);
+}
+
+/* Finishes the sentence the gate note starts, so it is drawn as a link rather than as a second control. */
+.list .row .fix {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.list .row .invalid {
+  color: var(--invalid);
+}
+
+/* Below this the three tracks no longer fit, so the notes drop to their own line under the label and control. */
+@media (max-width: 950px) {
+  .list .row {
+    /* The control track keeps its width so the controls stay a column rather than a ragged right edge. The
+       last track is fixed rather than sized to its content: as `auto` it was wide only on the rows carrying a
+       revert link, which moved those rows' controls out of line with every other. */
+    grid-template-columns: minmax(0, 1fr) 16rem 3.5rem;
+  }
+
+  .list .row .notes {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+}
+
+/*
+  The status banner a settings tab shows in place of its rows - a linked-setting conflict, a file the tab has
+  nothing to edit yet. Global for the same reason `.frame` below is: two components draw the same banner, and a
+  second copy would drift.
+*/
+.tab-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px var(--gutter);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+/*
+  A group of rows inside a settings list, with its heading. Global rather than scoped to the component that
+  renders the catalog, because it is the same vocabulary as `.list .row` above and the install tab groups its
+  Wine fields with it - a second copy would drift.
+
+  The previous interface drew a frame as a separator, a title, then a bordered box. Only nested frames carry the
+  rule: on a top-level one it ran the whole tab and marked nothing.
+*/
+.frame[data-depth="1"],
+.frame[data-depth="2"] {
+  border-left: 2px solid var(--border);
+}
+
+/*
+  A group title has to outrank the rows it contains. At faint grey and 11.5px it sat below a 14px label in both
+  size and contrast, so each title read as a caption belonging to the row beneath it rather than as the heading
+  of the block below.
+*/
+.frame-title {
+  margin: 0;
+  /* The bar is drawn with a border rather than a pseudo-element so it survives the band's own inset gutter. */
+  padding: 9px var(--gutter);
+  border-left: 3px solid var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--band);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+/*
+  Rows of a group sit in from its heading, so the block reads as belonging to it. Applied to the label alone:
+  indenting the row would carry its control and notes tracks out of line with every ungrouped row.
+*/
+.frame[data-depth="0"] {
+  --row-indent: 16px;
+}
+
+.frame[data-depth="1"] {
+  --row-indent: 32px;
+}
+
+.frame[data-depth="2"] {
+  --row-indent: 48px;
+}
+
+/*
+  A nested group ranks below its parent by size and indent rather than by contrast: dimming it is what made the
+  titles read as captions in the first place, and its own rows would outrank it again.
+*/
+.frame[data-depth="1"] > .frame-title,
+.frame[data-depth="2"] > .frame-title {
+  padding-left: calc(var(--gutter) + 16px);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  background: color-mix(in srgb, var(--band) 60%, var(--bg));
+  border-left-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  border-top-color: var(--border);
+  border-bottom-color: var(--border);
+}

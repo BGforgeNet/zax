@@ -1,0 +1,436 @@
+{
+  "engine": "fission",
+  "commit": "3928b5dc26b3982b8ce10b8256dbaa4e9cfa1094",
+  "keys": [
+    {
+      "section": "system",
+      "key": "executable",
+      "kind": "text"
+    },
+    {
+      "section": "system",
+      "key": "master_dat",
+      "kind": "path"
+    },
+    {
+      "section": "system",
+      "key": "master_patches",
+      "kind": "path"
+    },
+    {
+      "section": "system",
+      "key": "critter_dat",
+      "kind": "path"
+    },
+    {
+      "section": "system",
+      "key": "critter_patches",
+      "kind": "path"
+    },
+    {
+      "section": "system",
+      "key": "fission_dat",
+      "kind": "path"
+    },
+    {
+      "section": "system",
+      "key": "fission_patches",
+      "kind": "path"
+    },
+    {
+      "section": "system",
+      "key": "language",
+      "kind": "text"
+    },
+    {
+      "section": "system",
+      "key": "master_override",
+      "kind": "bool"
+    },
+    {
+      "section": "system",
+      "key": "scroll_lock",
+      "kind": "number"
+    },
+    {
+      "section": "system",
+      "key": "interrupt_walk",
+      "kind": "bool"
+    },
+    {
+      "section": "system",
+      "key": "art_cache_size",
+      "kind": "number"
+    },
+    {
+      "section": "system",
+      "key": "color_cycling",
+      "kind": "bool"
+    },
+    {
+      "section": "system",
+      "key": "cycle_speed_factor",
+      "kind": "number"
+    },
+    {
+      "section": "system",
+      "key": "hashing",
+      "kind": "bool"
+    },
+    {
+      "section": "system",
+      "key": "splash",
+      "kind": "number"
+    },
+    {
+      "section": "system",
+      "key": "free_space",
+      "kind": "number"
+    },
+    {
+      "section": "preferences",
+      "key": "game_difficulty",
+      "kind": "number"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_difficulty",
+      "kind": "number"
+    },
+    {
+      "section": "preferences",
+      "key": "violence_level",
+      "kind": "number"
+    },
+    {
+      "section": "preferences",
+      "key": "target_highlight",
+      "kind": "number"
+    },
+    {
+      "section": "preferences",
+      "key": "item_highlight",
+      "kind": "number"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_looks",
+      "kind": "bool"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_messages",
+      "kind": "bool"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_taunts",
+      "kind": "bool"
+    },
+    {
+      "section": "preferences",
+      "key": "language_filter",
+      "kind": "bool"
+    },
+    {
+      "section": "preferences",
+      "key": "running",
+      "kind": "bool"
+    },
+    {
+      "section": "preferences",
+      "key": "subtitles",
+      "kind": "bool"
+    },
+    {
+      "section": "preferences",
+      "key": "combat_speed",
+      "kind": "number"
+    },
+    {
+      "section": "preferences",
+      "key": "player_speed",
+      "kind": "bool"
+    },
+    {
+      "section": "preferences",
+      "key": "text_base_delay",
+      "kind": "real"
+    },
+    {
+      "section": "preferences",
+      "key": "text_line_delay",
+      "kind": "real"
+    },
+    {
+      "section": "preferences",
+      "key": "brightness",
+      "kind": "real"
+    },
+    {
+      "section": "preferences",
+      "key": "mouse_sensitivity",
+      "kind": "real"
+    },
+    {
+      "section": "preferences",
+      "key": "running_burning_guy",
+      "kind": "bool"
+    },
+    {
+      "section": "sound",
+      "key": "initialize",
+      "kind": "bool"
+    },
+    {
+      "section": "sound",
+      "key": "debug",
+      "kind": "bool"
+    },
+    {
+      "section": "sound",
+      "key": "debug_sfxc",
+      "kind": "bool"
+    },
+    {
+      "section": "sound",
+      "key": "device",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "port",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "irq",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "dma",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "sounds",
+      "kind": "bool"
+    },
+    {
+      "section": "sound",
+      "key": "music",
+      "kind": "bool"
+    },
+    {
+      "section": "sound",
+      "key": "speech",
+      "kind": "bool"
+    },
+    {
+      "section": "sound",
+      "key": "master_volume",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "music_volume",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "sndfx_volume",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "speech_volume",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "cache_size",
+      "kind": "number"
+    },
+    {
+      "section": "sound",
+      "key": "music_path1",
+      "kind": "text"
+    },
+    {
+      "section": "sound",
+      "key": "music_path2",
+      "kind": "text"
+    },
+    {
+      "section": "debug",
+      "key": "mode",
+      "kind": "text"
+    },
+    {
+      "section": "debug",
+      "key": "show_tile_num",
+      "kind": "bool"
+    },
+    {
+      "section": "debug",
+      "key": "show_script_messages",
+      "kind": "bool"
+    },
+    {
+      "section": "debug",
+      "key": "show_load_info",
+      "kind": "bool"
+    },
+    {
+      "section": "debug",
+      "key": "output_map_data_info",
+      "kind": "bool"
+    },
+    {
+      "section": "debug",
+      "key": "write_offsets",
+      "kind": "bool"
+    },
+    {
+      "section": "graphics",
+      "key": "game_width",
+      "kind": "number"
+    },
+    {
+      "section": "graphics",
+      "key": "game_height",
+      "kind": "number"
+    },
+    {
+      "section": "graphics",
+      "key": "fullscreen",
+      "kind": "bool"
+    },
+    {
+      "section": "graphics",
+      "key": "stretch_enabled",
+      "kind": "bool"
+    },
+    {
+      "section": "graphics",
+      "key": "preserve_aspect",
+      "kind": "bool"
+    },
+    {
+      "section": "graphics",
+      "key": "high_quality",
+      "kind": "bool"
+    },
+    {
+      "section": "graphics",
+      "key": "highres_stencil",
+      "kind": "bool"
+    },
+    {
+      "section": "graphics",
+      "key": "widescreen",
+      "kind": "bool"
+    },
+    {
+      "section": "graphics",
+      "key": "square_pixels",
+      "kind": "bool"
+    },
+    {
+      "section": "graphics",
+      "key": "play_area",
+      "kind": "number"
+    },
+    {
+      "section": "graphics",
+      "key": "widescreen_variant_suffix",
+      "kind": "text"
+    },
+    {
+      "section": "enhancements",
+      "key": "StrictVanilla",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "AutoQuickSave",
+      "kind": "number"
+    },
+    {
+      "section": "enhancements",
+      "key": "AutoOpenDoors",
+      "kind": "number"
+    },
+    {
+      "section": "enhancements",
+      "key": "GaplessMusic",
+      "kind": "number"
+    },
+    {
+      "section": "enhancements",
+      "key": "EnhancedBarter",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "NumbersInDialogue",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "DisplayBonusDamage",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "ExplosionsEmitLight",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "RemoveCriticalTimelimits",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "DisplayKarmaChanges",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "SkipOpeningMovies",
+      "kind": "number"
+    },
+    {
+      "section": "enhancements",
+      "key": "MassHighlight",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "GameSpeed",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "AutoPush",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "Minimap",
+      "kind": "bool"
+    },
+    {
+      "section": "enhancements",
+      "key": "InventoryColumns",
+      "kind": "number"
+    },
+    {
+      "section": "enhancements",
+      "key": "NpcArmor",
+      "kind": "bool"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  // What knip reports that nothing else in the gate can see: an export nobody imports, a file nothing reaches,
+  // a dependency no source names. It infers entry points from the workspace manifests; what it cannot infer is
+  // named below.
+  "workspaces": {
+    ".": {
+      // Run by hand in the order scripts/gen/README.md gives, rather than imported or wired to a script. The
+      // mod-ini action's entry is named by path in its action.yml.
+      "entry": ["scripts/gen/*.mjs", "actions/mod-ini/action.mjs"],
+      // wasm-bindgen's loader, which exports what the Rust does whether or not a caller uses all of it.
+      "ignore": ["actions/mod-ini/wasm/**"]
+    },
+    "packages/ui": {
+      // ts-rs writes a binding for every Rust type that derives one, including the ones only other bindings
+      // name. Which of them the interface imports is the interface's business, not a defect in either side.
+      "ignore": ["src/lib/bindings/**"],
+      // The root `check` script reaches it through `pnpm --filter @zax/ui exec`, which is not an import.
+      "ignoreDependencies": ["svelte-check"]
+    }
+  }
+}

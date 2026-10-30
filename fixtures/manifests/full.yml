@@ -1,0 +1,16 @@
+spec: 1
+id: ecco
+name: EcCo Gameplay Overhaul
+version: "1.0.0"
+game: fallout2
+type: permanent
+reason: EcCo's changes live in the save; removing it breaks every save made while it was in.
+archive: ecco_v1-0-0.zip
+needs.game: [fallout2upu, fallout2rpu]
+needs.sfall: "4.4.5"
+entries:
+  - ecco.dat
+conflicts:
+  - present: [mods/other.dat]
+    absent: [mods/compat.ini]
+    reason: Not alongside Other without its compatibility patch.

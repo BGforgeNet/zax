@@ -1,0 +1,26 @@
+packages:
+  - packages/*
+
+# Ships a prebuilt binary its install script checks for; it does not run without it.
+allowBuilds:
+  esbuild: true
+
+# Anything not named above that wants a lifecycle script fails the install rather than being skipped with a
+# warning, so granting one stays a decision somebody made.
+strictDepBuilds: true
+
+# Refuses a version whose trust evidence - provenance, signing - is weaker than an earlier release's, which is
+# what a publish from a stolen credential looks like.
+trustPolicy: no-downgrade
+
+overrides:
+  # svelte-check asks for chokidar ^4.0.1, whose 4.0.2 and 4.0.3 were hand-published without provenance and
+  # will never be re-released; 5.0.0 restores it. Its one break is being ESM-only, which svelte-check loads
+  # fine.
+  chokidar: ^5.0.0
+
+auditConfig:
+  ignoreGhsas:
+    # deepmerge, which @sveltejs/vite-plugin-svelte uses to merge our own Svelte config at build time: no release
+    # fixes it. Drop this entry once a plugin release with sveltejs/vite-plugin-svelte#1415 is a week old.
+    - GHSA-gcqx-w48m-w2h4

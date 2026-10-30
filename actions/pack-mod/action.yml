@@ -1,0 +1,50 @@
+# Packs a mod's payload into an archive ZAX can install, on a version tag. Attaching it to the release is the
+# caller's step - every repository already has its own way of doing that, and an action that also published
+# would fight it.
+#
+# Nothing here stamps the manifest: ZAX takes the version from the tag and the payload from the release's sole
+# archive asset, so `f2mod.yml` is committed once and never touched again.
+#
+# Inputs reach the script through `env` rather than `${{ }}` interpolation, so a value can never be read as
+# shell. The checkout is the caller's too, so a mod that builds its files can run its build first.
+
+name: Pack a ZAX mod
+description: Packs a mod's payload into a release archive on a version tag, for a repository carrying an f2mod.yml.
+
+inputs:
+  paths:
+    description: What goes into the archive, one path per line, relative to `directory`.
+    default: mods
+  directory:
+    description: The directory those paths are relative to. `mods/` must end up at the archive's root.
+    default: "."
+  name:
+    description: The archive's base name. Defaults to the repository's own name.
+    default: ""
+  check-ini:
+    description: "`soft` or `hard` checks the ini files against f2mod.yml before packing, as the mod-ini action does. Empty skips it."
+    default: ""
+
+outputs:
+  archive:
+    description: The archive's name, written in the workspace and ready to attach to the release.
+    value: ${{ steps.pack.outputs.archive }}
+  version:
+    description: The version ZAX will read from the tag.
+    value: ${{ steps.pack.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Pack the payload
+      id: pack
+      shell: bash
+      env:
+        PATHS: ${{ inputs.paths }}
+        DIRECTORY: ${{ inputs.directory }}
+        NAME: ${{ inputs.name }}
+        CHECK_INI: ${{ inputs.check-ini }}
+        ACTION_PATH: ${{ github.action_path }}
+      # Addressed through `github.action_path` rather than relatively: the working directory is the caller's
+      # checkout, and the script lives beside the action in this repository.
+      run: "${{ github.action_path }}/scripts/pack.sh"

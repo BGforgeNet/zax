@@ -1,0 +1,21 @@
+[package]
+name = "zax-core"
+description = "Domain logic: ini parsing, catalog types, install state"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+ts-rs = "12.0.1"
+url = "2.5.8"
+yaml-rust2 = "0.13.0"
+zax-platform.workspace = true
+
+[dev-dependencies]
+proptest = "1.11.0"

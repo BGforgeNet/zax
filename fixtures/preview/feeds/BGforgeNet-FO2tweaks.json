@@ -1,0 +1,24 @@
+[
+ {
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.7/fo2tweaks_v14.7.zip",
+    "digest": "sha256:c8672900100727e097fc63a07d4f7f7d536f2d9a914dd7cd2d6b36005ed37e29",
+    "name": "fo2tweaks_v14.7.zip",
+    "size": 505901
+   }
+  ],
+  "tag_name": "v14.7"
+ },
+ {
+  "assets": [
+   {
+    "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.6/fo2tweaks_v14.6.zip",
+    "digest": "sha256:fb1b95d95c4fb5286dc187c843f25cff7e11d870575047287d39c4adfd6e70fb",
+    "name": "fo2tweaks_v14.6.zip",
+    "size": 505890
+   }
+  ],
+  "tag_name": "v14.6"
+ }
+]

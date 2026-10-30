@@ -1,0 +1,26 @@
+[package]
+name = "zax-fallout2"
+description = "Catalog, layout, actions and backend for one game"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Builders for inputs ZAX never writes itself - a versioned library - for the preview's tests to plant.
+fixtures = []
+
+[dependencies]
+dat3-core = { git = "https://github.com/BGforgeNet/dat3", rev = "78d67769ed2da2f793b723ef19fac5e55970910c", version = "0.11.0" }
+pelite = "0.10.0"
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+ts-rs = "12.0.1"
+url = "2.5.8"
+yaml-rust2 = "0.13.0"
+zax-core.workspace = true
+zax-platform.workspace = true

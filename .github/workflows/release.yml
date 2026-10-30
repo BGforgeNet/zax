@@ -1,0 +1,133 @@
+# Builds the distributables for a version tag and drafts a release from them.
+#
+# The release is drafted rather than published: what is attached here is what a user downloads and runs, and a
+# person should look at it before that becomes true. Publishing the draft is a deliberate act in the web
+# interface or with `gh release edit <tag> --draft=false`.
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+# No cancel-in-progress: a half-cancelled release leaves a draft with some platforms missing, which is worse
+# than two runs producing the same files.
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  # Linux builds on the oldest image GitHub offers, for the glibc floor the AppImage and the portable copy
+  # inherit from it - neither carries a glibc of its own. ci.yml's build job says what a newer image costs.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, and what this job builds is what users download - so the job's
+          # token does not stay in .git/config where the build could carry it into an artifact.
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      # No caching in this workflow, unlike ci.yml: a cache entry is writable from any branch that can run a
+      # workflow, and what this job produces is attested and downloaded by users. Paying a cold Rust build and a
+      # cold install on every release buys the guarantee that nothing restored from a cache reached the binaries.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+          # Its own `package-manager-cache` input defaults to true, so leaving `cache` unset is not the same
+          # as taking no cache.
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      # The tag is what names the release; a tag whose version does not match the manifest would produce
+      # binaries reporting a version nobody can find, so it is checked before anything is built.
+      - name: Check the tag matches the version
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: ./.github/scripts/check-tag-version.sh
+      - if: runner.os == 'Linux'
+        run: ./.github/scripts/install-linux-deps.sh
+      - run: ./.github/scripts/package.sh
+        shell: bash
+      # One step per target, as in ci.yml. The draft job merges these and attaches every file it finds, so the
+      # split does not change what a release carries - what it changes is the guard: `if-no-files-found` asks
+      # whether a step found anything, so four patterns in one step pass as long as any one of them matched. A
+      # target that stopped building would have gone out as a release missing it, silently. One target per
+      # step is what makes each one answerable.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Linux'
+        with:
+          name: zax-Linux-AppImage
+          path: release/*.AppImage
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Linux'
+        with:
+          name: zax-Linux-tar.gz
+          path: release/*.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Windows'
+        with:
+          name: zax-Windows-zip
+          path: release/*.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'Windows'
+        with:
+          name: zax-Windows-exe
+          path: release/*.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.os == 'macOS'
+        with:
+          name: zax-macOS-zip
+          path: release/*.zip
+          if-no-files-found: error
+
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Writing the draft, and the two the attestation needs to sign one against this workflow's identity.
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # Says which workflow, at which commit, produced each file - checkable afterwards with
+      # `gh attestation verify <file> --repo BGforgeNet/zax`, which is what tells a user the binary they
+      # downloaded came from this repository rather than from someone who reuploaded it.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/*
+
+      # Scans the built artifacts rather than the lockfile, so it lists what actually shipped.
+      - uses: anchore/sbom-action@aa80c8c5bd439a416a62804f2151ab38c671a638 # v0.24.1
+        with:
+          path: artifacts
+          artifact-name: zax-sbom.spdx.json
+          output-file: artifacts/zax-sbom.spdx.json
+          format: spdx-json
+
+      - name: Draft the release
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: ./.github/scripts/draft-release.sh

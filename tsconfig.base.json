@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // What Node 24 carries, for the scripts and the tests, rather than the oldest that compiles: left at ES2022
+    // the checker rejects `toSorted` and `Object.groupBy` on code that would run. The interface narrows this in
+    // its own config, since it runs in the system's webview rather than on Node.
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  }
+}
