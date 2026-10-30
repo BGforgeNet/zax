@@ -34,7 +34,7 @@ use crate::manifest::{
 use crate::mod_choice::ChoiceGroup;
 use crate::mod_created::{created_install_path, no_upgrade_here};
 use crate::mod_parts::{CarriedSelection, carry_over, offered_parts};
-use crate::mod_vendored::vendored_manifest_for;
+use crate::mod_vendored::{companions_for, vendored_manifest_for};
 use crate::mods::{MODS_DIRECTORY, answers_to_id};
 use crate::records::InstallRecord;
 
@@ -446,6 +446,14 @@ fn version_from_tag(tag: &str) -> Option<String> {
     is_mod_version(version).then(|| version.to_owned())
 }
 
+/// Where a release's manifest came from. Told apart by origin rather than by content: an author who
+/// publishes ZAX's copy word for word has published it, and what the copy knows beyond the format does not
+/// follow it there.
+enum ManifestSource {
+    Published(String),
+    Carried(&'static str),
+}
+
 /// A release's manifest, fetched once - a tag's tree does not change once pushed. Its absence is kept
 /// too: a repository that ships none would otherwise cost one request per release on every listing
 /// refresh. Where the repository has none, ZAX's own copy answers for the mods that have one.
@@ -454,12 +462,14 @@ fn fetch_manifest_text(
     feed: &FeedSource,
     release: &FeedRelease,
     version: Option<&str>,
-) -> Result<Option<String>> {
+) -> Result<Option<ManifestSource>> {
     let base = feed_cache_path(platform, feed.repository, Some(&release.tag));
     let kept = with_suffix(&base, ".yml");
     if platform.fs().stat(&kept)?.map(|stat| stat.kind) == Some(FileKind::File) {
         let held = platform.fs().read(&kept)?;
-        return Ok(Some(String::from_utf8_lossy(&held).into_owned()));
+        return Ok(Some(ManifestSource::Published(
+            String::from_utf8_lossy(&held).into_owned(),
+        )));
     }
 
     // ZAX's own copy, for a mod that describes itself nowhere. Last rather than first: wherever the
@@ -470,7 +480,7 @@ fn fetch_manifest_text(
 
     let missing = with_suffix(&base, ".none");
     if platform.fs().stat(&missing)?.map(|stat| stat.kind) == Some(FileKind::File) {
-        return Ok(fallback.map(str::to_owned));
+        return Ok(fallback.map(ManifestSource::Carried));
     }
 
     let text = match platform
@@ -484,12 +494,12 @@ fn fetch_manifest_text(
         // ZAX's guess at the same time.
         Err(Error::Network(failure)) if failure.status == Some(404) => {
             platform.fs().write(&missing, &[])?;
-            return Ok(fallback.map(str::to_owned));
+            return Ok(fallback.map(ManifestSource::Carried));
         }
         Err(err) => return Err(err),
     };
     platform.fs().write(&kept, text.as_bytes())?;
-    Ok(Some(text))
+    Ok(Some(ManifestSource::Published(text)))
 }
 
 /// The cache path with a suffix appended to the whole name, rather than replacing an extension the
@@ -615,11 +625,23 @@ fn release_from(
     notes: &mut FeedNotes,
 ) -> Result<Option<ModRelease>> {
     let tagged = version_from_tag(&release.tag);
-    let Some(text) = fetch_manifest_text(platform, feed, release, tagged.as_deref())? else {
+    let Some(source) = fetch_manifest_text(platform, feed, release, tagged.as_deref())? else {
         return Ok(None);
     };
     notes.saw_manifest = true;
-    let inferred = sole_archive(&release.assets);
+    // Where the document is ZAX's own copy, the assets it knows to sit beside the payload are set aside before
+    // anything is taken as the release's sole archive or executable.
+    let (text, companions) = match source {
+        ManifestSource::Published(text) => (text, &[] as &[&str]),
+        ManifestSource::Carried(text) => (text.to_owned(), companions_for(feed.id)),
+    };
+    let assets: Vec<ReleaseAsset> = release
+        .assets
+        .iter()
+        .filter(|asset| !companions.iter().any(|ending| asset.name.ends_with(ending)))
+        .cloned()
+        .collect();
+    let inferred = sole_archive(&assets);
     let manifest = match parse_manifest(
         text.as_bytes(),
         &ManifestDefaults {
@@ -665,7 +687,7 @@ fn release_from(
         }
     }
     let route = route_for(platform);
-    let installer = installer_for(route, &manifest, &release.assets);
+    let installer = installer_for(route, &manifest, &assets);
     let installer_route = declared_installer(&manifest, route).map(|_| route);
     Ok(Some(ModRelease {
         manifest_text: text,
@@ -1818,6 +1840,54 @@ mod tests {
         );
         let said = installer_miss(&manifest, Some(InstallerRoute::Windows));
         assert!(said.contains("no single executable"), "{said}");
+    }
+
+    /// UPU's row, with each of a release's assets as UPU v34 publishes them.
+    fn upu_release(manifest: Response) -> MemoryPlatform {
+        let repository = "BGforgeNet/Fallout2_Unofficial_Patch";
+        let assets = ["upu_v34.exe", "upu_v34.zip", "upu_v34_translations.zip"]
+            .map(zip)
+            .join(",");
+        platform(&[
+            (
+                &format!("https://api.github.com/repos/{repository}/releases?per_page=100"),
+                body(&listing("v34", &assets)),
+            ),
+            (
+                &format!("https://raw.githubusercontent.com/{repository}/v34/f2mod.yml"),
+                manifest,
+            ),
+        ])
+    }
+
+    fn upu_feed() -> FeedSource {
+        FeedSource {
+            repository: "BGforgeNet/Fallout2_Unofficial_Patch",
+            id: "upu",
+            line: None,
+        }
+    }
+
+    #[test]
+    fn a_carried_document_takes_the_payload_beside_its_translations() {
+        // Off Windows the route is the release's sole archive, and UPU publishes its translations as a second
+        // one: the copy ZAX carries knows that, so the payload is the archive left once they are set aside.
+        let found =
+            fetch_feed(&upu_release(Response::Status(404)), &upu_feed(), EARLY).expect("a release");
+        let installer = found.installer.expect("an installer for this system");
+        assert_eq!(installer.route, InstallerRoute::Other);
+        assert_eq!(installer.asset.name, "upu_v34.zip");
+    }
+
+    #[test]
+    fn an_authors_document_with_two_archives_is_still_theirs_to_settle() {
+        // The companion rule is the carried copy's knowledge of one release's habits, not the format's: an
+        // author publishing the same two archives names the payload, or the release offers no install here.
+        let published =
+            crate::mod_vendored::vendored_manifest_for("upu").expect("ZAX carries UPU's");
+        let found =
+            fetch_feed(&upu_release(body(published)), &upu_feed(), EARLY).expect("a release");
+        assert_eq!(found.installer, None);
     }
 
     #[test]

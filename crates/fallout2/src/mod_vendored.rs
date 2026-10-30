@@ -21,8 +21,9 @@
 //!
 //! No document names an installer asset. Both BGforge assets carry the version in their names, and
 //! the release is what knows it: the Windows route resolves to the release's sole `.exe` and the
-//! other to its sole archive. That also survives an upstream rename, where a name spelled here would
-//! go on missing until ZAX shipped again.
+//! other to its sole archive, once the companions an entry lists (the `_translations` zip both publish)
+//! are set aside. That also survives an upstream rename, where a name spelled here would go on missing
+//! until ZAX shipped again.
 //!
 //! None of them describes what its installer offers, and that is the point: a copy of upstream's
 //! component tree kept here would be a second home for a table the installer's own source already
@@ -35,7 +36,14 @@ pub struct VendoredManifest {
     pub id: &'static str,
     /// The document, which states no version and names no asset - the release supplies both.
     pub text: &'static str,
+    /// Endings of assets the mod's releases publish beside the payload, set aside before the release's sole
+    /// archive is taken: what an author would settle by naming the asset, which a document carried across
+    /// versions cannot do when the names carry the version.
+    pub companions: &'static [&'static str],
 }
+
+/// What the release lines of RPU and UPU publish beside their payload archive.
+const TRANSLATIONS: &[&str] = &["_translations.zip"];
 
 /// `mods/upu.ini` as UPU v34 ships it, which both RPU lines ship unchanged inside their own releases: one
 /// description for the three documents that install the file. Each entry names its file, since an RPU
@@ -182,18 +190,22 @@ pub const VENDORED_MANIFESTS: &[VendoredManifest] = &[
     VendoredManifest {
         id: "rpu23",
         text: RPU23,
+        companions: TRANSLATIONS,
     },
     VendoredManifest {
         id: "rpu24",
         text: RPU24,
+        companions: TRANSLATIONS,
     },
     VendoredManifest {
         id: "upu",
         text: UPU,
+        companions: TRANSLATIONS,
     },
     VendoredManifest {
         id: "fo1in2",
         text: FO1IN2,
+        companions: &[],
     },
 ];
 
@@ -204,6 +216,16 @@ pub fn vendored_manifest_for(id: &str) -> Option<&'static str> {
         .iter()
         .find(|entry| entry.id == id)
         .map(|entry| entry.text)
+}
+
+/// The companion endings ZAX's copy for this mod id lists. Only for a release read through that copy: an
+/// author's own manifest names its payload, and the format's refusal of two unnamed archives is theirs.
+#[must_use]
+pub fn companions_for(id: &str) -> &'static [&'static str] {
+    VENDORED_MANIFESTS
+        .iter()
+        .find(|entry| entry.id == id)
+        .map_or(&[], |entry| entry.companions)
 }
 
 #[cfg(test)]
