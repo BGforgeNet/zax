@@ -27,8 +27,8 @@ jobs:
           # Nothing here pushes, and the default leaves the job's token in .git/config where anything
           # later in the job - or an artifact made from the checkout - could carry it back out.
           persist-credentials: false
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
           cache: pnpm
@@ -65,7 +65,8 @@ jobs:
       - run: pnpm verify:chokidar
       - run: ./.github/scripts/check-generated.sh
 
-  # The Rust workspace: formatting, lints on both targets, tests, and the bindings the tests write.
+  # The Rust workspace: formatting, lints on both targets, tests, the bindings the tests write, and the
+  # dependencies' advisories.
   rust:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -86,6 +87,7 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - run: ./.github/scripts/rust-gate.sh
+      - run: ./.github/scripts/audit-crates.sh
 
   # The domain's tests again on Windows, and only those. `zax-host` is where the real filesystem, process
   # launch and registry calls are - drive letters, a case-insensitive filesystem, `reg query` - and the logic
@@ -156,8 +158,8 @@ jobs:
           # Nothing here pushes, and the default leaves the job's token in .git/config where anything
           # later in the job - or an artifact made from the checkout - could carry it back out.
           persist-credentials: false
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
           cache: pnpm
@@ -179,35 +181,35 @@ jobs:
       # One artifact per target rather than one per platform: each platform builds the application two ways,
       # and nobody wants both. Each path names an extension rather than wildcarding the directory, so a target
       # that silently stopped producing anything fails its step instead of uploading nothing.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: runner.os == 'Linux'
         with:
           name: zax-Linux-AppImage
           path: release/*.AppImage
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: runner.os == 'Linux'
         with:
           name: zax-Linux-tar.gz
           path: release/*.tar.gz
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: runner.os == 'Windows'
         with:
           name: zax-Windows-zip
           path: release/*.zip
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: runner.os == 'Windows'
         with:
           name: zax-Windows-exe
           path: release/*.exe
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: runner.os == 'macOS'
         with:
           name: zax-macOS-zip
@@ -244,13 +246,13 @@ jobs:
           # Nothing here pushes, and the default leaves the job's token in .git/config where anything
           # later in the job - or an artifact made from the checkout - could carry it back out.
           persist-credentials: false
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: zax-Windows-zip
           path: dist

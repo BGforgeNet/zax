@@ -15,10 +15,10 @@ flate2 = { version = "1.1.10", default-features = false, features = ["rust_backe
 fs4 = "1.1.0"
 hex = "0.4.3"
 md-5 = "0.11.0"
-sevenz-rust2 = "0.20.2"
+sevenz-rust2 = "0.24.1"
 sha2 = "0.11.0"
 tar = "0.4.46"
 ureq = { version = "3.4.2", default-features = false, features = ["rustls", "gzip"] }
 url = "2.5.8"
 zax-platform.workspace = true
-zip = { version = "7.2.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2"] }

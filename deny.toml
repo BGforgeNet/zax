@@ -1,0 +1,9 @@
+# cargo-deny, run by .github/scripts/audit-crates.sh. Only the advisories check is run: a licence policy for
+# the dependencies has not been decided.
+
+[advisories]
+# A yanked release was pulled by its author, usually for a defect.
+yanked = "deny"
+# Our own dependencies only: one that arrives through another crate is for that crate to replace, and the
+# notice offers no upgrade to take.
+unmaintained = "workspace"

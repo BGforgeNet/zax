@@ -171,10 +171,13 @@ impl Archive for HostArchive {
                     .map_err(|err| broken(archive, &err))?;
                 for at in 0..held.len() {
                     let mut entry = held.by_index(at).map_err(|err| broken(archive, &err))?;
-                    if entry.is_dir() || !wanted(&options.only, entry.name()) {
+                    let name = entry
+                        .name()
+                        .map_err(|err| broken(archive, &err))?
+                        .into_owned();
+                    if entry.is_dir() || !wanted(&options.only, &name) {
                         continue;
                     }
-                    let name = entry.name().to_owned();
                     let mut bytes = Vec::new();
                     entry
                         .read_to_end(&mut bytes)
@@ -247,7 +250,10 @@ impl Archive for HostArchive {
                         .unix_mode()
                         .is_some_and(|mode| mode & 0o170_000 == 0o120_000);
                     out.push(ArchiveEntryInfo {
-                        name: entry.name().replace('\\', "/"),
+                        name: entry
+                            .name()
+                            .map_err(|err| broken(archive, &err))?
+                            .replace('\\', "/"),
                         kind: if link {
                             ArchiveEntryKind::Link
                         } else if entry.is_dir() {

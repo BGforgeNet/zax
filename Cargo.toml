@@ -15,8 +15,9 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-# Floor set by dat3-core, which zax-fallout2 links for DAT archives.
-rust-version = "1.87"
+# The pinned toolchain's: the resolver picks dependency versions that build on this, so a lower value would
+# hold back releases the pinned compiler builds fine.
+rust-version = "1.98"
 publish = false
 
 [workspace.dependencies]
