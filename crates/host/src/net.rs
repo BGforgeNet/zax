@@ -364,6 +364,9 @@ impl HostNetwork {
             // Not a limit on the whole transfer: that would fail a slow link that is still making
             // progress, which is what the per-chunk silence check exists to tell apart.
             .timeout_recv_response(Some(policy.response_timeout))
+            // ureq answers a 4xx or 5xx as an error by default, with no status left to read; the callers
+            // branch on the status (a feed's 404, a retryable 503, a range the server refused).
+            .http_status_as_error(false)
             .build();
         Self {
             agent: config.into(),
@@ -542,7 +545,8 @@ impl Network for HostNetwork {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicUsize};
 
     #[test]
     fn a_host_is_read_out_of_the_address_and_falls_back_to_it() {
@@ -669,5 +673,61 @@ mod tests {
             matches!(held.kind, NetworkFailure::Offline | NetworkFailure::Timeout),
             "{held:?}"
         );
+    }
+
+    /// A server on loopback that answers every request with `status` and an empty body, counting the
+    /// requests it was sent.
+    fn answering(status: &'static str) -> (String, Arc<AtomicUsize>) {
+        use std::io::{BufRead, BufReader};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a loopback port");
+        let url = format!("http://{}/f2mod.yml", listener.local_addr().expect("bound"));
+        let served = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&served);
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                counter.fetch_add(1, Ordering::SeqCst);
+                let mut reader = BufReader::new(&stream);
+                let mut line = String::new();
+                while reader.read_line(&mut line).is_ok_and(|read| read > 2) {
+                    line.clear();
+                }
+                let _ = write!(
+                    &stream,
+                    "HTTP/1.1 {status}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+                );
+            }
+        });
+        (url, served)
+    }
+
+    #[test]
+    fn a_status_the_server_answered_with_is_reported_as_that_status() {
+        // The feed falls back to a carried manifest on exactly a 404; reported as unreachable, it fails
+        // every mod that publishes none.
+        let (url, _) = answering("404 Not Found");
+        let err = HostNetwork::default().fetch_text(&url).expect_err("a 404");
+        let Error::Network(held) = err else {
+            panic!("{err:?}");
+        };
+        assert_eq!(
+            (held.kind, held.status),
+            (NetworkFailure::Status, Some(404)),
+            "{held:?}"
+        );
+    }
+
+    #[test]
+    fn a_download_the_server_says_is_not_there_is_asked_for_once() {
+        let (url, served) = answering("404 Not Found");
+        let at = std::env::temp_dir().join(format!("zax-net-404-{}", std::process::id()));
+        let err = HostNetwork::default()
+            .download(&url, &at.join("payload.zip"), &DownloadOptions::default())
+            .expect_err("a 404");
+        let Error::Network(held) = err else {
+            panic!("{err:?}");
+        };
+        assert_eq!(held.status, Some(404), "{held:?}");
+        assert_eq!(served.load(Ordering::SeqCst), 1, "a 404 is not retried");
+        let _ = fs::remove_dir_all(&at);
     }
 }
