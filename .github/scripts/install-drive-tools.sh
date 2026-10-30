@@ -33,4 +33,12 @@ case "$RUNNER_OS" in
     ;;
 esac
 
-cargo install tauri-driver --locked --version "$TAURI_DRIVER_VERSION"
+# Into the job's temp directory, which ci.yml caches keyed on this file: compiling it is most of what this script
+# costs, and cargo leaves an install of the same version where it is.
+root="$RUNNER_TEMP/tauri-driver"
+cargo install tauri-driver --locked --version "$TAURI_DRIVER_VERSION" --root "$root"
+if [ "$RUNNER_OS" = Windows ]; then
+  cygpath -w "$root/bin" >>"$GITHUB_PATH"
+else
+  echo "$root/bin" >>"$GITHUB_PATH"
+fi

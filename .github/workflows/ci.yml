@@ -140,8 +140,10 @@ jobs:
   # program will start on and neither bundle carries one: on 24.04 the standard library links pidfd_spawnp,
   # which records a need for glibc 2.39 and leaves the program refusing to start on Debian 12, Ubuntu 22.04
   # and RHEL 9. That image's WebKitGTK is a release behind 24.04's rather than a generation.
+  #
+  # Not held behind the checks: packaging needs nothing they produce, and waiting for them put their whole run
+  # in front of the slowest path through the workflow.
   build:
-    needs: [verify, rust]
     strategy:
       fail-fast: false
       matrix:
@@ -216,6 +218,11 @@ jobs:
       # the uploads, so a failing drive still leaves the build to download. Windows is driven in `drive-windows`,
       # and macOS has no WebDriver for its webview.
       - if: runner.os == 'Linux'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/tauri-driver
+          key: tauri-driver-${{ matrix.os }}-${{ hashFiles('.github/scripts/install-drive-tools.sh') }}
+      - if: runner.os == 'Linux'
         run: ./.github/scripts/install-drive-tools.sh
       - if: runner.os == 'Linux'
         run: xvfb-run pnpm drive
@@ -247,6 +254,10 @@ jobs:
         with:
           name: zax-Windows-zip
           path: dist
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/tauri-driver
+          key: tauri-driver-windows-2022-${{ hashFiles('.github/scripts/install-drive-tools.sh') }}
       - run: ./.github/scripts/install-drive-tools.sh
         shell: bash
       - run: |

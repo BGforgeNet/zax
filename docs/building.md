@@ -70,8 +70,8 @@ path visible, not to be aimed at. CI runs the measured variant, so the floor gat
 slowing every local run. Components are measured alongside the TypeScript: the interface is where the wording
 a user reads is decided, and leaving `.svelte` out of the ratio would have said nothing about it.
 
-CI runs the interface's checks and the Rust gate on every push, then builds the distributables on Linux,
-Windows and macOS. The domain's tests run a second time on Windows, on their own: `zax-host` is where the real
+CI runs the interface's checks and the Rust gate on every push, and builds the distributables on Linux,
+Windows and macOS alongside them. The domain's tests run a second time on Windows, on their own: `zax-host` is where the real
 filesystem, process launch and registry calls are, and drive letters, a case-insensitive filesystem and
 `reg query` have no equivalent on the Linux runner.
 
