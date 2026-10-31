@@ -1,0 +1,292 @@
+{
+  "format": 1,
+  "generated": "2026-10-31T15:07:49.298328023Z",
+  "orders": {
+    "fallout2rpu": [
+      "rpu.dat",
+      "party_orders.dat",
+      "npc_armor.dat",
+      "rpu_czech.dat",
+      "rpu_french.dat",
+      "rpu_german.dat",
+      "rpu_hungarian.dat",
+      "rpu_italian.dat",
+      "rpu_polish.dat",
+      "rpu_portuguese.dat",
+      "rpu_russian.dat",
+      "upu_russian_sound.dat",
+      "rpu_spanish.dat",
+      "rpu_enhanced_worldmap.dat",
+      "rpu_extended_flamer.dat",
+      "rpu_rifle_animations.dat",
+      "rpu_wakizashi_animations.dat",
+      "cassidy_head.dat",
+      "cassidy_voice_joey_bracken_hq.dat",
+      "rpu_improved_mysterious_stranger.dat",
+      "walk_speed_fix_low_fps.dat",
+      "goris_fast_derobing_low_fps.dat",
+      "fo2tweaks.dat",
+      "InventoryFilter.dat"
+    ],
+    "fallout2upu": [
+      "upu.dat",
+      "party_orders.dat",
+      "npc_armor.dat",
+      "upu_czech.dat",
+      "upu_french.dat",
+      "upu_german.dat",
+      "upu_hungarian.dat",
+      "upu_italian.dat",
+      "upu_polish.dat",
+      "upu_portuguese.dat",
+      "upu_russian.dat",
+      "upu_spanish.dat",
+      "upu_russian_sound.dat",
+      "rpu_enhanced_worldmap.dat",
+      "rpu_extended_flamer.dat",
+      "rpu_rifle_animations.dat",
+      "rpu_wakizashi_animations.dat",
+      "cassidy_head.dat",
+      "cassidy_voice_joey_bracken_hq.dat",
+      "rpu_improved_mysterious_stranger.dat",
+      "walk_speed_fix_low_fps.dat",
+      "goris_fast_derobing_low_fps.dat",
+      "fo2tweaks.dat",
+      "InventoryFilter.dat"
+    ],
+    "shared": [
+      "party_orders.dat",
+      "npc_armor.dat",
+      "upu_russian_sound.dat",
+      "rpu_enhanced_worldmap.dat",
+      "rpu_extended_flamer.dat",
+      "rpu_rifle_animations.dat",
+      "rpu_wakizashi_animations.dat",
+      "cassidy_head.dat",
+      "cassidy_voice_joey_bracken_hq.dat",
+      "rpu_improved_mysterious_stranger.dat",
+      "walk_speed_fix_low_fps.dat",
+      "goris_fast_derobing_low_fps.dat",
+      "fo2tweaks.dat",
+      "InventoryFilter.dat"
+    ]
+  },
+  "mods": [
+    {
+      "id": "fo1in2",
+      "name": "ET TU",
+      "base": true,
+      "line": null,
+      "requires": [],
+      "releases": [
+        {
+          "version": "2.0.3911",
+          "rank": 5,
+          "published": "2026-10-14T15:01:26Z",
+          "requires": [
+            "base.creates",
+            "extract-dat"
+          ],
+          "assets": [
+            {
+              "name": "Fallout1in2.zip",
+              "url": "https://github.com/rotators/Fo1in2/releases/download/v2.0.3911/Fallout1in2.zip",
+              "size": 412718928,
+              "sha256": "7510d44b55db9f8945100321c859210cf4e77aa3beb4a3958d7c00c82bfc18ee"
+            }
+          ],
+          "manifest": "---\nspec: 1\nid: fo1in2\nname: Fallout et tu\ngame: fallout2\ntype: base\nbecomes: fo1in2\ncreates.directory: Fallout1in2\ninputs:\n  - id: fallout1\n    label: Your Fallout 1 folder\n    help: \"The folder holding Fallout 1's MASTER.DAT. Fallout et tu unpacks the game's art and sound from it.\"\n    holds: master.dat\nextract-dat.from: fallout1\nextract-dat.list: undat_files.txt\nextract-dat.into: data\nversion: 2.0.3911\narchive: Fallout1in2.zip\n"
+        },
+        {
+          "version": "1.16.3771",
+          "rank": 4,
+          "published": "2026-06-03T16:48:07Z",
+          "requires": [
+            "base.creates",
+            "extract-dat"
+          ],
+          "assets": [
+            {
+              "name": "Fallout1in2.zip",
+              "url": "https://github.com/rotators/Fo1in2/releases/download/v1.16.3771/Fallout1in2.zip",
+              "size": 408198121,
+              "sha256": "68777c2c32b911da902992c2d1cd5d4ce895059bd182909b579aa1eaeda0c686"
+            }
+          ],
+          "manifest": "---\nspec: 1\nid: fo1in2\nname: Fallout et tu\ngame: fallout2\ntype: base\nbecomes: fo1in2\ncreates.directory: Fallout1in2\ninputs:\n  - id: fallout1\n    label: Your Fallout 1 folder\n    help: \"The folder holding Fallout 1's MASTER.DAT. Fallout et tu unpacks the game's art and sound from it.\"\n    holds: master.dat\nextract-dat.from: fallout1\nextract-dat.list: undat_files.txt\nextract-dat.into: data\nversion: 1.16.3771\narchive: Fallout1in2.zip\n"
+        },
+        {
+          "version": "1.15.3735",
+          "rank": 3,
+          "published": "2026-02-19T13:24:27Z",
+          "requires": [
+            "base.creates",
+            "extract-dat"
+          ],
+          "assets": [
+            {
+              "name": "Fallout1in2.zip",
+              "url": "https://github.com/rotators/Fo1in2/releases/download/v1.15.3735/Fallout1in2.zip",
+              "size": 405639094,
+              "sha256": "ce6c7fcfa26bc1f86a5106210b022ab88075738a09d6815206f474f7ed840131"
+            }
+          ],
+          "manifest": "---\nspec: 1\nid: fo1in2\nname: Fallout et tu\ngame: fallout2\ntype: base\nbecomes: fo1in2\ncreates.directory: Fallout1in2\ninputs:\n  - id: fallout1\n    label: Your Fallout 1 folder\n    help: \"The folder holding Fallout 1's MASTER.DAT. Fallout et tu unpacks the game's art and sound from it.\"\n    holds: master.dat\nextract-dat.from: fallout1\nextract-dat.list: undat_files.txt\nextract-dat.into: data\nversion: 1.15.3735\narchive: Fallout1in2.zip\n"
+        },
+        {
+          "version": "1.14.3688",
+          "rank": 2,
+          "published": "2025-09-02T09:46:59Z",
+          "requires": [
+            "base.creates",
+            "extract-dat"
+          ],
+          "assets": [
+            {
+              "name": "Fallout1in2.zip",
+              "url": "https://github.com/rotators/Fo1in2/releases/download/v1.14.3688/Fallout1in2.zip",
+              "size": 405610992,
+              "sha256": "2e1170d339adb764d3ed2e14cd86a51053bee8a93a31b011425647a721c4f734"
+            }
+          ],
+          "manifest": "---\nspec: 1\nid: fo1in2\nname: Fallout et tu\ngame: fallout2\ntype: base\nbecomes: fo1in2\ncreates.directory: Fallout1in2\ninputs:\n  - id: fallout1\n    label: Your Fallout 1 folder\n    help: \"The folder holding Fallout 1's MASTER.DAT. Fallout et tu unpacks the game's art and sound from it.\"\n    holds: master.dat\nextract-dat.from: fallout1\nextract-dat.list: undat_files.txt\nextract-dat.into: data\nversion: 1.14.3688\narchive: Fallout1in2.zip\n"
+        },
+        {
+          "version": "1.13.3643",
+          "rank": 1,
+          "published": "2025-07-28T15:10:04Z",
+          "requires": [
+            "base.creates",
+            "extract-dat"
+          ],
+          "assets": [
+            {
+              "name": "Fallout1in2.zip",
+              "url": "https://github.com/rotators/Fo1in2/releases/download/v1.13.3643/Fallout1in2.zip",
+              "size": 405606504,
+              "sha256": "e8683da23727a6578e88cb70076281f35aa14af5b3347e0697b60771f317d538"
+            }
+          ],
+          "manifest": "---\nspec: 1\nid: fo1in2\nname: Fallout et tu\ngame: fallout2\ntype: base\nbecomes: fo1in2\ncreates.directory: Fallout1in2\ninputs:\n  - id: fallout1\n    label: Your Fallout 1 folder\n    help: \"The folder holding Fallout 1's MASTER.DAT. Fallout et tu unpacks the game's art and sound from it.\"\n    holds: master.dat\nextract-dat.from: fallout1\nextract-dat.list: undat_files.txt\nextract-dat.into: data\nversion: 1.13.3643\narchive: Fallout1in2.zip\n"
+        }
+      ]
+    },
+    {
+      "id": "fo2tweaks",
+      "name": "FO2tweaks",
+      "base": false,
+      "line": null,
+      "requires": [],
+      "releases": []
+    },
+    {
+      "id": "rpu23",
+      "name": "RPU 2.3",
+      "base": true,
+      "line": {
+        "prefix": "2.3.",
+        "counter": true
+      },
+      "requires": [
+        "line"
+      ],
+      "releases": [
+        {
+          "version": "2.3.34",
+          "rank": 1,
+          "published": "2025-10-18T04:23:21Z",
+          "requires": [
+            "base.inno",
+            "base.script"
+          ],
+          "assets": [
+            {
+              "name": "rpu_v2.3.34.zip",
+              "url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.3.34/rpu_v2.3.34.zip",
+              "size": 867147794,
+              "sha256": "c9433bfb3c45a451dc7ff4e6a8622a641a78cd1cfa20b047b1e95421834957fa"
+            },
+            {
+              "name": "rpu_v2.3.34.exe",
+              "url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.3.34/rpu_v2.3.34.exe",
+              "size": 980415370,
+              "sha256": "12e18ba15f409a10d4b5b7a6491ce9ee22485395aa6d15e36a390c99e67b8956"
+            }
+          ],
+          "manifest": "---\nspec: 1\nid: rpu23\nname: Restoration Project Updated 2.3\ngame: fallout2\ntype: base\nbecomes: fallout2rpu\ninstaller.windows.built-with: inno\ninstaller.other.run: rpu-install.sh\nsettings:\n  main.marcus_armor:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: Mutant armor for Marcus\n  main.dogmeat_armor:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: Kevlar armor for Dogmeat\n  main.smoking:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: Smoking animation\n    help: \"The player character's smoking animation.\"\n  main.lenny_new_look:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: New look for Lenny\n    help: Gives Lenny a different ghoul sprite.\n  main.vault_boxer:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: Vault boxer in the ring\n    help: Use the unique vault boxer model when fighting in the ring.\n  main.goris_derobing_speed:\n    file: mods/upu.ini\n    kind: int\n    min: 16\n    max: 100\n    unit: fps\n    sentinels:\n      0: \"Off\"\n    default: 50\n    label: Goris de-robing speed\n    help: How fast Goris takes off his robe. The original game plays it at 16. No effect if the alternative low FPS Goris de-robing is installed.\n  main.critters_walk_faster:\n    file: mods/upu.ini\n    kind: bool\n    default: 1\n    label: Faster walking for slow critters\n    help: \"Robots, various guards and a few other critters walk much slower than everyone else; this speeds them up a little. Cosmetic only. No effect if the alternative low FPS walk speed fix is installed.\"\n  main.wipe_inventory:\n    file: mods/upu.ini\n    kind: bool\n    default: 0\n    label: Fresh merchant stock on each restock\n    help: \"Off, merchants keep every item you ever sold them, on top of their restocks. On, each restock gives them fresh inventory. Quest items are always kept. Can be changed mid-game.\"\n  ncr.repeatable_brahmin_drive:\n    file: mods/upu.ini\n    kind: bool\n    default: 1\n    label: Repeatable NCR brahmin drive\n    help: \"The NCR to Redding brahmin drive can be done again, as Duppo says. The drives end if Hal dies.\"\nversion: 2.3.34\narchive: rpu_v2.3.34.zip\ninstaller.windows.asset: rpu_v2.3.34.exe\ninstaller.other.asset: rpu_v2.3.34.zip\n"
+        }
+      ]
+    },
+    {
+      "id": "rpu24",
+      "name": "RPU 2.4",
+      "base": true,
+      "line": {
+        "prefix": "2.4.",
+        "counter": false
+      },
+      "requires": [
+        "line"
+      ],
+      "releases": [
+        {
+          "version": "2.4.34",
+          "rank": 1,
+          "published": "2025-10-18T04:23:25Z",
+          "requires": [
+            "base.inno",
+            "base.script"
+          ],
+          "assets": [
+            {
+              "name": "rpu_v2.4.34.zip",
+              "url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.34/rpu_v2.4.34.zip",
+              "size": 866970542,
+              "sha256": "b8f8a9c900a553c4e781e74bcf805f5663bc37b3633ebfbebfc928b70470285e"
+            },
+            {
+              "name": "rpu_v2.4.34.exe",
+              "url": "https://github.com/BGforgeNet/Fallout2_Restoration_Project/releases/download/v2.4.34/rpu_v2.4.34.exe",
+              "size": 980251749,
+              "sha256": "226b2252840a9230bb4ced1550becb2bd69d3580c15ee5c2148d5dc0a750f898"
+            }
+          ],
+          "manifest": "---\nspec: 1\nid: rpu24\nname: Restoration Project Updated 2.4\ngame: fallout2\ntype: base\nbecomes: fallout2rpu\ninstaller.windows.built-with: inno\ninstaller.other.run: rpu-install.sh\nsettings:\n  main.marcus_armor:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: Mutant armor for Marcus\n  main.dogmeat_armor:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: Kevlar armor for Dogmeat\n  main.smoking:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: Smoking animation\n    help: \"The player character's smoking animation.\"\n  main.lenny_new_look:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: New look for Lenny\n    help: Gives Lenny a different ghoul sprite.\n  main.vault_boxer:\n    file: mods/rpu.ini\n    kind: bool\n    default: 1\n    label: Vault boxer in the ring\n    help: Use the unique vault boxer model when fighting in the ring.\n  main.goris_derobing_speed:\n    file: mods/upu.ini\n    kind: int\n    min: 16\n    max: 100\n    unit: fps\n    sentinels:\n      0: \"Off\"\n    default: 50\n    label: Goris de-robing speed\n    help: How fast Goris takes off his robe. The original game plays it at 16. No effect if the alternative low FPS Goris de-robing is installed.\n  main.critters_walk_faster:\n    file: mods/upu.ini\n    kind: bool\n    default: 1\n    label: Faster walking for slow critters\n    help: \"Robots, various guards and a few other critters walk much slower than everyone else; this speeds them up a little. Cosmetic only. No effect if the alternative low FPS walk speed fix is installed.\"\n  main.wipe_inventory:\n    file: mods/upu.ini\n    kind: bool\n    default: 0\n    label: Fresh merchant stock on each restock\n    help: \"Off, merchants keep every item you ever sold them, on top of their restocks. On, each restock gives them fresh inventory. Quest items are always kept. Can be changed mid-game.\"\n  ncr.repeatable_brahmin_drive:\n    file: mods/upu.ini\n    kind: bool\n    default: 1\n    label: Repeatable NCR brahmin drive\n    help: \"The NCR to Redding brahmin drive can be done again, as Duppo says. The drives end if Hal dies.\"\nversion: 2.4.34\narchive: rpu_v2.4.34.zip\ninstaller.windows.asset: rpu_v2.4.34.exe\ninstaller.other.asset: rpu_v2.4.34.zip\n"
+        }
+      ]
+    },
+    {
+      "id": "upu",
+      "name": "UPU",
+      "base": true,
+      "line": null,
+      "requires": [],
+      "releases": [
+        {
+          "version": "34",
+          "rank": 1,
+          "published": "2025-10-18T04:14:13Z",
+          "requires": [
+            "base.inno",
+            "base.script"
+          ],
+          "assets": [
+            {
+              "name": "upu_v34.zip",
+              "url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v34/upu_v34.zip",
+              "size": 57621459,
+              "sha256": "e11369a3622b1c294a3aa24503e3c3a06fa1af17e407b7769981f4b22402f6c5"
+            },
+            {
+              "name": "upu_v34.exe",
+              "url": "https://github.com/BGforgeNet/Fallout2_Unofficial_Patch/releases/download/v34/upu_v34.exe",
+              "size": 97135562,
+              "sha256": "7148bdced50055da822de28ac59fc57e682e577020b5f828198d1b664fe51926"
+            }
+          ],
+          "manifest": "---\nspec: 1\nid: upu\nname: Unofficial Patch Updated\ngame: fallout2\ntype: base\nbecomes: fallout2upu\ninstaller.windows.built-with: inno\ninstaller.other.run: upu-install.sh\nsettings:\n  main.goris_derobing_speed:\n    file: mods/upu.ini\n    kind: int\n    min: 16\n    max: 100\n    unit: fps\n    sentinels:\n      0: \"Off\"\n    default: 50\n    label: Goris de-robing speed\n    help: How fast Goris takes off his robe. The original game plays it at 16. No effect if the alternative low FPS Goris de-robing is installed.\n  main.critters_walk_faster:\n    file: mods/upu.ini\n    kind: bool\n    default: 1\n    label: Faster walking for slow critters\n    help: \"Robots, various guards and a few other critters walk much slower than everyone else; this speeds them up a little. Cosmetic only. No effect if the alternative low FPS walk speed fix is installed.\"\n  main.wipe_inventory:\n    file: mods/upu.ini\n    kind: bool\n    default: 0\n    label: Fresh merchant stock on each restock\n    help: \"Off, merchants keep every item you ever sold them, on top of their restocks. On, each restock gives them fresh inventory. Quest items are always kept. Can be changed mid-game.\"\n  ncr.repeatable_brahmin_drive:\n    file: mods/upu.ini\n    kind: bool\n    default: 1\n    label: Repeatable NCR brahmin drive\n    help: \"The NCR to Redding brahmin drive can be done again, as Duppo says. The drives end if Hal dies.\"\nversion: \"34\"\narchive: upu_v34.zip\ninstaller.windows.asset: upu_v34.exe\ninstaller.other.asset: upu_v34.zip\n"
+        }
+      ]
+    }
+  ]
+}

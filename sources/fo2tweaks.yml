@@ -1,0 +1,6 @@
+# Followed mod source. See crates/indexer/src/source.rs for the format.
+id: fo2tweaks
+repository: BGforgeNet/FO2tweaks
+repository-id: 47547650
+name: FO2tweaks
+base: false
