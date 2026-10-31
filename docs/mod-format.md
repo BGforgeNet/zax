@@ -46,4 +46,4 @@ ZAX's maintainers write a manifest for each followed mod that describes itself n
 so that it can be installed at all. It sits in the mod's source file for the mod index, as its `document`, which
 makes it a worse description of your mod than yours would be: it is a guess at what you would write. Publishing
 your own overrides it from the next release onward, with no coordination needed, and the copy can then be deleted.
-The source files are in [the index sources](../fixtures/index/sources/).
+The source files are on [the index branch](https://github.com/BGforgeNet/zax/tree/index/sources).

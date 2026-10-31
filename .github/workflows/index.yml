@@ -1,0 +1,74 @@
+# Rebuilds the mod index every copy of ZAX reads, and publishes it on the `index` branch.
+#
+# That branch holds the maintainers' source files under `sources/` and the built `v1/index.json`, which ZAX
+# downloads raw from it. Nothing there runs: GitHub runs scheduled workflows only from the default branch, so the
+# indexer is built from this one and pointed at that one.
+
+name: index
+
+on:
+  # Daily: a new release reaches ZAX within a day, and the index's own age - which ZAX warns about past a
+  # fortnight - stays a sign of the indexer stopping rather than of a quiet week.
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+# Queued rather than cancelled: a run cancelled between building and publishing publishes nothing, which is
+# harmless, but two publishing at once would race on the branch.
+concurrency:
+  group: index
+
+jobs:
+  # Read-only: the indexer parses manifests from repositories other than this one, so the token it holds can
+  # write nothing. It is passed for GitHub's API rate limit, which a runner's shared address exhausts unsigned.
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: index
+          path: index-branch
+          persist-credentials: false
+      # No cache, as in release.yml: what this builds decides what every copy of ZAX downloads, and a cache entry
+      # is writable from any branch that can run a workflow.
+      - run: cargo run --locked -p zax-indexer -- build --sources index-branch/sources --out "$RUNNER_TEMP"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: index
+          path: ${{ runner.temp }}/v1/index.json
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: index
+          path: index-branch
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index
+          path: index-branch/v1
+      - run: ./.github/scripts/publish-index.sh
+        env:
+          INDEX_DIR: index-branch
+          GITHUB_TOKEN: ${{ github.token }}

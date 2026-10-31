@@ -2,7 +2,7 @@
 
 ## How ZAX chooses one
 
-ZAX reads one document, the mod index, which ZAX's maintainers build from the repositories they follow. For each
+ZAX reads one document, the mod index, which is rebuilt once a day from the repositories it follows. For each
 release the indexer reads the manifest from the repository at the release's tag, and writes it into the index
 with every value explicit: the version (the tag's, where the manifest states none), and every asset it uses,
 with the SHA-256 GitHub states for it. Two ids may share a repository, each on its own tags.
@@ -45,7 +45,7 @@ a difference nobody can see.
 ## Getting a mod into the index
 
 A mod is followed once ZAX's maintainers add a source file for it to the mod index - installing a mod is
-trusting its publisher, and that file is where the trust is granted. The source files are in
-[the index sources](../../fixtures/index/sources/), and their format is described in
+trusting its publisher, and that file is where the trust is granted. The source files are on
+[the index branch](https://github.com/BGforgeNet/zax/tree/index/sources), and their format is described in
 [the indexer](../../crates/indexer/src/source.rs). A mod that has to write outside `mods/` is granted the
 directory there, under `grants`, with why nothing packable would do.
