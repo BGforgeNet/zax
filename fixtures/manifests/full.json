@@ -1,5 +1,6 @@
 {
   "parses": {
+    "grants": [],
     "id": "ecco",
     "name": "EcCo Gameplay Overhaul",
     "version": "1.0.0",

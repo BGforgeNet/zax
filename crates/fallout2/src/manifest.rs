@@ -304,6 +304,9 @@ pub struct ModManifest {
     pub dropped: Vec<DroppedSetting>,
     /// What each ini section is for, keyed by the name the settings' addresses use.
     pub section_help: Option<BTreeMap<String, String>>,
+    /// Directories below the install, outside `mods/`, this mod may write: what ZAX's maintainers
+    /// granted it, carried with the manifest so every path it declares is judged against the same list.
+    pub grants: Vec<String>,
 }
 
 /// Every part of a manifest, flat and in declared order - the shape a selection is judged against.
@@ -484,10 +487,22 @@ fn bound(value: Option<&Yaml>, where_at: &str) -> Parsed<f64> {
 }
 
 /// A mapping's fields, with every key checked against what this version knows.
+/// Which reader a document goes through, and so what an unknown field means.
+///
+/// An author's file is refused over one, so a misspelling cannot drop a rule. The index's copy is
+/// written by an indexer newer than this ZAX may be, which adds fields this version may ignore and
+/// names anything it may not under the release's `requires`, judged before the document is read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Strictness {
+    Author,
+    Indexed,
+}
+
 fn record<'a>(
     value: Option<&'a Yaml>,
     where_at: &str,
     allowed: &[&str],
+    strictness: Strictness,
 ) -> Parsed<BTreeMap<String, &'a Yaml>> {
     let Some(hash) = value.and_then(Yaml::as_hash) else {
         return refuse(format!("{where_at} must be a mapping"));
@@ -498,6 +513,9 @@ fn record<'a>(
             return refuse(format!("{where_at} has a key that is not text"));
         };
         if !allowed.contains(&name) {
+            if strictness == Strictness::Indexed {
+                continue;
+            }
             return refuse(format!("{where_at} has an unknown field \"{name}\""));
         }
         out.insert(name.to_owned(), held);
@@ -566,8 +584,8 @@ fn link(value: Option<&Yaml>, where_at: &str) -> Parsed<String> {
     Ok(url)
 }
 
-fn parse_gate(value: Option<&Yaml>, where_at: &str) -> Parsed<Gate> {
-    let fields = record(value, where_at, &["id", "is", "is-not"])?;
+fn parse_gate(value: Option<&Yaml>, where_at: &str, strictness: Strictness) -> Parsed<Gate> {
+    let fields = record(value, where_at, &["id", "is", "is-not"], strictness)?;
     let id = text(
         fields.get("id").copied(),
         &format!("{where_at}'s id"),
@@ -661,7 +679,11 @@ fn numeric_kind(fields: &BTreeMap<String, &Yaml>, where_at: &str) -> Parsed<Nume
     })
 }
 
-fn parse_kind(fields: &BTreeMap<String, &Yaml>, where_at: &str) -> Parsed<Option<SettingKind>> {
+fn parse_kind(
+    fields: &BTreeMap<String, &Yaml>,
+    where_at: &str,
+    strictness: Strictness,
+) -> Parsed<Option<SettingKind>> {
     let kind = text(
         fields.get("kind").copied(),
         &format!("{where_at}'s kind"),
@@ -696,7 +718,7 @@ fn parse_kind(fields: &BTreeMap<String, &Yaml>, where_at: &str) -> Parsed<Option
             let mut options = Vec::new();
             for (at, option) in listed.iter().enumerate() {
                 let one = format!("{where_at}'s option {}", at + 1);
-                let parts = record(Some(option), &one, &["value", "label", "help"])?;
+                let parts = record(Some(option), &one, &["value", "label", "help"], strictness)?;
                 options.push(ChoiceOption {
                     value: literal(parts.get("value").copied(), &format!("{one} value"))?,
                     label: text(
@@ -741,7 +763,12 @@ struct ParsedSettings {
 ///
 /// The id is the mod's id plus the address, verbatim - a gate names a sibling with no transform - the
 /// same rule the catalog's generator applies to the engine's own files.
-fn parse_settings(value: Option<&Yaml>, mod_id: &str, granted: &[&str]) -> Parsed<ParsedSettings> {
+fn parse_settings(
+    value: Option<&Yaml>,
+    mod_id: &str,
+    granted: &[&str],
+    strictness: Strictness,
+) -> Parsed<ParsedSettings> {
     let Some(hash) = value.and_then(Yaml::as_hash) else {
         return refuse("\"settings\" must be a mapping");
     };
@@ -779,7 +806,7 @@ fn parse_settings(value: Option<&Yaml>, mod_id: &str, granted: &[&str]) -> Parse
         };
 
         let allowed: Vec<&str> = ENTRY_FIELDS.iter().chain(extra).copied().collect();
-        let parts = record(Some(entry), &where_at, &allowed)?;
+        let parts = record(Some(entry), &where_at, &allowed, strictness)?;
 
         if !is_address(&address) {
             return refuse(format!("{where_at} cannot become an id"));
@@ -790,7 +817,7 @@ fn parse_settings(value: Option<&Yaml>, mod_id: &str, granted: &[&str]) -> Parse
 
         // Narrowed rather than asserted, so a kind added to one of the two and not the other drops a
         // control instead of crashing.
-        let Some(kind) = parse_kind(&parts, &where_at)? else {
+        let Some(kind) = parse_kind(&parts, &where_at, strictness)? else {
             out.dropped.push(DroppedSetting {
                 address,
                 why: unknown_kind(kind_name),
@@ -812,7 +839,11 @@ fn parse_settings(value: Option<&Yaml>, mod_id: &str, granted: &[&str]) -> Parse
             engine: None,
             gated_by: match parts.get("gated-by") {
                 None => None,
-                Some(held) => Some(parse_gate(Some(held), &format!("{where_at}'s gate"))?),
+                Some(held) => Some(parse_gate(
+                    Some(held),
+                    &format!("{where_at}'s gate"),
+                    strictness,
+                )?),
             },
         };
         out.settings.push(ModSetting {
@@ -1049,12 +1080,13 @@ struct DeclaredGroup {
 fn parse_parts(
     groups_value: Option<&Yaml>,
     parts_value: Option<&Yaml>,
+    strictness: Strictness,
 ) -> Parsed<Vec<ModPartGroup>> {
     let listed = items(groups_value, "\"part-groups\"")?;
     let mut declared: Vec<DeclaredGroup> = Vec::new();
     for (at, raw) in listed.iter().enumerate() {
         let where_at = format!("\"part-groups\" entry {}", at + 1);
-        let fields = record(Some(raw), &where_at, PART_GROUP_FIELDS)?;
+        let fields = record(Some(raw), &where_at, PART_GROUP_FIELDS, strictness)?;
         let id = text(
             fields.get("id").copied(),
             &format!("{where_at}'s id"),
@@ -1105,7 +1137,7 @@ fn parse_parts(
 
     for (at, raw) in items(parts_value, "\"parts\"")?.iter().enumerate() {
         let where_at = format!("\"parts\" entry {}", at + 1);
-        let fields = record(Some(raw), &where_at, PART_FIELDS)?;
+        let fields = record(Some(raw), &where_at, PART_FIELDS, strictness)?;
         let group = text(
             fields.get("group").copied(),
             &format!("{where_at}'s group"),
@@ -1249,12 +1281,12 @@ fn parse_creates(value: Option<&Yaml>) -> Parsed<ModCreates> {
 const INPUT_FIELDS: &[&str] = &["id", "label", "help", "holds"];
 
 /// What the user is asked for, each answer checked against a file the folder must hold.
-fn parse_inputs(value: Option<&Yaml>) -> Parsed<Vec<ModInput>> {
+fn parse_inputs(value: Option<&Yaml>, strictness: Strictness) -> Parsed<Vec<ModInput>> {
     let listed = items(value, "\"inputs\"")?;
     let mut inputs: Vec<ModInput> = Vec::new();
     for (at, raw) in listed.iter().enumerate() {
         let where_at = format!("\"inputs\" entry {}", at + 1);
-        let fields = record(Some(raw), &where_at, INPUT_FIELDS)?;
+        let fields = record(Some(raw), &where_at, INPUT_FIELDS, strictness)?;
         let id = text(
             fields.get("id").copied(),
             &format!("{where_at}'s id"),
@@ -1316,12 +1348,17 @@ fn parse_extract_dat(
     })
 }
 
-fn parse_conflicts(value: Option<&Yaml>) -> Parsed<Vec<ConflictRule>> {
+fn parse_conflicts(value: Option<&Yaml>, strictness: Strictness) -> Parsed<Vec<ConflictRule>> {
     let listed = items(value, "\"conflicts\"")?;
     let mut out = Vec::new();
     for (at, rule) in listed.iter().enumerate() {
         let where_at = format!("\"conflicts\" entry {}", at + 1);
-        let fields = record(Some(rule), &where_at, &["present", "absent", "reason"])?;
+        let fields = record(
+            Some(rule),
+            &where_at,
+            &["present", "absent", "reason"],
+            strictness,
+        )?;
         let paths = |key: &str| -> Parsed<Vec<String>> {
             let Some(held) = fields.get(key) else {
                 return Ok(Vec::new());
@@ -1437,11 +1474,33 @@ fn installer_platforms(root: &Yaml) -> Vec<String> {
 /// # Errors
 ///
 /// Answers a [`Refusal`] naming the cause, worded for whoever has to fix the manifest.
+pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModManifest> {
+    read_manifest(bytes, defaults, Strictness::Author)
+}
+
+/// Reads a release's manifest as the index serves it: every value explicit, the grants ZAX's
+/// maintainers gave it stated beside them, and fields a newer indexer added passed over.
+///
+/// # Errors
+///
+/// Answers a [`Refusal`] naming the cause. Every check the author's file passes still applies: the
+/// index is downloaded data, so it is read at the same boundary.
+pub fn parse_indexed_manifest(bytes: &[u8]) -> Parsed<ModManifest> {
+    read_manifest(bytes, &ManifestDefaults::default(), Strictness::Indexed)
+}
+
+/// Only in the index's copy: a grant is ZAX's maintainers' to give, never an author's to claim.
+const GRANTS_FIELD: &str = "grants";
+
 #[expect(
     clippy::too_many_lines,
     reason = "one field at a time, in the spec's order"
 )]
-pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModManifest> {
+fn read_manifest(
+    bytes: &[u8],
+    defaults: &ManifestDefaults,
+    strictness: Strictness,
+) -> Parsed<ModManifest> {
     if bytes.len() > MANIFEST_BYTE_CAP {
         return refuse(format!(
             "it is {} bytes, past the {MANIFEST_BYTE_CAP} byte cap",
@@ -1516,8 +1575,9 @@ pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModMa
         .iter()
         .copied()
         .chain(section_keys.iter().map(String::as_str))
+        .chain((strictness == Strictness::Indexed).then_some(GRANTS_FIELD))
         .collect();
-    let fields = record(Some(&root), "the manifest", &allowed)?;
+    let fields = record(Some(&root), "the manifest", &allowed, strictness)?;
 
     // Everything after this is judged by this version's rules, so the number that selects them is
     // checked here.
@@ -1554,8 +1614,28 @@ pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModMa
             "\"id\" (\"{id}\") is inside the catalog's \"{head}\" namespace"
         ));
     }
-    // Read once, off the id: every path this manifest declares is judged against what ZAX grants it.
-    let granted = grants_for(&id);
+    // Read once: every path this manifest declares is judged against what ZAX grants it.
+    let grants: Vec<String> = match strictness {
+        Strictness::Author => grants_for(&id)
+            .iter()
+            .map(|&path| path.to_owned())
+            .collect(),
+        Strictness::Indexed => match fields.get(GRANTS_FIELD) {
+            None => Vec::new(),
+            Some(held) => {
+                let listed = items(Some(held), "\"grants\"")?;
+                let mut out = Vec::new();
+                for (at, entry) in listed.iter().enumerate() {
+                    out.push(confined_path(
+                        Some(entry),
+                        &format!("\"grants\" entry {}", at + 1),
+                    )?);
+                }
+                out
+            }
+        },
+    };
+    let granted: Vec<&str> = grants.iter().map(String::as_str).collect();
 
     // Stated wins over supplied: what the file says is the author's own claim, where the tag and the
     // release's assets are ZAX reading the release for one.
@@ -1634,7 +1714,7 @@ pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModMa
             creates = Some(parse_creates(fields.get("creates.directory").copied())?);
             inputs = match fields.get("inputs") {
                 None => None,
-                Some(held) => Some(parse_inputs(Some(held))?),
+                Some(held) => Some(parse_inputs(Some(held), strictness)?),
             };
             if states(&fields, "extract-dat") {
                 extract_dat = Some(parse_extract_dat(
@@ -1719,6 +1799,7 @@ pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModMa
         Some(_) => Some(parse_parts(
             fields.get("part-groups").copied(),
             fields.get("parts").copied(),
+            strictness,
         )?),
     };
     if parts.is_some() && fields.contains_key("archive") {
@@ -1742,7 +1823,7 @@ pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModMa
 
     let schema = match fields.get("settings") {
         None => ParsedSettings::default(),
-        Some(held) => parse_settings(Some(held), &id, granted)?,
+        Some(held) => parse_settings(Some(held), &id, &granted, strictness)?,
     };
     let section_help = parse_section_help(&fields, &schema)?;
 
@@ -1795,11 +1876,12 @@ pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModMa
         },
         conflicts: match fields.get("conflicts") {
             None => Vec::new(),
-            Some(held) => parse_conflicts(Some(held))?,
+            Some(held) => parse_conflicts(Some(held), strictness)?,
         },
         settings: schema.settings,
         dropped: schema.dropped,
         section_help,
+        grants,
     })
 }
 
@@ -1834,6 +1916,29 @@ mod tests {
         assert_eq!(manifest.version, "1.0");
         assert_eq!(manifest.mod_type, ModType::Pluggable, "the default type");
         assert!(manifest.conflicts.is_empty());
+    }
+
+    #[test]
+    fn the_indexed_reader_passes_over_unknown_fields_the_authors_refuses() {
+        let text = minimal(
+            "later: 1\nparts:\n  - { id: a, group: g, label: A, archive: a.dat, later: 1 }\n\
+             part-groups:\n  - { id: g, label: G, pick: any, later: 1 }\n",
+        );
+        let read = parse_indexed_manifest(text.as_bytes()).expect("read by the index's rules");
+        assert_eq!(part_options(&read).len(), 1);
+        assert!(refusal(&text).contains("unknown field \"later\""));
+    }
+
+    #[test]
+    fn a_grant_is_read_from_the_index_and_refused_from_an_author() {
+        let text = minimal("grants: [data/sound/music]\n");
+        let read = parse_indexed_manifest(text.as_bytes()).expect("an indexed grant");
+        assert_eq!(read.grants, vec!["data/sound/music".to_owned()]);
+        assert!(refusal(&text).contains("unknown field \"grants\""));
+        assert!(
+            parse_indexed_manifest(minimal("grants: [../outside]\n").as_bytes()).is_err(),
+            "a grant is confined like every other path"
+        );
     }
 
     #[test]

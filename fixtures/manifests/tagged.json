@@ -4,6 +4,7 @@
     "archive": "fo2tweaks.zip"
   },
   "parses": {
+    "grants": [],
     "id": "fo2tweaks",
     "name": "FO2tweaks",
     "version": "14.7",

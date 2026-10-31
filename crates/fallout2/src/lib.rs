@@ -17,6 +17,7 @@ pub mod engines;
 pub mod files;
 pub mod fission;
 pub mod hires;
+pub mod index;
 pub mod install_lock;
 pub mod launch;
 pub mod layout;

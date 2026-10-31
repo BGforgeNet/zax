@@ -1,6 +1,7 @@
 {
   "defaults": { "archive": "cassidy.zip" },
   "parses": {
+    "grants": [],
     "id": "cassidy",
     "name": "Cassidy Restoration",
     "version": "1.2",
