@@ -777,12 +777,34 @@ fn apply_under_lock(
         .map(|path| path.to_lowercase())
         .collect();
     let root = Path::new(&install.path);
+    // Ahead of the overwrites, and taking the folders they empty: a folder entry the new release ships
+    // as a file of the same name is in the way until its old contents are gone.
+    for path in &plan.removes {
+        let Some(found) = real_cased_path(platform, root, path, None) else {
+            continue;
+        };
+        platform
+            .fs()
+            .copy(&found, &inside_path(&work.join(REMOVED), path))?;
+        if upgrading {
+            platform.fs().copy(&found, &inside_path(&backup, path))?;
+        }
+        platform.fs().remove(&found)?;
+        prune_emptied(platform, &found, path)?;
+    }
     for file in &plan.files {
         // Resolved fresh rather than trusting the plan's `overwrites` - the directory may have moved on
         // since.
         let Some(found) = real_cased_path(platform, root, &file.path, None) else {
             continue;
         };
+        if platform.fs().stat(&found)?.map(|stat| stat.kind) == Some(FileKind::Dir) {
+            return Err(Error::Unsupported(format!(
+                "{} is a folder holding files {} did not install, so the file of that name cannot \
+                 replace it. Move them out of it, then retry.",
+                file.path, manifest.name
+            )));
+        }
         // Only what was there before the transaction is worth setting aside, and only once. On a retry
         // what sits here is this transaction's own half-deployed file: copying it would overwrite the
         // real original with the wreckage, and a restore would then put the failed attempt back.
@@ -803,18 +825,6 @@ fn apply_under_lock(
         if found != inside_path(root, &file.path) {
             platform.fs().remove(&found)?;
         }
-    }
-    for path in &plan.removes {
-        let Some(found) = real_cased_path(platform, root, path, None) else {
-            continue;
-        };
-        platform
-            .fs()
-            .copy(&found, &inside_path(&work.join(REMOVED), path))?;
-        if upgrading {
-            platform.fs().copy(&found, &inside_path(&backup, path))?;
-        }
-        platform.fs().remove(&found)?;
     }
 
     for payload in &payloads {
@@ -861,10 +871,15 @@ fn apply_under_lock(
         // The journal's entry, not the record's: on a retry the record holds this transaction's own
         // unfinished entry, whose base is empty, and merging against that would drop every default the
         // last release set.
+        // Matched as the loader matches paths, so a release that respells the file keeps its base.
         let base = previous
             .as_ref()
-            .and_then(|held| held.shipped.get(&file.path))
-            .map(|text| IniDocument::parse(&zax_core::text::latin1_bytes(text)));
+            .and_then(|held| {
+                held.shipped
+                    .iter()
+                    .find(|(path, _)| path.to_lowercase() == file.path.to_lowercase())
+            })
+            .map(|(_, text)| IniDocument::parse(&zax_core::text::latin1_bytes(text)));
         let outcome = merge_ini(
             IniDocument::parse(&shipped_bytes),
             &IniDocument::parse(&platform.fs().read(&previous_copy)?),
@@ -1890,6 +1905,118 @@ mod tests {
             Some(FISSION)
         );
         assert!(platform.text_at("/games/f2/mods/ecco.dat").is_some());
+    }
+
+    /// A host serving two releases of EcCo, the first at `URL` and the second beside it, and the second
+    /// release as the index would describe it.
+    fn upgrade_host(
+        first: &[(&str, &str)],
+        second: &[(&str, &str)],
+        extra: (&str, &str),
+    ) -> (MemoryPlatform, ModRelease, ModRelease) {
+        const NEXT_URL: &str = "https://example/ecco-next.zip";
+        let mut options = options(&[], first, "first");
+        options
+            .downloads
+            .insert(NEXT_URL.to_owned(), Content::from("second"));
+        options.archives.insert(
+            "second".to_owned(),
+            second
+                .iter()
+                .map(|(name, text)| ((*name).to_owned(), Content::from(*text)))
+                .collect(),
+        );
+        let platform = MemoryPlatform::new(options);
+        let older = release_with(&platform, extra.0, "first");
+        let newer = release_with(&platform, extra.1, "second");
+        let newer = ModRelease {
+            archive: Some(ReleaseAsset {
+                url: NEXT_URL.to_owned(),
+                ..newer.archive.expect("an archive")
+            }),
+            ..newer
+        };
+        (platform, older, newer)
+    }
+
+    #[test]
+    fn an_ini_whose_case_changed_between_releases_still_merges_against_the_last_one() {
+        // B=1 is the old default the user never changed, so the new release's B=2 lands.
+        let (platform, older, newer) = upgrade_host(
+            &[
+                ("mods/ecco.dat", "1"),
+                ("mods/Ecco.ini", "[Main]\nA=1\nB=1\n"),
+            ],
+            &[
+                ("mods/ecco.dat", "2"),
+                ("mods/ecco.ini", "[Main]\nA=1\nB=2\n"),
+            ],
+            ("", ""),
+        );
+        installed(&platform, &older);
+        platform
+            .fs()
+            .write(Path::new("/games/f2/mods/Ecco.ini"), b"[Main]\nA=7\nB=1\n")
+            .expect("the user's edit");
+        installed(&platform, &newer);
+        assert_eq!(
+            platform.text_at("/games/f2/mods/ecco.ini").as_deref(),
+            Some("[Main]\nA=7\nB=2\n")
+        );
+    }
+
+    #[test]
+    fn a_folder_entry_that_becomes_a_file_of_the_same_name_upgrades() {
+        let (platform, older, newer) = upgrade_host(
+            &[("mods/ecco.dat/ecco.ini", "[x]\n")],
+            &[("mods/ecco.dat", "packed")],
+            ("entries: [ecco.dat]\n", ""),
+        );
+        installed(&platform, &older);
+        installed(&platform, &newer);
+        assert_eq!(
+            platform.text_at("/games/f2/mods/ecco.dat").as_deref(),
+            Some("packed")
+        );
+        assert_eq!(
+            recorded(&platform, "ecco").expect("a record entry").files,
+            ["mods/ecco.dat"]
+        );
+    }
+
+    #[test]
+    fn a_folder_still_holding_the_users_files_is_not_replaced_by_a_file() {
+        let (platform, older, newer) = upgrade_host(
+            &[("mods/ecco.dat/ecco.ini", "[x]\n")],
+            &[("mods/ecco.dat", "packed")],
+            ("entries: [ecco.dat]\n", ""),
+        );
+        installed(&platform, &older);
+        platform
+            .fs()
+            .write(Path::new("/games/f2/mods/ecco.dat/notes.txt"), b"mine")
+            .expect("the user's file");
+        let plan = planned(&platform, &newer);
+        let err = apply_mod_install(
+            &platform,
+            &install(),
+            &newer,
+            &plan,
+            &ModProgress::default(),
+            now(),
+            CLOCK,
+        )
+        .expect_err("a folder in the way");
+        assert!(
+            format!("{err}").contains("is a folder holding files"),
+            "{err}"
+        );
+        assert_eq!(
+            platform
+                .text_at("/games/f2/mods/ecco.dat/notes.txt")
+                .as_deref(),
+            Some("mine")
+        );
     }
 
     #[test]
