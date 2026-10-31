@@ -982,6 +982,7 @@ pub fn restore_mod_install(
             platform.fs().copy(&kept, &target)?;
         } else {
             platform.fs().remove(&target)?;
+            prune_emptied(platform, &target, path)?;
         }
     }
     let removed_root = work.join(REMOVED);
@@ -1005,6 +1006,23 @@ pub fn restore_mod_install(
     };
     save_record(platform, &restored)?;
     platform.fs().remove(&work)
+}
+
+/// Removes the directories below `mods/` that deleting `relative`, found at `removed`, left empty. Kept,
+/// an emptied folder entry still reads as the mod, installed by hand; `mods/` itself always stays.
+fn prune_emptied(platform: &dyn Platform, removed: &Path, relative: &str) -> Result<()> {
+    let below_mods = relative.split('/').count().saturating_sub(2);
+    for directory in removed.ancestors().skip(1).take(below_mods) {
+        // One the attempt never created has nothing to prune, but its parent may.
+        if platform.fs().stat(directory)?.map(|stat| stat.kind) != Some(FileKind::Dir) {
+            continue;
+        }
+        if !platform.fs().list(directory)?.is_empty() {
+            break;
+        }
+        platform.fs().remove(directory)?;
+    }
+    Ok(())
 }
 
 fn list_recursively(platform: &dyn Platform, root: &Path) -> Result<Vec<String>> {
@@ -1159,6 +1177,7 @@ pub fn uninstall_mod(
             }
         }
         platform.fs().remove(&target)?;
+        prune_emptied(platform, &target, path)?;
         deleted.push(path.clone());
     }
 
@@ -1772,6 +1791,85 @@ mod tests {
             !String::from_utf8_lossy(&order).contains("ecco.dat"),
             "the order line outlived the file: {}",
             String::from_utf8_lossy(&order)
+        );
+    }
+
+    #[test]
+    fn uninstalling_a_folder_entry_takes_the_folder_it_emptied() {
+        // Left behind, the empty folder still reads as the mod, installed by hand.
+        let platform = platform(
+            &[("/games/f2/mods/keep/own.txt", "the user's")],
+            &[
+                ("mods/InventoryFilter.dat/InvenFilter.ini", "[x]\n"),
+                ("mods/InventoryFilter.dat/art/a.frm", "frm"),
+                ("mods/keep/ecco.txt", "mine"),
+            ],
+            "payload",
+        );
+        installed(
+            &platform,
+            &release_with(&platform, "entries: [InventoryFilter.dat]\n", "payload"),
+        );
+        uninstall_mod(&platform, &install(), "ecco", now()).expect("a removal");
+        assert_eq!(
+            platform
+                .fs()
+                .stat(Path::new("/games/f2/mods/InventoryFilter.dat"))
+                .expect("a read"),
+            None
+        );
+        // A folder still holding what is not the mod's stays, and so does mods/ itself.
+        assert!(platform.text_at("/games/f2/mods/keep/own.txt").is_some());
+        assert!(
+            platform
+                .fs()
+                .stat(Path::new("/games/f2/mods"))
+                .expect("a read")
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn restoring_a_new_folder_entry_takes_the_folder_it_emptied() {
+        let platform = platform(
+            &[],
+            &[("mods/InventoryFilter.dat/InvenFilter.ini", "[x]\n")],
+            "payload",
+        );
+        let release = release_with(&platform, "entries: [InventoryFilter.dat]\n", "payload");
+        installed(&platform, &release);
+        // The same install as if it had stopped before its commit: the entry unfinished, the journal
+        // still open.
+        let record = load_record(&platform, "/games/f2").expect("a record");
+        let unfinished = InstalledMod {
+            complete: false,
+            ..recorded(&platform, "ecco").expect("a record entry")
+        };
+        save_record(&platform, &with_mod(&record, &unfinished)).expect("a record");
+        write_transaction(
+            &platform,
+            &install(),
+            &ModTransaction {
+                id: "ecco".to_owned(),
+                archive: release.archive.as_ref().map(pin),
+                parts: BTreeMap::new(),
+                selection: Vec::new(),
+                manifest_text: release.manifest_text.clone(),
+                version: "1.0".to_owned(),
+                previous: None,
+                order: None,
+                preexisting: Vec::new(),
+            },
+        )
+        .expect("a journal");
+
+        restore_mod_install(&platform, &install(), "ecco", now()).expect("a restore");
+        assert_eq!(
+            platform
+                .fs()
+                .stat(Path::new("/games/f2/mods/InventoryFilter.dat"))
+                .expect("a read"),
+            None
         );
     }
 

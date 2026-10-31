@@ -28,7 +28,8 @@ a difference nobody can see.
 - **Upgrade replaces, never overlays.** Files the new release drops are backed up and removed, top-level `.dat`s
   are enabled in the load order, and each ini merges with the user's changes winning over new defaults - the
   previously shipped copy tells the two apart.
-- **Removal** deletes exactly the recorded files, copies first going to a timestamped backup.
+- **Removal** deletes exactly the recorded files, copies first going to a timestamped backup, and then the folders
+  under `mods/` that this leaves empty.
 - **Installed by hand** (present, no record): offered the current release laid over it, removed by the
   `mods/<id>.*` convention.
 - **Installed at a version the index does not list**: offered the current release in its place, without calling
