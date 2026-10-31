@@ -25,9 +25,10 @@ a difference nobody can see.
 ## Installing, upgrading, removing
 
 - **Recorded per install**: version, deployed files, the manifest, and the ini files as shipped.
-- **Upgrade replaces, never overlays.** Files the new release drops are backed up and removed, top-level `.dat`s
-  are enabled in the load order, and each ini merges with the user's changes winning over new defaults - the
-  previously shipped copy tells the two apart.
+- **Upgrade replaces, never overlays.** Files the new release drops are backed up and removed, its load order
+  entries are enabled only where they are new (one the previous release shipped stays on or off as the user left
+  it), and each ini merges with the user's changes winning over new defaults - the previously shipped copy tells
+  the two apart.
 - **Removal** deletes exactly the recorded files, copies first going to a timestamped backup, and then the folders
   under `mods/` that this leaves empty.
 - **While Fission's list holds the load order** (Fission ran last), installing and removing are refused: sfall's

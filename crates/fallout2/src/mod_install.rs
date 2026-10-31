@@ -533,12 +533,15 @@ pub fn plan_mod_install(
 #[derive(Debug, Default)]
 struct OrderChanges {
     enable: Vec<String>,
+    /// The entries of `enable` the release being replaced already shipped: placed where the file lacks
+    /// them, and otherwise left on or off as the user set them.
+    keep: Vec<String>,
     drop: Vec<String>,
 }
 
-/// One pass over the order file: the mod's dats end enabled whatever an older file said, and lines
-/// whose dat this change removed go with it. One save rather than two, so the user's file is read,
-/// backed up and rewritten once per operation.
+/// One pass over the order file: the mod's dats end enabled whatever an older file said, unless an
+/// earlier release already shipped them, and lines whose dat this change removed go with it. One save
+/// rather than two, so the user's file is read, backed up and rewritten once per operation.
 fn update_order_lines(
     platform: &dyn Platform,
     install: &Install,
@@ -558,7 +561,15 @@ fn update_order_lines(
     }
     let snapshot = read_mods(platform, install)?;
     let held = list_mods(&snapshot);
-    let wanted: BTreeSet<String> = enable.iter().map(|name| name.to_lowercase()).collect();
+    let kept: BTreeSet<String> = spelled(&changes.keep)
+        .iter()
+        .map(|name| name.to_lowercase())
+        .collect();
+    let wanted: BTreeSet<String> = enable
+        .iter()
+        .map(|name| name.to_lowercase())
+        .filter(|name| !kept.contains(name))
+        .collect();
     let gone: BTreeSet<String> = drop.iter().map(|name| name.to_lowercase()).collect();
     let mut mods: Vec<Mod> = held
         .into_iter()
@@ -906,11 +917,19 @@ fn apply_under_lock(
             .collect(),
         None => order_dats(&plan.removes),
     };
+    // What the previous release already ordered keeps the state the user gave it: turning a dat they
+    // switched off back on is an upgrade overriding the user's choice with the release's default.
+    let shipped_before: Vec<String> = match previous.as_ref() {
+        Some(held) if held.entries.is_empty() => order_dats(&held.files),
+        Some(held) => held.entries.clone(),
+        None => Vec::new(),
+    };
     update_order_lines(
         platform,
         install,
         &OrderChanges {
             enable: plan.order_lines.clone(),
+            keep: shipped_before,
             drop: dropped,
         },
     )?;
@@ -1279,6 +1298,7 @@ fn uninstall_under_lock(
         install,
         &OrderChanges {
             enable: Vec::new(),
+            keep: Vec::new(),
             drop,
         },
     )?;
@@ -1962,6 +1982,34 @@ mod tests {
         assert_eq!(
             platform.text_at("/games/f2/mods/ecco.ini").as_deref(),
             Some("[Main]\nA=7\nB=2\n")
+        );
+    }
+
+    #[test]
+    fn an_upgrade_leaves_an_entry_the_user_disabled_off_and_enables_only_its_new_ones() {
+        let (platform, older, newer) = upgrade_host(
+            &[("mods/ecco.dat", "1")],
+            &[("mods/ecco.dat", "2"), ("mods/ecco_extra.dat", "2")],
+            ("", ""),
+        );
+        installed(&platform, &older);
+        platform
+            .fs()
+            .write(Path::new("/games/f2/mods/mods_order.txt"), b"; ecco.dat\n")
+            .expect("the user turns it off");
+        installed(&platform, &newer);
+        let snapshot = read_mods(&platform, &install()).expect("a reading");
+        let enabled: Vec<(String, bool)> = list_mods(&snapshot)
+            .into_iter()
+            .map(|one| (one.name, one.enabled))
+            .collect();
+        assert!(
+            enabled.contains(&("ecco.dat".to_owned(), false)),
+            "{enabled:?}"
+        );
+        assert!(
+            enabled.contains(&("ecco_extra.dat".to_owned(), true)),
+            "{enabled:?}"
         );
     }
 
