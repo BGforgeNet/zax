@@ -4,6 +4,11 @@ A base mod transforms an install into a different game - RPU and UPU are the cas
 game, cannot be uninstalled, and does not describe what it does: it names the installer its release already
 ships, and ZAX runs that.
 
+Because the recipe runs a program or builds a whole install, it is written by ZAX's maintainers, as the
+`document` in the mod's source file for the mod index - never taken from a repository's own `f2mod.yml`. A
+release whose `f2mod.yml` describes a base mod is left out of the index. What follows is the shape that
+document takes.
+
 ```yaml
 type: base
 becomes: fallout2rpu

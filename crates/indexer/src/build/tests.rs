@@ -223,6 +223,66 @@ fn a_refused_manifest_or_a_missing_one_is_left_out_with_its_reason() {
 }
 
 #[test]
+fn a_version_the_file_states_against_its_tag_is_left_out() {
+    let platform = World::new(
+        REPO,
+        &[
+            release("v2.0", false, vec![asset("ecco.zip", Some(DIGEST))]),
+            release("v1.0", false, vec![asset("ecco.zip", Some(DIGEST))]),
+        ],
+    )
+    .manifest("v2.0", Some(&format!("{MANIFEST}version: '1.9'\n")))
+    .manifest("v1.0", Some(&format!("{MANIFEST}version: '1.0'\n")))
+    .platform();
+    let built = run(&platform, &[source()]);
+    let versions: Vec<&str> = built.index.mods[0]
+        .releases
+        .iter()
+        .map(|one| one.version.as_str())
+        .collect();
+    // Agreeing with the tag is fine; disagreeing puts two numbers on one release.
+    assert_eq!(versions, ["1.0"]);
+    assert!(
+        built.notes[0].contains("states version 1.9, and its tag says 2.0"),
+        "{:?}",
+        built.notes
+    );
+}
+
+#[test]
+fn a_repositorys_own_file_may_not_describe_a_base_mod_but_the_maintainers_document_may() {
+    let base = "spec: 1\ngame: fallout2\nid: ecco\nname: EcCo\ntype: base\nbecomes: fallout2rpu\n\
+                installer.other.run: install.sh\n";
+    let world = || {
+        World::new(
+            REPO,
+            &[release(
+                "v1.0",
+                false,
+                vec![asset("ecco.zip", Some(DIGEST))],
+            )],
+        )
+    };
+    let published = world().manifest("v1.0", Some(base)).platform();
+    let built = run(&published, &[source()]);
+    assert!(built.index.mods[0].releases.is_empty());
+    assert!(
+        built.notes[0].contains("describes a base mod"),
+        "{:?}",
+        built.notes
+    );
+
+    let carried = world().manifest("v1.0", None).platform();
+    let maintained = Source {
+        base: true,
+        document: Some(base.to_owned()),
+        ..source()
+    };
+    let built = run(&carried, &[maintained]);
+    assert_eq!(built.index.mods[0].releases.len(), 1, "{:?}", built.notes);
+}
+
+#[test]
 fn a_maintainers_document_stands_in_with_companions_set_aside_and_installers_named() {
     let document = "spec: 1\ngame: fallout2\nid: ecco\nname: EcCo\ntype: base\nbecomes: fallout2rpu\n\
                     installer.windows.built-with: inno\ninstaller.other.run: install.sh\n";

@@ -74,6 +74,8 @@ fn a_mod_that_creates_an_install_says_where_and_what_it_asks_for() {
             "  creates Fallout1in2/ beside the install, reporting as fo1in2",
             "  asks for fallout1: Your Fallout 1 folder (master.dat)",
             "  unpacks fallout1's archive into Fallout1in2/data, as undat_files.txt names",
+            "  base: read only from the mod index's source file; a release whose own f2mod.yml \
+             describes a base mod is left out of the index",
         ]
     );
 }

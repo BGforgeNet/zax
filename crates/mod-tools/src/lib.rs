@@ -95,6 +95,16 @@ pub fn describe_manifest(bytes: &[u8]) -> Result<Vec<String>, String> {
         }
     }
 
+    // Not a refusal: ZAX's maintainers draft base recipes with this too. Said because the mod index
+    // takes one only from its own source file, and leaves a release whose repository states one out.
+    if manifest.mod_type == ModType::Base {
+        lines.push(
+            "  base: read only from the mod index's source file; a release whose own f2mod.yml \
+             describes a base mod is left out of the index"
+                .to_owned(),
+        );
+    }
+
     // Not a refusal: the mod installs and these controls do not appear. Reported because an author
     // writing to a later spec would otherwise see a clean OK and no sign the schema was trimmed.
     for gone in &manifest.dropped {

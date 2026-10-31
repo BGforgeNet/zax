@@ -12,6 +12,6 @@ export type ModInstallState = {
  */
 standing: { [key in string]: Standing }, 
 /**
- * Rows only this install's record knows about, complete as they are drawn - no feed describes them.
+ * Rows only this install's record knows about, complete as they are drawn - no release describes them.
  */
 unfollowed: Array<ModOffer>, };

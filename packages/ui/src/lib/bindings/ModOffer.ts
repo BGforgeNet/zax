@@ -34,8 +34,8 @@ asks: Array<ModInput>,
  */
 choices: ChoiceOffer | null, 
 /**
- * Set on a row the record alone describes, where no feed follows the mod: `version` is then what is
- * on disk rather than what is offered. Both readings otherwise have the same shape, and a retry row
+ * Set on a row the record alone describes, where the index offers no release: `version` is then
+ * what is on disk rather than what is offered. Both readings otherwise have the same shape, and a retry row
  * arrives either way, so nothing downstream could tell an offered version from an installed one
  * without this.
  */

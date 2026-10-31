@@ -13,7 +13,7 @@ use zax_fallout2::index::{
     INDEX_FORMAT, Index, IndexedAsset, IndexedLine, IndexedMod, IndexedRelease, counter_of,
 };
 use zax_fallout2::manifest::{
-    MANIFEST_NAME, ManifestDefaults, ModManifest, parse_indexed_manifest,
+    MANIFEST_NAME, ManifestDefaults, ModManifest, ModType, parse_indexed_manifest,
     parse_manifest_with_grants, part_options,
 };
 use zax_fallout2::mod_feed::{ReleaseAsset, sole_archive, sole_executable, version_from_tag};
@@ -226,7 +226,7 @@ fn index_release(
         .map(release_asset)
         .collect();
     let defaults = ManifestDefaults {
-        version: Some(tagged),
+        version: Some(tagged.clone()),
         archive: sole_archive(&candidates).map(|asset| asset.name.clone()),
     };
     let mut manifest = match parse_manifest_with_grants(text.as_bytes(), &defaults, &source.grants)
@@ -238,13 +238,30 @@ fn index_release(
             )));
         }
     };
-    if manifest.id != source.id
-        || source
-            .line
-            .as_ref()
-            .is_some_and(|line| !line.holds(&manifest.version))
+    if manifest.id != source.id {
+        return Ok(Outcome::OtherMod);
+    }
+    // The tag decides the version: a file stating another would put two numbers on one release.
+    if manifest.version != tagged {
+        return Ok(Outcome::Skipped(format!(
+            "Its {MANIFEST_NAME} states version {}, and its tag says {tagged}.",
+            manifest.version
+        )));
+    }
+    if source
+        .line
+        .as_ref()
+        .is_some_and(|line| !line.holds(&manifest.version))
     {
         return Ok(Outcome::OtherMod);
+    }
+    // A base mod's recipe runs an installer or builds a whole install, so only the maintainers' own
+    // document may state one; a repository's file stating one is the author asking ZAX to run a program.
+    if !carried && manifest.mod_type == ModType::Base {
+        return Ok(Outcome::Skipped(format!(
+            "Its {MANIFEST_NAME} describes a base mod, whose recipe only the index's source file may \
+             state."
+        )));
     }
 
     // Every value the release supplied is written into the document, so ZAX infers nothing.

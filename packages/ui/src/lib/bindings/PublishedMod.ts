@@ -6,7 +6,7 @@ import type { ModPart } from "./ModPart";
 import type { ModType } from "./ModType";
 
 /**
- * What one feed has published, with nothing of any install in it - a repository publishes one release,
+ * What the index offers for one mod, with nothing of any install in it - one current release,
  * whichever game folder is on screen. This is the half of an offer that survives a change of game.
  */
 export type PublishedMod = { id: string, name: string, version: string, modType: ModType, 

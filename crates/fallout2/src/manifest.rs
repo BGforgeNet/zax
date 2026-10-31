@@ -322,8 +322,9 @@ pub fn part_options(manifest: &ModManifest) -> Vec<&ModPart> {
 
 // --- shapes ---------------------------------------------------------------------------------
 
-/// The mod's own id becomes a feed match, a path piece and every setting id's prefix - lowercase, no
-/// separators.
+/// The mod's own id becomes the index's match, a path piece and every setting id's prefix - lowercase,
+/// no separators. No dot either: a setting id is `<id>.<section>.<key>`, so with none in the id its
+/// first segment is the mod, and a file in `mods/` named `<id>.<ext>` answers to one mod only.
 #[must_use]
 pub fn is_mod_id(text: &str) -> bool {
     let mut bytes = text.bytes();
@@ -333,7 +334,7 @@ pub fn is_mod_id(text: &str) -> bool {
     if !(first.is_ascii_lowercase() || first.is_ascii_digit()) {
         return false;
     }
-    bytes.all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'.' || b == b'-')
+    bytes.all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 /// Versions become path components and feed comparisons; the same bound the sfall names already pass.
@@ -2038,7 +2039,8 @@ mod tests {
 
     #[test]
     fn an_id_that_is_not_an_id_is_refused() {
-        for bad in ["EcCo", "ec co", "/etc", ".hidden"] {
+        // A dot would make `<id>.<section>.<key>` ambiguous about where the mod's id ends.
+        for bad in ["EcCo", "ec co", "/etc", ".hidden", "ec.co"] {
             let text = format!("spec: 1\ngame: fallout2\nid: \"{bad}\"\nname: X\nversion: 1.0\n");
             assert!(parse(&text).is_err(), "{bad} was accepted");
         }

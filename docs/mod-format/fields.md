@@ -10,9 +10,9 @@ last part is a name you choose, as in `settings.sections.main`, is one field per
 | Field                          | Required           | Meaning                                                                                |
 | ------------------------------ | ------------------ | -------------------------------------------------------------------------------------- |
 | `spec`                         | yes                | Format version, currently `1`. An earlier one reads; a later needs a newer ZAX.        |
-| `id`                           | yes                | Permanent identity: lowercase `a-z0-9.-`. See "The id is forever".                     |
+| `id`                           | yes                | Permanent identity: lowercase `a-z0-9-`, no dot. See "The id is forever".              |
 | `name`                         | yes                | Display name.                                                                          |
-| `version`                      | unless tagged      | Digit-led. Quote it - YAML reads `14.7` as a number, and the literal wins.             |
+| `version`                      | no                 | The tag's. Stated, it must equal the tag's, or the release is left out of the index.   |
 | `author`                       | no                 | Who wrote it, shown beside the name.                                                   |
 | `description`                  | no                 | A sentence or two on what the mod is, shown on its row.                                |
 | `forum`                        | no                 | Where the mod is discussed: an `https` address ZAX offers to open; see below.          |
