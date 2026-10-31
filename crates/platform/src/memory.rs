@@ -19,7 +19,9 @@ use sha2::{Digest, Sha256};
 use crate::archive::{Archive, ArchiveEntry, ArchiveEntryInfo, ArchiveEntryKind, ExtractOptions};
 use crate::fs::{DirEntry, FileKind, FileStat, FileSystem};
 use crate::hash::Hashing;
-use crate::net::{DownloadOptions, DownloadProgress, Network, NetworkError, NetworkFailure};
+use crate::net::{
+    DownloadOptions, DownloadProgress, HttpResponse, Network, NetworkError, NetworkFailure,
+};
 use crate::paths::Paths;
 use crate::process::{LaunchOptions, ProcessIdentity, ProcessLauncher, RunOutcome};
 use crate::registry::Registry;
@@ -124,11 +126,13 @@ impl From<Vec<u8>> for Content {
     }
 }
 
-/// A canned `fetch_text` answer: a body, or a status for a server that answered with a failure.
+/// A canned answer: a body, a status for a server that answered with a failure, or a whole response
+/// for a caller that reads headers back.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Response {
     Body(String),
     Status(u16),
+    Full(HttpResponse),
 }
 
 /// Answers `free_space` for one path at a time.
@@ -237,6 +241,8 @@ pub struct Records {
     pub executable: Vec<String>,
     pub opened: Vec<String>,
     pub fetched: Vec<String>,
+    /// The headers each `request` sent, in order, so a test can assert what a caller authenticated with.
+    pub requested: Vec<(String, Vec<(String, String)>)>,
     pub downloaded: Vec<DownloadRecord>,
     pub extracted: Vec<ExtractRecord>,
     pub listed: Vec<String>,
@@ -733,6 +739,16 @@ impl ProcessLauncher for MemoryPlatform {
     }
 }
 
+fn failed_status(url: &str, status: u16) -> Error {
+    NetworkError {
+        kind: NetworkFailure::Status,
+        url: url.to_owned(),
+        message: format!("{url} answered {status}"),
+        status: Some(status),
+    }
+    .into()
+}
+
 impl Network for MemoryPlatform {
     fn fetch_text(&self, url: &str) -> Result<String> {
         self.state().records.fetched.push(url.to_owned());
@@ -746,14 +762,42 @@ impl Network for MemoryPlatform {
                 status: None,
             }
             .into()),
-            Some(Response::Status(status)) => Err(NetworkError {
-                kind: NetworkFailure::Status,
+            Some(Response::Status(status)) => Err(failed_status(url, *status)),
+            Some(Response::Full(response)) if !(200..300).contains(&response.status) => {
+                Err(failed_status(url, response.status))
+            }
+            Some(Response::Full(response)) => Ok(response.body.clone()),
+            Some(Response::Body(body)) => Ok(body.clone()),
+        }
+    }
+
+    fn request(&self, url: &str, headers: &[(&str, &str)]) -> Result<HttpResponse> {
+        self.state().records.requested.push((
+            url.to_owned(),
+            headers
+                .iter()
+                .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+                .collect(),
+        ));
+        match self.options.responses.get(url) {
+            None => Err(NetworkError {
+                kind: NetworkFailure::Offline,
                 url: url.to_owned(),
-                message: format!("{url} answered {status}"),
-                status: Some(*status),
+                message: format!("No canned response for {url}"),
+                status: None,
             }
             .into()),
-            Some(Response::Body(body)) => Ok(body.clone()),
+            Some(Response::Status(status)) => Ok(HttpResponse {
+                status: *status,
+                headers: Vec::new(),
+                body: String::new(),
+            }),
+            Some(Response::Body(body)) => Ok(HttpResponse {
+                status: 200,
+                headers: Vec::new(),
+                body: body.clone(),
+            }),
+            Some(Response::Full(response)) => Ok(response.clone()),
         }
     }
 
@@ -1307,6 +1351,45 @@ mod tests {
             panic!("an uncanned URL should read as an unreachable host");
         };
         assert_eq!(err.kind, NetworkFailure::Offline);
+    }
+
+    #[test]
+    fn a_request_answers_a_status_records_its_headers_and_reads_back_a_full_response() {
+        let full = HttpResponse {
+            status: 200,
+            headers: vec![("link".to_owned(), "<next>".to_owned())],
+            body: "[]".to_owned(),
+        };
+        let p = MemoryPlatform::new(MemoryOptions {
+            responses: BTreeMap::from([
+                ("https://example/gone".to_owned(), Response::Status(404)),
+                (
+                    "https://example/page".to_owned(),
+                    Response::Full(full.clone()),
+                ),
+            ]),
+            ..MemoryOptions::default()
+        });
+        let gone = p
+            .request("https://example/gone", &[("authorization", "token")])
+            .expect("a status is an answer");
+        assert_eq!(gone.status, 404);
+        assert_eq!(
+            p.request("https://example/page", &[]).expect("a page"),
+            full
+        );
+        assert_eq!(
+            p.fetch_text("https://example/page").expect("its body"),
+            "[]"
+        );
+        assert_eq!(
+            p.records().requested[0],
+            (
+                "https://example/gone".to_owned(),
+                vec![("authorization".to_owned(), "token".to_owned())]
+            )
+        );
+        assert!(p.request("https://example/unknown", &[]).is_err());
     }
 
     #[test]

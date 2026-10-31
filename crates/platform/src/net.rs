@@ -61,8 +61,34 @@ impl std::fmt::Debug for DownloadOptions<'_> {
     }
 }
 
+/// What a server answered, whatever the status: a caller sending headers is one that reads them back
+/// (a page link, a remaining quota) and branches on the status itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HttpResponse {
+    pub status: u16,
+    /// Names lowercased, in the order the server sent them.
+    pub headers: Vec<(String, String)>,
+    pub body: String,
+}
+
+impl HttpResponse {
+    /// The first value of a header, by its name in any case.
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        let name = name.to_ascii_lowercase();
+        self.headers
+            .iter()
+            .find(|(held, _)| *held == name)
+            .map(|(_, value)| value.as_str())
+    }
+}
+
 pub trait Network: Send + Sync {
     fn fetch_text(&self, url: &str) -> Result<String>;
+
+    /// A GET with these request headers, answered whatever its status. Fails only where no answer
+    /// arrived, or its body could not be read.
+    fn request(&self, url: &str, headers: &[(&str, &str)]) -> Result<HttpResponse>;
 
     /// Writes the whole body at the destination, or fails with a [`NetworkError`]. Complete is part
     /// of the contract: a body that stops short of its declared length is a failure here rather

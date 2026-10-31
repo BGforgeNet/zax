@@ -18,7 +18,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use zax_platform::net::{DownloadOptions, DownloadProgress, Network, NetworkError, NetworkFailure};
+use zax_platform::net::{
+    DownloadOptions, DownloadProgress, HttpResponse, Network, NetworkError, NetworkFailure,
+};
 use zax_platform::{Error, Result};
 
 /// How long the transfer may produce nothing before it is abandoned. Deliberately not a limit on the
@@ -380,27 +382,59 @@ impl HostNetwork {
     }
 }
 
+/// A request that got no answer, named for the reader. A feed that went quiet says something different
+/// from one that was never reached, and the download's own wording is about a transfer rather than a
+/// request.
+fn unanswered(url: &str, err: &ureq::Error) -> Error {
+    let kind = failure_of(err);
+    let message = if kind == NetworkFailure::Timeout {
+        format!("{} did not answer in time.", host_of(url))
+    } else {
+        human_reason(kind, url, &err.to_string())
+    };
+    Error::Network(NetworkError {
+        kind,
+        url: url.to_owned(),
+        message,
+        status: None,
+    })
+}
+
 impl Network for HostNetwork {
+    fn request(&self, url: &str, headers: &[(&str, &str)]) -> Result<HttpResponse> {
+        let mut request = self.agent.get(url);
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        let response = request.call().map_err(|err| unanswered(url, &err))?;
+        let status = response.status().as_u16();
+        let headers = response
+            .headers()
+            .iter()
+            .filter_map(|(name, value)| {
+                value
+                    .to_str()
+                    .ok()
+                    .map(|value| (name.as_str().to_owned(), value.to_owned()))
+            })
+            .collect();
+        let body = response
+            .into_body()
+            .read_to_string()
+            .map_err(|_| network(NetworkFailure::Incomplete, url, "", Some(status)))?;
+        Ok(HttpResponse {
+            status,
+            headers,
+            body,
+        })
+    }
+
     fn fetch_text(&self, url: &str) -> Result<String> {
-        let response = match self.agent.get(url).call() {
-            Ok(response) => response,
-            Err(err) => {
-                let kind = failure_of(&err);
-                // A feed that went quiet says something different from one that was never reached, and
-                // the download's own wording is about a transfer rather than a request.
-                let message = if kind == NetworkFailure::Timeout {
-                    format!("{} did not answer in time.", host_of(url))
-                } else {
-                    human_reason(kind, url, &err.to_string())
-                };
-                return Err(Error::Network(NetworkError {
-                    kind,
-                    url: url.to_owned(),
-                    message,
-                    status: None,
-                }));
-            }
-        };
+        let response = self
+            .agent
+            .get(url)
+            .call()
+            .map_err(|err| unanswered(url, &err))?;
         let status = response.status().as_u16();
         if !(200..300).contains(&status) {
             let detail = format!(
@@ -712,6 +746,52 @@ mod tests {
             (held.kind, held.status),
             (NetworkFailure::Status, Some(404)),
             "{held:?}"
+        );
+    }
+
+    #[test]
+    fn a_request_answers_whatever_status_came_back_with_its_headers() {
+        let (url, _) = answering("404 Not Found");
+        let response = HostNetwork::default()
+            .request(&url, &[])
+            .expect("an answer, however unwelcome");
+        assert_eq!(response.status, 404);
+        assert_eq!(response.header("Content-Length"), Some("0"));
+    }
+
+    #[test]
+    fn a_request_sends_the_headers_it_is_given() {
+        use std::io::{BufRead, BufReader};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("a loopback port");
+        let url = format!("http://{}/releases", listener.local_addr().expect("bound"));
+        let (sent, seen) = std::sync::mpsc::channel::<String>();
+        std::thread::spawn(move || {
+            let Some(Ok(stream)) = listener.incoming().next() else {
+                return;
+            };
+            let mut reader = BufReader::new(&stream);
+            let mut line = String::new();
+            while reader.read_line(&mut line).is_ok_and(|read| read > 2) {
+                let _ = sent.send(line.trim_end().to_ascii_lowercase());
+                line.clear();
+            }
+            let _ = write!(
+                &stream,
+                "HTTP/1.1 200 OK\r\nlink: <next>; rel=\"next\"\r\ncontent-length: 2\r\n\
+                 connection: close\r\n\r\n[]"
+            );
+        });
+        let response = HostNetwork::default()
+            .request(&url, &[("Accept", "application/vnd.github+json")])
+            .expect("an answer");
+        assert_eq!((response.status, response.body.as_str()), (200, "[]"));
+        assert_eq!(response.header("link"), Some("<next>; rel=\"next\""));
+        let lines: Vec<String> = seen.try_iter().collect();
+        assert!(
+            lines
+                .iter()
+                .any(|line| line == "accept: application/vnd.github+json"),
+            "{lines:?}"
         );
     }
 
