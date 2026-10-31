@@ -9,8 +9,10 @@ with the SHA-256 GitHub states for it. Two ids may share a repository, each on i
 
 A release is left out of the index where GitHub states no digest for its assets (anything uploaded before GitHub
 began recording them), where it is a draft or a prerelease, or where its manifest is refused. The indexer's log
-names each refused release with the reason, and counts the ones left out for having no digest. The indexer ranks a mod's releases - by version, not by date, so a hotfix on an older
-line does not shadow the current one - and ZAX offers the highest-ranked release it can install.
+names each refused release with the reason, and counts the ones left out for having no digest.
+
+The indexer ranks a mod's releases - by version, not by date, so a hotfix on an older line does not shadow the
+current one - and ZAX offers the highest-ranked release it can install.
 
 ## A published release is finished
 

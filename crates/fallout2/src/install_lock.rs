@@ -192,6 +192,11 @@ pub fn with_install_lock<T>(
     now: i64,
     write: impl FnOnce() -> Result<T>,
 ) -> Result<T> {
+    // Nothing can be writing into a folder that is not there, and no claim can be written into it: the
+    // work runs unclaimed and reports what it finds, which for a removal is that nothing is here.
+    if platform.fs().stat(install)?.map(|stat| stat.kind) != Some(zax_platform::fs::FileKind::Dir) {
+        return write();
+    }
     let mut lock = match take_install_lock(platform, install, what, now)? {
         Claim::Refused(why) => return Err(Error::Unsupported(why)),
         Claim::Taken(lock) => lock,
@@ -298,6 +303,18 @@ mod tests {
     fn lock_file(platform: &MemoryPlatform) -> LockRecord {
         let bytes = platform.file_at(LOCK).expect("a lock file");
         decode(&bytes).expect("a readable lock")
+    }
+
+    #[test]
+    fn a_folder_that_is_gone_is_not_claimed_and_the_work_answers_for_itself() {
+        // Nothing can be writing into a folder that is not there, and a claim there cannot be written:
+        // removing a mod from a deleted game folder says what it finds rather than failing on the lock.
+        let platform = MemoryPlatform::new(MemoryOptions::default());
+        let answer = with_install_lock(&platform, Path::new(INSTALL), "Removing", 0, || {
+            Ok(platform.file_at(LOCK))
+        })
+        .expect("no claim to refuse");
+        assert_eq!(answer, None, "the work ran with no lock file written");
     }
 
     #[test]
