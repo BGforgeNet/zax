@@ -374,12 +374,12 @@ fn install_under_lock(
         Some(unfinished) => latin1_bytes(&unfinished.before),
         None => here,
     };
-    // With no release recorded there is no base, and then every value the user holds wins - the ones
-    // they never chose too, which is most of a `ddraw.ini` and includes what the mod sets for its own
-    // scripts. What their sfall shipped stands in, read before the installer replaces sfall; a retry
-    // takes it from the unfinished record, since the sfall in the folder may by then be the installer's.
-    let stand_in = match (&previous, unfinished) {
-        (Some(_), _) => BTreeMap::new(),
+    // The merge base is what the release being replaced shipped, or with none recorded what the user's
+    // sfall shipped, read before the installer replaces it - with no base every value the user holds
+    // wins, the many they never chose too. The unfinished entry carries it, so a retry has it once the
+    // finished entry is gone from the record and the sfall in the folder is the installer's.
+    let base = match (&previous, unfinished) {
+        (Some(previous), _) => latin1_bytes(&previous.shipped),
         (None, Some(unfinished)) => latin1_bytes(&unfinished.shipped),
         (None, None) => sfall_base(platform, install, options)?,
     };
@@ -405,8 +405,8 @@ fn install_under_lock(
         entries: Vec::new(),
         parts: Vec::new(),
         manifest: release.manifest_text.clone(),
-        // The stand-in base until the install finishes and records what it shipped in its place.
-        shipped: latin1_texts(&stand_in),
+        // The merge base until the install finishes and records what it shipped in its place.
+        shipped: latin1_texts(&base),
         before: latin1_texts(&mine),
         carried: BTreeMap::new(),
     };
@@ -480,7 +480,12 @@ fn install_under_lock(
         // sentence below, which is exactly what happened.
         if route == InstallerRoute::Windows && outcome.code == Some(INNO_CANCELLED_BEFORE) {
             let written = load_record(platform, &install.path)?;
-            save_record(platform, &without_base(&written, &manifest.id))?;
+            // An upgrade's release is still what the folder holds, so its entry goes back.
+            let restored = match &previous {
+                Some(previous) => with_base(&written, previous),
+                None => without_base(&written, &manifest.id),
+            };
+            save_record(platform, &restored)?;
             return Err(Error::Unsupported(format!(
                 "{}'s installer was cancelled, so nothing of it was installed.",
                 manifest.name
@@ -516,11 +521,6 @@ fn install_under_lock(
     // After the installer rather than before it, which is the one thing that differs from a stacking
     // mod: the installer owns writing these files, so the user's values go back in once it has written
     // them.
-    // The record holds what the last release shipped as latin1 text, which is the encoding the game's
-    // own files are read in; the merge works on bytes.
-    let base = previous
-        .as_ref()
-        .map_or(stand_in, |held| latin1_bytes(&held.shipped));
     let merged = merge_user_files(platform, root, &declared, &mine, Some(&base))?;
 
     let written = load_record(platform, &install.path)?;
@@ -1167,6 +1167,81 @@ mod tests {
             "{err}"
         );
         assert_eq!(recorded(&platform), None);
+    }
+
+    /// What an earlier release of UPU left in the record, shipping `ddraw.ini` as given.
+    fn installed_release(platform: &MemoryPlatform, shipped: &str) -> InstalledMod {
+        let held = InstalledMod {
+            id: "upu".to_owned(),
+            version: "0.9".to_owned(),
+            mod_type: Some(ModType::Base),
+            reason: None,
+            complete: true,
+            files: Vec::new(),
+            entries: Vec::new(),
+            parts: Vec::new(),
+            manifest: manifest_text("installer.other.run: upu-install.sh\n"),
+            shipped: BTreeMap::from([("ddraw.ini".to_owned(), shipped.to_owned())]),
+            before: BTreeMap::new(),
+            carried: BTreeMap::new(),
+        };
+        let record = load_record(platform, "/games/f2").expect("a record");
+        save_record(platform, &with_base(&record, &held)).expect("a record");
+        held
+    }
+
+    #[test]
+    fn a_wizard_cancelled_before_an_upgrade_began_keeps_the_release_installed() {
+        // The previous release is still what the folder holds.
+        let platform = inno_host(Some(INNO_CANCELLED_BEFORE));
+        let previous = installed_release(&platform, "[Misc]\nA=0\n");
+        applied(&platform, &inno_release(&platform)).expect_err("cancelled");
+        assert_eq!(recorded(&platform), Some(previous));
+    }
+
+    #[test]
+    fn a_retried_upgrade_merges_against_the_release_it_replaces() {
+        // B=0 is the old release's default, which the user never changed, so the new default lands;
+        // A=1 is the user's own and stays.
+        let mod_ini = "[Misc]\nA=0\nB=5\n";
+        let mut options = host_options(
+            &[("/games/f2/ddraw.ini", "[Misc]\nA=1\nB=0\n")],
+            Some(3),
+            "",
+        );
+        options.archives = BTreeMap::from([(
+            "payload".to_owned(),
+            BTreeMap::from([
+                ("upu-install.sh".to_owned(), Content::from("#!/bin/sh\n")),
+                ("ddraw.ini".to_owned(), Content::from(mod_ini)),
+            ]),
+        )]);
+        let first = MemoryPlatform::new(options);
+        installed_release(&first, "[Misc]\nA=0\nB=0\n");
+        applied(&first, &script_release(&first)).expect_err("a failure");
+
+        let mut carried = host_options(&[], Some(0), "");
+        carried.archives = BTreeMap::from([(
+            "payload".to_owned(),
+            BTreeMap::from([
+                ("upu-install.sh".to_owned(), Content::from("#!/bin/sh\n")),
+                ("ddraw.ini".to_owned(), Content::from(mod_ini)),
+            ]),
+        )]);
+        carried.files = first
+            .all_files()
+            .into_iter()
+            .map(|path| {
+                let bytes = first.fs().read(Path::new(&path)).expect("a file");
+                (path, Content::Binary(bytes))
+            })
+            .collect();
+        let retry = MemoryPlatform::new(carried);
+        applied(&retry, &script_release(&retry)).expect("the retry");
+        assert_eq!(
+            retry.text_at("/games/f2/ddraw.ini").as_deref(),
+            Some("[Misc]\nA=1\nB=5\n")
+        );
     }
 
     #[test]

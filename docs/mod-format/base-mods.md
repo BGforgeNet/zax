@@ -47,8 +47,9 @@ for - refuses as needing a newer ZAX rather than as a misspelling. Both decide w
 nothing safe to assume about either.
 
 The Windows route is also the only install here the user can call off part way: cancelling the wizard before it
-starts writing is reported as the answer it is, and the record of an install that never began goes with it.
-Cancelling once it has started reports like any other interrupted base install, because that is what it is.
+starts writing is reported as the answer it is, and the record of an install that never began goes with it - on
+an upgrade, the record of the release still installed comes back. Cancelling once it has started reports like
+any other interrupted base install, because that is what it is.
 
 Nothing about a base install is undone: there is no uninstall, and a failed one is reported with how far it got
 and where the installer's own backup directory is, rather than unwound.
