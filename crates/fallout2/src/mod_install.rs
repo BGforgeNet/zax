@@ -38,8 +38,8 @@ use crate::mod_transaction::{
     write_transaction,
 };
 use crate::mods::{
-    MODS_DIRECTORY, MODS_ORDER_PATH, Mod, ModKind, ModsSaveRequest, answers_to_id, list_mods,
-    named_in_order, order_dats, read_mods, restore_order, save_mods,
+    MODS_DIRECTORY, MODS_ORDER_PATH, Mod, ModKind, ModsSaveRequest, OrderFormat, answers_to_id,
+    list_mods, named_in_order, order_dats, read_mods, restore_order, save_mods,
 };
 use crate::recommended_order::{order_with, place_for, recommendation_for};
 use crate::records::{
@@ -302,6 +302,20 @@ pub fn conflict_for(
     None
 }
 
+/// Refuses while the order file holds Fission's list, as the Load order tab does: sfall's list sits in
+/// the sidecar until a launch swaps it back, so lines written now would land in Fission's file and the
+/// mod would never reach sfall's.
+fn refuse_foreign_order(platform: &dyn Platform, install: &Install, doing: &str) -> Result<()> {
+    if read_mods(platform, install)?.format != Some(OrderFormat::Fission) {
+        return Ok(());
+    }
+    Err(Error::Unsupported(format!(
+        "This folder's mod order is in Fission's format, which ZAX cannot edit, so {doing} could not \
+         update sfall's list. Run the game or another engine and ZAX puts the sfall list back, then \
+         try again."
+    )))
+}
+
 /// Downloads and verifies the release, then resolves what installing it would do - without writing a
 /// byte into the game directory. The archive is fetched into the working directory unless a verified
 /// copy is already there, which is what makes a retry resume instead of paying the download again.
@@ -322,6 +336,7 @@ pub fn plan_mod_install(
     // user should get before spending a transfer on it.
     let record = load_record(platform, &install.path)?;
     assert_usable(&record, &manifest.id)?;
+    refuse_foreign_order(platform, install, &format!("installing {}", manifest.name))?;
     let payloads = payloads_for(release, selection)?;
     let work = mod_work_directory(platform, install, &manifest.id);
     let granted: Vec<&str> = manifest.grants.iter().map(String::as_str).collect();
@@ -653,6 +668,8 @@ fn apply_under_lock(
     let work = mod_work_directory(platform, install, &manifest.id);
     let record = load_record(platform, &install.path)?;
     assert_usable(&record, &manifest.id)?;
+    // Again rather than trusting the plan: a launch between the two may have swapped the slot.
+    refuse_foreign_order(platform, install, &format!("installing {}", manifest.name))?;
     // Resolved here rather than at the deploy, so a release whose payload and manifest disagree about
     // being one file is refused before the transaction opens rather than part way through it.
     let payloads = payloads_for(release, plan.parts.as_deref().unwrap_or_default())?;
@@ -1177,6 +1194,8 @@ fn uninstall_under_lock(
     if let Some(recorded) = &recorded {
         refuse_removal(recorded)?;
     }
+    let name = recorded.as_ref().map_or_else(|| id.to_owned(), mod_name);
+    refuse_foreign_order(platform, install, &format!("removing {name}"))?;
 
     let root = Path::new(&install.path);
     let files: Vec<String> = match &recorded {
@@ -1824,6 +1843,53 @@ mod tests {
         let err = restore_mod_install(&platform, &install(), "ecco", now(), CLOCK)
             .expect_err("nothing waiting");
         assert!(format!("{err}").contains("waiting to be restored"), "{err}");
+    }
+
+    #[test]
+    fn an_order_file_in_fissions_format_refuses_an_install_and_a_removal() {
+        // Written into Fission's file, the mod's lines would never reach the sfall list a launch puts
+        // back, and sfall would not load it.
+        const FISSION: &str = "# FISSION mods_order.txt | v1\n1|other\n";
+        let (platform, release) = simple();
+        installed(&platform, &release);
+        platform
+            .fs()
+            .write(
+                Path::new("/games/f2/mods/mods_order.txt"),
+                FISSION.as_bytes(),
+            )
+            .expect("a launch of Fission");
+        platform
+            .fs()
+            .write(
+                Path::new("/games/f2/mods/mods_order.sfall.txt"),
+                b"ecco.dat\n",
+            )
+            .expect("the list it set aside");
+
+        let refused = plan_mod_install(
+            &platform,
+            &install(),
+            &release,
+            &[],
+            &ModProgress::default(),
+        )
+        .expect_err("a Fission order");
+        assert!(
+            refused.to_string().contains("Fission's format"),
+            "{refused}"
+        );
+        let refused = uninstall_mod(&platform, &install(), "ecco", now(), CLOCK)
+            .expect_err("a Fission order");
+        assert!(
+            refused.to_string().contains("Fission's format"),
+            "{refused}"
+        );
+        assert_eq!(
+            platform.text_at("/games/f2/mods/mods_order.txt").as_deref(),
+            Some(FISSION)
+        );
+        assert!(platform.text_at("/games/f2/mods/ecco.dat").is_some());
     }
 
     #[test]

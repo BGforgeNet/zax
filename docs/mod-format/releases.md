@@ -30,6 +30,8 @@ a difference nobody can see.
   previously shipped copy tells the two apart.
 - **Removal** deletes exactly the recorded files, copies first going to a timestamped backup, and then the folders
   under `mods/` that this leaves empty.
+- **While Fission's list holds the load order** (Fission ran last), installing and removing are refused: sfall's
+  list waits beside it until the game or another engine is run, and lines written now would never reach it.
 - **Installed by hand** (present, no record): offered the current release laid over it, removed by the
   `mods/<id>.*` convention.
 - **Installed at a version the index does not list**: offered the current release in its place, without calling
