@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use serde_json::{Value, json};
-use zax_fallout2::index::{Channel, read_index, read_release};
-use zax_platform::memory::{Content, MemoryOptions, MemoryPlatform, Response};
+use zax_fallout2::index::{read_index, read_release};
+use zax_platform::memory::{MemoryOptions, MemoryPlatform, Response};
 use zax_platform::net::HttpResponse;
 
 use super::*;
@@ -48,7 +47,6 @@ const MANIFEST: &str = "spec: 1\ngame: fallout2\nid: ecco\nname: EcCo\n";
 struct World {
     repository: String,
     responses: BTreeMap<String, Response>,
-    downloads: BTreeMap<String, Content>,
 }
 
 impl World {
@@ -69,7 +67,6 @@ impl World {
         Self {
             repository: repository.to_owned(),
             responses,
-            downloads: BTreeMap::new(),
         }
     }
 
@@ -86,35 +83,19 @@ impl World {
         self
     }
 
-    fn bytes(mut self, name: &str, payload: &str) -> Self {
-        self.downloads.insert(
-            format!("https://github.com/{REPO}/releases/download/{name}"),
-            Content::Text(payload.to_owned()),
-        );
-        self
-    }
-
     fn platform(self) -> MemoryPlatform {
         MemoryPlatform::new(MemoryOptions {
             responses: self.responses,
-            downloads: self.downloads,
             ..MemoryOptions::default()
         })
     }
 }
 
-fn run(platform: &MemoryPlatform, sources: &[Source], state: &mut State) -> Built {
-    platform
-        .fs()
-        .mkdir(Path::new("/work"))
-        .expect("a work directory");
+fn run(platform: &MemoryPlatform, sources: &[Source]) -> Built {
     build(
-        platform,
         &Github::new(platform, None),
         sources,
-        state,
         "2026-10-31T00:00:00Z",
-        Path::new("/work"),
     )
     .expect("a build")
 }
@@ -133,14 +114,13 @@ fn a_release_is_written_with_every_value_explicit_and_reads_back_in_zax() {
     )
     .manifest("v1.0", Some(MANIFEST))
     .platform();
-    let built = run(&platform, &[source()], &mut State::default());
+    let built = run(&platform, &[source()]);
 
     // Through the reader ZAX uses, from the published text.
     let index = read_index(&serde_json::to_string(&built.index).expect("json")).expect("an index");
     let listed = &index.mods[0];
     let indexed = &listed.releases[0];
     assert_eq!((indexed.version.as_str(), indexed.rank), ("1.0", 1));
-    assert_eq!(indexed.channel, Channel::Stable);
     assert!(
         indexed.manifest.contains("archive: ecco.zip"),
         "{}",
@@ -152,7 +132,8 @@ fn a_release_is_written_with_every_value_explicit_and_reads_back_in_zax() {
 }
 
 #[test]
-fn a_prerelease_is_listed_for_testers_and_ranks_below_its_final_release() {
+fn a_prerelease_is_left_out_and_the_final_releases_are_ranked() {
+    // No manifest is registered for the prerelease: asking for it would fail the build.
     let platform = World::new(
         REPO,
         &[
@@ -162,98 +143,58 @@ fn a_prerelease_is_listed_for_testers_and_ranks_below_its_final_release() {
             release("v1.9", false, vec![asset("ecco.zip", Some(DIGEST))]),
         ],
     )
-    .manifest("v2.0-rc1", Some(MANIFEST))
     .manifest("v2.0", Some(MANIFEST))
     .manifest("v1.10", Some(MANIFEST))
     .manifest("v1.9", Some(MANIFEST))
     .platform();
-    let built = run(&platform, &[source()], &mut State::default());
-    let order: Vec<(&str, u64, Channel)> = built.index.mods[0]
+    let built = run(&platform, &[source()]);
+    let order: Vec<(&str, u64)> = built.index.mods[0]
         .releases
         .iter()
-        .map(|one| (one.version.as_str(), one.rank, one.channel))
+        .map(|one| (one.version.as_str(), one.rank))
         .collect();
-    assert_eq!(
-        order,
-        [
-            ("2.0", 4, Channel::Stable),
-            ("2.0-rc1", 3, Channel::Testing),
-            ("1.10", 2, Channel::Stable),
-            ("1.9", 1, Channel::Stable),
-        ]
-    );
+    assert_eq!(order, [("2.0", 3), ("1.10", 2), ("1.9", 1)]);
 }
 
 #[test]
-fn an_asset_with_no_stated_digest_is_hashed_once_and_remembered() {
-    let world = || {
-        World::new(
-            REPO,
-            &[release("v1.0", false, vec![asset("ecco.zip", None)])],
-        )
-        .manifest("v1.0", Some(MANIFEST))
-        .bytes("ecco.zip", "payload")
-    };
-    let mut state = State::default();
-    let first = world().platform();
-    let built = run(&first, &[source()], &mut state);
-    let sha256 = built.index.mods[0].releases[0].assets[0].sha256.clone();
-    assert_eq!(sha256.len(), 64);
-    assert_eq!(first.records().downloaded.len(), 1);
-    assert!(
-        first
-            .fs()
-            .stat(Path::new("/work/ecco.zip"))
-            .expect("stat")
-            .is_none()
-    );
-
-    let second = world().platform();
-    let again = run(&second, &[source()], &mut state);
-    assert_eq!(again.index.mods[0].releases[0].assets[0].sha256, sha256);
-    assert!(
-        second.records().downloaded.is_empty(),
-        "the stored hash answers"
-    );
-}
-
-#[test]
-fn an_asset_replaced_after_publication_skips_its_release() {
-    let mut state = State::default();
-    state.hashes.insert(
-        format!("{ID}/v1.0/ecco.zip"),
-        StoredHash {
-            sha256: "abcdef".to_owned(),
-            size: 7,
-        },
-    );
+fn a_release_without_digests_is_left_out_unread_and_counted() {
+    // No manifest is registered for v1.0: a release with no digest at all is not asked about further.
     let platform = World::new(
         REPO,
-        &[release(
-            "v1.0",
-            false,
-            vec![asset("ecco.zip", Some("sha256:fedcba"))],
-        )],
+        &[
+            release(
+                "v2.0",
+                false,
+                vec![
+                    asset("ecco.zip", Some(DIGEST)),
+                    asset("ecco_extra.zip", None),
+                ],
+            ),
+            release("v1.0", false, vec![asset("ecco.zip", None)]),
+        ],
     )
-    .manifest("v1.0", Some(MANIFEST))
+    .manifest(
+        "v2.0",
+        Some("spec: 1\ngame: fallout2\nid: ecco\nname: EcCo\narchive: ecco_extra.zip\n"),
+    )
     .platform();
-    let built = run(&platform, &[source()], &mut state);
+    let built = run(&platform, &[source()]);
     assert!(built.index.mods[0].releases.is_empty());
     assert!(
-        built.index.mods[0].skipped[0]
-            .reason
-            .contains("changed after"),
+        built.notes[0].contains("ecco v2.0") && built.notes[0].contains("ecco_extra.zip"),
         "{:?}",
-        built.index.mods[0].skipped
+        built.notes
     );
-    assert_eq!(
-        state.hashes[&format!("{ID}/v1.0/ecco.zip")].sha256,
-        "abcdef"
+    assert!(
+        built.notes[1].contains("older than GitHub's digests: 1"),
+        "{:?}",
+        built.notes
     );
+    assert!(platform.records().downloaded.is_empty());
 }
 
 #[test]
-fn a_refused_manifest_or_a_missing_one_is_skipped_with_its_reason() {
+fn a_refused_manifest_or_a_missing_one_is_left_out_with_its_reason() {
     let platform = World::new(
         REPO,
         &[
@@ -267,19 +208,17 @@ fn a_refused_manifest_or_a_missing_one_is_skipped_with_its_reason() {
     )
     .manifest("v1.0", None)
     .platform();
-    let skipped = run(&platform, &[source()], &mut State::default())
-        .index
-        .mods
-        .remove(0)
-        .skipped;
-    assert_eq!(skipped.len(), 2);
+    let built = run(&platform, &[source()]);
+    assert!(built.index.mods[0].releases.is_empty());
+    let notes = &built.notes;
+    assert_eq!(notes.len(), 2);
     assert!(
-        skipped[0].reason.contains("unknown field \"later\""),
-        "{skipped:?}"
+        notes[0].contains("ecco v2.0") && notes[0].contains("unknown field \"later\""),
+        "{notes:?}"
     );
     assert!(
-        skipped[1].reason.contains("publishes no f2mod.yml"),
-        "{skipped:?}"
+        notes[1].contains("ecco v1.0") && notes[1].contains("publishes no f2mod.yml"),
+        "{notes:?}"
     );
 }
 
@@ -307,7 +246,7 @@ fn a_maintainers_document_stands_in_with_companions_set_aside_and_installers_nam
         companions: vec!["_translations.zip".to_owned()],
         ..source()
     };
-    let built = run(&platform, &[carried], &mut State::default());
+    let built = run(&platform, &[carried]);
     let listed = &built.index.mods[0];
     let indexed = &listed.releases[0];
     assert_eq!(indexed.requires, ["base.inno", "base.script"]);
@@ -346,7 +285,7 @@ fn a_line_takes_only_its_own_releases_and_a_renamed_repository_is_followed_by_id
         }),
         ..source()
     };
-    let built = run(&platform, &[lined], &mut State::default());
+    let built = run(&platform, &[lined]);
     let versions: Vec<&str> = built.index.mods[0]
         .releases
         .iter()
@@ -375,7 +314,7 @@ fn the_editions_orders_are_carried_with_what_they_agree_on() {
         }),
         ..source()
     };
-    let built = run(&platform, &[rpu, upu], &mut State::default());
+    let built = run(&platform, &[rpu, upu]);
     assert_eq!(built.index.orders["shared"], ["a.dat", "c.dat"]);
     assert_eq!(built.index.orders["fallout2upu"], ["C.dat", "a.dat"]);
 }

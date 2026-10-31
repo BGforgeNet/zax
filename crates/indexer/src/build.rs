@@ -1,17 +1,16 @@
 //! Turning the source files and the repositories' releases into the index.
 //!
-//! A release that cannot be described is listed as skipped, with its reason, so ZAX can say why a
-//! version is missing. A failure to read GitHub is not that: it fails the whole build, so the index
-//! already published stays up rather than being replaced by one with that mod's releases missing.
+//! It reads only what GitHub states and downloads nothing, so it keeps no state between runs. A
+//! release that cannot be described is left out and named in the notes for a maintainer. A failure to
+//! read GitHub is not that: it fails the whole build, so the index already published stays up rather
+//! than being replaced by one with that mod's releases missing.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 use zax_fallout2::index::{
-    Channel, INDEX_FORMAT, Index, IndexedAsset, IndexedLine, IndexedMod, IndexedRelease,
-    SkippedRelease, counter_of,
+    INDEX_FORMAT, Index, IndexedAsset, IndexedLine, IndexedMod, IndexedRelease, counter_of,
 };
 use zax_fallout2::manifest::{
     MANIFEST_NAME, ManifestDefaults, ModManifest, parse_indexed_manifest,
@@ -19,27 +18,10 @@ use zax_fallout2::manifest::{
 };
 use zax_fallout2::mod_feed::{ReleaseAsset, sole_archive, sole_executable, version_from_tag};
 use zax_fallout2::recommended_order::agreed_order;
-use zax_platform::net::DownloadOptions;
-use zax_platform::{Error, Platform, Result};
+use zax_platform::{Error, Result};
 
 use crate::github::{Github, GithubAsset, GithubRelease};
 use crate::source::Source;
-
-/// What the indexer remembers between runs: the hash of every asset it had to hash itself, so an
-/// asset is downloaded once, and a stated one, so a replaced asset is noticed.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct State {
-    /// Keyed `<repository id>/<tag>/<asset name>`: what a release names an asset by, which a
-    /// re-upload under the same name keeps.
-    #[serde(default)]
-    pub hashes: BTreeMap<String, StoredHash>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct StoredHash {
-    pub sha256: String,
-    pub size: u64,
-}
 
 /// The index and what a maintainer should read about how it was built.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,20 +36,11 @@ pub struct Built {
 ///
 /// Fails where GitHub cannot be read, where two sources state an order for one game, or where the
 /// indexer's own output would not read back as what it read - a defect here, never a release's.
-pub fn build(
-    platform: &dyn Platform,
-    github: &Github<'_>,
-    sources: &[Source],
-    state: &mut State,
-    generated: &str,
-    work: &Path,
-) -> Result<Built> {
+pub fn build(github: &Github<'_>, sources: &[Source], generated: &str) -> Result<Built> {
     let mut notes = Vec::new();
     let mut mods = Vec::new();
     for source in sources {
-        mods.push(index_mod(
-            platform, github, source, state, work, &mut notes,
-        )?);
+        mods.push(index_mod(github, source, &mut notes)?);
     }
     Ok(Built {
         index: Index {
@@ -114,14 +87,7 @@ fn orders(sources: &[Source]) -> Result<BTreeMap<String, Vec<String>>> {
     Ok(out)
 }
 
-fn index_mod(
-    platform: &dyn Platform,
-    github: &Github<'_>,
-    source: &Source,
-    state: &mut State,
-    work: &Path,
-    notes: &mut Vec<String>,
-) -> Result<IndexedMod> {
+fn index_mod(github: &Github<'_>, source: &Source, notes: &mut Vec<String>) -> Result<IndexedMod> {
     let repository = github.repository_name(source.repository_id)?;
     if repository != source.repository {
         notes.push(format!(
@@ -131,10 +97,12 @@ fn index_mod(
     }
 
     let mut releases: Vec<IndexedRelease> = Vec::new();
-    let mut skipped = Vec::new();
+    let mut undigested = 0;
     let mut versions: BTreeSet<String> = BTreeSet::new();
     for release in github.releases(&repository)? {
-        if release.draft {
+        // Prereleases are not offered yet. When they are, they go in a list of their own, which a ZAX
+        // that does not know it passes over rather than offering them as final.
+        if release.draft || release.prerelease {
             continue;
         }
         // A tag naming no version is not a release for ZAX at all, so it is passed over in silence.
@@ -148,14 +116,18 @@ fn index_mod(
         {
             continue;
         }
+        // GitHub states a digest for every asset uploaded since it began recording them, and for none
+        // before; an older release is left out rather than hashed here, and is not asked about further.
+        if release.assets.iter().all(|asset| asset.digest.is_none()) {
+            undigested += 1;
+            continue;
+        }
         let context = Context {
-            platform,
             github,
             source,
             repository: &repository,
-            work,
         };
-        match index_release(&context, &release, tagged, state)? {
+        match index_release(&context, &release, tagged)? {
             Outcome::Indexed(indexed) => {
                 // Newest first from GitHub, so the first release of a version is the one kept.
                 if versions.insert(indexed.version.clone()) {
@@ -163,11 +135,16 @@ fn index_mod(
                 }
             }
             Outcome::OtherMod => {}
-            Outcome::Skipped(reason) => skipped.push(SkippedRelease {
-                tag: release.tag.clone(),
-                reason,
-            }),
+            Outcome::Skipped(reason) => {
+                notes.push(format!("{} {}: left out. {reason}", source.id, release.tag));
+            }
         }
+    }
+    if undigested > 0 {
+        notes.push(format!(
+            "{}: releases left out as older than GitHub's digests: {undigested}.",
+            source.id
+        ));
     }
 
     releases.sort_by(|a, b| compare_release_versions(source.line.as_ref(), &b.version, &a.version));
@@ -187,16 +164,13 @@ fn index_mod(
             Vec::new()
         },
         releases,
-        skipped,
     })
 }
 
 struct Context<'a> {
-    platform: &'a dyn Platform,
     github: &'a Github<'a>,
     source: &'a Source,
     repository: &'a str,
-    work: &'a Path,
 }
 
 enum Outcome {
@@ -219,7 +193,6 @@ fn index_release(
     context: &Context<'_>,
     release: &GithubRelease,
     tagged: String,
-    state: &mut State,
 ) -> Result<Outcome> {
     let source = context.source;
     let (text, carried) =
@@ -319,16 +292,21 @@ fn index_release(
                 "Its manifest names {name}, which the release does not publish."
             )));
         };
-        let key = format!("{}/{}/{}", source.repository_id, release.tag, asset.name);
-        match hash_of(context, &key, asset, state)? {
-            Ok(sha256) => assets.push(IndexedAsset {
-                name: asset.name.clone(),
-                url: asset.url.clone(),
-                size: asset.size,
-                sha256,
-            }),
-            Err(reason) => return Ok(Outcome::Skipped(reason)),
-        }
+        let Some(sha256) = asset
+            .digest
+            .as_deref()
+            .and_then(|digest| digest.strip_prefix("sha256:"))
+        else {
+            return Ok(Outcome::Skipped(format!(
+                "GitHub states no SHA-256 for {name}."
+            )));
+        };
+        assets.push(IndexedAsset {
+            name: asset.name.clone(),
+            url: asset.url.clone(),
+            size: asset.size,
+            sha256: sha256.to_ascii_lowercase(),
+        });
     }
 
     let document = emit_document(&text, &explicit, &source.grants)?;
@@ -353,11 +331,6 @@ fn index_release(
     Ok(Outcome::Indexed(IndexedRelease {
         version: manifest.version.clone(),
         rank: 0,
-        channel: if release.prerelease {
-            Channel::Testing
-        } else {
-            Channel::Stable
-        },
         published: release.published.clone(),
         requires: requires_of(&manifest),
         assets,
@@ -407,54 +380,6 @@ fn requires_of(manifest: &ModManifest) -> Vec<String> {
         out.push("grants");
     }
     out.into_iter().map(ToOwned::to_owned).collect()
-}
-
-/// An asset's SHA-256: the one GitHub states, or the indexer's own of the bytes. The inner error is a
-/// reason to skip the release; the outer one fails the build.
-fn hash_of(
-    context: &Context<'_>,
-    key: &str,
-    asset: &GithubAsset,
-    state: &mut State,
-) -> Result<std::result::Result<String, String>> {
-    let stated = asset
-        .digest
-        .as_deref()
-        .and_then(|digest| digest.strip_prefix("sha256:"))
-        .map(str::to_ascii_lowercase);
-    let changed = || {
-        Err(format!(
-            "{} changed after the release was published; a correction is a new release.",
-            asset.name
-        ))
-    };
-    if let Some(held) = state.hashes.get(key) {
-        if stated.as_ref().is_some_and(|stated| *stated != held.sha256) || held.size != asset.size {
-            return Ok(changed());
-        }
-        return Ok(Ok(held.sha256.clone()));
-    }
-    let sha256 = match stated {
-        Some(stated) => stated,
-        None => {
-            let at = context.work.join(&asset.name);
-            context
-                .platform
-                .net()
-                .download(&asset.url, &at, &DownloadOptions::default())?;
-            let computed = context.platform.hash().sha256(&at)?;
-            context.platform.fs().remove(&at)?;
-            computed
-        }
-    };
-    state.hashes.insert(
-        key.to_owned(),
-        StoredHash {
-            sha256: sha256.clone(),
-            size: asset.size,
-        },
-    );
-    Ok(Ok(sha256))
 }
 
 /// The author's document with the values the release supplied written in, emitted as YAML so every

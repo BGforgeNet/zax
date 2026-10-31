@@ -65,13 +65,10 @@ pub struct IndexedMod {
     /// What judging this mod at all takes, beyond what each release needs.
     #[serde(default)]
     pub requires: Vec<String>,
-    /// Newest first, as the indexer ranked them.
+    /// Newest first, as the indexer ranked them. Final releases only: prereleases, when offered, go in a
+    /// list of their own, which a version that does not know it passes over instead of offering them.
     #[serde(default)]
     pub releases: Vec<IndexedRelease>,
-    /// Releases the indexer could not read, and why: what lets a missing version be explained rather
-    /// than an older one offered in silence.
-    #[serde(default)]
-    pub skipped: Vec<SkippedRelease>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -110,7 +107,6 @@ pub struct IndexedRelease {
     pub version: String,
     /// Higher is newer, within one mod. The only ordering ZAX applies to a mod's versions.
     pub rank: u64,
-    pub channel: Channel,
     /// When the release was published, RFC 3339.
     pub published: String,
     #[serde(default)]
@@ -125,29 +121,14 @@ pub struct IndexedRelease {
     pub manifest: String,
 }
 
-/// Which audience a release is for. A channel this version does not know is offered to nobody.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Channel {
-    Stable,
-    Testing,
-    #[serde(other)]
-    Unknown,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct IndexedAsset {
     pub name: String,
     pub url: String,
     pub size: u64,
-    /// Lowercase hex. Always present: the indexer hashes what its host states no digest for.
+    /// Lowercase hex, as the host states it. Always present: a release whose host states no digest is
+    /// not indexed.
     pub sha256: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct SkippedRelease {
-    pub tag: String,
-    pub reason: String,
 }
 
 /// Reads the index.
@@ -285,7 +266,6 @@ mod tests {
         let mut release = json!({
             "version": "1.0",
             "rank": 1,
-            "channel": "stable",
             "published": "2026-10-31T00:00:00Z",
             "assets": [asset("ecco.zip")],
             // JSON text is YAML, so a test can build the document as a value.
@@ -405,13 +385,6 @@ mod tests {
             "main.a": { "kind": "bool", "label": "A", "file": "data/sound/music/hq.ini" },
         });
         assert!(read(&index(ungranted, json!({}))).is_err());
-    }
-
-    #[test]
-    fn an_unknown_channel_reads_as_unknown_rather_than_failing_the_index() {
-        let document = index(manifest(), json!({ "channel": "nightly" }));
-        let index = read_index(&document.to_string()).expect("an index");
-        assert_eq!(index.mods[0].releases[0].channel, Channel::Unknown);
     }
 
     #[test]
