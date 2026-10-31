@@ -646,6 +646,12 @@ fn still_installed(
     identified: Option<GameType>,
     held: &InstalledMod,
 ) -> bool {
+    // An unfinished install is a transaction marker rather than a claim about the directory - it is
+    // what lets a relaunch offer the retry, and its files may not have landed yet.
+    if !held.complete {
+        return true;
+    }
+
     for file in &held.files {
         let at = join_relative(root, file);
         if matches!(platform.fs().stat(&at), Ok(Some(stat)) if stat.kind == FileKind::File) {
@@ -654,12 +660,6 @@ fn still_installed(
     }
     if !held.files.is_empty() {
         return false;
-    }
-
-    // An unfinished install is a transaction marker rather than a claim about the directory - it is
-    // what lets a relaunch offer the retry.
-    if !held.complete {
-        return true;
     }
 
     // The same tolerance the caller extends to an unreadable directory: a path that no longer reads
@@ -1100,6 +1100,26 @@ mod tests {
         let platform = platform_with(&[("/games/f2/fallout2.exe", "MZ")]);
         let mut held = a_mod("ecco");
         held.files = Vec::new();
+        held.complete = false;
+        let record = InstallRecord {
+            path: INSTALL.to_owned(),
+            mods: vec![held],
+            ..InstallRecord::default()
+        };
+        assert_eq!(
+            reconcile_record(&platform, &record)
+                .expect("reconcile")
+                .mods
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn an_unfinished_install_whose_files_have_not_landed_yet_is_kept() {
+        // Stopped before its first file arrived, so a restore still has its entry to unwind.
+        let platform = platform_with(&[("/games/f2/fallout2.exe", "MZ")]);
+        let mut held = a_mod("ecco");
         held.complete = false;
         let record = InstallRecord {
             path: INSTALL.to_owned(),
