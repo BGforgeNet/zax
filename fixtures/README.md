@@ -14,8 +14,13 @@ format looks like in the wild, and it moves when the mod's own arrives.
 
 `upu/mods/upu.ini` and `rpu/mods/rpu.ini` are the inis UPU v34 and RPU v2.4.34 ship, verbatim, read out of
 their release archives. UPU's is also the one both RPU lines ship, and RPU's is the same in 2.3.34. The
-manifests ZAX carries for those mods (`crates/fallout2/src/mod_vendored.rs`) describe them, and a test holds
-each description to these files.
+manifests the index sources carry for those mods (`index/sources/`) describe them, and a test holds each
+description to these files.
+
+`index/` is the mod index as it would be built: `sources/` the maintainers' source files, `github/` GitHub's
+answers for the followed repositories captured and trimmed, and `v1/index.json` the index built from both,
+which a test holds the indexer to. `preview/index.json` is the same build with FO2tweaks described by
+`fo2tweaks/f2mod.yml`, which the browser preview serves.
 
 `manifests/` is the odd one out: not copies of anything but specimens written here, one per shape the mod
 manifest format takes, each with a `.json` sibling holding what it must parse to. They are what makes the

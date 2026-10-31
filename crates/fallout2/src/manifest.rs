@@ -20,7 +20,6 @@ use zax_core::catalog::{
 use zax_core::install::GameType;
 
 use crate::catalog::settings;
-use crate::mod_grants::grants_for;
 
 /// The file's name at the repository root.
 ///
@@ -428,8 +427,8 @@ fn below(path: &str, directory: &str) -> bool {
 /// Whether a mod may write to a path: under `mods/` as every mod may, or below one of the
 /// directories ZAX grants this one.
 ///
-/// The grant is ZAX's own list, so a manifest cannot widen it by declaring a path and neither can a
-/// hand-edited record - and it widens only where, never how far, since a granted path is confined
+/// The grant is given in the index's source files, so an author's manifest cannot widen it by
+/// declaring a path - and it widens only where, never how far, since a granted path is confined
 /// exactly as `mods/` is.
 #[must_use]
 pub fn may_write(path: &str, granted: &[&str]) -> bool {
@@ -1478,8 +1477,8 @@ pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModMa
     read_manifest(bytes, defaults, Strictness::Author, None)
 }
 
-/// Reads an author's manifest with the grants its index source gives it, rather than ZAX's own table:
-/// what the indexer judges a mod's paths against.
+/// Reads an author's manifest with the grants its index source gives it: what the indexer judges a
+/// mod's paths against.
 ///
 /// # Errors
 ///
@@ -1500,12 +1499,19 @@ pub fn parse_manifest_with_grants(
 /// Answers a [`Refusal`] naming the cause. Every check the author's file passes still applies: the
 /// index is downloaded data, so it is read at the same boundary.
 pub fn parse_indexed_manifest(bytes: &[u8]) -> Parsed<ModManifest> {
-    read_manifest(
-        bytes,
-        &ManifestDefaults::default(),
-        Strictness::Indexed,
-        None,
-    )
+    parse_held_manifest(bytes, &ManifestDefaults::default())
+}
+
+/// Reads a manifest ZAX kept from the index - a record's snapshot, an open transaction's pin - with
+/// what the record states beside it standing in for anything the copy leaves implicit. Its grants are
+/// the ones the index gave: the copy is ZAX's own file, which only someone who could write the game
+/// folder directly can change.
+///
+/// # Errors
+///
+/// As [`parse_indexed_manifest`].
+pub fn parse_held_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModManifest> {
+    read_manifest(bytes, defaults, Strictness::Indexed, None)
 }
 
 /// Only in the index's copy: a grant is ZAX's maintainers' to give, never an author's to claim.
@@ -1636,13 +1642,8 @@ fn read_manifest(
     }
     // Read once: every path this manifest declares is judged against what ZAX grants it.
     let grants: Vec<String> = match strictness {
-        Strictness::Author => match given_grants {
-            Some(given) => given.to_vec(),
-            None => grants_for(&id)
-                .iter()
-                .map(|&path| path.to_owned())
-                .collect(),
-        },
+        // An author's file alone grants nothing: grants are given in the index's source files.
+        Strictness::Author => given_grants.map(<[String]>::to_vec).unwrap_or_default(),
         Strictness::Indexed => match fields.get(GRANTS_FIELD) {
             None => Vec::new(),
             Some(held) => {

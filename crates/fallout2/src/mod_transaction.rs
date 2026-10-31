@@ -20,7 +20,7 @@ use zax_core::install::Install;
 use zax_platform::fs::FileKind;
 use zax_platform::{Error, Platform, Result};
 
-use crate::manifest::{ManifestDefaults, ModType, parse_manifest};
+use crate::manifest::{ManifestDefaults, ModType, parse_held_manifest};
 use crate::mod_feed::{ModRelease, ReleaseAsset};
 use crate::records::{InstalledMod, install_key};
 
@@ -289,7 +289,7 @@ pub fn write_transaction(
 ///
 /// Fails where the pinned manifest will not parse, which a journal this version wrote cannot produce.
 pub fn release_of(transaction: &ModTransaction) -> Result<ModRelease> {
-    let manifest = parse_manifest(
+    let manifest = parse_held_manifest(
         transaction.manifest_text.as_bytes(),
         &ManifestDefaults {
             version: Some(transaction.version.clone()),
@@ -312,6 +312,9 @@ pub fn release_of(transaction: &ModTransaction) -> Result<ModRelease> {
         installer: None,
         installer_route: None,
         line: None,
+        // A retry finishes the release it pinned; nothing compares it with another version.
+        rank: 0,
+        ranks: BTreeMap::new(),
     })
 }
 

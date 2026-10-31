@@ -167,7 +167,9 @@ impl Backend {
         let wine = self.platform().os() != zax_platform::OperatingSystem::Windows;
         let reading = held.reading.as_ref().map(|reading| {
             let settings = &reading.settings;
-            let order = reading.order.view(reading.install.game_type);
+            let order = reading
+                .order
+                .view(reading.install.game_type, &self.edition_orders());
             // `None` on Windows, where the field is hidden and an action must not sit unapplied over
             // something the user cannot reach.
             let own_debug = wine.then(|| {
@@ -664,6 +666,7 @@ impl Backend {
     ///
     /// Fails where no install is selected.
     pub fn edit_order(&self, edit: &OrderEdit) -> Result<AppView> {
+        let orders = self.edition_orders();
         let mut held = self.held();
         let reading = Self::reading_mut(&mut held)?;
         let game_type = reading.install.game_type;
@@ -671,7 +674,7 @@ impl Backend {
         match edit {
             OrderEdit::Toggle { name } => order.toggle(name),
             OrderEdit::Shift { name, by } => order.shift(name, *by),
-            OrderEdit::Sort => order.sort(game_type),
+            OrderEdit::Sort => order.sort(game_type, &orders),
             OrderEdit::Forget { name } => order.forget(name),
             OrderEdit::ForgetMissing => order.forget_missing(),
         }

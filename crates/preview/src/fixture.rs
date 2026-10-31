@@ -21,23 +21,16 @@ const FALLOUT2_CFG: &str = include_str!("../../../fixtures/f2up/fallout2.cfg");
 const F2_RES_INI: &str = include_str!("../../../fixtures/f2up/f2_res.ini");
 const DDRAW_INI: &str = include_str!("../../../fixtures/f2up/ddraw.ini");
 
-// The ini FO2tweaks' release ships, verbatim, and a manifest for it written here - the mod publishes
-// none of its own yet. Describing the real ini is what makes the settings surface worth showing; the
-// document being ours is why the feed below records that this repository carries no manifest.
+// The ini FO2tweaks' release ships, verbatim, and the manifest written for it - the mod publishes none
+// of its own yet. Describing the real ini is what makes the settings surface worth showing.
 const FO2TWEAKS_MANIFEST: &str = include_str!("../../../fixtures/fo2tweaks/f2mod.yml");
 const FO2TWEAKS_INI: &str = include_str!("../../../fixtures/fo2tweaks/mods/fo2tweaks.ini");
 
-// Real release listings, captured from each repository's own API and cut to the fields ZAX reads plus
-// the newest releases of each line. Seeded as network answers below so the mods tab performs its real
-// read: a listing states what exists and does nothing with it, so a real capture of one is not the
-// invented version number the rest of this seam refuses to produce.
-const RPU_FEED: &str =
-    include_str!("../../../fixtures/preview/feeds/BGforgeNet-Fallout2_Restoration_Project.json");
-const UPU_FEED: &str =
-    include_str!("../../../fixtures/preview/feeds/BGforgeNet-Fallout2_Unofficial_Patch.json");
-const FO1IN2_FEED: &str = include_str!("../../../fixtures/preview/feeds/rotators-Fo1in2.json");
-const FO2TWEAKS_FEED: &str =
-    include_str!("../../../fixtures/preview/feeds/BGforgeNet-FO2tweaks.json");
+// The real mod index, built from the real source files against captured GitHub answers, with FO2tweaks
+// described by the manifest above (the indexer's fixture test pins it). Seeded as the network's answer
+// so the mods tab performs its real read: the index states what exists and does nothing with it, so a
+// real build of one is not the invented version number the rest of this seam refuses to produce.
+const PREVIEW_INDEX: &str = include_str!("../../../fixtures/preview/index.json");
 
 /// One seeded game folder: where it is, what makes it read as the type it is meant to be, and the
 /// version it states where that differs from the shared fixture's.
@@ -91,39 +84,6 @@ const PREVIEW_GAMES: &[PreviewGame] = &[
         stamp: Some("FALLOUT ET TU v1.15.3735"),
     },
 ];
-
-/// The captured listing for each repository, by the address the feed reader asks for.
-fn captured_feeds() -> BTreeMap<String, &'static str> {
-    [
-        ("BGforgeNet/Fallout2_Restoration_Project", RPU_FEED),
-        ("BGforgeNet/Fallout2_Unofficial_Patch", UPU_FEED),
-        ("rotators/Fo1in2", FO1IN2_FEED),
-        ("BGforgeNet/FO2tweaks", FO2TWEAKS_FEED),
-    ]
-    .into_iter()
-    .map(|(repository, body)| (repository.to_owned(), body))
-    .collect()
-}
-
-/// The repositories this fixture holds a manifest for. FO2tweaks does not publish an `f2mod.yml` yet;
-/// the fixture is the document it would publish, and the same one the seeded record carries, so what
-/// the preview shows of a described mod is what a real read would give once it does. The three base
-/// mods stay on the note instead, which is the answer their tags really give.
-const CAPTURED_MANIFESTS: &[(&str, &str)] = &[("BGforgeNet/FO2tweaks", FO2TWEAKS_MANIFEST)];
-
-/// Every tag a captured listing names, which is what a manifest is asked for per release.
-fn tags_in(body: &str) -> Vec<String> {
-    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(body) else {
-        return Vec::new();
-    };
-    parsed
-        .as_array()
-        .map(Vec::as_slice)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|release| release.get("tag_name")?.as_str().map(str::to_owned))
-        .collect()
-}
 
 /// The state file a fresh preview starts from.
 fn preview_state() -> String {
@@ -245,29 +205,12 @@ pub fn preview_platform() -> Result<PreviewPlatform> {
         files.insert(at, Content::from(""));
     }
 
-    // Seeded as network answers rather than straight into the feed cache because the in-memory seam
-    // keeps a fixed clock: a file it writes always reads as stale and the fetch happens anyway.
-    let mut responses: BTreeMap<String, Response> = BTreeMap::new();
-    let feeds = captured_feeds();
-    for (repository, body) in &feeds {
-        responses.insert(
-            format!("https://api.github.com/repos/{repository}/releases?per_page=100"),
-            Response::Body((*body).to_owned()),
-        );
-    }
-    // Answered for every tag of the repository that has one: the manifest is committed rather than
-    // stamped per release, so which tag was asked for decides the version rather than the document.
-    for (repository, manifest) in CAPTURED_MANIFESTS {
-        let Some(body) = feeds.get(*repository) else {
-            continue;
-        };
-        for tag in tags_in(body) {
-            responses.insert(
-                format!("https://raw.githubusercontent.com/{repository}/{tag}/f2mod.yml"),
-                Response::Body((*manifest).to_owned()),
-            );
-        }
-    }
+    // Seeded as the network's answer rather than straight into the index cache because the in-memory
+    // seam keeps a fixed clock: a file it writes always reads as stale and the fetch happens anyway.
+    let responses = BTreeMap::from([(
+        zax_fallout2::mod_feed::INDEX_URL.to_owned(),
+        Response::Body(PREVIEW_INDEX.to_owned()),
+    )]);
 
     // What each engine's cached archive unpacks to, keyed by the text the cache writes into it, so
     // picking a build on the Engines tab deploys for real. Without contents the preflight refuses the
@@ -311,7 +254,6 @@ pub fn preview_platform() -> Result<PreviewPlatform> {
 
     seed_record(&platform)?;
     seed_cached_builds(&platform)?;
-    seed_absent_manifests(&platform, &feeds)?;
     Ok(PreviewPlatform {
         process: PreviewProcess {
             identity: ProcessIdentity {
@@ -441,30 +383,6 @@ fn seed_cached_builds(platform: &MemoryPlatform) -> Result<()> {
             Path::new(&format!("{at}/release.json")),
             note.to_string().as_bytes(),
         )?;
-    }
-    Ok(())
-}
-
-/// Per release, the note that its author publishes no manifest of their own - which is what sends the
-/// base mods to the documents ZAX carries for exactly that case. True of the three: none of those
-/// repositories has an `f2mod.yml`, at the tag or on its default branch, so the note records the answer
-/// the network would give. The fourth is answered above instead, and a note here would stop it ever
-/// being asked for.
-fn seed_absent_manifests(
-    platform: &MemoryPlatform,
-    feeds: &BTreeMap<String, &'static str>,
-) -> Result<()> {
-    let described: Vec<&str> = CAPTURED_MANIFESTS.iter().map(|(at, _)| *at).collect();
-    for (repository, body) in feeds {
-        if described.contains(&repository.as_str()) {
-            continue;
-        }
-        for tag in tags_in(body) {
-            let at = zax_fallout2::mod_feed::feed_cache_path(platform, repository, Some(&tag));
-            let mut marker = at.into_os_string();
-            marker.push(".none");
-            platform.fs().write(Path::new(&marker), &[])?;
-        }
     }
     Ok(())
 }
@@ -618,37 +536,16 @@ mod tests {
     }
 
     #[test]
-    fn the_captured_listings_are_answered_at_the_address_the_reader_asks_for() {
+    fn the_index_is_answered_at_the_address_the_reader_asks_for() {
         let platform = preview_platform().expect("the fixture seeds");
-        let held = platform
-            .net()
-            .fetch_text("https://api.github.com/repos/BGforgeNet/FO2tweaks/releases?per_page=100")
-            .expect("a captured listing");
-        assert!(held.contains("tag_name"), "{held:.80}");
-    }
-
-    #[test]
-    fn a_repository_that_publishes_no_manifest_says_so_rather_than_being_asked_per_release() {
-        let platform = preview_platform().expect("the fixture seeds");
-        let tags = tags_in(RPU_FEED);
-        assert!(!tags.is_empty(), "the captured listing names releases");
-        for tag in tags {
-            let at = zax_fallout2::mod_feed::feed_cache_path(
-                &platform,
-                "BGforgeNet/Fallout2_Restoration_Project",
-                Some(&tag),
-            );
-            let mut marker = at.into_os_string();
-            marker.push(".none");
-            assert!(
-                platform
-                    .fs()
-                    .stat(Path::new(&marker))
-                    .expect("a read")
-                    .is_some(),
-                "{tag} has no note"
-            );
-        }
+        let index = zax_fallout2::mod_feed::read_mod_index(&platform, 0).expect("the index");
+        // FO2tweaks is the described mod, and it is described only here.
+        assert!(
+            index
+                .mods
+                .iter()
+                .any(|one| one.id == "fo2tweaks" && !one.releases.is_empty())
+        );
     }
 
     #[test]

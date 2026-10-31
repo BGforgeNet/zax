@@ -2,23 +2,21 @@
 
 ## How ZAX chooses one
 
-A feed entry names a repository and the id it follows. Of the releases whose manifest carries that id, ZAX takes
-the highest manifest `version` - not the newest by date, so a hotfix on an older line does not shadow the
-current one. It reads the hundred most recent releases, which is as many as one request may ask for; past that,
-a hotfix to a line that old is not seen. Two ids may share a repository, each on its own tags. A manifest that
-refuses to parse is reported rather than skipped: when no release matches, the first refusal is the answer.
+ZAX reads one document, the mod index, which ZAX's maintainers build from the repositories they follow. For each
+release the indexer reads the manifest from the repository at the release's tag, and writes it into the index
+with every value explicit: the version (the tag's, where the manifest states none), and every asset it uses,
+with the SHA-256 GitHub states for it. Two ids may share a repository, each on its own tags.
 
-The manifest is read from the repository at the release's tag, and nothing else on the release describes it. A
-tag's tree does not change once pushed, so what is read for one is kept; a tag that carries no manifest is
-remembered as carrying none, which is what keeps following a repository from costing one request per release
-every time the listing refreshes.
+A release is left out of the index where GitHub states no digest for its assets (anything uploaded before GitHub
+began recording them), where it is a draft or a prerelease, or where its manifest is refused. The indexer's log
+names each refused release with the reason, and counts the ones left out for having no digest. The indexer ranks a mod's releases - by version, not by date, so a hotfix on an older
+line does not shadow the current one - and ZAX offers the highest-ranked release it can install.
 
 ## A published release is finished
 
 Do not edit a release once it is published: not the tag, not the assets, not a re-upload under the same name.
-What ZAX read for a tag is what it keeps, and the digest it verifies a download against is the one the release
-stated when it was read - so a payload swapped underneath a published version is a release whose bytes and
-whose record no longer agree, and which of the two a given machine has depends on when it last looked.
+The index takes the digest GitHub states, so a payload swapped underneath a published version is two different
+sets of bytes under one version number, and which one a given machine installed depends on when it looked.
 
 Nothing enforces this, which is why it is worth saying. A correction is a new tag: the version is what the tag
 says, so `v14.7.1` costs nothing beyond pushing it, and it reaches every install as an upgrade rather than as
@@ -33,13 +31,15 @@ a difference nobody can see.
 - **Removal** deletes exactly the recorded files, copies first going to a timestamped backup.
 - **Installed by hand** (present, no record): offered the current release laid over it, removed by the
   `mods/<id>.*` convention.
-- **No longer followed** by the feed list: stays listed, with a note that updates will not be offered. Removal
-  still works from the record.
+- **Installed at a version the index does not list**: offered the current release in its place, without calling
+  it an upgrade, since nothing can say which of the two is newer.
+- **No longer followed** (the index does not list the id): stays listed, with a note that updates will not be
+  offered. Removal still works from the record, as it does while the index cannot be read at all.
 
-## Getting a feed to follow a mod
+## Getting a mod into the index
 
-The feed list ships in ZAX's code and changes only with a ZAX release - installing a mod is trusting its
-publisher, and the list is where that trust is granted. Add the repository and id to `MOD_FEEDS` in
-`crates/fallout2/src/mod_feed.rs`. A mod that has to write outside `mods/` needs a second entry, in
-`MOD_GRANTS` in `crates/fallout2/src/mod_grants.rs`, naming the directory and why nothing packable would
-do.
+A mod is followed once ZAX's maintainers add a source file for it to the mod index - installing a mod is
+trusting its publisher, and that file is where the trust is granted. The source files are in
+[the index sources](../../fixtures/index/sources/), and their format is described in
+[the indexer](../../crates/indexer/src/source.rs). A mod that has to write outside `mods/` is granted the
+directory there, under `grants`, with why nothing packable would do.

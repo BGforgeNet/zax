@@ -1,4 +1,4 @@
-//! A source file: one followed mod, written by ZAX's maintainers on the index branch.
+//! A source file: one followed mod, written by ZAX's maintainers and kept with the index.
 //!
 //! What is here is what a mod's own manifest cannot be trusted to say about itself - where it is
 //! published, what it may write outside `mods/`, how a base mod installs - plus a document to stand in
@@ -25,12 +25,19 @@ pub struct Source {
     pub name: String,
     pub base: bool,
     pub line: Option<IndexedLine>,
-    /// The manifest to use for a tag the repository publishes none at, written as an author would.
+    /// The manifest to use for a tag the repository publishes none at, written as an author would. It
+    /// states no version and names no installer asset: the release supplies both, so an asset renamed
+    /// upstream is followed without editing this. Nor does it copy what an installer offers - that
+    /// table is the installer's own, and a copy here would go stale against its next release.
     pub document: Option<String>,
     /// Asset name endings set aside before a payload or installer is inferred, for a document the
     /// maintainers wrote: what lets a release publishing two archives still have a sole payload.
     pub companions: Vec<String>,
-    /// Directories outside `mods/` the mod may write.
+    /// Directories outside `mods/` the mod may write. Per mod rather than per path, so a capability one
+    /// mod needs is never handed to every mod. A mod whose files can be packed into a `.dat` has no case
+    /// for one; a grant is for files the engine reads from a filesystem directory rather than through
+    /// the archives - HQ music's `data/sound/music/`, Hero Appearance's `appearance/` - and goes in
+    /// once that mod publishes a manifest declaring its own id.
     pub grants: Vec<String>,
     /// The load order this mod's edition states for itself.
     pub order: Option<EditionOrder>,

@@ -1,7 +1,8 @@
 //! Where mods belong in `mods_order.txt`, as far as ZAX is prepared to say.
 //!
-//! The orders ship in code for the same reason the feed list does: they are a judgement ZAX makes on
-//! the user's behalf, so they are reviewable and change only with a release. A mod earns a line when
+//! The orders come from the mod index, where ZAX's maintainers carry each edition's own shipped order
+//! and the indexer computes what the editions agree on: a judgement made on the user's behalf, so it is
+//! reviewable, and it changes with the index rather than with a ZAX release. A mod earns a line when
 //! where it belongs is actually stated somewhere - not inferred from what it looks like. Everything
 //! else stays unranked, which is the honest answer for most of a mods folder and keeps the interface
 //! from telling someone their working order is wrong.
@@ -9,89 +10,18 @@
 //! Nothing here moves a file on its own. The advice is shown, the sort is a button, and both land in
 //! the same unsaved-then-save flow a manual reorder does.
 
-use std::sync::LazyLock;
+use std::collections::BTreeMap;
 
 use zax_core::install::GameType;
 
 use crate::mods::{Mod, OrderClaim};
 
-/// The Restoration Project Updated's own shipped order (`release/mods_order.txt` in
-/// BGforgeNet/Fallout2_Restoration_Project), earliest-loading first - a mod further down overrides one
-/// above it, so the last line wins.
-///
-/// It is not a list of RPU's own files: `rpu.dat` is RPU and the `rpu_*` lines are its components, but
-/// the rest name separate mods whose place RPU states rather than owns.
-pub const RPU_ORDER: &[&str] = &[
-    "rpu.dat",
-    "party_orders.dat",
-    "npc_armor.dat",
-    "rpu_czech.dat",
-    "rpu_french.dat",
-    "rpu_german.dat",
-    "rpu_hungarian.dat",
-    "rpu_italian.dat",
-    "rpu_polish.dat",
-    "rpu_portuguese.dat",
-    "rpu_russian.dat",
-    "upu_russian_sound.dat",
-    "rpu_spanish.dat",
-    "rpu_enhanced_worldmap.dat",
-    "rpu_extended_flamer.dat",
-    "rpu_rifle_animations.dat",
-    "rpu_wakizashi_animations.dat",
-    "cassidy_head.dat",
-    "cassidy_voice_joey_bracken_hq.dat",
-    "rpu_improved_mysterious_stranger.dat",
-    "walk_speed_fix_low_fps.dat",
-    "goris_fast_derobing_low_fps.dat",
-    "fo2tweaks.dat",
-    "InventoryFilter.dat",
-];
-
-/// The Unofficial Patch Updated's own (`release/mods_order.txt` in
-/// BGforgeNet/Fallout2_Unofficial_Patch): the same list with `upu.dat` and the `upu_*` translations
-/// where RPU carries its own. The two installs are exclusive, so no folder is ever judged against both.
-pub const UPU_ORDER: &[&str] = &[
-    "upu.dat",
-    "party_orders.dat",
-    "npc_armor.dat",
-    "upu_czech.dat",
-    "upu_french.dat",
-    "upu_german.dat",
-    "upu_hungarian.dat",
-    "upu_italian.dat",
-    "upu_polish.dat",
-    "upu_portuguese.dat",
-    "upu_russian.dat",
-    "upu_spanish.dat",
-    "upu_russian_sound.dat",
-    "rpu_enhanced_worldmap.dat",
-    "rpu_extended_flamer.dat",
-    "rpu_rifle_animations.dat",
-    "rpu_wakizashi_animations.dat",
-    "cassidy_head.dat",
-    "cassidy_voice_joey_bracken_hq.dat",
-    "rpu_improved_mysterious_stranger.dat",
-    "walk_speed_fix_low_fps.dat",
-    "goris_fast_derobing_low_fps.dat",
-    "fo2tweaks.dat",
-    "InventoryFilter.dat",
-];
+/// The key under which the index carries what the editions agree on.
+pub const SHARED_ORDER: &str = "shared";
 
 fn fold(name: &str) -> String {
     name.to_lowercase()
 }
-
-/// What an install neither project speaks for gets: the mods both of them place, in the order both give
-/// them. Neither file was written for a vanilla or a killap-patched install, but where two
-/// independently maintained orders agree about a third party's mod, that agreement is as good a
-/// statement of its place as exists.
-///
-/// Computed rather than written out, so it shrinks by itself the day one project moves an entry - which
-/// the order's own test asserts, since a disagreement would otherwise be settled silently in RPU's
-/// favour.
-pub static SHARED_ORDER: LazyLock<Vec<&'static str>> =
-    LazyLock::new(|| agreed_order(RPU_ORDER, &[UPU_ORDER]));
 
 /// The entries of `lead` that every one of `others` also names, in `lead`'s order: what independently
 /// maintained orders agree on, with a disagreement settled in the lead's favour.
@@ -107,17 +37,19 @@ pub fn agreed_order<'a>(lead: &[&'a str], others: &[&[&str]]) -> Vec<&'a str> {
         .collect()
 }
 
-/// The order an install is judged against. The two Updated projects each state their own; every other
-/// type falls back to what they agree on, and no type is judged against a project it is not.
+/// The order an install is judged against: the one its own edition states, else what the editions
+/// agree on, so no type is judged against a project it is not. Nothing where the index states neither,
+/// which leaves every entry unranked.
 #[must_use]
-pub fn recommendation_for(game_type: GameType) -> &'static [&'static str] {
-    match game_type {
-        GameType::Fallout2Rpu => RPU_ORDER,
-        GameType::Fallout2Upu => UPU_ORDER,
-        GameType::Fallout2 | GameType::Fallout2Up | GameType::Fallout2Rp | GameType::Fo1In2 => {
-            &SHARED_ORDER
-        }
-    }
+pub fn recommendation_for(
+    orders: &BTreeMap<String, Vec<String>>,
+    game_type: GameType,
+) -> Vec<String> {
+    orders
+        .get(game_type.as_str())
+        .or_else(|| orders.get(SHARED_ORDER))
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// Where the order puts an entry, or nothing for one it does not name.
@@ -161,8 +93,8 @@ fn placement_in(order: &[&str], claim: &OrderClaim) -> Option<usize> {
 /// what it names is absent or because two of them wait on each other, leaves its entry unranked, which
 /// is what every entry nobody has spoken for already gets.
 #[must_use]
-pub fn order_with(base: &[&str], claims: &[OrderClaim]) -> Vec<String> {
-    let mut out: Vec<String> = base.iter().map(|name| (*name).to_owned()).collect();
+pub fn order_with(base: &[String], claims: &[OrderClaim]) -> Vec<String> {
+    let mut out: Vec<String> = base.to_vec();
     // One placement per entry, carrying the claim its two sides come from.
     let mut pending: Vec<(&OrderClaim, &String)> = claims
         .iter()
@@ -256,67 +188,72 @@ mod tests {
         mods.iter().map(|one| one.name.as_str()).collect()
     }
 
+    fn owned(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| (*name).to_owned()).collect()
+    }
+
     fn claim(entry: &str, overrides: &[&str], overridden_by: &[&str]) -> OrderClaim {
         OrderClaim {
             entries: vec![entry.to_owned()],
-            overrides: overrides.iter().map(|s| (*s).to_owned()).collect(),
-            overridden_by: overridden_by.iter().map(|s| (*s).to_owned()).collect(),
+            overrides: owned(overrides),
+            overridden_by: owned(overridden_by),
         }
     }
 
     #[test]
-    fn the_two_projects_agree_about_where_the_shared_mods_go() {
-        // A disagreement would otherwise be settled silently in RPU's favour.
-        let in_upu: Vec<usize> = SHARED_ORDER
-            .iter()
-            .map(|name| rank_of(name, UPU_ORDER).expect("shared means UPU names it"))
-            .collect();
-        assert!(
-            in_upu.windows(2).all(|pair| pair[0] < pair[1]),
-            "the shared entries sit in a different order in UPU: {in_upu:?}"
+    fn an_install_is_judged_against_its_own_edition_or_what_the_editions_agree_on() {
+        let orders = BTreeMap::from([
+            ("fallout2rpu".to_owned(), owned(&["rpu.dat", "a.dat"])),
+            ("fallout2upu".to_owned(), owned(&["upu.dat", "a.dat"])),
+            (SHARED_ORDER.to_owned(), owned(&["a.dat"])),
+        ]);
+        assert_eq!(
+            recommendation_for(&orders, GameType::Fallout2Rpu),
+            ["rpu.dat", "a.dat"]
         );
-        assert!(!SHARED_ORDER.is_empty());
-    }
-
-    #[test]
-    fn neither_projects_own_files_survive_into_the_shared_order() {
-        // `rpu.dat` and the `rpu_*` translations are RPU's own, so UPU names none of them.
-        assert_eq!(rank_of("rpu.dat", &SHARED_ORDER), None);
-        assert_eq!(rank_of("rpu_czech.dat", &SHARED_ORDER), None);
-        assert!(rank_of("party_orders.dat", &SHARED_ORDER).is_some());
-    }
-
-    #[test]
-    fn an_install_is_judged_against_its_own_project_only() {
-        assert_eq!(recommendation_for(GameType::Fallout2Rpu), RPU_ORDER);
-        assert_eq!(recommendation_for(GameType::Fallout2Upu), UPU_ORDER);
+        assert_eq!(
+            recommendation_for(&orders, GameType::Fallout2Upu),
+            ["upu.dat", "a.dat"]
+        );
         for other in [
             GameType::Fallout2,
             GameType::Fallout2Up,
             GameType::Fallout2Rp,
             GameType::Fo1In2,
         ] {
-            assert_eq!(recommendation_for(other), SHARED_ORDER.as_slice());
+            assert_eq!(recommendation_for(&orders, other), ["a.dat"]);
         }
+        assert!(recommendation_for(&BTreeMap::new(), GameType::Fallout2Rpu).is_empty());
+    }
+
+    #[test]
+    fn what_the_editions_agree_on_follows_the_lead_and_drops_what_only_one_names() {
+        let lead = ["rpu.dat", "party_orders.dat", "fo2tweaks.dat"];
+        let other = ["upu.dat", "fo2tweaks.dat", "party_orders.dat"];
+        assert_eq!(
+            agreed_order(&lead, &[&other]),
+            ["party_orders.dat", "fo2tweaks.dat"]
+        );
     }
 
     #[test]
     fn a_rank_is_found_however_the_file_spells_it() {
-        assert_eq!(rank_of("RPU.DAT", RPU_ORDER), Some(0));
-        assert_eq!(rank_of("inventoryfilter.dat", RPU_ORDER), Some(23));
-        assert_eq!(rank_of("nothing.dat", RPU_ORDER), None);
+        let order = ["rpu.dat", "InventoryFilter.dat"];
+        assert_eq!(rank_of("RPU.DAT", &order), Some(0));
+        assert_eq!(rank_of("inventoryfilter.dat", &order), Some(1));
+        assert_eq!(rank_of("nothing.dat", &order), None);
     }
 
     #[test]
     fn a_claim_lands_as_late_as_both_its_sides_allow() {
-        let base = ["a.dat", "b.dat", "c.dat"];
+        let base = owned(&["a.dat", "b.dat", "c.dat"]);
         let placed = order_with(&base, &[claim("new.dat", &["a.dat"], &["c.dat"])]);
         assert_eq!(placed, ["a.dat", "b.dat", "new.dat", "c.dat"]);
     }
 
     #[test]
     fn a_claim_naming_nothing_the_order_holds_leaves_its_entry_unranked() {
-        let base = ["a.dat"];
+        let base = owned(&["a.dat"]);
         let placed = order_with(&base, &[claim("new.dat", &["absent.dat"], &[])]);
         assert_eq!(placed, ["a.dat"]);
     }
@@ -325,14 +262,14 @@ mod tests {
     fn a_claim_whose_sides_cross_states_a_place_that_does_not_exist() {
         // `c.dat` already loads after `a.dat`, so nothing can override one and be overridden by the
         // other.
-        let base = ["c.dat", "a.dat"];
+        let base = owned(&["c.dat", "a.dat"]);
         let placed = order_with(&base, &[claim("new.dat", &["a.dat"], &["c.dat"])]);
         assert_eq!(placed, ["c.dat", "a.dat"]);
     }
 
     #[test]
     fn a_claim_may_hang_off_an_entry_another_claim_placed() {
-        let base = ["a.dat"];
+        let base = owned(&["a.dat"]);
         let placed = order_with(
             &base,
             &[
@@ -345,7 +282,7 @@ mod tests {
 
     #[test]
     fn two_claims_waiting_on_each_other_both_stay_unranked() {
-        let base = ["a.dat"];
+        let base = owned(&["a.dat"]);
         let placed = order_with(
             &base,
             &[
@@ -358,7 +295,7 @@ mod tests {
 
     #[test]
     fn the_shipped_order_wins_where_it_names_the_entry_already() {
-        let base = ["a.dat", "rpu.dat"];
+        let base = owned(&["a.dat", "rpu.dat"]);
         let placed = order_with(&base, &[claim("rpu.dat", &[], &["a.dat"])]);
         assert_eq!(placed, ["a.dat", "rpu.dat"]);
     }

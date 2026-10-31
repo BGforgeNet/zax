@@ -690,6 +690,8 @@ mod tests {
             }),
             installer_route: Some(route),
             line: None,
+            rank: 0,
+            ranks: Default::default(),
         }
     }
 

@@ -7,4 +7,4 @@ import type { ModType } from "./ModType";
  * Tagged with the kind, which is the field every surface branches on, and spelled the way the
  * interface reads it: `install-over` rather than `installOver`, as the TypeScript named them.
  */
-export type Availability = { "kind": "install" } | { "kind": "install-over" } | { "kind": "nightly", commit: string, } | { "kind": "installed" } | { "kind": "upgrade", from: string, } | { "kind": "convert", from: string, was: ModType, } | { "kind": "downgrade", from: string, } | { "kind": "retry", version: string, } | { "kind": "unfollowed" } | { "kind": "blocked", why: string, from: string | null, };
+export type Availability = { "kind": "install" } | { "kind": "install-over" } | { "kind": "nightly", commit: string, } | { "kind": "installed" } | { "kind": "upgrade", from: string, } | { "kind": "convert", from: string, was: ModType, } | { "kind": "downgrade", from: string, } | { "kind": "unlisted", from: string, } | { "kind": "retry", version: string, } | { "kind": "unfollowed" } | { "kind": "blocked", why: string, from: string | null, };

@@ -149,6 +149,43 @@ pub fn read_index(text: &str) -> Result<Index> {
     Ok(index)
 }
 
+/// When the index was built, in milliseconds since the epoch, read from the `YYYY-MM-DDTHH:MM:SS`
+/// UTC instant the indexer writes; nothing for any other shape. Only an age is derived from it, so
+/// the fraction and the zone suffix are not read.
+#[must_use]
+pub fn generated_millis(generated: &str) -> Option<i64> {
+    let number = |range: std::ops::Range<usize>| -> Option<i64> {
+        let digits = generated.get(range)?;
+        digits
+            .bytes()
+            .all(|byte| byte.is_ascii_digit())
+            .then(|| digits.parse().ok())?
+    };
+    let shaped = generated.as_bytes();
+    if shaped.len() < 19
+        || shaped[4] != b'-'
+        || shaped[7] != b'-'
+        || shaped[10] != b'T'
+        || shaped[13] != b':'
+        || shaped[16] != b':'
+    {
+        return None;
+    }
+    let (year, month, day) = (number(0..4)?, number(5..7)?, number(8..10)?);
+    let seconds = number(11..13)? * 3600 + number(14..16)? * 60 + number(17..19)?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    // Days from the civil date, counted in 400-year eras that start on 1 March so the leap day is last.
+    let shifted = if month <= 2 { year - 1 } else { year };
+    let era = shifted.div_euclid(400);
+    let of_era = shifted - era * 400;
+    let of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    let of_cycle = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
+    let days = era * 146_097 + of_cycle - 719_468;
+    Some((days * 86_400 + seconds) * 1000)
+}
+
 /// What a release needs that this version lacks, the mod's own needs included. Empty where it can be
 /// installed.
 #[must_use]
@@ -385,6 +422,22 @@ mod tests {
             "main.a": { "kind": "bool", "label": "A", "file": "data/sound/music/hq.ini" },
         });
         assert!(read(&index(ungranted, json!({}))).is_err());
+    }
+
+    #[test]
+    fn the_build_instant_reads_as_milliseconds_since_the_epoch() {
+        assert_eq!(generated_millis("1970-01-01T00:00:00Z"), Some(0));
+        assert_eq!(
+            generated_millis("2026-10-31T10:34:11.113448548Z"),
+            Some(1_793_442_851_000)
+        );
+        // The leap day sits at the end of the shifted year, so the day after it is one day on.
+        assert_eq!(
+            generated_millis("2024-03-01T00:00:00Z").zip(generated_millis("2024-02-29T00:00:00Z")),
+            Some((1_709_251_200_000, 1_709_164_800_000))
+        );
+        assert_eq!(generated_millis("yesterday"), None);
+        assert_eq!(generated_millis("2026-13-01T00:00:00Z"), None);
     }
 
     #[test]

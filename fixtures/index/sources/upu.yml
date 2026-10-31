@@ -1,0 +1,74 @@
+# Followed mod source. See crates/indexer/src/source.rs for the format.
+id: upu
+repository: BGforgeNet/Fallout2_Unofficial_Patch
+repository-id: 193239194
+name: UPU
+base: true
+companions: [_translations.zip]
+# UPU's own shipped order (release/mods_order.txt in the repository): RPU's list with upu.dat and the
+# upu_* translations where RPU carries its own.
+order:
+  game: fallout2upu
+  entries:
+    - upu.dat
+    - party_orders.dat
+    - npc_armor.dat
+    - upu_czech.dat
+    - upu_french.dat
+    - upu_german.dat
+    - upu_hungarian.dat
+    - upu_italian.dat
+    - upu_polish.dat
+    - upu_portuguese.dat
+    - upu_russian.dat
+    - upu_spanish.dat
+    - upu_russian_sound.dat
+    - rpu_enhanced_worldmap.dat
+    - rpu_extended_flamer.dat
+    - rpu_rifle_animations.dat
+    - rpu_wakizashi_animations.dat
+    - cassidy_head.dat
+    - cassidy_voice_joey_bracken_hq.dat
+    - rpu_improved_mysterious_stranger.dat
+    - walk_speed_fix_low_fps.dat
+    - goris_fast_derobing_low_fps.dat
+    - fo2tweaks.dat
+    - InventoryFilter.dat
+document: |
+  spec: 1
+  id: upu
+  name: Unofficial Patch Updated
+  game: fallout2
+  type: base
+  becomes: fallout2upu
+  installer.windows.built-with: inno
+  installer.other.run: upu-install.sh
+  settings:
+    main.goris_derobing_speed:
+      file: mods/upu.ini
+      kind: int
+      min: 16
+      max: 100
+      unit: fps
+      sentinels: { 0: "Off" }
+      default: 50
+      label: Goris de-robing speed
+      help: How fast Goris takes off his robe. The original game plays it at 16. No effect if the alternative low FPS Goris de-robing is installed.
+    main.critters_walk_faster:
+      file: mods/upu.ini
+      kind: bool
+      default: 1
+      label: Faster walking for slow critters
+      help: Robots, various guards and a few other critters walk much slower than everyone else; this speeds them up a little. Cosmetic only. No effect if the alternative low FPS walk speed fix is installed.
+    main.wipe_inventory:
+      file: mods/upu.ini
+      kind: bool
+      default: 0
+      label: Fresh merchant stock on each restock
+      help: Off, merchants keep every item you ever sold them, on top of their restocks. On, each restock gives them fresh inventory. Quest items are always kept. Can be changed mid-game.
+    ncr.repeatable_brahmin_drive:
+      file: mods/upu.ini
+      kind: bool
+      default: 1
+      label: Repeatable NCR brahmin drive
+      help: The NCR to Redding brahmin drive can be done again, as Duppo says. The drives end if Hal dies.

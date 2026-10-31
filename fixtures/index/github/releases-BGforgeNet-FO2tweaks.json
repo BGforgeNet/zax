@@ -1,0 +1,191 @@
+[
+  {
+    "tag_name": "v14.7",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-07-20T07:30:59Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v14.7.zip",
+        "size": 505901,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.7/fo2tweaks_v14.7.zip",
+        "digest": "sha256:c8672900100727e097fc63a07d4f7f7d536f2d9a914dd7cd2d6b36005ed37e29"
+      }
+    ]
+  },
+  {
+    "tag_name": "v14.6",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-07-13T00:58:39Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v14.6.zip",
+        "size": 505890,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.6/fo2tweaks_v14.6.zip",
+        "digest": "sha256:fb1b95d95c4fb5286dc187c843f25cff7e11d870575047287d39c4adfd6e70fb"
+      }
+    ]
+  },
+  {
+    "tag_name": "v14.5",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-07-01T05:02:11Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v14.5.zip",
+        "size": 508631,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.5/fo2tweaks_v14.5.zip",
+        "digest": "sha256:aed10e9fa31145f0de5783a387994803b08a88edb6ee4997513543b8d60c3b3a"
+      }
+    ]
+  },
+  {
+    "tag_name": "v14.4",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-04-25T06:21:20Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v14.4.zip",
+        "size": 508644,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.4/fo2tweaks_v14.4.zip",
+        "digest": "sha256:ddb566616583af74acb1341f2ecd1f7348ddf2031505c6fabc9eadf8d04cfd79"
+      }
+    ]
+  },
+  {
+    "tag_name": "v14.3",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-03-31T03:21:22Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v14.3.zip",
+        "size": 508711,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.3/fo2tweaks_v14.3.zip",
+        "digest": "sha256:42b5e1de8898b8f5620fce727841d3acb2b58fcd2289cdf4ec2bffdaa54ddf06"
+      }
+    ]
+  },
+  {
+    "tag_name": "v14.2",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-03-20T15:45:12Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v14.2.zip",
+        "size": 508565,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.2/fo2tweaks_v14.2.zip",
+        "digest": "sha256:02e60bbc2d9490721c7b700c53059437064bca390609f3dd0cfac0bfd911298f"
+      }
+    ]
+  },
+  {
+    "tag_name": "v14.1",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-02-26T03:05:51Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v14.1.zip",
+        "size": 508533,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14.1/fo2tweaks_v14.1.zip",
+        "digest": "sha256:a7c43848c88526a36877a0f6a129db3069437108058d3018be434eae0b2ba8e5"
+      }
+    ]
+  },
+  {
+    "tag_name": "v14",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-02-11T06:05:22Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v14.zip",
+        "size": 508546,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v14/fo2tweaks_v14.zip",
+        "digest": "sha256:73742ec3686c5444ece30ff9a7564977b4fabbcfe5ff8fea8b3ef569fac94e26"
+      }
+    ]
+  },
+  {
+    "tag_name": "v13",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2025-12-07T08:03:54Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v13.zip",
+        "size": 505332,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v13/fo2tweaks_v13.zip",
+        "digest": "sha256:783aff05c8a8fe1bcda177f26cfc1860d3bec3b61c0f227a96acefe18fe1244e"
+      }
+    ]
+  },
+  {
+    "tag_name": "v12.24",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2025-10-11T03:02:06Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v12.24.zip",
+        "size": 504906,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v12.24/fo2tweaks_v12.24.zip",
+        "digest": "sha256:32399280faee07af46e6e4f094a0caa67421417d69748c6d1c31076fc74d9593"
+      }
+    ]
+  },
+  {
+    "tag_name": "v12.23",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2025-10-07T15:35:47Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v12.23.zip",
+        "size": 503596,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v12.23/fo2tweaks_v12.23.zip",
+        "digest": "sha256:bebeb181d982d598d738f9c3bf55f3e658de453cd09fc4d7dea3407d606d1a9c"
+      }
+    ]
+  },
+  {
+    "tag_name": "v12.22",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2025-02-28T07:25:12Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v12.22.zip",
+        "size": 495855,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v12.22/fo2tweaks_v12.22.zip",
+        "digest": null
+      }
+    ]
+  },
+  {
+    "tag_name": "v12.21",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2024-08-03T15:05:09Z",
+    "assets": [
+      {
+        "name": "fo2tweaks_v12.21.zip",
+        "size": 494845,
+        "browser_download_url": "https://github.com/BGforgeNet/FO2tweaks/releases/download/v12.21/fo2tweaks_v12.21.zip",
+        "digest": null
+      }
+    ]
+  },
+  {
+    "tag_name": "v1",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2015-12-13T10:30:55Z",
+    "assets": []
+  }
+]

@@ -694,6 +694,8 @@ extract-dat.into: data
             installer: None,
             installer_route: None,
             line: None,
+            rank: 0,
+            ranks: Default::default(),
         }
     }
 

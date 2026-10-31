@@ -729,7 +729,7 @@ class Store {
    */
   get modsUnsettled(): string | null {
     return this.modListing !== null && this.readingOffers
-      ? "Rereading the feeds and this game's folder. The rows below may be a moment out of date."
+      ? "Rereading the mod index and this game's folder. The rows below may be a moment out of date."
       : null;
   }
 
@@ -1155,7 +1155,7 @@ class Store {
   /** Both halves, for the Mods tab's Refresh button - the one control that asks the feeds again. */
   async loadModOffers(refresh = false): Promise<void> {
     if (!this.install) return;
-    await this.run("Reading the mod feeds", async () => {
+    await this.run("Reading the mod index", async () => {
       await this.readModListing(refresh);
       return null;
     });

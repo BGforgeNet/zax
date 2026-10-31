@@ -1060,6 +1060,9 @@ mod order {
     #[test]
     fn names_the_mods_loading_against_the_recommendation_and_sorting_puts_just_those_right() {
         let mut held = Machine::started();
+        // The orders come with the index, which the interface reads once an install is open.
+        assert_eq!(held.reading()["order"]["against"], json!([]));
+        held.act("read_mod_listing", &json!({ "refresh": false }));
         assert_eq!(
             held.reading()["order"]["against"],
             json!(["InventoryFilter.dat", "fo2tweaks.dat"])

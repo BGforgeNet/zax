@@ -35,15 +35,15 @@ Each page is the whole of its subject; nothing below is needed for a mod that is
 
 ## The id is forever
 
-The `id` is the feed match, the settings-id prefix, the removal convention and the record key. Renaming it
+The `id` is the index's match, the settings-id prefix, the removal convention and the record key. Renaming it
 publishes a different mod: existing installs would be offered a fresh install beside themselves rather than an
 upgrade. Ids may not begin with `game`, `hires` or `sfall`, the catalog's own namespaces. Part ids are forever
 for the same reason, as [Parts](mod-format/parts.md) spells out.
 
 ## Publishing nothing, for now
 
-ZAX carries manifests for the mods that describe themselves nowhere - the base mods, so far - so that they can
-be installed at all. Such a manifest is written by ZAX, ships in ZAX, and changes only with a ZAX release, which
-makes it a worse description of your mod than yours would be: it cannot know about a release until someone
-updates it. Publishing your own overrides it from the next release onward, with no coordination needed. The
-entry naming your mod is in `crates/fallout2/src/mod_vendored.rs`, and it is deleted once you publish.
+ZAX's maintainers write a manifest for each followed mod that describes itself nowhere - the base mods, so far -
+so that it can be installed at all. It sits in the mod's source file for the mod index, as its `document`, which
+makes it a worse description of your mod than yours would be: it is a guess at what you would write. Publishing
+your own overrides it from the next release onward, with no coordination needed, and the copy can then be deleted.
+The source files are in [the index sources](../fixtures/index/sources/).

@@ -11,7 +11,7 @@
 
   const KIND_LABEL = { dat: "dat", folder: "folder", file: "file", missing: "missing" } as const;
 
-  const PREVIEW_FEEDS = "The browser preview cannot reach the mod feeds - this needs the desktop build";
+  const PREVIEW_FEEDS = "The browser preview cannot download a release - this needs the desktop build";
 
   /**
    * The version the choice dialog is sitting on. Set where the list arrives rather than by an effect watching
@@ -71,11 +71,13 @@
           ? `Installed: ${state.from}, which can be removed. ${offer.version} cannot be - installing it gives that up.`
           : `Installed: ${state.from}, which cannot be removed. ${offer.version} can be.`;
       case "downgrade":
-        return `Installed: ${state.from}, newer than what the feed offers - a feed answering with an older release is worth distrusting.`;
+        return `Installed: ${state.from}, newer than what the mod index offers - an index answering with an older release is worth distrusting.`;
+      case "unlisted":
+        return `Installed: ${state.from}, a version the mod index does not list, so whether ${offer.version} is newer is not known.`;
       case "retry":
         return `An install of ${state.version} never finished.`;
       case "unfollowed":
-        return "Installed. No feed follows this mod any more, so updates will not be offered.";
+        return "Installed. The mod index no longer lists this mod, so updates will not be offered.";
       case "blocked":
         return state.why;
     }
@@ -115,6 +117,7 @@
       case "upgrade":
       case "convert":
       case "downgrade":
+      case "unlisted":
         return state.from;
       case "retry":
         return "incomplete";
@@ -129,7 +132,7 @@
    * The Available column. `version` on a row the record alone describes is what is on disk rather than an
    * offer, so it is not one to advertise - see `noFeed`.
    */
-  const availableOf = (offer: ModOffer): string => (offer.noFeed ? "no feed" : offer.version);
+  const availableOf = (offer: ModOffer): string => (offer.noFeed ? "not listed" : offer.version);
 
   /** Whether the row gets a Remove control: something of it is here, and its type permits removal. */
   function removable(offer: ModOffer): boolean {
@@ -141,7 +144,9 @@
     // comparison, so a blocked row naming an installed version is the ordinary state of a mod that raised its
     // floor in a later release - removable, like every other install, and not updatable until the gate passes.
     if (state.kind === "blocked") return state.from !== null;
-    return ["installed", "upgrade", "downgrade", "install-over", "unfollowed", "convert"].includes(state.kind);
+    return ["installed", "upgrade", "downgrade", "unlisted", "install-over", "unfollowed", "convert"].includes(
+      state.kind,
+    );
   }
 
   /** A schema's sections, in the order the manifest declares them - the author's one lever over layout. */
@@ -196,6 +201,9 @@
         return `Install ${offer.version} over it`;
       case "upgrade":
         return `Upgrade to ${offer.version}`;
+      // Not "upgrade": nothing can say which of the two is newer.
+      case "unlisted":
+        return `Replace with ${offer.version}`;
       // Named though neither can be acted on, so the column keeps its shape down the list and the reason is
       // on the control rather than only in the prose - `installRefusal` supplies it.
       case "installed":
@@ -297,8 +305,14 @@
         </div>
 
         {#if store.modListing === null}
-          <p class="empty">{store.readingOffers ? "Reading the mod feeds..." : "The feeds have not been read yet."}</p>
+          <p class="empty">
+            {store.readingOffers ? "Reading the mod index..." : "The mod index has not been read yet."}
+          </p>
         {:else}
+          <!-- About the index rather than any mod: that it could not be read, or how old it is. -->
+          {#if store.modListing.notice}
+            <p class="status warn index-notice">{store.modListing.notice}</p>
+          {/if}
           <div class="offers">
             {#if store.modListing.offers.length > 0}
               <!-- A heading for the two columns: a bare pair of versions beside a name does not say which is
@@ -442,7 +456,7 @@
             {/each}
           </div>
           {#if store.modListing.offers.length === 0 && store.modListing.failures.length === 0}
-            <p class="empty">No mod feeds are known for this game yet.</p>
+            <p class="empty">The mod index lists no mods for this game yet.</p>
           {/if}
         {/if}
       {:else if store.modsTab === "fission"}
@@ -1283,6 +1297,10 @@
 
   .status.warn {
     color: var(--invalid);
+  }
+
+  .index-notice {
+    margin: 0 0 8px;
   }
 
   /* The author and the mod's own pages on one line, which is one fact about the release rather than three. */

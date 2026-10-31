@@ -17,7 +17,7 @@ use zax_fallout2::manifest::{
     parse_manifest_with_grants, part_options,
 };
 use zax_fallout2::mod_feed::{ReleaseAsset, sole_archive, sole_executable, version_from_tag};
-use zax_fallout2::recommended_order::agreed_order;
+use zax_fallout2::recommended_order::{SHARED_ORDER, agreed_order};
 use zax_platform::{Error, Result};
 
 use crate::github::{Github, GithubAsset, GithubRelease};
@@ -82,7 +82,7 @@ fn orders(sources: &[Source]) -> Result<BTreeMap<String, Vec<String>>> {
             .into_iter()
             .map(ToOwned::to_owned)
             .collect();
-        out.insert("shared".to_owned(), shared);
+        out.insert(SHARED_ORDER.to_owned(), shared);
     }
     Ok(out)
 }

@@ -1,0 +1,128 @@
+[
+  {
+    "tag_name": "v2.0.3911",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-10-14T15:01:26Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 412718928,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v2.0.3911/Fallout1in2.zip",
+        "digest": "sha256:7510d44b55db9f8945100321c859210cf4e77aa3beb4a3958d7c00c82bfc18ee"
+      }
+    ]
+  },
+  {
+    "tag_name": "v1.16.3771",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-06-03T16:48:07Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 408198121,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v1.16.3771/Fallout1in2.zip",
+        "digest": "sha256:68777c2c32b911da902992c2d1cd5d4ce895059bd182909b579aa1eaeda0c686"
+      }
+    ]
+  },
+  {
+    "tag_name": "v1.15.3735",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-02-19T13:24:27Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 405639094,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v1.15.3735/Fallout1in2.zip",
+        "digest": "sha256:ce6c7fcfa26bc1f86a5106210b022ab88075738a09d6815206f474f7ed840131"
+      }
+    ]
+  },
+  {
+    "tag_name": "v1.14.3688",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2025-09-02T09:46:59Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 405610992,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v1.14.3688/Fallout1in2.zip",
+        "digest": "sha256:2e1170d339adb764d3ed2e14cd86a51053bee8a93a31b011425647a721c4f734"
+      }
+    ]
+  },
+  {
+    "tag_name": "v1.13.3643",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2025-07-28T15:10:04Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 405606504,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v1.13.3643/Fallout1in2.zip",
+        "digest": "sha256:e8683da23727a6578e88cb70076281f35aa14af5b3347e0697b60771f317d538"
+      }
+    ]
+  },
+  {
+    "tag_name": "v1.12.3613",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2025-05-09T10:35:19Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 405570687,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v1.12.3613/Fallout1in2.zip",
+        "digest": null
+      }
+    ]
+  },
+  {
+    "tag_name": "v1.11.3575",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2025-01-05T21:11:59Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 405485406,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v1.11.3575/Fallout1in2.zip",
+        "digest": null
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1476",
+    "prerelease": true,
+    "draft": false,
+    "published_at": "2020-01-10T06:00:30Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 231945491,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v0.1476/Fallout1in2.zip",
+        "digest": null
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1207",
+    "prerelease": true,
+    "draft": false,
+    "published_at": "2019-12-01T02:26:00Z",
+    "assets": [
+      {
+        "name": "Fallout1in2.zip",
+        "size": 152667577,
+        "browser_download_url": "https://github.com/rotators/Fo1in2/releases/download/v0.1207/Fallout1in2.zip",
+        "digest": null
+      }
+    ]
+  }
+]

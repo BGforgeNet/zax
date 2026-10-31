@@ -16,7 +16,9 @@ mods as well as settings.
 - **Mods.** Install, upgrade and remove mods published as releases, with their settings edited like the game's
   own. Upgrades keep the changes you made to a mod's ini rather than overwriting them, an interrupted install
   can be resumed or put back exactly, and removal deletes only what was recorded as installed. A mod's row says
-  what it is and who wrote it, and opens its forum thread or its home page where the release publishes one.
+  what it is and who wrote it, and opens its forum thread or its home page where the release publishes one. The
+  mods come from one index ZAX's maintainers keep, so a newly followed mod or release appears without a ZAX
+  update, and every download is checked against the digest the index states for it.
 - **Big mods too.** Restoration Project and the Unofficial Patch install through their own installers. On
   Windows that installer's own window opens, where you pick your language and anything else it offers. ZAX
   points it at the right folder, waits, and takes over again when it finishes - and says so if you close it
@@ -29,8 +31,8 @@ mods as well as settings.
   a Fallout et tu installation on the list - the row says so rather than offering to unpack a release over it,
   since Fallout et tu publishes no update of any kind and one laid over an install would overwrite the mod's
   own configuration and load order.
-- **An older release, where you want one.** Every mod row can install a version other than the newest its feed
-  publishes - never one below what is already installed, which a base mod's installer has no way to undo.
+- **An older release, where you want one.** Every mod row can install a version other than the newest the index
+  lists - never one below what is already installed, which a base mod's installer has no way to undo.
 - **What a release offers is asked before it downloads.** A mod publishing variants or add-ons asks which you
   want, and carries the answer to the next upgrade.
 - **Load order.** Reorder and enable mods, see which installed mod each entry belongs to, sort to a
@@ -47,7 +49,7 @@ mods as well as settings.
   where every card shows the selected game's build - or pick one as you run it from the arrow beside Run in CE.
   Games follow the newest build you hold until you choose otherwise, a game you pin to an older build stays on
   it, and Follow latest takes it back.
-- **Update checks run at startup.** What ZAX, sfall, the engines and the mod feeds have published is asked for
+- **Update checks run at startup.** What ZAX, sfall, the engines and the mod index have published is asked for
   when the window opens rather than waiting on a Check button - once, since none of it depends on which game is
   selected. Switching games only re-checks that game's folder. A machine that cannot reach any of it is left as
   it was: the versions read as unchecked, and the buttons still ask.

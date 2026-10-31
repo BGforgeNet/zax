@@ -3,6 +3,8 @@
 //! The order file is written whole, so "changed" is a comparison of the two lists rather than a flag to
 //! keep in step, and it counts as one unsaved change however much of it moved.
 
+use std::collections::BTreeMap;
+
 use zax_core::install::GameType;
 
 use crate::fission::fission_mounts;
@@ -42,6 +44,10 @@ pub struct OrderSession {
     pub mods: Vec<Mod>,
     baseline: Vec<Mod>,
 }
+
+/// The editions' load orders, keyed as the mod index keys them. Asked for at each use rather than held:
+/// the index may be read after the folder is.
+pub type EditionOrders = BTreeMap<String, Vec<String>>;
 
 impl OrderSession {
     #[must_use]
@@ -94,13 +100,13 @@ impl OrderSession {
 
     /// The order this install is judged against: its own project's, or the shared fallback, with the
     /// places the installed mods state for themselves folded in.
-    fn recommendation(&self, game_type: GameType) -> Vec<String> {
-        order_with(recommendation_for(game_type), &self.claims)
+    fn recommendation(&self, game_type: GameType, orders: &EditionOrders) -> Vec<String> {
+        order_with(&recommendation_for(orders, game_type), &self.claims)
     }
 
     /// Puts the mods the recommendation names in its order; everything else keeps its place.
-    pub fn sort(&mut self, game_type: GameType) {
-        let order = self.recommendation(game_type);
+    pub fn sort(&mut self, game_type: GameType, orders: &EditionOrders) {
+        let order = self.recommendation(game_type, orders);
         let named: Vec<&str> = order.iter().map(String::as_str).collect();
         self.mods = recommended_order(&self.mods, &named);
     }
@@ -119,8 +125,8 @@ impl OrderSession {
     }
 
     #[must_use]
-    pub fn view(&self, game_type: GameType) -> OrderView {
-        let order = self.recommendation(game_type);
+    pub fn view(&self, game_type: GameType, orders: &EditionOrders) -> OrderView {
+        let order = self.recommendation(game_type, orders);
         let named: Vec<&str> = order.iter().map(String::as_str).collect();
         let names = |keep: &dyn Fn(&Mod) -> bool| {
             self.mods
@@ -195,9 +201,33 @@ mod tests {
     #[test]
     fn forgetting_the_missing_drops_only_what_is_gone() {
         let mut held = session("a.dat\ngone.dat\n", &["a.dat"]);
-        assert_eq!(held.view(GameType::Fallout2).missing, ["gone.dat"]);
+        assert_eq!(
+            held.view(GameType::Fallout2, &EditionOrders::new()).missing,
+            ["gone.dat"]
+        );
         held.forget_missing();
         assert_eq!(shown(&held), ["a.dat"]);
+    }
+
+    #[test]
+    fn the_recommendation_is_the_one_given_when_the_view_is_drawn() {
+        // The index can arrive after the folder was read, so the session holds no copy of its own.
+        let mut held = session("b.dat\na.dat\n", &["a.dat", "b.dat"]);
+        assert!(
+            held.view(GameType::Fallout2, &EditionOrders::new())
+                .against
+                .is_empty()
+        );
+        let orders = EditionOrders::from([(
+            "shared".to_owned(),
+            vec!["a.dat".to_owned(), "b.dat".to_owned()],
+        )]);
+        assert_eq!(
+            held.view(GameType::Fallout2, &orders).against,
+            ["b.dat", "a.dat"]
+        );
+        held.sort(GameType::Fallout2, &orders);
+        assert_eq!(shown(&held), ["a.dat", "b.dat"]);
     }
 
     #[test]
@@ -206,7 +236,10 @@ mod tests {
             format: Some(OrderFormat::Fission),
             ..ModsSnapshot::default()
         });
-        let closed = held.view(GameType::Fallout2).closed.expect("a closed tab");
+        let closed = held
+            .view(GameType::Fallout2, &EditionOrders::new())
+            .closed
+            .expect("a closed tab");
         assert!(closed.contains("Fission's format"));
         assert!(closed.contains("Run the game or another engine"));
     }

@@ -4,8 +4,10 @@ import type { ModOffer } from "./ModOffer";
 
 export type ModListing = { offers: Array<ModOffer>, 
 /**
- * Feeds that could not answer, each with why - offline, no manifest yet, needs a newer ZAX. Base
- * mods only: a stacking mod nobody can read is not news, and four such rows would bury the mods
- * that did answer.
+ * Listed mods none of whose releases this version can install, each with why.
  */
-failures: Array<FeedFailure>, };
+failures: Array<FeedFailure>, 
+/**
+ * What to say about the index itself: that it could not be read, or that it is old.
+ */
+notice: string | null, };

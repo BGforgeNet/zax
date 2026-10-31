@@ -49,8 +49,8 @@ const offer = (over: Record<string, unknown> = {}): ModOffer => {
 const available = (availability: Record<string, unknown>) =>
   (availability.kind === "blocked" ? { from: null, ...availability } : availability) as ModOffer["availability"];
 
-const listing = (offers: ModOffer[], failures: ModListing["failures"] = []) =>
-  vi.spyOn(store, "modListing", "get").mockReturnValue({ offers, failures });
+const listing = (offers: ModOffer[], failures: ModListing["failures"] = [], notice: string | null = null) =>
+  vi.spyOn(store, "modListing", "get").mockReturnValue({ offers, failures, notice });
 
 const publish = (
   over: Record<string, unknown> = {},
@@ -141,7 +141,7 @@ describe("before the feeds have answered", () => {
   /* "Reading" and "not read yet" are different states, and a shared message would hide which one this is. */
   test("distinguishes a read in flight from one that never started", () => {
     vi.spyOn(store, "modListing", "get").mockReturnValue(null);
-    expect(view().one("p.empty").textContent).toContain("have not been read yet");
+    expect(view().one("p.empty").textContent).toContain("has not been read yet");
   });
 });
 
@@ -204,7 +204,7 @@ describe("what an offer's status says", () => {
     ]);
     const v = view();
     expect(v.all(".offer:not(.head) .current")[0]?.textContent?.trim()).toBe("1.0");
-    expect(v.all(".offer:not(.head) .offered")[0]?.textContent?.trim()).toBe("no feed");
+    expect(v.all(".offer:not(.head) .offered")[0]?.textContent?.trim()).toBe("not listed");
   });
 
   /* The sfall gate answers before the version comparison, so a refused row is frequently an installed mod. */
@@ -215,8 +215,16 @@ describe("what an offer's status says", () => {
   /* A feed answering with an older release than what is installed is worth distrusting, so the row says so. */
   test("a feed offering something older than what is installed says the feed is suspect", () => {
     const text = status({ kind: "downgrade", from: "15.0" });
-    expect(text).toContain("newer than what the feed offers");
+    expect(text).toContain("newer than what the mod index offers");
     expect(text).toContain("worth distrusting");
+  });
+
+  /* Nothing can order a version the index does not list, so the row claims neither upgrade nor downgrade. */
+  test("an installed version the index does not list is offered a replacement, not an upgrade", () => {
+    const text = status({ kind: "unlisted", from: "1.5" });
+    expect(text).toContain("1.5");
+    expect(text).toContain("does not list");
+    expect(columns({ kind: "unlisted", from: "1.5" }).current).toBe("1.5");
   });
 
   test("a mod in the folder with no record says it was installed by hand", () => {
@@ -246,7 +254,7 @@ describe("what an offer's status says", () => {
     onlyInRecord([
       { id: "old", name: "An older mod", version: "1.0", type: "pluggable", availability: { kind: "unfollowed" } },
     ]);
-    expect(view().one("p.status").textContent).toContain("No feed follows this mod");
+    expect(view().one("p.status").textContent).toContain("no longer lists this mod");
   });
 
   test("a blocked mod gives the reason it is blocked, in its own words", () => {
@@ -352,6 +360,9 @@ describe("what a row offers to do", () => {
     expect(actions({ kind: "upgrade", from: "14.7" })).toContain("Upgrade to 14.8");
     unmountAll();
     expect(actions({ kind: "install-over" })).toContain("Install 14.8 over it");
+    unmountAll();
+    // Nothing can say a version the index does not list is older, so the offer is not called an upgrade.
+    expect(actions({ kind: "unlisted", from: "1.5" })).toContain("Replace with 14.8");
   });
 
   /*
@@ -445,7 +456,7 @@ describe("what a row offers to do", () => {
     expect(drawn.all(".offer .primary")[0]?.hasAttribute("disabled")).toBe(true);
     // The reason on screen, not only a greyed control: both come from one sentence in the store.
     expect(drawn.one(".reading p").textContent).toBe(store.modsUnsettled);
-    expect(drawn.text()).toContain("Rereading the feeds and this game's folder.");
+    expect(drawn.text()).toContain("Rereading the mod index and this game's folder.");
     // The whole tab under it, refused in one act rather than control by control.
     expect(drawn.one(".scroll").hasAttribute("inert")).toBe(true);
   });
@@ -487,24 +498,35 @@ describe("a mod that says up front it cannot be uninstalled", () => {
   });
 });
 
-describe("a feed that could not be read", () => {
+describe("a mod with nothing this version can install", () => {
   test("is listed with its reason rather than dropped silently", () => {
     nothingPublished([
       {
-        repository: "BGforgeNet/Fallout2_Restoration_Project",
         id: "rpu",
         name: "Restoration Project",
-        why: "The feed did not answer.",
+        why: "Restoration Project 2.5 needs a newer version of ZAX (it uses later).",
       },
     ]);
     const v = view();
     expect(v.text()).toContain("Restoration Project");
-    expect(v.text()).toContain("The feed did not answer.");
+    expect(v.text()).toContain("needs a newer version of ZAX");
   });
 
-  test("says no feeds are known when there is neither an offer nor a failure", () => {
+  test("says the index lists nothing when there is neither an offer nor a failure", () => {
     nothingPublished();
-    expect(view().one("p.empty").textContent).toContain("No mod feeds are known");
+    expect(view().one("p.empty").textContent).toContain("lists no mods for this game");
+  });
+});
+
+describe("the index itself", () => {
+  test("says above the list that it could not be read, or how old it is", () => {
+    listing([offer({})], [], "The mod index was last updated 20 days ago.");
+    expect(view().one("p.index-notice").textContent).toBe("The mod index was last updated 20 days ago.");
+  });
+
+  test("says nothing about itself while it is current", () => {
+    publish();
+    expect(view().all("p.index-notice")).toHaveLength(0);
   });
 });
 

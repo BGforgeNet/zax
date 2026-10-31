@@ -47,17 +47,16 @@ use crate::files::CONFIG_FILES;
 use crate::hires::installed_hires_version;
 use crate::install_lock::still_running;
 use crate::launch::{game_program, plan_launch};
-use crate::manifest::{DroppedSetting, ManifestDefaults, ModSetting, may_write, parse_manifest};
+use crate::manifest::{DroppedSetting, ModSetting, may_write};
 use crate::mod_asset::ModProgress;
 use crate::mod_base::{BaseInstallOutcome, BaseInstallPlan, apply_base_install, plan_base_install};
 use crate::mod_create::{
     CreateInstallOutcome, CreateInstallPlan, apply_create_install, plan_create_install,
 };
 use crate::mod_feed::{
-    FeedSource, MOD_FEEDS, ModFeedListing, ModInstallState, ModRelease, compare_in_line,
-    fetch_feed, fetch_feed_at, list_mod_versions, read_mod_feeds, read_mod_install_state,
+    ModFeedListing, ModFeeds, ModInstallState, ModRelease, held_orders, list_mod_versions,
+    read_mod_feeds, read_mod_install_state, release_named,
 };
-use crate::mod_grants::grants_for;
 use crate::mod_install::{
     ModInstallOutcome, ModInstallPlan, ModRemoval, apply_mod_install, plan_mod_install,
     restore_mod_install, uninstall_mod,
@@ -67,8 +66,11 @@ use crate::mods::{
     ModsSaveRequest, ModsSnapshot, OrderFormat, OrderSwap, preview_order_swap, read_mods,
     save_mods, swap_order_to,
 };
+use crate::order_session::EditionOrders;
 use crate::reconcile_settings::{HeldTarget, address, address_of};
-use crate::records::{InstalledEngine, load_record, reconcile_record, save_record};
+use crate::records::{
+    InstalledEngine, grants_of, load_record, manifest_of, reconcile_record, save_record,
+};
 mod app;
 
 pub use app::{
@@ -381,20 +383,12 @@ impl Reporter {
     }
 }
 
-/// What the feeds published, read once and kept.
-#[derive(Debug, Clone)]
-struct HeldFeeds {
-    listing: ModFeedListing,
-    releases: Vec<ModRelease>,
-}
-
 pub struct Backend {
     platform: Arc<dyn Platform>,
     shell: Arc<dyn Shell>,
-    /// A repository publishes one release whichever game folder is selected, so re-reading it per
-    /// install would spend the same requests - and, inside the feed cache's window, the same parse of
-    /// the same files - to arrive at the answer already held.
-    feeds: Mutex<Option<HeldFeeds>>,
+    /// The index lists one current release per mod whichever game folder is selected, so re-reading it
+    /// per install would arrive at the answer already held.
+    feeds: Mutex<Option<ModFeeds>>,
     /// The running operation's cancel. One at a time because the interface refuses to start a second
     /// while one runs, and cleared as it is used so a click that arrives late cannot reach whatever
     /// started next.
@@ -476,8 +470,8 @@ impl Backend {
         }
     }
 
-    /// The feeds as last read, reading them if nothing has.
-    fn feeds_held(&self) -> HeldFeeds {
+    /// The index as last read, reading it if nothing has.
+    fn feeds_held(&self) -> ModFeeds {
         let mut held = self
             .feeds
             .lock()
@@ -485,34 +479,46 @@ impl Backend {
         if let Some(held) = held.as_ref() {
             return held.clone();
         }
-        let (listing, releases) = read_mod_feeds(self.platform(), self.shell.millis());
-        let read = HeldFeeds { listing, releases };
+        let read = read_mod_feeds(self.platform(), self.shell.millis());
         *held = Some(read.clone());
         read
     }
 
-    /// The feeds where something has read them, and nothing otherwise - for a reading of an install,
+    /// The index where something has read it, and nothing otherwise - for a reading of an install,
     /// which must not reach the network on its own initiative.
-    fn feeds_if_read(&self) -> Option<HeldFeeds> {
+    fn feeds_if_read(&self) -> Option<ModFeeds> {
         self.feeds
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
 
-    /// The same, for the two callers asking after the feeds themselves rather than needing a release
-    /// from them: startup and the Refresh control. `again` is Refresh, and a held answer carrying a
-    /// refusal is read again regardless - the machine that was offline when ZAX started may not be a
+    /// The editions' load orders: the index's as this session read it, else as the last one cached it.
+    /// Read where an order is judged rather than when the folder is, since the index may arrive later.
+    fn edition_orders(&self) -> EditionOrders {
+        let read = self
+            .feeds
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+            .and_then(|feeds| feeds.index.as_ref().map(|index| index.orders.clone()));
+        // A cached copy that cannot be read from disk ranks nothing, which is how a folder stands with
+        // no index at all; the Mods tab's own read reports the index failing.
+        read.unwrap_or_else(|| held_orders(self.platform()).unwrap_or_default())
+    }
+
+    /// The same, for the two callers asking after the index itself rather than needing a release from
+    /// it: startup and the Refresh control. `again` is Refresh, and a held answer that could not read
+    /// the index is read again regardless - the machine that was offline when ZAX started may not be a
     /// minute later.
     ///
-    /// That retry belongs here and not in `feeds_held`, or an offline machine would attempt every feed
+    /// That retry belongs here and not in `feeds_held`, or an offline machine would attempt the index
     /// again on every change of game, which is the cost the two halves exist to avoid.
-    fn feeds_asked(&self, again: bool) -> HeldFeeds {
-        if !again && self.feeds_held().listing.failures.is_empty() {
+    fn feeds_asked(&self, again: bool) -> ModFeeds {
+        if !again && self.feeds_held().index.is_some() {
             return self.feeds_held();
         }
-        let (listing, releases) = read_mod_feeds(self.platform(), self.shell.millis());
-        let read = HeldFeeds { listing, releases };
+        let read = read_mod_feeds(self.platform(), self.shell.millis());
         *self
             .feeds
             .lock()
@@ -540,26 +546,33 @@ impl Backend {
                 selection: open.selection,
             });
         }
-        let Some(feed) = MOD_FEEDS.iter().find(|entry| entry.id == mod_id) else {
-            return Err(Error::Unsupported(format!(
-                "No known feed carries \"{mod_id}\"."
-            )));
-        };
-        let source = FeedSource::from(feed);
-        // A version the user picked is fetched by name; otherwise the release the listing was drawn
-        // from, so what gets installed is the version the button offered. Going back to the feed for the
+        // A version the user picked is taken by name; otherwise the release the listing was drawn from,
+        // so what gets installed is the version the button offered. Reading the index again for the
         // newest here would let a release published since open the plan the user never saw, and the
         // confirmation compares the two - so the flow would refuse itself rather than install anything.
+        let feeds = self.feeds_held();
+        let Some(index) = &feeds.index else {
+            return Err(Error::Unsupported(
+                "The mod index could not be read, so nothing can be installed from it.".to_owned(),
+            ));
+        };
         let release = match version {
-            Some(version) => fetch_feed_at(self.platform(), &source, version, self.shell.millis())?,
-            None => match self
-                .feeds_held()
-                .releases
-                .into_iter()
-                .find(|one| one.manifest.id == mod_id)
-            {
-                Some(held) => held,
-                None => fetch_feed(self.platform(), &source, self.shell.millis())?,
+            Some(version) => release_named(self.platform(), index, mod_id, version)?,
+            None => match feeds.releases.iter().find(|one| one.manifest.id == mod_id) {
+                Some(held) => held.clone(),
+                None => {
+                    return Err(Error::Unsupported(
+                        feeds
+                            .listing
+                            .failures
+                            .iter()
+                            .find(|one| one.id == mod_id)
+                            .map_or_else(
+                                || format!("The mod index offers no release of \"{mod_id}\"."),
+                                |failure| failure.why.clone(),
+                            ),
+                    ));
+                }
             },
         };
         Ok(ChosenRelease {
@@ -578,13 +591,7 @@ impl Backend {
             }
             // The mod stays installed and listed; only its configuration surface is missing, as it is
             // for any mod without a schema.
-            let Ok(manifest) = parse_manifest(
-                held.manifest.as_bytes(),
-                &ManifestDefaults {
-                    version: Some(held.version.clone()),
-                    archive: None,
-                },
-            ) else {
+            let Some(manifest) = manifest_of(&held) else {
                 continue;
             };
             // A mod without a schema gets no configuration surface - the schema is the convention. One
@@ -876,7 +883,7 @@ impl Backend {
         let sfall = installed_sfall_version(self.platform(), install)?;
         read_mod_install_state(
             self.platform(),
-            &self.feeds_held().releases,
+            &self.feeds_held(),
             install,
             &record,
             sfall.as_deref(),
@@ -961,31 +968,28 @@ impl Backend {
         })
     }
 
-    /// The versions this mod's feed publishes, newest first, for a row that offers a choice rather than
-    /// only the release at the head of its line. `above` is what the install already carries, and the
-    /// answer excludes it and everything below: the comparison belongs here, where the release line
-    /// that defines it is known.
+    /// The versions the index lists for this mod, newest first, for a row that offers a choice rather
+    /// than only the release at the head of its line. `above` is what the install already carries, and
+    /// the answer excludes it and everything below - by the index's own ranking, so where `above` is a
+    /// version the index does not list, nothing can be excluded and every version is offered.
     ///
     /// # Errors
     ///
-    /// Fails where no known feed carries the id, or where the listing cannot be read.
+    /// Fails where the index cannot be read or does not list the id.
     pub fn mod_versions(&self, mod_id: &str, above: Option<&str>) -> Result<Vec<String>> {
-        let Some(feed) = MOD_FEEDS.iter().find(|entry| entry.id == mod_id) else {
-            return Err(Error::Unsupported(format!(
-                "No known feed carries \"{mod_id}\"."
-            )));
+        let Some(index) = self.feeds_held().index else {
+            return Err(Error::Unsupported(
+                "The mod index could not be read, so no versions can be listed.".to_owned(),
+            ));
         };
-        let source = FeedSource::from(feed);
-        let versions = list_mod_versions(self.platform(), &source, self.shell.millis())?;
-        let Some(above) = above else {
-            return Ok(versions);
-        };
-        Ok(versions
-            .into_iter()
-            .filter(|version| {
-                compare_in_line(feed.line.as_ref(), version, above) == std::cmp::Ordering::Greater
-            })
-            .collect())
+        let versions = list_mod_versions(&index, mod_id)?;
+        // Newest first, so everything before `above` is what ranks above it.
+        Ok(
+            match above.and_then(|held| versions.iter().position(|one| one == held)) {
+                Some(at) => versions[..at].to_vec(),
+                None => versions,
+            },
+        )
     }
 
     /// Unwinds an install that never finished; the working directory holds everything it puts back.
@@ -1030,13 +1034,7 @@ impl Backend {
         // Bounded to the files the record itself declares - its state snapshots and its schema's files.
         let mut allowed: BTreeSet<String> = held.shipped.keys().cloned().collect();
         // An unreadable snapshot narrows what may be opened; it does not widen anything.
-        if let Ok(manifest) = parse_manifest(
-            held.manifest.as_bytes(),
-            &ManifestDefaults {
-                version: Some(held.version.clone()),
-                archive: None,
-            },
-        ) {
+        if let Some(manifest) = manifest_of(held) {
             for setting in &manifest.settings {
                 allowed.insert(setting.def.targets.own().file.clone());
             }
@@ -1044,7 +1042,9 @@ impl Backend {
         // The second condition is defence in depth: both sources of `allowed` are already bounded the
         // same way - the record reader drops an entry naming a path the mod may not write, and the
         // manifest parser does the same to a setting's file.
-        if !allowed.contains(file) || !may_write(file, grants_for(mod_id)) {
+        let grants = grants_of(held);
+        let granted: Vec<&str> = grants.iter().map(String::as_str).collect();
+        if !allowed.contains(file) || !may_write(file, &granted) {
             return Err(Error::Unsupported(format!(
                 "\"{file}\" is not one of {mod_id}'s files."
             )));
@@ -1870,10 +1870,27 @@ mod tests {
     }
 
     #[test]
-    fn a_mod_no_known_feed_carries_has_no_versions_to_offer() {
-        let (backend, _) = backend_with(&[]);
-        let err = backend.mod_versions("nobody", None).expect_err("no feed");
-        assert!(format!("{err}").contains("No known feed carries"), "{err}");
+    fn a_mod_the_index_does_not_list_has_no_versions_to_offer() {
+        let (backend, platform) = backend_with(&[]);
+        let err = backend.mod_versions("nobody", None).expect_err("no index");
+        assert!(format!("{err}").contains("could not be read"), "{err}");
+        // A cached index answers once the network will not, and it lists nothing by that id.
+        platform
+            .fs()
+            .write(
+                &crate::mod_feed::index_cache_path(&*platform),
+                br#"{"format": 1, "generated": "2026-10-31T00:00:00Z", "mods": []}"#,
+            )
+            .expect("a cache the test seeds");
+        // The Refresh control is what reads an index that could not be read before.
+        assert!(backend.published_mods(true).notice.is_none());
+        let err = backend
+            .mod_versions("nobody", None)
+            .expect_err("not listed");
+        assert!(
+            format!("{err}").contains("does not list \"nobody\""),
+            "{err}"
+        );
     }
 
     #[test]

@@ -573,8 +573,8 @@ mod tests {
     }
 
     #[test]
-    fn the_feeds_are_read_for_real_from_the_captured_listings() {
-        // A listing states what exists and does nothing with it, so a real capture of one is not the
+    fn the_mods_tab_reads_the_seeded_index_for_real() {
+        // The index states what exists and does nothing with it, so a real build of one is not the
         // invented version number the rest of this seam refuses to produce.
         let (held, _) = started();
         let view = held

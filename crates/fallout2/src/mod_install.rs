@@ -27,10 +27,9 @@ use zax_platform::fs::{DirEntry, FileKind};
 use zax_platform::{Error, Platform, Result};
 
 use crate::archive_preflight::{is_archiving_clutter, preflight_archive};
-use crate::manifest::{ManifestDefaults, ModManifest, ModPart, ModType, may_write, parse_manifest};
+use crate::manifest::{ModManifest, ModPart, ModType, may_write};
 use crate::mod_asset::{AssetNaming, ModProgress, fetch_asset};
-use crate::mod_feed::{ModRelease, ReleaseAsset, is_archive_name};
-use crate::mod_grants::grants_for;
+use crate::mod_feed::{ModRelease, ReleaseAsset, held_orders, is_archive_name};
 use crate::mod_parts::chosen_parts;
 use crate::mod_transaction::{
     ModTransaction, PinnedAsset, mod_work_directory, read_transaction, write_transaction,
@@ -40,7 +39,9 @@ use crate::mods::{
     named_in_order, order_dats, read_mods, restore_order, save_mods,
 };
 use crate::recommended_order::{order_with, place_for, recommendation_for};
-use crate::records::{InstallRecord, InstalledMod, assert_usable, load_record, save_record};
+use crate::records::{
+    InstallRecord, InstalledMod, assert_usable, grants_of, load_record, manifest_of, save_record,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "../../../packages/ui/src/lib/bindings/")]
@@ -321,7 +322,7 @@ pub fn plan_mod_install(
     assert_usable(&load_record(platform, &install.path)?, &manifest.id)?;
     let payloads = payloads_for(release, selection)?;
     let work = mod_work_directory(platform, install, &manifest.id);
-    let granted = grants_for(&manifest.id);
+    let granted: Vec<&str> = manifest.grants.iter().map(String::as_str).collect();
 
     let mut files: Vec<PlannedFile> = Vec::new();
     let mut order_lines: Vec<String> = Vec::new();
@@ -372,7 +373,7 @@ pub fn plan_mod_install(
 
         let mut mine: Vec<PlannedFile> = Vec::new();
         for entry in entries {
-            if entry.kind != ArchiveEntryKind::File || !may_write(&entry.name, granted) {
+            if entry.kind != ArchiveEntryKind::File || !may_write(&entry.name, &granted) {
                 continue;
             }
             // Dropped rather than deployed: what the archiving machine added is not the mod, and
@@ -535,8 +536,8 @@ fn update_order_lines(
         .collect();
     // The record is written before the first byte is deployed, so the mod being installed has already
     // stated its own place by the time this runs, alongside every mod that stated one before it.
-    let base = recommendation_for(install.game_type);
-    let order = order_with(base, &snapshot.claims);
+    let base = recommendation_for(&held_orders(platform)?, install.game_type);
+    let order = order_with(&base, &snapshot.claims);
     let order: Vec<&str> = order.iter().map(String::as_str).collect();
     for name in &enable {
         // A line the file already carries stays where the user put it; only a first placement is ZAX's
@@ -929,9 +930,10 @@ pub fn restore_mod_install(
     };
 
     let root = Path::new(&install.path);
-    let granted = grants_for(id);
+    let grants = grants_of(pending);
+    let granted: Vec<&str> = grants.iter().map(String::as_str).collect();
     for path in &pending.files {
-        if !may_write(path, granted) {
+        if !may_write(path, &granted) {
             continue;
         }
         let target = inside_path(root, path);
@@ -1006,7 +1008,7 @@ fn permanence_of(recorded: &InstalledMod) -> Permanence {
         };
     }
     // A snapshot this version cannot read gives no verdict, which the caller refuses on.
-    match snapshot_of(recorded) {
+    match manifest_of(recorded) {
         None => Permanence {
             mod_type: None,
             name: recorded.id.clone(),
@@ -1020,21 +1022,10 @@ fn permanence_of(recorded: &InstalledMod) -> Permanence {
     }
 }
 
-fn snapshot_of(recorded: &InstalledMod) -> Option<ModManifest> {
-    parse_manifest(
-        recorded.manifest.as_bytes(),
-        &ManifestDefaults {
-            version: Some(recorded.version.clone()),
-            archive: None,
-        },
-    )
-    .ok()
-}
-
 /// The directory a recorded mod created, where its manifest snapshot says it created one. A snapshot
 /// this version cannot read says nothing either way, and the general sentence is the safe one.
 fn created_directory(recorded: &InstalledMod) -> Option<String> {
-    snapshot_of(recorded)?
+    manifest_of(recorded)?
         .creates
         .map(|creates| creates.directory)
 }
@@ -1103,9 +1094,10 @@ pub fn uninstall_mod(
 
     let backup = backup_directory(platform).join(stamp(now));
     let mut deleted: Vec<String> = Vec::new();
-    let granted = grants_for(id);
+    let grants = recorded.as_ref().map(grants_of).unwrap_or_default();
+    let granted: Vec<&str> = grants.iter().map(String::as_str).collect();
     for path in &files {
-        if !may_write(path, granted) {
+        if !may_write(path, &granted) {
             continue;
         }
         let target = inside_path(root, path);
@@ -1190,6 +1182,7 @@ fn refuse_removal(recorded: &InstalledMod) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::manifest::{ManifestDefaults, parse_manifest};
     use zax_core::install::GameType;
     use zax_platform::memory::{Content, MemoryOptions, MemoryPlatform};
 
@@ -1245,6 +1238,8 @@ mod tests {
             installer: None,
             installer_route: None,
             line: None,
+            rank: 0,
+            ranks: Default::default(),
         }
     }
 

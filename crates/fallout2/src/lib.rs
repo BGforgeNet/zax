@@ -28,13 +28,11 @@ pub mod mod_choice;
 pub mod mod_create;
 pub mod mod_created;
 pub mod mod_feed;
-pub mod mod_grants;
 pub mod mod_ini;
 pub mod mod_install;
 pub mod mod_parts;
 pub mod mod_state;
 pub mod mod_transaction;
-pub mod mod_vendored;
 pub mod mods;
 pub mod order_session;
 #[cfg(any(test, feature = "fixtures"))]

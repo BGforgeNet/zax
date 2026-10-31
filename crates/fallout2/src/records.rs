@@ -21,10 +21,9 @@ use zax_platform::{Error, Platform, Result};
 
 use crate::manifest::{
     ManifestDefaults, ModManifest, ModType, inside_mods, is_confined, is_mod_id, is_mod_version,
-    may_write, parse_manifest,
+    may_write, parse_held_manifest,
 };
 use crate::mod_created::created_install_path;
-use crate::mod_grants::grants_for;
 
 /// Bumped when the meaning of a field changes - the same rule the manifest's `spec` carries, and read
 /// as the same kind of floor: a record stating a later format is one this version may read but must
@@ -184,14 +183,27 @@ pub fn assert_usable(record: &InstallRecord, id: &str) -> Result<()> {
 /// the same fallback everywhere rather than one per reader.
 #[must_use]
 pub fn manifest_of(held: &InstalledMod) -> Option<ModManifest> {
-    parse_manifest(
-        held.manifest.as_bytes(),
+    snapshot_manifest(&held.manifest, &held.version)
+}
+
+fn snapshot_manifest(text: &str, version: &str) -> Option<ModManifest> {
+    parse_held_manifest(
+        text.as_bytes(),
         &ManifestDefaults {
-            version: Some(held.version.clone()),
+            version: Some(version.to_owned()),
             archive: None,
         },
     )
     .ok()
+}
+
+/// Where a recorded mod may write outside `mods/`: what the index granted the release it installed,
+/// as its snapshot carries. Nothing, where the snapshot cannot be read.
+#[must_use]
+pub fn grants_of(held: &InstalledMod) -> Vec<String> {
+    manifest_of(held)
+        .map(|manifest| manifest.grants)
+        .unwrap_or_default()
 }
 
 /// What to call a recorded mod.
@@ -265,19 +277,21 @@ fn read_mod(entry: &Yaml) -> Option<InstalledMod> {
         _ => None,
     };
 
-    // Judged against what ZAX grants this id, not against what the entry claims: a record is the one
-    // route into these paths that skipped the manifest, so it must not reach further than a manifest
-    // could.
+    // Judged against what the entry's own manifest snapshot was granted, not against its file list: a
+    // file list reaching past what any manifest could declare is a damaged entry.
     //
     // A base mod is the exception, and the reason is what it is: its installer owns the whole game
     // directory, and the files it keeps for the user sit at the root by the engine's design. The
     // bound that still holds is the install directory itself.
-    let granted = grants_for(&id);
+    let grants = snapshot_manifest(&manifest, &version)
+        .map(|held| held.grants)
+        .unwrap_or_default();
+    let granted: Vec<&str> = grants.iter().map(String::as_str).collect();
     let writable = |path: &str| {
         if mod_type == Some(ModType::Base) {
             is_confined(path)
         } else {
-            may_write(path, granted)
+            may_write(path, &granted)
         }
     };
 

@@ -3,6 +3,7 @@ import type { FeedFailure } from "./FeedFailure";
 import type { PublishedMod } from "./PublishedMod";
 
 /**
- * Every feed's current release, and the feeds that could not answer. Read once, not once per install.
+ * Every listed mod's current release, and the mods that have none to offer. Read once, not once per
+ * install.
  */
-export type ModFeedListing = { published: Array<PublishedMod>, failures: Array<FeedFailure>, };
+export type ModFeedListing = { published: Array<PublishedMod>, failures: Array<FeedFailure>, notice: string | null, };

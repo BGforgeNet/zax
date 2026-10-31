@@ -242,6 +242,8 @@ parts:
             installer: None,
             installer_route: None,
             line: None,
+            rank: 0,
+            ranks: Default::default(),
         }
     }
 
@@ -321,6 +323,8 @@ parts:
             installer: None,
             installer_route: None,
             line: None,
+            rank: 0,
+            ranks: Default::default(),
         };
         assert_eq!(carry_over(&release, None), CarriedSelection::default());
     }
