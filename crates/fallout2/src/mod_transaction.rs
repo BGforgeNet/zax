@@ -282,6 +282,17 @@ pub fn write_transaction(
     platform.fs().write(&at, &body)
 }
 
+/// Removes the journal, silent where there is none.
+///
+/// # Errors
+///
+/// Fails where the journal is there but cannot be removed.
+pub fn discard_transaction(platform: &dyn Platform, install: &Install, id: &str) -> Result<()> {
+    platform
+        .fs()
+        .remove(&mod_work_directory(platform, install, id).join(JOURNAL))
+}
+
 /// The pinned release, as the feed would have answered it. What makes a retry install the version its
 /// unfinished attempt started on, without asking the network which version that was.
 ///

@@ -32,7 +32,8 @@ use crate::mod_asset::{AssetNaming, ModProgress, fetch_asset};
 use crate::mod_feed::{ModRelease, ReleaseAsset, held_orders, is_archive_name};
 use crate::mod_parts::chosen_parts;
 use crate::mod_transaction::{
-    ModTransaction, PinnedAsset, mod_work_directory, read_transaction, write_transaction,
+    ModTransaction, PinnedAsset, discard_transaction, mod_work_directory, read_transaction,
+    write_transaction,
 };
 use crate::mods::{
     MODS_DIRECTORY, MODS_ORDER_PATH, Mod, ModKind, ModsSaveRequest, answers_to_id, list_mods,
@@ -238,6 +239,35 @@ fn fingerprint_of(
     lines.extend(order_lines.iter().map(|name| format!("+{name}")));
     lines.extend(removes.iter().map(|path| format!("-{path}")));
     fnv1a(&lines.join("\n"))
+}
+
+/// The transaction open for this mod, or nothing. A journal is live only while the record holds the
+/// mod's unfinished entry; beside a finished entry or none it outlived its install (a cleanup that
+/// failed, a stop before the first write) and would replay that release over whatever happened since,
+/// so it goes with the copies it governed, which a new transaction would otherwise take for the
+/// originals - only the verified download stays.
+///
+/// # Errors
+///
+/// Fails where the journal cannot be read or a stale one cannot be cleared.
+pub fn open_transaction(
+    platform: &dyn Platform,
+    install: &Install,
+    record: &InstallRecord,
+    id: &str,
+) -> Result<Option<ModTransaction>> {
+    if record
+        .mods
+        .iter()
+        .any(|held| held.id == id && !held.complete)
+    {
+        return read_transaction(platform, install, id);
+    }
+    let work = mod_work_directory(platform, install, id);
+    discard_transaction(platform, install, id)?;
+    platform.fs().remove(&work.join(OVERWRITTEN))?;
+    platform.fs().remove(&work.join(REMOVED))?;
+    Ok(None)
 }
 
 fn file_exists(platform: &dyn Platform, path: &Path) -> Result<bool> {
@@ -477,13 +507,14 @@ pub fn plan_mod_install(
     // record instead, a retry would find its own unfinished entry there and conclude it replaces
     // itself - so the files a first attempt already removed would go unlisted, and their order lines
     // would outlive them.
-    let open = read_transaction(platform, install, &manifest.id)?;
+    let open = open_transaction(platform, install, &record, &manifest.id)?;
     let replacing = match open.and_then(|held| held.previous) {
         Some(previous) => Some(previous),
-        None => load_record(platform, &install.path)?
+        None => record
             .mods
-            .into_iter()
-            .find(|held| held.id == manifest.id && held.complete),
+            .iter()
+            .find(|held| held.id == manifest.id && held.complete)
+            .cloned(),
     };
     let removes: Vec<String> = replacing
         .map(|held| held.files)
@@ -640,7 +671,7 @@ pub fn apply_mod_install(
     // as it was before the first byte landed, and a retry that re-derived it would be recording its own
     // wreckage - the half-deployed files as the originals to restore, its own unfinished entry as what
     // it replaces.
-    let journal = match read_transaction(platform, install, &manifest.id)? {
+    let journal = match open_transaction(platform, install, &record, &manifest.id)? {
         Some(held) => held,
         None => {
             let snapshot = read_mods(platform, install)?;
@@ -1654,6 +1685,46 @@ mod tests {
         );
         assert_eq!(recorded(&platform, "ecco"), None);
         assert_eq!(platform.fs().stat(&work).expect("a read"), None);
+    }
+
+    #[test]
+    fn a_journal_that_outlived_its_finished_install_is_not_replayed() {
+        // The working directory's removal failed after the record was marked complete, and the user has
+        // tuned the ini since: replaying that first install's journal would extract over the edit with
+        // nothing set aside.
+        let platform = platform(
+            &[],
+            &[("mods/ecco.dat", "new"), ("mods/ecco.ini", "[Main]\nA=1\n")],
+            "payload",
+        );
+        let release = release_with(&platform, "", "payload");
+        installed(&platform, &release);
+        write_transaction(
+            &platform,
+            &install(),
+            &ModTransaction {
+                id: "ecco".to_owned(),
+                archive: release.archive.as_ref().map(pin),
+                parts: BTreeMap::new(),
+                selection: Vec::new(),
+                manifest_text: release.manifest_text.clone(),
+                version: "1.0".to_owned(),
+                previous: None,
+                order: None,
+                preexisting: Vec::new(),
+            },
+        )
+        .expect("a journal");
+        platform
+            .fs()
+            .write(Path::new("/games/f2/mods/ecco.ini"), b"[Main]\nA=7\n")
+            .expect("the user's edit");
+
+        installed(&platform, &release);
+        assert_eq!(
+            platform.text_at("/games/f2/mods/ecco.ini").as_deref(),
+            Some("[Main]\nA=7\n")
+        );
     }
 
     #[test]

@@ -58,10 +58,10 @@ use crate::mod_feed::{
     read_mod_feeds, read_mod_install_state, release_named,
 };
 use crate::mod_install::{
-    ModInstallOutcome, ModInstallPlan, ModRemoval, apply_mod_install, plan_mod_install,
-    restore_mod_install, uninstall_mod,
+    ModInstallOutcome, ModInstallPlan, ModRemoval, apply_mod_install, open_transaction,
+    plan_mod_install, restore_mod_install, uninstall_mod,
 };
-use crate::mod_transaction::{read_transaction, release_of};
+use crate::mod_transaction::release_of;
 use crate::mods::{
     ModsSaveRequest, ModsSnapshot, OrderFormat, OrderSwap, preview_order_swap, read_mods,
     save_mods, swap_order_to,
@@ -540,7 +540,8 @@ impl Backend {
         // An unfinished attempt decides its own selection too, and for the same reason: the copies
         // waiting beside it are those parts', and a second answer to the dialog would land on the first
         // attempt's work.
-        if let Some(open) = read_transaction(self.platform(), install, mod_id)? {
+        let record = load_record(self.platform(), &install.path)?;
+        if let Some(open) = open_transaction(self.platform(), install, &record, mod_id)? {
             return Ok(ChosenRelease {
                 release: release_of(&open)?,
                 selection: open.selection,
