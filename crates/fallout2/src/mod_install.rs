@@ -28,6 +28,7 @@ use zax_platform::{Error, Platform, Result};
 
 use crate::archive_preflight::{is_archiving_clutter, preflight_archive};
 use crate::case_lowering::{Listings, real_cased_path};
+use crate::install_lock::with_install_lock;
 use crate::manifest::{ModManifest, ModPart, ModType, may_write};
 use crate::mod_asset::{AssetNaming, ModProgress, fetch_asset};
 use crate::mod_feed::{ModRelease, ReleaseAsset, held_orders, is_archive_name};
@@ -609,14 +610,34 @@ fn update_order_lines(
 ///
 /// # Errors
 ///
-/// Fails where the manifest's own conflict rules fire, where the record may not be written, or where
-/// any of the five phases cannot complete.
+/// Fails where another writer holds the directory, where the manifest's own conflict rules fire, where
+/// the record may not be written, or where any of the five phases cannot complete.
+pub fn apply_mod_install(
+    platform: &dyn Platform,
+    install: &Install,
+    release: &ModRelease,
+    plan: &ModInstallPlan,
+    options: &ModProgress<'_>,
+    now: LocalTime,
+    clock: i64,
+) -> Result<ModInstallOutcome> {
+    // Claimed as a base install claims it: its installer outlives the ZAX that started it, and still
+    // rewrites mods/ and the order file this would rewrite too.
+    with_install_lock(
+        platform,
+        Path::new(&install.path),
+        &format!("Installing {}", release.manifest.name),
+        clock,
+        || apply_under_lock(platform, install, release, plan, options, now),
+    )
+}
+
 #[expect(
     clippy::too_many_lines,
     reason = "the five phases in the order recovery is written against; splitting them would put the \
               sequence a restore undoes out of one reader's sight"
 )]
-pub fn apply_mod_install(
+fn apply_under_lock(
     platform: &dyn Platform,
     install: &Install,
     release: &ModRelease,
@@ -936,9 +957,25 @@ fn without_mod(record: &InstallRecord, id: &str) -> InstallRecord {
 ///
 /// # Errors
 ///
-/// Fails where nothing is waiting to be restored, where the working directory is gone, or where a write
-/// fails.
+/// Fails where another writer holds the directory, where nothing is waiting to be restored, where the
+/// working directory is gone, or where a write fails.
 pub fn restore_mod_install(
+    platform: &dyn Platform,
+    install: &Install,
+    id: &str,
+    now: LocalTime,
+    clock: i64,
+) -> Result<()> {
+    with_install_lock(
+        platform,
+        Path::new(&install.path),
+        &format!("Restoring {id}"),
+        clock,
+        || restore_under_lock(platform, install, id, now),
+    )
+}
+
+fn restore_under_lock(
     platform: &dyn Platform,
     install: &Install,
     id: &str,
@@ -1105,9 +1142,25 @@ pub struct ModRemoval {
 ///
 /// # Errors
 ///
-/// Fails where the mod's type forbids removal, where the record cannot be read or written, or where
-/// nothing of the mod is here.
+/// Fails where another writer holds the directory, where the mod's type forbids removal, where the
+/// record cannot be read or written, or where nothing of the mod is here.
 pub fn uninstall_mod(
+    platform: &dyn Platform,
+    install: &Install,
+    id: &str,
+    now: LocalTime,
+    clock: i64,
+) -> Result<ModRemoval> {
+    with_install_lock(
+        platform,
+        Path::new(&install.path),
+        &format!("Removing {id}"),
+        clock,
+        || uninstall_under_lock(platform, install, id, now),
+    )
+}
+
+fn uninstall_under_lock(
     platform: &dyn Platform,
     install: &Install,
     id: &str,
@@ -1252,6 +1305,8 @@ mod tests {
     const ARCHIVE: &str = "ecco.zip";
     const URL: &str = "https://example/ecco.zip";
     const WORK: &str = "/home/tester/.cache/zax/tmp";
+    /// When an operation claims the directory, which the claim only reports.
+    const CLOCK: i64 = 1_700_000_000_000;
 
     fn now() -> LocalTime {
         LocalTime {
@@ -1308,7 +1363,11 @@ mod tests {
 
     /// A host serving one archive at `URL`, holding whatever the game folder is said to hold.
     fn platform(files: &[(&str, &str)], inside: &[(&str, &str)], payload: &str) -> MemoryPlatform {
-        MemoryPlatform::new(MemoryOptions {
+        MemoryPlatform::new(options(files, inside, payload))
+    }
+
+    fn options(files: &[(&str, &str)], inside: &[(&str, &str)], payload: &str) -> MemoryOptions {
+        MemoryOptions {
             files: files
                 .iter()
                 .map(|(path, text)| ((*path).to_owned(), Content::from(*text)))
@@ -1321,8 +1380,10 @@ mod tests {
                     .map(|(name, text)| ((*name).to_owned(), Content::from(*text)))
                     .collect(),
             )]),
+            // The game folder is there before anything is written into it, as the claim requires.
+            dirs: vec!["/games/f2".to_owned()],
             ..MemoryOptions::default()
-        })
+        }
     }
 
     /// The ordinary case: one archive holding one dat, nothing in the folder yet.
@@ -1346,6 +1407,7 @@ mod tests {
             &plan,
             &ModProgress::default(),
             now(),
+            CLOCK,
         )
         .expect("an install")
     }
@@ -1534,6 +1596,7 @@ mod tests {
             &plan,
             &ModProgress::default(),
             now(),
+            CLOCK,
         )
         .expect("an install");
         // The timestamped backup outlives the working directory, which is what a later uninstall
@@ -1592,6 +1655,7 @@ mod tests {
             &plan,
             &ModProgress::default(),
             now(),
+            CLOCK,
         )
         .expect("an upgrade");
         assert_eq!(
@@ -1667,7 +1731,7 @@ mod tests {
             .write(Path::new("/games/f2/mods/ecco.dat"), b"half written")
             .expect("a write");
 
-        restore_mod_install(&platform, &install(), "ecco", now()).expect("a restore");
+        restore_mod_install(&platform, &install(), "ecco", now(), CLOCK).expect("a restore");
         assert_eq!(
             platform
                 .fs()
@@ -1745,7 +1809,7 @@ mod tests {
             ),
         )
         .expect("a record");
-        let err = restore_mod_install(&platform, &install(), "ecco", now())
+        let err = restore_mod_install(&platform, &install(), "ecco", now(), CLOCK)
             .expect_err("nothing to restore from");
         assert!(
             format!("{err}").contains("Retry the install instead"),
@@ -1757,8 +1821,8 @@ mod tests {
     fn a_finished_install_is_not_something_to_restore() {
         let (platform, release) = simple();
         installed(&platform, &release);
-        let err =
-            restore_mod_install(&platform, &install(), "ecco", now()).expect_err("nothing waiting");
+        let err = restore_mod_install(&platform, &install(), "ecco", now(), CLOCK)
+            .expect_err("nothing waiting");
         assert!(format!("{err}").contains("waiting to be restored"), "{err}");
     }
 
@@ -1766,7 +1830,8 @@ mod tests {
     fn uninstall_deletes_what_the_record_names_and_keeps_a_copy() {
         let (platform, release) = simple();
         installed(&platform, &release);
-        let removal = uninstall_mod(&platform, &install(), "ecco", now()).expect("a removal");
+        let removal =
+            uninstall_mod(&platform, &install(), "ecco", now(), CLOCK).expect("a removal");
         assert_eq!(removal.files, ["mods/ecco.dat"]);
         assert_eq!(
             platform
@@ -1795,6 +1860,51 @@ mod tests {
     }
 
     #[test]
+    fn a_directory_another_writer_has_claimed_is_not_written_to() {
+        // A base installer outlives the ZAX that started it, and still writes mods/ and the order file.
+        // The claim below names this process, so the host has to say it is still running for the
+        // claim to hold.
+        let pid = MemoryPlatform::default().process().identity().pid;
+        let platform = MemoryPlatform::new(MemoryOptions {
+            live_pids: vec![pid],
+            ..options(&[], &[("mods/ecco.dat", "new")], "payload")
+        });
+        let release = release_with(&platform, "", "payload");
+        installed(&platform, &release);
+        let plan = planned(&platform, &release);
+        assert!(matches!(
+            crate::install_lock::take_install_lock(
+                &platform,
+                Path::new("/games/f2"),
+                "Installing RPU",
+                0
+            )
+            .expect("a claim"),
+            crate::install_lock::Claim::Taken(_)
+        ));
+
+        let refusals = [
+            apply_mod_install(
+                &platform,
+                &install(),
+                &release,
+                &plan,
+                &ModProgress::default(),
+                now(),
+                CLOCK,
+            )
+            .map(|_| ()),
+            uninstall_mod(&platform, &install(), "ecco", now(), CLOCK).map(|_| ()),
+            restore_mod_install(&platform, &install(), "ecco", now(), CLOCK),
+        ];
+        for refusal in refusals {
+            let err = refusal.expect_err("claimed by another writer");
+            assert!(format!("{err}").contains("Installing RPU"), "{err}");
+        }
+        assert!(platform.text_at("/games/f2/mods/ecco.dat").is_some());
+    }
+
+    #[test]
     fn uninstalling_a_folder_entry_takes_the_folder_it_emptied() {
         // Left behind, the empty folder still reads as the mod, installed by hand.
         let platform = platform(
@@ -1810,7 +1920,7 @@ mod tests {
             &platform,
             &release_with(&platform, "entries: [InventoryFilter.dat]\n", "payload"),
         );
-        uninstall_mod(&platform, &install(), "ecco", now()).expect("a removal");
+        uninstall_mod(&platform, &install(), "ecco", now(), CLOCK).expect("a removal");
         assert_eq!(
             platform
                 .fs()
@@ -1863,7 +1973,7 @@ mod tests {
         )
         .expect("a journal");
 
-        restore_mod_install(&platform, &install(), "ecco", now()).expect("a restore");
+        restore_mod_install(&platform, &install(), "ecco", now(), CLOCK).expect("a restore");
         assert_eq!(
             platform
                 .fs()
@@ -1885,7 +1995,8 @@ mod tests {
                 Path::new("/games/f2/mods/ecco.dat"),
             )
             .expect("a rename");
-        let removal = uninstall_mod(&platform, &install(), "ecco", now()).expect("a removal");
+        let removal =
+            uninstall_mod(&platform, &install(), "ecco", now(), CLOCK).expect("a removal");
         assert_eq!(removal.files, ["mods/EcCo.dat"]);
         assert_eq!(platform.text_at("/games/f2/mods/ecco.dat"), None);
         assert_eq!(
@@ -1921,6 +2032,7 @@ mod tests {
                     ]),
                 ),
             ]),
+            dirs: vec!["/games/f2".to_owned()],
             ..MemoryOptions::default()
         });
         installed(&platform, &release_with(&platform, "", "ecco"));
@@ -1965,7 +2077,7 @@ mod tests {
             ["mods/ecco.dat"],
             "the file moved to its new owner"
         );
-        uninstall_mod(&platform, &install(), "other", now()).expect("a removal");
+        uninstall_mod(&platform, &install(), "other", now(), CLOCK).expect("a removal");
         // EcCo's own file stays, and the file it gave up went with the mod that took it.
         assert!(
             platform
@@ -1990,7 +2102,8 @@ mod tests {
             &[],
             "payload",
         );
-        let removal = uninstall_mod(&platform, &install(), "ecco", now()).expect("a removal");
+        let removal =
+            uninstall_mod(&platform, &install(), "ecco", now(), CLOCK).expect("a removal");
         assert_eq!(removal.files, ["mods/ecco.dat"]);
         assert!(
             platform
@@ -2004,7 +2117,8 @@ mod tests {
     #[test]
     fn nothing_of_a_mod_that_is_not_here_is_removed() {
         let (platform, _) = simple();
-        let err = uninstall_mod(&platform, &install(), "ecco", now()).expect_err("nothing here");
+        let err =
+            uninstall_mod(&platform, &install(), "ecco", now(), CLOCK).expect_err("nothing here");
         assert!(format!("{err}").contains("is here to remove"), "{err}");
     }
 
@@ -2033,7 +2147,7 @@ mod tests {
             ),
         )
         .expect("a record");
-        let err = uninstall_mod(&platform, &install(), "ecco", now()).expect_err("refused");
+        let err = uninstall_mod(&platform, &install(), "ecco", now(), CLOCK).expect_err("refused");
         assert!(
             format!("{err}").contains("it rewrites the scripts"),
             "{err}"
@@ -2068,7 +2182,7 @@ mod tests {
             ),
         )
         .expect("a record");
-        let err = uninstall_mod(&platform, &install(), "upu", now()).expect_err("refused");
+        let err = uninstall_mod(&platform, &install(), "upu", now(), CLOCK).expect_err("refused");
         assert!(format!("{err}").contains("fresh copy of the game"), "{err}");
     }
 
@@ -2101,7 +2215,8 @@ mod tests {
             ),
         )
         .expect("a record");
-        let err = uninstall_mod(&platform, &install(), "fo1in2", now()).expect_err("refused");
+        let err =
+            uninstall_mod(&platform, &install(), "fo1in2", now(), CLOCK).expect_err("refused");
         assert!(format!("{err}").contains("Fallout1in2"), "{err}");
     }
 

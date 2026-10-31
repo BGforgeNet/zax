@@ -945,6 +945,7 @@ impl Backend {
                     &plan,
                     &reporter.mods(),
                     now,
+                    self.shell.millis(),
                 )
                 .map(InstallOutcome::Creates),
                 InstallPlan::Base(_) => apply_base_install(
@@ -963,6 +964,7 @@ impl Backend {
                     &plan,
                     &reporter.mods(),
                     now,
+                    self.shell.millis(),
                 )
                 .map(InstallOutcome::Stacking),
             }
@@ -997,16 +999,30 @@ impl Backend {
     ///
     /// # Errors
     ///
-    /// Fails where nothing is waiting, or where the working directory is gone.
+    /// Fails where another writer holds the directory, where nothing is waiting, or where the working
+    /// directory is gone.
     pub fn restore_mod(&self, install: &Install, mod_id: &str) -> Result<()> {
-        restore_mod_install(self.platform(), install, mod_id, self.shell.now())
+        restore_mod_install(
+            self.platform(),
+            install,
+            mod_id,
+            self.shell.now(),
+            self.shell.millis(),
+        )
     }
 
     /// # Errors
     ///
-    /// Fails where the mod's type forbids removal, or where nothing of it is here.
+    /// Fails where another writer holds the directory, where the mod's type forbids removal, or where
+    /// nothing of it is here.
     pub fn remove_mod(&self, install: &Install, mod_id: &str) -> Result<ModRemoval> {
-        uninstall_mod(self.platform(), install, mod_id, self.shell.now())
+        uninstall_mod(
+            self.platform(),
+            install,
+            mod_id,
+            self.shell.now(),
+            self.shell.millis(),
+        )
     }
 
     /// The installed mods' settings schemas, rendered by the same per-kind controls the catalog uses.

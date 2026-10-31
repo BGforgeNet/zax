@@ -32,6 +32,7 @@ use zax_platform::{Error, Platform, Result};
 use crate::archive_preflight::preflight_archive;
 use crate::dat::DatSource;
 use crate::files::CONFIG_FILES;
+use crate::install_lock::with_install_lock;
 use crate::manifest::{ModCreates, ModManifest, ModType};
 use crate::mod_asset::{AssetNaming, ModProgress, fetch_asset};
 use crate::mod_created::{created_install_path, no_upgrade_here};
@@ -469,8 +470,29 @@ pub fn plan_create_install(
 ///
 /// # Errors
 ///
-/// As `plan_create_install`, plus any write that fails while the payload is being unpacked.
+/// As `plan_create_install`, plus where another writer holds this install, and any write that fails
+/// while the payload is being unpacked.
 pub fn apply_create_install(
+    platform: &dyn Platform,
+    install: &Install,
+    release: &ModRelease,
+    plan: &CreateInstallPlan,
+    options: &ModProgress<'_>,
+    now: LocalTime,
+    clock: i64,
+) -> Result<CreateInstallOutcome> {
+    // The host install is what this reads its files from and records into, and a base installer
+    // still running there would be rewriting both.
+    with_install_lock(
+        platform,
+        Path::new(&install.path),
+        &format!("Installing {}", release.manifest.name),
+        clock,
+        || create_under_lock(platform, install, release, plan, options, now),
+    )
+}
+
+fn create_under_lock(
     platform: &dyn Platform,
     install: &Install,
     release: &ModRelease,
@@ -778,6 +800,7 @@ extract-dat.into: data
             &plan,
             &ModProgress::default(),
             now(),
+            1_700_000_000_000,
         )
     }
 

@@ -19,7 +19,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use zax_platform::{Platform, Result};
+use zax_platform::{Error, Platform, Result};
 
 /// The file, at the top of the install beside the config files ZAX already writes there.
 const LOCK_NAME: &str = ".zax-lock";
@@ -176,6 +176,31 @@ pub fn take_install_lock(
     // each of those stands between the user and an install that nothing is actually performing.
     platform.fs().remove(&at)?;
     claim_again(platform, at, mine)
+}
+
+/// Runs `write` with the directory claimed, for a writer that hands the claim to no other process. The
+/// claim goes on every way out, and one that cannot be given back is reported, since a lock naming
+/// this still-running ZAX would refuse its next operation.
+///
+/// # Errors
+///
+/// Fails where the claim is refused or cannot be made or released, and wherever `write` does.
+pub fn with_install_lock<T>(
+    platform: &dyn Platform,
+    install: &Path,
+    what: &str,
+    now: i64,
+    write: impl FnOnce() -> Result<T>,
+) -> Result<T> {
+    let mut lock = match take_install_lock(platform, install, what, now)? {
+        Claim::Refused(why) => return Err(Error::Unsupported(why)),
+        Claim::Taken(lock) => lock,
+    };
+    let outcome = write();
+    let released = lock.release(platform);
+    let value = outcome?;
+    released?;
+    Ok(value)
 }
 
 /// Whether a live id is still the program the claim was handed to. A claim that never reached an
