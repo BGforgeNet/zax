@@ -4,6 +4,7 @@ members = [
   "crates/core",
   "crates/fallout2",
   "crates/host",
+  "crates/indexer",
   "crates/mod-tools",
   "crates/platform",
   "crates/preview",

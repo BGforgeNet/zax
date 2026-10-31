@@ -5616,6 +5616,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zax-indexer"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "serde",
+ "serde_json",
+ "yaml-rust2",
+ "zax-fallout2",
+ "zax-host",
+ "zax-platform",
+]
+
+[[package]]
 name = "zax-mod-tools"
 version = "0.1.0"
 dependencies = [

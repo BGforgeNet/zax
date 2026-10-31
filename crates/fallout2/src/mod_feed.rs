@@ -26,6 +26,7 @@ use zax_platform::fs::FileKind;
 use zax_platform::{Error, Platform, Result};
 
 use crate::base_version::{BaseVersion, installed_base_version};
+use crate::index::{counter_of, line_holds};
 use crate::manifest::ModPart;
 use crate::manifest::{
     MANIFEST_NAME, ManifestDefaults, ModInput, ModManifest, ModType, is_mod_version,
@@ -72,18 +73,8 @@ pub struct ModLine {
     pub counter: bool,
 }
 
-/// Whether a version belongs to a line: its own numbering, or the counter the line inherited.
 fn held_by_line(line: &ModLine, version: &str) -> bool {
-    version.starts_with(line.prefix)
-        || (line.counter && !version.is_empty() && version.bytes().all(|b| b.is_ascii_digit()))
-}
-
-/// The number a version ends on - 30 for `v30`, 34 for `2.3.34`, 30 for the `2.3.3u30` an install of
-/// that era stamps. RPU's counter ran through all three spellings, so it is what orders a line whatever
-/// scheme wrote it.
-fn counter_of(version: &str) -> Option<u64> {
-    let digits = version.len() - version.trim_end_matches(|c: char| c.is_ascii_digit()).len();
-    version[version.len() - digits..].parse().ok()
+    line_holds(line.prefix, line.counter, version)
 }
 
 /// How two of one row's versions compare. A line orders by its counter, because the schemes either
@@ -405,7 +396,8 @@ fn sole(assets: &[ReleaseAsset], wanted: impl Fn(&str) -> bool) -> Option<&Relea
     matching.next().is_none().then_some(first)
 }
 
-fn sole_archive(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
+#[must_use]
+pub fn sole_archive(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
     sole(assets, is_archive_name)
 }
 
@@ -413,7 +405,8 @@ fn sole_archive(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
 /// release's sole executable. Matched on the shape rather than on `built-with`, which would be a table
 /// with one row - and a toolkit this version does not know refuses at parse, so the guess never reaches
 /// an unknown one.
-fn sole_executable(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
+#[must_use]
+pub fn sole_executable(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
     sole(assets, |name| name.to_lowercase().ends_with(".exe"))
 }
 
@@ -438,7 +431,8 @@ fn declared_installer(manifest: &ModManifest, route: InstallerRoute) -> Option<O
 
 /// A tag's version: `v14.7` is 14.7. A tag shaped like anything else names no version and is passed
 /// over.
-fn version_from_tag(tag: &str) -> Option<String> {
+#[must_use]
+pub fn version_from_tag(tag: &str) -> Option<String> {
     let version = tag
         .strip_prefix('v')
         .or_else(|| tag.strip_prefix('V'))

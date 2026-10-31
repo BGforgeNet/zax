@@ -81,6 +81,30 @@ pub struct IndexedLine {
     pub counter: bool,
 }
 
+impl IndexedLine {
+    #[must_use]
+    pub fn holds(&self, version: &str) -> bool {
+        line_holds(&self.prefix, self.counter, version)
+    }
+}
+
+/// The number a version ends on - 30 for `v30`, 34 for `2.3.34`, 30 for the `2.3.3u30` an install of
+/// that era stamps. RPU's counter ran through all three spellings, so it is what orders a line whatever
+/// scheme wrote it.
+#[must_use]
+pub fn counter_of(version: &str) -> Option<u64> {
+    let digits = version.len() - version.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+    version[version.len() - digits..].parse().ok()
+}
+
+/// Whether a version belongs to a line: its own numbering, or the counter the line inherited. The one
+/// rule both the indexer and a stamped install's placement judge by.
+#[must_use]
+pub fn line_holds(prefix: &str, counter: bool, version: &str) -> bool {
+    version.starts_with(prefix)
+        || (counter && !version.is_empty() && version.bytes().all(|b| b.is_ascii_digit()))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct IndexedRelease {
     pub version: String,
@@ -94,8 +118,11 @@ pub struct IndexedRelease {
     /// Every file the manifest names, keyed by the name it uses.
     #[serde(default)]
     pub assets: Vec<IndexedAsset>,
-    /// The release's manifest with every value explicit, read by the same parser as an author's file.
-    pub manifest: serde_json::Value,
+    /// The release's manifest as YAML text with every value explicit, read by the same parser as an
+    /// author's file. Text rather than a JSON object because YAML keeps a scalar as it was written:
+    /// `1.10` through a JSON number would come back as `1.1`, and a shipped default is compared as
+    /// text.
+    pub manifest: String,
 }
 
 /// Which audience a release is for. A channel this version does not know is offered to nobody.
@@ -180,12 +207,7 @@ pub fn read_release(listed: &IndexedMod, release: &IndexedRelease) -> Result<Rea
             missing.join(", ")
         )));
     }
-    let manifest_text = serde_json::to_string(&release.manifest).map_err(|err| {
-        Error::Unsupported(format!(
-            "The manifest of {} {} could not be read: {err}.",
-            listed.name, release.version
-        ))
-    })?;
+    let manifest_text = release.manifest.clone();
     let manifest = parse_indexed_manifest(manifest_text.as_bytes()).map_err(|refusal| {
         Error::Unsupported(format!(
             "The manifest of {} {} was refused: {refusal}.",
@@ -266,7 +288,8 @@ mod tests {
             "channel": "stable",
             "published": "2026-10-31T00:00:00Z",
             "assets": [asset("ecco.zip")],
-            "manifest": manifest,
+            // JSON text is YAML, so a test can build the document as a value.
+            "manifest": manifest.to_string(),
         });
         if let (Some(into), Some(from)) = (release.as_object_mut(), extra.as_object()) {
             for (key, value) in from {

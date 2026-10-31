@@ -1475,7 +1475,21 @@ fn installer_platforms(root: &Yaml) -> Vec<String> {
 ///
 /// Answers a [`Refusal`] naming the cause, worded for whoever has to fix the manifest.
 pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModManifest> {
-    read_manifest(bytes, defaults, Strictness::Author)
+    read_manifest(bytes, defaults, Strictness::Author, None)
+}
+
+/// Reads an author's manifest with the grants its index source gives it, rather than ZAX's own table:
+/// what the indexer judges a mod's paths against.
+///
+/// # Errors
+///
+/// As [`parse_manifest`].
+pub fn parse_manifest_with_grants(
+    bytes: &[u8],
+    defaults: &ManifestDefaults,
+    grants: &[String],
+) -> Parsed<ModManifest> {
+    read_manifest(bytes, defaults, Strictness::Author, Some(grants))
 }
 
 /// Reads a release's manifest as the index serves it: every value explicit, the grants ZAX's
@@ -1486,7 +1500,12 @@ pub fn parse_manifest(bytes: &[u8], defaults: &ManifestDefaults) -> Parsed<ModMa
 /// Answers a [`Refusal`] naming the cause. Every check the author's file passes still applies: the
 /// index is downloaded data, so it is read at the same boundary.
 pub fn parse_indexed_manifest(bytes: &[u8]) -> Parsed<ModManifest> {
-    read_manifest(bytes, &ManifestDefaults::default(), Strictness::Indexed)
+    read_manifest(
+        bytes,
+        &ManifestDefaults::default(),
+        Strictness::Indexed,
+        None,
+    )
 }
 
 /// Only in the index's copy: a grant is ZAX's maintainers' to give, never an author's to claim.
@@ -1500,6 +1519,7 @@ fn read_manifest(
     bytes: &[u8],
     defaults: &ManifestDefaults,
     strictness: Strictness,
+    given_grants: Option<&[String]>,
 ) -> Parsed<ModManifest> {
     if bytes.len() > MANIFEST_BYTE_CAP {
         return refuse(format!(
@@ -1616,10 +1636,13 @@ fn read_manifest(
     }
     // Read once: every path this manifest declares is judged against what ZAX grants it.
     let grants: Vec<String> = match strictness {
-        Strictness::Author => grants_for(&id)
-            .iter()
-            .map(|&path| path.to_owned())
-            .collect(),
+        Strictness::Author => match given_grants {
+            Some(given) => given.to_vec(),
+            None => grants_for(&id)
+                .iter()
+                .map(|&path| path.to_owned())
+                .collect(),
+        },
         Strictness::Indexed => match fields.get(GRANTS_FIELD) {
             None => Vec::new(),
             Some(held) => {

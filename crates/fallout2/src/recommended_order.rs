@@ -90,13 +90,22 @@ fn fold(name: &str) -> String {
 /// Computed rather than written out, so it shrinks by itself the day one project moves an entry - which
 /// the order's own test asserts, since a disagreement would otherwise be settled silently in RPU's
 /// favour.
-pub static SHARED_ORDER: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
-    RPU_ORDER
-        .iter()
+pub static SHARED_ORDER: LazyLock<Vec<&'static str>> =
+    LazyLock::new(|| agreed_order(RPU_ORDER, &[UPU_ORDER]));
+
+/// The entries of `lead` that every one of `others` also names, in `lead`'s order: what independently
+/// maintained orders agree on, with a disagreement settled in the lead's favour.
+#[must_use]
+pub fn agreed_order<'a>(lead: &[&'a str], others: &[&[&str]]) -> Vec<&'a str> {
+    lead.iter()
         .copied()
-        .filter(|name| UPU_ORDER.iter().any(|other| fold(other) == fold(name)))
+        .filter(|name| {
+            others
+                .iter()
+                .all(|other| other.iter().any(|held| fold(held) == fold(name)))
+        })
         .collect()
-});
+}
 
 /// The order an install is judged against. The two Updated projects each state their own; every other
 /// type falls back to what they agree on, and no type is judged against a project it is not.

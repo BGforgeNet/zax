@@ -1,0 +1,19 @@
+[package]
+name = "zax-indexer"
+description = "Builds the mod index ZAX reads, from the followed repositories' releases and the maintainers' source files"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+jiff = "0.2.37"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+yaml-rust2 = "0.13.0"
+zax-fallout2.workspace = true
+zax-host.workspace = true
+zax-platform.workspace = true
