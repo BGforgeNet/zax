@@ -24,3 +24,6 @@ auditConfig:
     # deepmerge, which @sveltejs/vite-plugin-svelte uses to merge our own Svelte config at build time: no release
     # fixes it. Drop this entry once a plugin release with sveltejs/vite-plugin-svelte#1415 is a week old.
     - GHSA-gcqx-w48m-w2h4
+    # minimatch, which eslint uses to match our own lint globs: the fix is the 11.0 major, first published
+    # 2026-10-27. Drop this entry once eslint takes minimatch 11, or once 11.0.1 is a week old and an override holds.
+    - GHSA-g3hv-75wg-m249
