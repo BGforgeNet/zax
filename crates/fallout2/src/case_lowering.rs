@@ -8,10 +8,10 @@
 //! their lowercase form, never inside `backup/` or a `.git/`, and not at all if two entries would
 //! collide, which is the one outcome that loses a file.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
-use zax_platform::fs::FileKind;
+use zax_platform::fs::{DirEntry, FileKind};
 use zax_platform::{Platform, Result};
 
 /// Where the install's own way back lives. Renaming inside it would rewrite the history it exists to
@@ -32,6 +32,38 @@ fn inside(root: &Path, relative: &str) -> PathBuf {
         at.push(part);
     }
     at
+}
+
+/// One read per directory across a batch of lookups. Held only while nothing is writing, since a
+/// mutation would go unseen.
+pub type Listings = HashMap<PathBuf, Option<Vec<DirEntry>>>;
+
+/// A relative path resolved to its on-disk spelling under `root`, or nothing when nothing answers to
+/// it. Matched case-insensitively segment by segment, the way the loader and upstream's own checks
+/// treat paths, so `MODS/Rpu.DAT` on a case-sensitive filesystem still answers to `mods/rpu.dat` - and
+/// the caller gets the real name to copy or delete.
+pub fn real_cased_path(
+    platform: &dyn Platform,
+    root: &Path,
+    relative: &str,
+    listings: Option<&mut Listings>,
+) -> Option<PathBuf> {
+    let mut held = listings;
+    let mut at = root.to_path_buf();
+    for segment in relative.replace('\\', "/").split('/') {
+        let entries = match held.as_deref_mut() {
+            Some(cache) => cache
+                .entry(at.clone())
+                .or_insert_with(|| platform.fs().list(&at).ok())
+                .clone(),
+            None => platform.fs().list(&at).ok(),
+        };
+        let found = entries?
+            .into_iter()
+            .find(|entry| entry.name.to_lowercase() == segment.to_lowercase())?;
+        at = at.join(found.name);
+    }
+    Some(at)
 }
 
 /// Whether a name has anything for case to apply to - `12.dat` reads the same either way.
@@ -181,6 +213,19 @@ mod tests {
                 .collect(),
             ..MemoryOptions::default()
         })
+    }
+
+    #[test]
+    fn a_path_is_resolved_to_its_on_disk_spelling() {
+        let platform = platform_with(&[("/games/f2/MODS/Ecco.DAT", "held")]);
+        assert_eq!(
+            real_cased_path(&platform, Path::new("/games/f2"), "mods/ecco.dat", None),
+            Some(PathBuf::from("/games/f2/MODS/Ecco.DAT"))
+        );
+        assert_eq!(
+            real_cased_path(&platform, Path::new("/games/f2"), "mods/other.dat", None),
+            None
+        );
     }
 
     #[test]

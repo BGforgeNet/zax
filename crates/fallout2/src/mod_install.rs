@@ -12,7 +12,7 @@
 //! install finishes and kept by failure and cancellation alike, so a retry resumes instead of paying the
 //! download again and a restore can put every byte back.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use zax_core::directories::backup_directory;
@@ -23,10 +23,11 @@ use zax_core::install::Install;
 use zax_core::stamp::{LocalTime, stamp};
 use zax_core::text::latin1;
 use zax_platform::archive::{ArchiveEntryInfo, ArchiveEntryKind, ExtractOptions};
-use zax_platform::fs::{DirEntry, FileKind};
+use zax_platform::fs::FileKind;
 use zax_platform::{Error, Platform, Result};
 
 use crate::archive_preflight::{is_archiving_clutter, preflight_archive};
+use crate::case_lowering::{Listings, real_cased_path};
 use crate::manifest::{ModManifest, ModPart, ModType, may_write};
 use crate::mod_asset::{AssetNaming, ModProgress, fetch_asset};
 use crate::mod_feed::{ModRelease, ReleaseAsset, held_orders, is_archive_name};
@@ -272,38 +273,6 @@ pub fn open_transaction(
 
 fn file_exists(platform: &dyn Platform, path: &Path) -> Result<bool> {
     Ok(platform.fs().stat(path)?.map(|stat| stat.kind) == Some(FileKind::File))
-}
-
-/// One read per directory across a batch of lookups. Held only while nothing is writing, since a
-/// mutation would go unseen.
-type Listings = HashMap<PathBuf, Option<Vec<DirEntry>>>;
-
-/// A relative path resolved to its on-disk spelling under `root`, or nothing when nothing answers to
-/// it. Matched case-insensitively segment by segment, the way the loader and upstream's own checks
-/// treat paths, so `MODS/Rpu.DAT` on a case-sensitive filesystem still answers to `mods/rpu.dat` - and
-/// the caller gets the real name to copy or delete.
-fn real_cased_path(
-    platform: &dyn Platform,
-    root: &Path,
-    relative: &str,
-    listings: Option<&mut Listings>,
-) -> Option<PathBuf> {
-    let mut held = listings;
-    let mut at = root.to_path_buf();
-    for segment in relative.replace('\\', "/").split('/') {
-        let entries = match held.as_deref_mut() {
-            Some(cache) => cache
-                .entry(at.clone())
-                .or_insert_with(|| platform.fs().list(&at).ok())
-                .clone(),
-            None => platform.fs().list(&at).ok(),
-        };
-        let found = entries?
-            .into_iter()
-            .find(|entry| entry.name.to_lowercase() == segment.to_lowercase())?;
-        at = at.join(found.name);
-    }
-    Some(at)
 }
 
 /// The clashes the manifest declares, judged against the directory as it is now. Only the ones ZAX
@@ -1171,7 +1140,11 @@ pub fn uninstall_mod(
         if !may_write(path, &granted) {
             continue;
         }
-        let target = inside_path(root, path);
+        // Resolved as the install resolved it: a base install's lowercasing pass, or a hand rename,
+        // leaves the recorded spelling naming nothing on a case-sensitive filesystem.
+        let Some(target) = real_cased_path(platform, root, path, None) else {
+            continue;
+        };
         let Some(found) = platform.fs().stat(&target)? else {
             continue;
         };
@@ -1802,6 +1775,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn uninstall_finds_a_recorded_file_whose_case_changed_on_disk() {
+        // A base install's lowercasing pass renames a stacking mod's mixed-case files under it.
+        let platform = platform(&[], &[("mods/EcCo.dat", "new")], "payload");
+        installed(&platform, &release_with(&platform, "", "payload"));
+        platform
+            .fs()
+            .rename(
+                Path::new("/games/f2/mods/EcCo.dat"),
+                Path::new("/games/f2/mods/ecco.dat"),
+            )
+            .expect("a rename");
+        let removal = uninstall_mod(&platform, &install(), "ecco", now()).expect("a removal");
+        assert_eq!(removal.files, ["mods/EcCo.dat"]);
+        assert_eq!(platform.text_at("/games/f2/mods/ecco.dat"), None);
+        assert_eq!(
+            platform
+                .fs()
+                .read(&removal.backup.join("mods").join("EcCo.dat"))
+                .expect("a read"),
+            b"new"
+        );
+    }
+
     /// EcCo installed with a file another mod also ships, and that other mod's release beside it.
     fn two_mods_sharing_a_file(extra: &str) -> (MemoryPlatform, ModRelease) {
         const OTHER_URL: &str = "https://example/other.zip";
@@ -2075,19 +2072,6 @@ mod tests {
         };
         assert_eq!(
             single_file_target(&zipped, None, "EcCo").expect("an archive"),
-            None
-        );
-    }
-
-    #[test]
-    fn a_path_is_resolved_to_its_on_disk_spelling() {
-        let platform = platform(&[("/games/f2/MODS/Ecco.DAT", "held")], &[], "payload");
-        assert_eq!(
-            real_cased_path(&platform, Path::new("/games/f2"), "mods/ecco.dat", None),
-            Some(PathBuf::from("/games/f2/MODS/Ecco.DAT"))
-        );
-        assert_eq!(
-            real_cased_path(&platform, Path::new("/games/f2"), "mods/other.dat", None),
             None
         );
     }

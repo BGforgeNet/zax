@@ -19,6 +19,7 @@ use zax_core::install::GameType;
 use zax_platform::fs::FileKind;
 use zax_platform::{Error, Platform, Result};
 
+use crate::case_lowering::real_cased_path;
 use crate::manifest::{
     ManifestDefaults, ModManifest, ModType, inside_mods, is_confined, is_mod_id, is_mod_version,
     may_write, parse_held_manifest,
@@ -652,8 +653,12 @@ fn still_installed(
         return true;
     }
 
+    // Matched the way the loader and the install match, so a file whose case changed on disk still
+    // answers for the mod.
     for file in &held.files {
-        let at = join_relative(root, file);
+        let Some(at) = real_cased_path(platform, root, file, None) else {
+            continue;
+        };
         if matches!(platform.fs().stat(&at), Ok(Some(stat)) if stat.kind == FileKind::File) {
             return true;
         }
@@ -1067,6 +1072,29 @@ mod tests {
         let record = InstallRecord {
             path: INSTALL.to_owned(),
             mods: vec![a_mod("ecco")],
+            ..InstallRecord::default()
+        };
+        assert_eq!(
+            reconcile_record(&platform, &record)
+                .expect("reconcile")
+                .mods
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_mod_whose_files_changed_case_on_disk_is_kept() {
+        // The loader folds case, and a base install's lowercasing pass renames what it finds.
+        let platform = platform_with(&[
+            ("/games/f2/fallout2.exe", "MZ"),
+            ("/games/f2/mods/ecco.dat", "dat"),
+        ]);
+        let mut held = a_mod("ecco");
+        held.files = vec!["mods/EcCo.dat".to_owned()];
+        let record = InstallRecord {
+            path: INSTALL.to_owned(),
+            mods: vec![held],
             ..InstallRecord::default()
         };
         assert_eq!(
