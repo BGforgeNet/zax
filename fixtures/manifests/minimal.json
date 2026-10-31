@@ -1,6 +1,7 @@
 {
   "parses": {
     "grants": [],
+    "replaces": [],
     "id": "fo2tweaks",
     "name": "FO2tweaks",
     "version": "14.7",

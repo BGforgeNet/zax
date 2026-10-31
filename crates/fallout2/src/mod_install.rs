@@ -40,7 +40,8 @@ use crate::mods::{
 };
 use crate::recommended_order::{order_with, place_for, recommendation_for};
 use crate::records::{
-    InstallRecord, InstalledMod, assert_usable, grants_of, load_record, manifest_of, save_record,
+    InstallRecord, InstalledMod, assert_usable, grants_of, load_record, manifest_of, mod_name,
+    save_record,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, ts_rs::TS)]
@@ -319,7 +320,8 @@ pub fn plan_mod_install(
     let manifest = &release.manifest;
     // Ahead of the download rather than after it: a record this version may not write is a refusal the
     // user should get before spending a transfer on it.
-    assert_usable(&load_record(platform, &install.path)?, &manifest.id)?;
+    let record = load_record(platform, &install.path)?;
+    assert_usable(&record, &manifest.id)?;
     let payloads = payloads_for(release, selection)?;
     let work = mod_work_directory(platform, install, &manifest.id);
     let granted: Vec<&str> = manifest.grants.iter().map(String::as_str).collect();
@@ -448,6 +450,29 @@ pub fn plan_mod_install(
     }
 
     let planned: BTreeSet<String> = files.iter().map(|file| file.path.to_lowercase()).collect();
+
+    // A file another installed mod owns: laid over it, this mod's merge would read that mod's file as
+    // the user's, and removing either would delete what the other still lists. Only a mod declaring it
+    // replaces the owner takes the file over.
+    for owner in record
+        .mods
+        .iter()
+        .filter(|held| held.id != manifest.id && !manifest.replaces.contains(&held.id))
+    {
+        let Some(shared) = files.iter().find(|file| {
+            owner
+                .files
+                .iter()
+                .any(|path| path.to_lowercase() == file.path.to_lowercase())
+        }) else {
+            continue;
+        };
+        let name = mod_name(owner);
+        return Err(Error::Unsupported(format!(
+            "{} would install {}, which belongs to {name}, installed here. Remove {name} first.",
+            manifest.name, shared.path
+        )));
+    }
     // What this install replaces comes from the open transaction when there is one. Read from the
     // record instead, a retry would find its own unfinished entry there and conclude it replaces
     // itself - so the files a first attempt already removed would go unlisted, and their order lines
@@ -697,7 +722,10 @@ pub fn apply_mod_install(
         before: BTreeMap::new(),
         carried: BTreeMap::new(),
     };
-    save_record(platform, &with_mod(&record, &pending))?;
+    save_record(
+        platform,
+        &taking_over(&with_mod(&record, &pending), &pending, &manifest.replaces),
+    )?;
 
     // Phase 2, deploy.
     options.step(&format!(
@@ -873,6 +901,18 @@ fn with_mod(record: &InstallRecord, held: &InstalledMod) -> InstallRecord {
         mods,
         ..record.clone()
     }
+}
+
+/// The record with the files `held` installs dropped from the mods it replaces: a file has one owner,
+/// and removing a mod deletes only what it owns.
+fn taking_over(record: &InstallRecord, held: &InstalledMod, replaces: &[String]) -> InstallRecord {
+    let taken: BTreeSet<String> = held.files.iter().map(|path| path.to_lowercase()).collect();
+    let mut out = record.clone();
+    for one in out.mods.iter_mut().filter(|one| replaces.contains(&one.id)) {
+        one.files
+            .retain(|path| !taken.contains(&path.to_lowercase()));
+    }
+    out
 }
 
 fn without_mod(record: &InstallRecord, id: &str) -> InstallRecord {
@@ -1688,6 +1728,89 @@ mod tests {
             !String::from_utf8_lossy(&order).contains("ecco.dat"),
             "the order line outlived the file: {}",
             String::from_utf8_lossy(&order)
+        );
+    }
+
+    /// EcCo installed with a file another mod also ships, and that other mod's release beside it.
+    fn two_mods_sharing_a_file(extra: &str) -> (MemoryPlatform, ModRelease) {
+        const OTHER_URL: &str = "https://example/other.zip";
+        let platform = MemoryPlatform::new(MemoryOptions {
+            downloads: BTreeMap::from([
+                (URL.to_owned(), Content::from("ecco")),
+                (OTHER_URL.to_owned(), Content::from("other")),
+            ]),
+            archives: BTreeMap::from([
+                (
+                    "ecco".to_owned(),
+                    BTreeMap::from([
+                        ("mods/ecco.dat".to_owned(), Content::from("dat")),
+                        ("mods/shared.ini".to_owned(), Content::from("[A]\nx=1\n")),
+                    ]),
+                ),
+                (
+                    "other".to_owned(),
+                    BTreeMap::from([
+                        ("mods/other.dat".to_owned(), Content::from("dat")),
+                        ("mods/Shared.ini".to_owned(), Content::from("[B]\ny=2\n")),
+                    ]),
+                ),
+            ]),
+            ..MemoryOptions::default()
+        });
+        installed(&platform, &release_with(&platform, "", "ecco"));
+        let text = format!(
+            "spec: 1\nid: other\nname: Other\nversion: 1.0\ngame: fallout2\ntype: pluggable\n\
+             archive: other.zip\n{extra}"
+        );
+        let other = ModRelease {
+            manifest: parse_manifest(text.as_bytes(), &ManifestDefaults::default())
+                .expect("a manifest the test writes"),
+            manifest_text: text,
+            archive: Some(ReleaseAsset {
+                name: "other.zip".to_owned(),
+                url: OTHER_URL.to_owned(),
+                digest: Some(digest(&platform, "other")),
+                size: Some(5),
+            }),
+            ..release_with(&platform, "", "ecco")
+        };
+        (platform, other)
+    }
+
+    #[test]
+    fn a_file_another_installed_mod_owns_is_refused_naming_that_mod() {
+        // Installed anyway, the second mod's merge would read the first's file as the user's, and
+        // removing it would delete a file the first one's record still lists.
+        let (platform, other) = two_mods_sharing_a_file("");
+        let refused = plan_mod_install(&platform, &install(), &other, &[], &ModProgress::default())
+            .expect_err("a file EcCo owns");
+        let text = refused.to_string();
+        assert!(text.contains("mods/Shared.ini"), "{text}");
+        assert!(text.contains("EcCo"), "{text}");
+    }
+
+    #[test]
+    fn a_mod_declaring_it_replaces_another_takes_that_ones_files_over() {
+        let (platform, other) = two_mods_sharing_a_file("replaces: [ecco]\n");
+        installed(&platform, &other);
+        let ecco = recorded(&platform, "ecco").expect("still installed");
+        assert_eq!(
+            ecco.files,
+            ["mods/ecco.dat"],
+            "the file moved to its new owner"
+        );
+        uninstall_mod(&platform, &install(), "other", now()).expect("a removal");
+        // EcCo's own file stays, and the file it gave up went with the mod that took it.
+        assert!(
+            platform
+                .fs()
+                .stat(Path::new("/games/f2/mods/ecco.dat"))
+                .expect("a read")
+                .is_some()
+        );
+        assert_eq!(
+            recorded(&platform, "ecco").expect("still installed").files,
+            ["mods/ecco.dat"]
         );
     }
 

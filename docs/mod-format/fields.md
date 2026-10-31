@@ -39,6 +39,7 @@ last part is a name you choose, as in `settings.sections.main`, is one field per
 | `extract-dat.list`             | with `from`        | The response file naming what to lift out of it, one path per line.                    |
 | `extract-dat.into`             | with `from`        | Where those files land inside the created install.                                     |
 | `conflicts`                    | no                 | When installing refuses; see below.                                                    |
+| `replaces`                     | no                 | Ids of mods whose files this one may take over; see below.                             |
 | `settings`                     | no                 | The settings schema; see [Settings](settings.md).                                      |
 | `settings.sections.<section>`  | no                 | What one ini section of the schema is for; see [Settings](settings.md).                |
 
@@ -147,6 +148,9 @@ it as a sentence.
 These are the clashes ZAX cannot see for itself. Two mods writing the same file refuse without a rule, and files
 your install already holds are shown as overwrites before anything is confirmed; a rule is for an
 incompatibility with no file in common.
+
+A mod that supersedes another and ships some of its files names it in `replaces`. Installing it then takes those
+files over: they leave the other mod's record, so removing either mod deletes only what it still owns.
 
 ## What parsing refuses
 

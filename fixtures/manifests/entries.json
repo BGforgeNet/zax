@@ -1,6 +1,7 @@
 {
   "parses": {
     "grants": [],
+    "replaces": [],
     "id": "inventoryfilter",
     "name": "Inventory Filter",
     "version": "1.4",

@@ -298,6 +298,9 @@ pub struct ModManifest {
     pub order: Option<ModOrder>,
     /// Installs ZAX refuses because the author declared the clash.
     pub conflicts: Vec<ConflictRule>,
+    /// Mods whose files this one may take over, by id. Without it, a file another installed mod owns
+    /// refuses the install; with it, the file moves to this mod's record.
+    pub replaces: Vec<String>,
     pub settings: Vec<ModSetting>,
     /// Entries the schema declares that this version cannot draw.
     pub dropped: Vec<DroppedSetting>,
@@ -1422,6 +1425,7 @@ const MANIFEST_FIELDS: &[&str] = &[
     "extract-dat.list",
     "extract-dat.into",
     "conflicts",
+    "replaces",
     "settings",
     "install",
 ];
@@ -1852,6 +1856,24 @@ fn read_manifest(
     };
     let section_help = parse_section_help(&fields, &schema)?;
 
+    let mut replaces = Vec::new();
+    if let Some(held) = fields.get("replaces") {
+        for (at, item) in items(Some(held), "\"replaces\"")?.iter().enumerate() {
+            let named = text(
+                Some(item),
+                &format!("\"replaces\" entry {}", at + 1),
+                SHORT_TEXT,
+            )?;
+            if !is_mod_id(&named) || named == id {
+                return refuse(format!(
+                    "\"replaces\" entry {} (\"{named}\") is not another mod's id",
+                    at + 1
+                ));
+            }
+            replaces.push(named);
+        }
+    }
+
     Ok(ModManifest {
         id,
         name: text(fields.get("name").copied(), "\"name\"", SHORT_TEXT)?,
@@ -1903,6 +1925,7 @@ fn read_manifest(
             None => Vec::new(),
             Some(held) => parse_conflicts(Some(held), strictness)?,
         },
+        replaces,
         settings: schema.settings,
         dropped: schema.dropped,
         section_help,
@@ -2044,6 +2067,17 @@ mod tests {
             let text = format!("spec: 1\ngame: fallout2\nid: \"{bad}\"\nname: X\nversion: 1.0\n");
             assert!(parse(&text).is_err(), "{bad} was accepted");
         }
+    }
+
+    #[test]
+    fn a_mod_names_the_mods_it_replaces_by_id_and_never_itself() {
+        assert_eq!(
+            accepted(&minimal("replaces: [old-ecco]\n")).replaces,
+            ["old-ecco"]
+        );
+        assert!(refusal(&minimal("replaces: [ecco]\n")).contains("not another mod's id"));
+        assert!(refusal(&minimal("replaces: [Old Ecco]\n")).contains("not another mod's id"));
+        assert!(refusal(&minimal("replaces: old-ecco\n")).contains("must be a list"));
     }
 
     #[test]
