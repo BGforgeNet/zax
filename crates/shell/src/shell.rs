@@ -33,8 +33,6 @@ impl WindowShell {
     }
 }
 
-/// One broken-down instant as `stamp` wants it. The fields are already in range by construction - the
-/// date-time they come from is a calendar one - so the conversions below cannot narrow anything away.
 /// An extension in every upper- and lower-case spelling. GTK matches a file filter's pattern case-sensitively, and
 /// the files ZAX asks for come in both (a GOG `MASTER.DAT`, an unpacked `master.dat`), so `*.dat` alone hides one.
 fn every_case(extension: &str) -> Vec<String> {
@@ -55,6 +53,8 @@ fn every_case(extension: &str) -> Vec<String> {
     spellings
 }
 
+/// One broken-down instant as `stamp` wants it. The fields are already in range by construction - the
+/// date-time they come from is a calendar one - so the conversions below cannot narrow anything away.
 fn broken_down(held: jiff::civil::DateTime) -> LocalTime {
     LocalTime {
         year: i32::from(held.year()),
