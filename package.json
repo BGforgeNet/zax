@@ -34,13 +34,13 @@
     "globals": "^17.13.0",
     "happy-dom": "^21.0.4",
     "jiti": "^2.7.0",
-    "knip": "6.42.1",
-    "oxfmt": "^0.74.0",
-    "oxlint": "^1.89.0",
+    "knip": "6.43.0",
+    "oxfmt": "^0.75.0",
+    "oxlint": "^1.90.0",
     "oxlint-tsgolint": "^7.0.2005",
-    "svelte": "^5.57.2",
+    "svelte": "^5.57.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.0",
+    "typescript-eslint": "^8.72.1",
     "vitest": "^5.0.5",
     "yaml": "2.9.1"
   }
