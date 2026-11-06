@@ -34,8 +34,7 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    /* Bordered on both sides now that it no longer runs into the window's edge. */
-    border-inline: 1px solid var(--border);
+    border-right: 1px solid var(--border);
     background: var(--panel-alt);
   }
 

@@ -23,22 +23,14 @@
   --invalid: light-dark(#c0392b, #ff8a7a);
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
-  /*
-    The settings column stops at what its row actually needs - three tracks of 19rem, 16rem and 22rem, plus the
-    two gaps and the pane's own inset - so no width is left over to render as blank space on the right.
-  */
-  --col: calc(57rem + 60px);
   --sidebar: 264px;
 
   /* How far the sidebar's tab strip sits inside its own border: the shared strip's gutter is a pane's, and
      too wide for a 264px column. */
   --tab-inset: 8px;
 
-  /*
-    Both columns are centred as one block, so the surplus width becomes margin at the window's two edges rather
-    than a gap opening between them. Measured against the shell, which is what holds both.
-  */
-  --gutter: max(16px, calc((100cqi - var(--sidebar) - var(--col)) / 2));
+  /* The inset of what spans the whole window, the notice and the status bar; the second column sets its own. */
+  --gutter: 16px;
 }
 
 /* The theme picker's only job: narrowing the used scheme, which is what every token above reads. */
@@ -219,10 +211,10 @@ button {
 */
 .list .row {
   display: grid;
-  /* The notes track is bounded rather than 1fr: as a fraction it absorbed every surplus pixel, which on a tab
-     whose settings carry no help text left the row's whole right half blank. The surplus goes to the last
-     track instead, which is what carries the revert link to the row's right edge. */
-  grid-template-columns: minmax(0, 19rem) minmax(0, 16rem) minmax(0, 22rem) 1fr;
+  /* Every track is bounded: the window is as wide as the screen when maximized, and a track taking the surplus
+     either opened a gap between a label and its value or carried the revert link out of reach of its setting.
+     The surplus is the row's own background, past its last track. */
+  grid-template-columns: minmax(0, 19rem) minmax(0, 16rem) minmax(0, 22rem) 3.5rem;
   column-gap: 16px;
   align-items: baseline;
   padding: 6px var(--gutter);

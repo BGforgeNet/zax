@@ -187,8 +187,6 @@
 
 <style>
   .shell {
-    /* `--gutter` is measured against this, which is what holds both columns and so what centres them. */
-    container-type: inline-size;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -207,7 +205,6 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-right: 1px solid var(--border);
   }
 
   /*
@@ -328,11 +325,9 @@
     fill: currentColor;
   }
 
-  /* The outer gutter, which is the centring one: it is the margin outside the pair, not an inset within it. */
   .body {
     flex: 1;
     display: flex;
     min-height: 0;
-    padding-inline: var(--gutter);
   }
 </style>

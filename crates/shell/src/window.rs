@@ -8,7 +8,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
-use tauri::{App, Manager as _, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    App, LogicalPosition, LogicalSize, Manager as _, PhysicalSize, Url, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
+};
 use zax_core::log::{LogLevel, append_log};
 use zax_fallout2::backend::Shell as _;
 use zax_platform::Platform;
@@ -82,18 +85,14 @@ pub fn build(
     let (navigating, navigating_clock) = (Arc::clone(platform), Arc::clone(clock));
     let shown = AtomicBool::new(false);
 
-    WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html".into()))
+    let window = WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html".into()))
         .title("ZAX")
-        // At default text size the columns stop growing near 1240 and the rest is margin; `--col` in app.css is in
-        // rem, so larger text raises that cap, and this default is sized for it.
-        .inner_size(1440.0, 900.0)
+        // Where no monitor answers; `fit_to_monitor` replaces it.
+        .inner_size(WIDTH, 900.0)
         // The game list, every tab strip and the save bar fit on one line from about 970 pixels at default text
         // size, and below that the tab strips scroll their tabs out of sight; the floor leaves a fifth over it for
         // fonts wider than the ones it was measured with.
-        .min_inner_size(1180.0, 640.0)
-        // A settings row gives every surplus pixel to its trailing track, so a wider window shows nothing
-        // more - it only pushes each revert link further from its setting. Resizing still works.
-        .maximizable(false)
+        .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .visible(false)
         .on_new_window(move |target, _features| {
             hand_outwards(opening.as_ref(), &opening_clock, &target, "open");
@@ -124,7 +123,57 @@ pub fn build(
             }
         })
         .build()?;
-    Ok(())
+    fit_to_monitor(&window)
+}
+
+/// The width the window opens at: the settings rows' tracks end near 1240 at default text size, and they are in
+/// rem, so this leaves room for larger text.
+const WIDTH: f64 = 1440.0;
+const MIN_WIDTH: f64 = 1180.0;
+const MIN_HEIGHT: f64 = 640.0;
+
+/// A title bar and frame, for a window not yet mapped: GTK reports its outer size equal to its inner one until
+/// the window manager has decorated it.
+const CHROME: f64 = 48.0;
+
+/// Where the window opens, in logical pixels, on a work area at `area_origin` of `area_size` when the frame
+/// takes `chrome`: the work area's full height, since most settings tabs are taller than any fixed default and
+/// a shorter window only scrolls them, at the usual width, centred across.
+#[must_use]
+pub fn opening_frame(
+    area_origin: LogicalPosition<f64>,
+    area_size: LogicalSize<f64>,
+    chrome: LogicalSize<f64>,
+) -> (LogicalPosition<f64>, LogicalSize<f64>) {
+    let chrome_height = chrome.height.max(CHROME);
+    let inner = LogicalSize::new(
+        WIDTH.min(area_size.width - chrome.width).max(MIN_WIDTH),
+        (area_size.height - chrome_height).max(MIN_HEIGHT),
+    );
+    let left = area_origin.x + ((area_size.width - inner.width - chrome.width) / 2.0).max(0.0);
+    (LogicalPosition::new(left, area_origin.y), inner)
+}
+
+/// Sizes the hidden window to the monitor it opens on. A machine with no monitor to ask keeps the builder's size.
+fn fit_to_monitor(window: &WebviewWindow) -> tauri::Result<()> {
+    let Some(monitor) = window.current_monitor()?.or(window.primary_monitor()?) else {
+        return Ok(());
+    };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let (outer, inner) = (window.outer_size()?, window.inner_size()?);
+    let chrome = PhysicalSize::new(
+        outer.width.saturating_sub(inner.width),
+        outer.height.saturating_sub(inner.height),
+    )
+    .to_logical::<f64>(scale);
+    let (origin, size) = opening_frame(
+        area.position.to_logical(scale),
+        area.size.to_logical(scale),
+        chrome,
+    );
+    window.set_size(size)?;
+    window.set_position(origin)
 }
 
 #[cfg(test)]
@@ -178,6 +227,35 @@ mod tests {
                 "{needed} is not granted: {granted}"
             );
         }
+    }
+
+    #[test]
+    fn the_window_opens_the_work_areas_height_at_the_usual_width_centred_under_its_top() {
+        // A 1080p monitor with a 48-pixel taskbar along the bottom.
+        let (origin, size) = opening_frame(
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(1920.0, 1032.0),
+            LogicalSize::new(2.0, 37.0),
+        );
+        assert_eq!(size, LogicalSize::new(1440.0, 984.0));
+        assert_eq!(origin, LogicalPosition::new(239.0, 0.0));
+
+        // A taskbar along the top and a frame that reports nothing yet, as GTK's does before mapping.
+        let (origin, size) = opening_frame(
+            LogicalPosition::new(0.0, 40.0),
+            LogicalSize::new(1366.0, 728.0),
+            LogicalSize::new(0.0, 0.0),
+        );
+        assert_eq!(size, LogicalSize::new(1366.0, 680.0));
+        assert_eq!(origin, LogicalPosition::new(0.0, 40.0));
+
+        // Never under the floor, however small the screen.
+        let (_, size) = opening_frame(
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(1024.0, 600.0),
+            LogicalSize::new(0.0, 0.0),
+        );
+        assert_eq!(size, LogicalSize::new(MIN_WIDTH, MIN_HEIGHT));
     }
 
     #[test]

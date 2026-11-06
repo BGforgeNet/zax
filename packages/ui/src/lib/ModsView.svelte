@@ -394,19 +394,19 @@
                     <p class="status">Cannot be uninstalled: {offer.reason}</p>
                   {/if}
                 </div>
-                {#if installLabel(offer) !== null}
-                  {@const refusal = installRefusal(offer)}
-                  <button
-                    class="primary"
-                    disabled={refusal !== null || store.busy !== null || !store.modsSettled}
-                    title={refusal ?? store.busyReason ?? store.modsUnsettled}
-                    onclick={() => void store.prepareMod(offer)}
-                  >
-                    {installButtonLabel(offer)}
-                  </button>
-                {/if}
                 <div class="offer-actions">
-                  <!-- Beside the button that names one version rather than replacing it: the head of the line is
+                  {#if installLabel(offer) !== null}
+                    {@const refusal = installRefusal(offer)}
+                    <button
+                      class="primary"
+                      disabled={refusal !== null || store.busy !== null || !store.modsSettled}
+                      title={refusal ?? store.busyReason ?? store.modsUnsettled}
+                      onclick={() => void store.prepareMod(offer)}
+                    >
+                      {installButtonLabel(offer)}
+                    </button>
+                  {/if}
+                  <!-- Under the button that names one version rather than replacing it: the head of the line is
                      what most installs want, and picking another is the deliberate act. Disabled rather than
                      hidden where the list cannot be read, as the sfall panel's buttons are. -->
                   {#if installLabel(offer) !== null && installRefusal(offer) === null}
@@ -1197,7 +1197,7 @@
   */
   .offers {
     display: grid;
-    grid-template-columns: 64px minmax(0, 19rem) 6.75rem 6.75rem minmax(0, 1fr) auto auto;
+    grid-template-columns: 64px minmax(0, 19rem) 6.75rem 6.75rem minmax(0, 1fr) auto;
     column-gap: 12px;
     padding: 0 var(--gutter);
   }
@@ -1238,7 +1238,7 @@
 
   /* Under the name and across the columns' room, so a long sentence does not squeeze the name's track. */
   .notes {
-    grid-column: 2 / -1;
+    grid-column: 2 / 6;
     grid-row: 2;
     min-width: 0;
   }
@@ -1312,23 +1312,18 @@
   }
 
   /*
-    A track of its own, so every install button is the width of the widest one in the list rather than of its
-    own label - one grid means the track is sized once for all the rows. Stretched into it for the same reason:
-    a button sized to its text would leave the track it was measured for.
+    A row's buttons stacked in one track: side by side, a row offering install, another version and removal
+    needed more width than the window's floor leaves, and since the track is the whole list's, that one row
+    squeezed every name. Stretched, so every button in the list is the width of the widest one.
   */
-  .primary {
-    grid-column: 6;
-    grid-row: 1;
-    justify-self: stretch;
-  }
-
   .offer-actions {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    justify-self: end;
-    grid-column: 7;
-    grid-row: 1;
+    flex-direction: column;
+    align-items: stretch;
+    align-self: start;
+    gap: 6px;
+    grid-column: 6;
+    grid-row: 1 / span 2;
   }
 
   /* The same clothes the save bar's primary and the wipe buttons' danger wear, so the same kind of action
