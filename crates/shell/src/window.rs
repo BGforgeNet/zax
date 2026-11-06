@@ -131,7 +131,7 @@ pub fn build(
 const WIDTH: f64 = 1440.0;
 /// The height the window opens at where the screen has room: every settings tab but the few long lists fits
 /// without scrolling at default text size.
-const HEIGHT: f64 = 1000.0;
+const HEIGHT: f64 = 1100.0;
 const MIN_WIDTH: f64 = 1180.0;
 const MIN_HEIGHT: f64 = 640.0;
 
@@ -246,8 +246,8 @@ mod tests {
             LogicalSize::new(2560.0, 1392.0),
             LogicalSize::new(2.0, 37.0),
         );
-        assert_eq!(size, LogicalSize::new(1440.0, 1000.0));
-        assert_eq!(origin, LogicalPosition::new(559.0, 172.0));
+        assert_eq!(size, LogicalSize::new(1440.0, 1100.0));
+        assert_eq!(origin, LogicalPosition::new(559.0, 122.0));
 
         // A 1080p one: nine tenths of the work area, less the frame, so a margin stays above and below.
         let (origin, size) = opening_frame(
