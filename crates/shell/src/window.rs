@@ -129,16 +129,22 @@ pub fn build(
 /// The width the window opens at: the settings rows' tracks end near 1240 at default text size, and they are in
 /// rem, so this leaves room for larger text.
 const WIDTH: f64 = 1440.0;
+/// The height the window opens at where the screen has room: every settings tab but the few long lists fits
+/// without scrolling at default text size.
+const HEIGHT: f64 = 1000.0;
 const MIN_WIDTH: f64 = 1180.0;
 const MIN_HEIGHT: f64 = 640.0;
+
+/// The share of the work area's height the window may take, so it opens as a window with a margin above and
+/// below rather than looking maximized.
+const MAX_SHARE: f64 = 0.9;
 
 /// A title bar and frame, for a window not yet mapped: GTK reports its outer size equal to its inner one until
 /// the window manager has decorated it.
 const CHROME: f64 = 48.0;
 
 /// Where the window opens, in logical pixels, on a work area at `area_origin` of `area_size` when the frame
-/// takes `chrome`: the work area's full height, since most settings tabs are taller than any fixed default and
-/// a shorter window only scrolls them, at the usual width, centred across.
+/// takes `chrome`: the usual size where it fits, shorter where the screen is, centred both ways.
 #[must_use]
 pub fn opening_frame(
     area_origin: LogicalPosition<f64>,
@@ -148,10 +154,13 @@ pub fn opening_frame(
     let chrome_height = chrome.height.max(CHROME);
     let inner = LogicalSize::new(
         WIDTH.min(area_size.width - chrome.width).max(MIN_WIDTH),
-        (area_size.height - chrome_height).max(MIN_HEIGHT),
+        HEIGHT
+            .min(area_size.height * MAX_SHARE - chrome_height)
+            .max(MIN_HEIGHT),
     );
     let left = area_origin.x + ((area_size.width - inner.width - chrome.width) / 2.0).max(0.0);
-    (LogicalPosition::new(left, area_origin.y), inner)
+    let top = area_origin.y + ((area_size.height - inner.height - chrome_height) / 2.0).max(0.0);
+    (LogicalPosition::new(left, top), inner)
 }
 
 /// Sizes the hidden window to the monitor it opens on. A machine with no monitor to ask keeps the builder's size.
@@ -230,15 +239,25 @@ mod tests {
     }
 
     #[test]
-    fn the_window_opens_the_work_areas_height_at_the_usual_width_centred_under_its_top() {
-        // A 1080p monitor with a 48-pixel taskbar along the bottom.
+    fn the_window_opens_at_the_usual_size_where_it_fits_and_shorter_where_not_centred_both_ways() {
+        // A 1440p monitor with a 48-pixel taskbar along the bottom: room for the usual size.
+        let (origin, size) = opening_frame(
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(2560.0, 1392.0),
+            LogicalSize::new(2.0, 37.0),
+        );
+        assert_eq!(size, LogicalSize::new(1440.0, 1000.0));
+        assert_eq!(origin, LogicalPosition::new(559.0, 172.0));
+
+        // A 1080p one: nine tenths of the work area, less the frame, so a margin stays above and below.
         let (origin, size) = opening_frame(
             LogicalPosition::new(0.0, 0.0),
             LogicalSize::new(1920.0, 1032.0),
             LogicalSize::new(2.0, 37.0),
         );
-        assert_eq!(size, LogicalSize::new(1440.0, 984.0));
-        assert_eq!(origin, LogicalPosition::new(239.0, 0.0));
+        assert!((size.width - 1440.0).abs() < 1e-9, "{size:?}");
+        assert!((size.height - 880.8).abs() < 1e-9, "{size:?}");
+        assert!((origin.y - 51.6).abs() < 1e-9, "{origin:?}");
 
         // A taskbar along the top and a frame that reports nothing yet, as GTK's does before mapping.
         let (origin, size) = opening_frame(
@@ -246,8 +265,8 @@ mod tests {
             LogicalSize::new(1366.0, 728.0),
             LogicalSize::new(0.0, 0.0),
         );
-        assert_eq!(size, LogicalSize::new(1366.0, 680.0));
-        assert_eq!(origin, LogicalPosition::new(0.0, 40.0));
+        assert_eq!(size, LogicalSize::new(1366.0, MIN_HEIGHT));
+        assert_eq!(origin, LogicalPosition::new(0.0, 60.0));
 
         // Never under the floor, however small the screen.
         let (_, size) = opening_frame(
