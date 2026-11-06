@@ -1327,6 +1327,20 @@
     grid-row: 1 / span 2;
   }
 
+  /*
+    The save bar's button clothes. Left native, a button whose border colour alone was set fell back to a 2px
+    outset border, light on two edges and dark on the other two. `:where` keeps this under `.primary` and
+    `.danger`, which recolour it.
+  */
+  :where(.offer-actions) button {
+    background: var(--panel-alt);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 4px 16px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
   /* The same clothes the save bar's primary and the wipe buttons' danger wear, so the same kind of action
      reads the same everywhere - in the rows and in the plan dialog's footer alike. */
   .primary {
@@ -1337,6 +1351,7 @@
   }
 
   .danger {
+    background: var(--panel);
     border-color: var(--invalid);
     color: var(--invalid);
   }
