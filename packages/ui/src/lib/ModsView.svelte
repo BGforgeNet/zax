@@ -196,9 +196,10 @@
       // A nightly joins install-over because laying the release over it is the same operation. A commit
       // cannot be ordered against releases, so the offer may be older - which the status line says, and why
       // the version list this unlocks is unfiltered: `chooseModVersion` floors on states that name a version.
+      // Both share the upgrade's label: one word for moving a present copy to the latest release, with the
+      // status line saying where newer cannot be told.
       case "install-over":
       case "nightly":
-        return `Update to ${offer.version}`;
       case "upgrade":
         return `Upgrade to ${offer.version}`;
       // Not "upgrade": nothing can say which of the two is newer.
