@@ -198,7 +198,7 @@
       // the version list this unlocks is unfiltered: `chooseModVersion` floors on states that name a version.
       case "install-over":
       case "nightly":
-        return `Install ${offer.version} over it`;
+        return `Update to ${offer.version}`;
       case "upgrade":
         return `Upgrade to ${offer.version}`;
       // Not "upgrade": nothing can say which of the two is newer.

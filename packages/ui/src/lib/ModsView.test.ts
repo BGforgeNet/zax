@@ -186,7 +186,7 @@ describe("what an offer's status says", () => {
     const labels = view()
       .all("button")
       .map((button) => (button.textContent ?? "").trim());
-    expect(labels).toContain("Install 14.8 over it");
+    expect(labels).toContain("Update to 14.8");
   });
 
   /* `version` on a row the record alone describes is what is on disk, not an offer - printing it under
@@ -359,7 +359,7 @@ describe("what a row offers to do", () => {
     unmountAll();
     expect(actions({ kind: "upgrade", from: "14.7" })).toContain("Upgrade to 14.8");
     unmountAll();
-    expect(actions({ kind: "install-over" })).toContain("Install 14.8 over it");
+    expect(actions({ kind: "install-over" })).toContain("Update to 14.8");
     unmountAll();
     // Nothing can say a version the index does not list is older, so the offer is not called an upgrade.
     expect(actions({ kind: "unlisted", from: "1.5" })).toContain("Replace with 14.8");
