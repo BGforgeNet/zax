@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import bgforgeLogo from "./assets/bgforge.png";
   import EnginesView from "./lib/EnginesView.svelte";
+  import { headerLinks } from "./lib/links.js";
   import ModsView from "./lib/ModsView.svelte";
   import NoInstall from "./lib/NoInstall.svelte";
   import SaveBar from "./lib/SaveBar.svelte";
@@ -104,45 +105,21 @@
 
         <!-- The shell hands a web link to the browser rather than following it, so this needs no operation. -->
         <span class="powered">
-          <!--
-            Where to report a bug and where to ask about one, then who made it. The mark is the only name the
-            GitHub link has, so it carries the label a tooltip would otherwise merely repeat; the forum has no
-            mark of its own and is a word.
-          -->
-          <a
-            class="mark"
-            href="https://github.com/BGforgeNet/zax"
-            target="_blank"
-            rel="noreferrer"
-            title="Source on GitHub"
-            aria-label="Source on GitHub"
-          >
-            <!-- The GitHub mark, from Primer's octicons (MIT). -->
-            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"
-              ><path
-                d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"
-              /></svg
+          <!-- Where to report a bug, ask about one, chat and support the work, then who made it. -->
+          {#each headerLinks as link (link.href)}
+            <a
+              class="mark"
+              style:color={link.color}
+              href={link.href}
+              target="_blank"
+              rel="noreferrer"
+              title={link.label}
+              aria-label={link.label}
             >
-          </a>
-          <span class="sep" aria-hidden="true">|</span>
-          <a href="https://forums.bgforge.net/viewtopic.php?t=365" target="_blank" rel="noreferrer">Forum</a>
-          <span class="sep" aria-hidden="true">|</span>
-          <a
-            class="mark discord"
-            href="https://discord.gg/4Yqfggm"
-            target="_blank"
-            rel="noreferrer"
-            title="Discord"
-            aria-label="Discord"
-          >
-            <!-- The Discord mark, from Simple Icons (CC0). -->
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"
-              ><path
-                d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"
-              /></svg
-            >
-          </a>
-          <span class="sep" aria-hidden="true">|</span>
+              <svg viewBox={link.viewBox} aria-hidden="true" focusable="false"><path d={link.path} /></svg>
+            </a>
+            <span class="sep" aria-hidden="true">|</span>
+          {/each}
           Powered by <a href="https://bgforge.net/" target="_blank" rel="noreferrer">BGforge</a>
           <img class="logo" src={bgforgeLogo} alt="" width="18" height="18" />
         </span>
@@ -339,12 +316,6 @@
 
   .powered a.mark svg {
     fill: currentColor;
-  }
-
-  /* Discord's brand blurple, kept on hover too: the colour is what says whose mark this is. */
-  .powered a.discord,
-  .powered a.discord:hover {
-    color: #5865f2;
   }
 
   .body {
