@@ -127,6 +127,8 @@
           <span class="sep" aria-hidden="true">|</span>
           <a href="https://forums.bgforge.net/viewtopic.php?t=365" target="_blank" rel="noreferrer">Forum</a>
           <span class="sep" aria-hidden="true">|</span>
+          <a href="https://discord.gg/4Yqfggm" target="_blank" rel="noreferrer">Discord</a>
+          <span class="sep" aria-hidden="true">|</span>
           Powered by <a href="https://bgforge.net/" target="_blank" rel="noreferrer">BGforge</a>
           <img class="logo" src={bgforgeLogo} alt="" width="18" height="18" />
         </span>

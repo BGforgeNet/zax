@@ -29,5 +29,6 @@ The same page carries the earlier Python versions, up to 0.7. To run ZAX from a 
 ### Info
 
 - [Forums](https://forums.bgforge.net/viewforum.php?f=34)
+- [Discord](https://discord.gg/4Yqfggm)
 - [Building](docs/building.md)
 - [Changelog](docs/changelog.md)

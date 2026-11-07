@@ -220,11 +220,12 @@ describe("with no install", () => {
 });
 
 describe("where to report a problem", () => {
-  test("carries the source and the forum, and names the bare mark for a screen reader", () => {
+  test("carries the source, forum and Discord, and names the bare mark for a screen reader", () => {
     const view = app();
     const links = view.all<HTMLAnchorElement>(".powered a").map((a) => a.getAttribute("href"));
     expect(links).toContain("https://github.com/BGforgeNet/zax");
     expect(links).toContain("https://forums.bgforge.net/viewtopic.php?t=365");
+    expect(links).toContain("https://discord.gg/4Yqfggm");
     expect(view.one("a.mark").getAttribute("aria-label")).toBe("Source on GitHub");
   });
 
