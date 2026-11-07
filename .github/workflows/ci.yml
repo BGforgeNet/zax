@@ -129,7 +129,7 @@ jobs:
           # later in the job - or an artifact made from the checkout - could carry it back out.
           persist-credentials: false
       - run: ./.github/scripts/lint-workflows.sh
-      - run: ./.github/scripts/draft-release.test.sh
+      - run: ./.github/scripts/publish-release.test.sh
       - run: ./actions/pack-mod/scripts/pack.test.sh
       # The committed WebAssembly rather than its sources, on the runner's own Node, as a caller's job would run it.
       - run: ./actions/mod-ini/scripts/action.test.sh

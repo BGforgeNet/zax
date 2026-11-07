@@ -2,7 +2,7 @@
 # Builds the distributables for the platform it runs on into release/, named ZAX-<version>-<os>.<ext>.
 #
 # The names are a contract: ZAX's own update check picks this machine's build out of a release by the
-# `-<os>.<ext>` ending (crates/core/src/updates.rs), and draft-release.sh counts them by extension. Each
+# `-<os>.<ext>` ending (crates/core/src/updates.rs), and publish-release.sh counts them by extension. Each
 # platform ships one build, so the name carries no architecture.
 #
 # Every target is portable: there is no installer, because there is nothing to install. ZAX has no file

@@ -1,8 +1,7 @@
-# Builds the distributables for a version tag and drafts a release from them.
+# Builds the distributables for a version tag and publishes a release from them.
 #
-# The release is drafted rather than published: what is attached here is what a user downloads and runs, and a
-# person should look at it before that becomes true. Publishing the draft is a deliberate act in the web
-# interface or with `gh release edit <tag> --draft=false`.
+# Pushing the tag is the decision to release: the release is created as a draft, and made public only once every
+# file is attached.
 
 name: release
 
@@ -58,7 +57,7 @@ jobs:
         run: ./.github/scripts/install-linux-deps.sh
       - run: ./.github/scripts/package.sh
         shell: bash
-      # One step per target, as in ci.yml. The draft job merges these and attaches every file it finds, so the
+      # One step per target, as in ci.yml. The publish job merges these and attaches every file it finds, so the
       # split does not change what a release carries - what it changes is the guard: `if-no-files-found` asks
       # whether a step found anything, so four patterns in one step pass as long as any one of them matched. A
       # target that stopped building would have gone out as a release missing it, silently. One target per
@@ -88,17 +87,17 @@ jobs:
           path: release/*.zip
           if-no-files-found: error
 
-  draft:
+  publish:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      # Writing the draft, and the two the attestation needs to sign one against this workflow's identity.
+      # Writing the release, and the two the attestation needs to sign one against this workflow's identity.
       contents: write
       id-token: write
       attestations: write
     steps:
-      # The draft script is in the repository, and this job starts with an empty workspace. The token has write
+      # The release script is in the repository, and this job starts with an empty workspace. The token has write
       # access, so it is not left in .git/config; the script reads its own from the environment.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -123,10 +122,10 @@ jobs:
           output-file: artifacts/zax-sbom.spdx.json
           format: spdx-json
 
-      - name: Draft the release
+      - name: Publish the release
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: ./.github/scripts/draft-release.sh
+        run: ./.github/scripts/publish-release.sh

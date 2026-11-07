@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly ROOT
-readonly SCRIPT="${ROOT}/.github/scripts/draft-release.sh"
+readonly SCRIPT="${ROOT}/.github/scripts/publish-release.sh"
 scratch=$(mktemp -d)
 trap 'rm -rf "${scratch}"' EXIT
 
@@ -43,6 +43,9 @@ run_case() {
 run_case new false false
 grep -qx 'release create v0.8.0 --draft --title v0.8.0 --generate-notes artifacts/ZAX-0.8.0-linux.AppImage artifacts/ZAX-0.8.0-linux.tar.gz artifacts/ZAX-0.8.0-mac.zip artifacts/ZAX-0.8.0-win.exe' \
   "${scratch}/new/calls"
+# Published last, once every file is attached: a release made public first would show a partial set.
+grep -qx 'release edit v0.8.0 --draft=false' "${scratch}/new/calls"
+[[ $(tail -n 1 "${scratch}/new/calls") == 'release edit v0.8.0 --draft=false' ]]
 
 run_case draft true true
 grep -qx 'release delete v0.8.0 --yes' "${scratch}/draft/calls"

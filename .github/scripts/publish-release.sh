@@ -1,10 +1,10 @@
 #!/bin/bash
-# Creates the draft release and attaches everything built for it. Draft rather than published: a person looks at
-# the artifacts before they become what users download.
+# Creates the release for a tag and attaches everything built for it. It is created as a draft and published once
+# every file is attached, so nobody can download a release that is still missing platforms.
 set -euo pipefail
 
-# What a complete release carries, as a count per extension: one file each. Counted by extension rather than by filename so this does not depend
-# on the version in each name - only on a target having produced something.
+# What a complete release carries, as a count per extension: one file each. Counted by extension rather than by
+# filename so this does not depend on the version in each name - only on a target having produced something.
 #
 # The upload steps cannot answer this on their own. `if-no-files-found` asks whether a step found anything, and
 # a step that never runs - a matrix entry removed, an `if:` that no longer matches its runner - is not a
@@ -39,14 +39,14 @@ done
 if [[ ${#missing[@]} -gt 0 ]]; then
   echo "The build did not produce a complete set of distributables:" >&2
   printf '  %s\n' "${missing[@]}" >&2
-  echo "A target stopped building, or its upload step did not run. Nothing was drafted." >&2
+  echo "A target stopped building, or its upload step did not run. Nothing was released." >&2
   exit 1
 fi
 
 echo "Attaching ${#files[@]} files:"
 printf '  %s\n' "${files[@]}"
 
-# Re-running a release must not fail on the draft that already exists, so an existing draft is replaced rather
+# Re-running a release must not fail on the draft a failed run left behind, so an existing draft is replaced rather
 # than added to - otherwise a second run attaches a second copy of every file. A published release is immutable
 # here: deleting one turns a routine workflow rerun into the disappearance of a release users already have.
 if draft=$(gh release view "${TAG}" --json isDraft --jq .isDraft 2>/dev/null); then
@@ -54,7 +54,7 @@ if draft=$(gh release view "${TAG}" --json isDraft --jq .isDraft 2>/dev/null); t
     echo "Release ${TAG} is already published; refusing to replace it." >&2
     exit 1
   fi
-  echo "Draft ${TAG} already exists; deleting it before drafting again."
+  echo "Draft ${TAG} already exists; deleting it before creating it again."
   gh release delete "${TAG}" --yes
 fi
 
@@ -64,4 +64,6 @@ gh release create "${TAG}" \
   --generate-notes \
   "${files[@]}"
 
-echo "Drafted ${TAG}. Publish it with: gh release edit ${TAG} --draft=false"
+gh release edit "${TAG}" --draft=false
+
+echo "Published ${TAG}."
