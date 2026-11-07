@@ -128,7 +128,7 @@
           <a href="https://forums.bgforge.net/viewtopic.php?t=365" target="_blank" rel="noreferrer">Forum</a>
           <span class="sep" aria-hidden="true">|</span>
           <a
-            class="mark"
+            class="mark discord"
             href="https://discord.gg/4Yqfggm"
             target="_blank"
             rel="noreferrer"
@@ -339,6 +339,12 @@
 
   .powered a.mark svg {
     fill: currentColor;
+  }
+
+  /* Discord's brand blurple, kept on hover too: the colour is what says whose mark this is. */
+  .powered a.discord,
+  .powered a.discord:hover {
+    color: #5865f2;
   }
 
   .body {
