@@ -220,13 +220,14 @@ describe("with no install", () => {
 });
 
 describe("where to report a problem", () => {
-  test("carries the source, forum and Discord, and names the bare mark for a screen reader", () => {
+  test("carries the source, forum and Discord, and names the bare marks for a screen reader", () => {
     const view = app();
     const links = view.all<HTMLAnchorElement>(".powered a").map((a) => a.getAttribute("href"));
     expect(links).toContain("https://github.com/BGforgeNet/zax");
     expect(links).toContain("https://forums.bgforge.net/viewtopic.php?t=365");
     expect(links).toContain("https://discord.gg/4Yqfggm");
-    expect(view.one("a.mark").getAttribute("aria-label")).toBe("Source on GitHub");
+    expect(view.one('a.mark[href*="github"]').getAttribute("aria-label")).toBe("Source on GitHub");
+    expect(view.one('a.mark[href*="discord"]').getAttribute("aria-label")).toBe("Discord");
   });
 
   /* Every outbound link leaves the page, so none of them may hand the opener to what it opens. */
