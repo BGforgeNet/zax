@@ -121,7 +121,17 @@
             <span class="sep" aria-hidden="true">|</span>
           {/each}
           Powered by <a href="https://bgforge.net/" target="_blank" rel="noreferrer">BGforge</a>
-          <img class="logo" src={bgforgeLogo} alt="" width="18" height="18" />
+          <!-- The logo repeats the named link beside it, so it is a pointer target only, not a second stop. -->
+          <a
+            class="brand"
+            href="https://bgforge.net/"
+            target="_blank"
+            rel="noreferrer"
+            tabindex="-1"
+            aria-hidden="true"
+          >
+            <img class="logo" src={bgforgeLogo} alt="" width="18" height="18" />
+          </a>
         </span>
       </div>
 
@@ -298,7 +308,8 @@
   }
 
   /* The mark stands for the link, so it takes the underline off and the row's own ink instead. */
-  .powered a.mark {
+  .powered a.mark,
+  .powered a.brand {
     display: flex;
     text-decoration: none;
   }
