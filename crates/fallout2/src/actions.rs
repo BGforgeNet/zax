@@ -111,8 +111,7 @@ pub fn actions() -> &'static [Action] {
                 group: ActionGroup::Fix,
                 label: "Speed up combat and interface".to_owned(),
                 description: "Removes the deliberate pauses in combat, panel animations and \
-                              floating text. The single biggest quality-of-life change for a \
-                              replay."
+                              floating text."
                     .to_owned(),
                 applied_label: "Already sped up".to_owned(),
                 wine: None,
