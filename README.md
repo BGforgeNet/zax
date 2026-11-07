@@ -15,20 +15,13 @@ packages debug info for bug reports. It should work with any game based on the F
 Download the file for your system from the [releases page](https://github.com/BGforgeNet/zax/releases). There is
 nothing to install: each runs where you put it.
 
-- Windows: the `.exe`, or the same program in a `.zip`.
+- Windows: the `.exe`.
 - Linux: the `.AppImage`. The `.tar.gz` holds the bare program, which uses the system's own WebKitGTK 4.1.
 - macOS: the `.zip` holds `ZAX.app`.
 
-None of them is code-signed, so Windows and macOS warn on the first run:
-[how to get past it](docs/building.md#first-run-on-windows-and-macos). A `data` directory beside the program makes
-the copy [portable](docs/building.md#portable-copies).
-
-The same page carries the earlier Python versions, up to 0.7. To run ZAX from a checkout, see
-[Building](docs/building.md).
+If Windows or macOS warn on the first run, see [help](docs/first-run.md).
 
 ### Info
 
-- [Forums](https://forums.bgforge.net/viewforum.php?f=34)
-- [Discord](https://discord.gg/4Yqfggm)
 - [Building](docs/building.md)
 - [Changelog](docs/changelog.md)

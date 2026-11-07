@@ -108,7 +108,7 @@ There is no cross-compilation, which is why CI uses three runners:
 
 | Platform | Artifacts                                   |
 | -------- | ------------------------------------------- |
-| Windows  | `.exe`, and the same program in a `.zip`    |
+| Windows  | `.exe`                                      |
 | Linux    | `.AppImage`, and a `.tar.gz` of the program |
 | macOS    | `.zip` of the application bundle            |
 
@@ -121,19 +121,6 @@ Neither Linux artifact carries a glibc, so the one the runner builds against is 
 starts on - an older one refuses at the loader, before `main`. CI packages Linux on the oldest image GitHub
 offers for that reason, which puts the floor at Ubuntu 22.04 and Debian 12. Reading it off a build:
 `readelf -V <program> | grep GLIBC_` names the versions it needs, and the highest is the floor.
-
-## First run on Windows and macOS
-
-Nothing ZAX ships is code-signed, so both systems warn once. Neither warning means the download is damaged.
-
-- **Windows.** SmartScreen shows "Windows protected your PC". More info, then Run anyway.
-- **macOS.** Open the app, dismiss the refusal, then System Settings -> Privacy & Security -> Open Anyway ->
-  Open. First launch only. Sequoia removed the Control-click shortcut that used to do this, so the app's own
-  context menu no longer offers it.
-
-What a release does carry is build provenance. `gh attestation verify <file> --repo BGforgeNet/zax` says which
-workflow at which commit produced the file, which is the check that distinguishes a genuine build from a
-reupload - signing would not add that.
 
 ## Portable copies
 

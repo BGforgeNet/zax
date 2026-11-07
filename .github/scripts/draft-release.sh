@@ -3,9 +3,8 @@
 # the artifacts before they become what users download.
 set -euo pipefail
 
-# What a complete release carries, as a count per extension. Two zips because Windows and macOS each produce
-# one; everything else is a single file. Counted by extension rather than by filename so this does not depend
-# on the version and architecture in each name - only on a target having produced something.
+# What a complete release carries, as a count per extension: one file each. Counted by extension rather than by filename so this does not depend
+# on the version in each name - only on a target having produced something.
 #
 # The upload steps cannot answer this on their own. `if-no-files-found` asks whether a step found anything, and
 # a step that never runs - a matrix entry removed, an `if:` that no longer matches its runner - is not a
@@ -15,7 +14,7 @@ readonly EXPECTED=(
   "1 *.AppImage"
   "1 *.tar.gz"
   "1 *.exe"
-  "2 *.zip"
+  "1 *.zip"
 )
 
 shopt -s nullglob

@@ -4,7 +4,7 @@
 //! running binary is the platform's business and getting it wrong leaves them with neither version.
 
 use serde_json::Value;
-use zax_platform::{Architecture, Error, OperatingSystem, Platform, Result};
+use zax_platform::{Error, OperatingSystem, Platform, Result};
 
 const LATEST_RELEASE: &str = "https://api.github.com/repos/BGforgeNet/zax/releases/latest";
 
@@ -20,18 +20,14 @@ pub struct ZaxRelease {
 /// What a release asset is named for one host.
 ///
 /// The endings `.github/scripts/package.sh` names each platform's preferred single-file build with.
-/// Extension alone cannot distinguish the Windows and macOS zips, and the release also carries an SBOM
-/// that no machine can run.
-fn asset_suffix(os: OperatingSystem, arch: Architecture) -> Option<String> {
-    if arch == Architecture::Other {
-        return None;
-    }
+/// The release also carries an SBOM that no machine can run, so the extension alone is not enough.
+fn asset_suffix(os: OperatingSystem) -> String {
     let (name, extension) = match os {
         OperatingSystem::Windows => ("win", "exe"),
         OperatingSystem::Linux => ("linux", "appimage"),
         OperatingSystem::MacOs => ("mac", "zip"),
     };
-    Some(format!("-{name}-{arch}.{extension}"))
+    format!("-{name}.{extension}")
 }
 
 /// The address if it is one this may be opened with, and `None` otherwise.
@@ -66,23 +62,21 @@ pub fn latest_zax(platform: &dyn Platform) -> Result<ZaxRelease> {
         ));
     }
 
-    let suffix = asset_suffix(platform.os(), platform.arch());
-    let build = suffix.and_then(|suffix| {
-        parsed
-            .get("assets")
-            .and_then(Value::as_array)
-            .unwrap_or(&Vec::new())
-            .iter()
-            .find(|asset| {
-                asset
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .is_some_and(|name| name.to_lowercase().ends_with(&suffix))
-            })
-            .and_then(|asset| asset.get("browser_download_url"))
-            .and_then(Value::as_str)
-            .map(ToOwned::to_owned)
-    });
+    let suffix = asset_suffix(platform.os());
+    let build = parsed
+        .get("assets")
+        .and_then(Value::as_array)
+        .unwrap_or(&Vec::new())
+        .iter()
+        .find(|asset| {
+            asset
+                .get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name.to_lowercase().ends_with(&suffix))
+        })
+        .and_then(|asset| asset.get("browser_download_url"))
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
 
     let page = parsed
         .get("html_url")
@@ -150,29 +144,25 @@ mod tests {
     #[test]
     fn the_build_for_this_machine_is_picked_out() {
         let assets = [
-            asset(
-                "zax-linux-x64.AppImage",
-                "https://example/zax-linux-x64.AppImage",
-            ),
-            asset("zax-win-x64.exe", "https://example/zax-win-x64.exe"),
+            asset("zax-linux.AppImage", "https://example/zax-linux.AppImage"),
+            asset("zax-win.exe", "https://example/zax-win.exe"),
             asset("zax.sbom.json", "https://example/sbom"),
         ]
         .join(",");
         let mut options = feed(&release_json(&assets));
         options.os = Some(OperatingSystem::Linux);
-        options.arch = Some(Architecture::X64);
         let platform = MemoryPlatform::new(options);
         assert_eq!(
             latest_zax(&platform).expect("fetch").url,
-            "https://example/zax-linux-x64.AppImage"
+            "https://example/zax-linux.AppImage"
         );
     }
 
     #[test]
     fn the_windows_and_macos_builds_are_told_apart() {
         let assets = [
-            asset("zax-mac-arm64.zip", "https://example/mac"),
-            asset("zax-win-arm64.exe", "https://example/win"),
+            asset("zax-mac.zip", "https://example/mac"),
+            asset("zax-win.exe", "https://example/win"),
         ]
         .join(",");
         for (os, wanted) in [
@@ -181,7 +171,6 @@ mod tests {
         ] {
             let mut options = feed(&release_json(&assets));
             options.os = Some(os);
-            options.arch = Some(Architecture::Arm64);
             let platform = MemoryPlatform::new(options);
             assert_eq!(
                 latest_zax(&platform).expect("fetch").url,
@@ -193,10 +182,9 @@ mod tests {
 
     #[test]
     fn a_machine_with_no_build_is_sent_to_the_release_page() {
-        let assets = asset("zax-linux-x64.AppImage", "https://example/linux");
+        let assets = asset("zax-linux.AppImage", "https://example/linux");
         let mut options = feed(&release_json(&assets));
-        options.os = Some(OperatingSystem::Linux);
-        options.arch = Some(Architecture::Other);
+        options.os = Some(OperatingSystem::Windows);
         let platform = MemoryPlatform::new(options);
         assert_eq!(
             latest_zax(&platform).expect("fetch").url,
@@ -207,10 +195,9 @@ mod tests {
     #[test]
     fn an_asset_address_that_is_not_https_is_refused() {
         // What receives this is the system's own opener, which does whatever the scheme says.
-        let assets = asset("zax-linux-x64.appimage", "file:///etc/passwd");
+        let assets = asset("zax-linux.appimage", "file:///etc/passwd");
         let mut options = feed(&release_json(&assets));
         options.os = Some(OperatingSystem::Linux);
-        options.arch = Some(Architecture::X64);
         let platform = MemoryPlatform::new(options);
         assert_eq!(
             latest_zax(&platform).expect("fetch").url,
@@ -227,10 +214,9 @@ mod tests {
 
     #[test]
     fn an_asset_name_is_matched_whatever_its_case() {
-        let assets = asset("ZAX-Linux-X64.AppImage", "https://example/linux");
+        let assets = asset("ZAX-Linux.AppImage", "https://example/linux");
         let mut options = feed(&release_json(&assets));
         options.os = Some(OperatingSystem::Linux);
-        options.arch = Some(Architecture::X64);
         let platform = MemoryPlatform::new(options);
         assert_eq!(
             latest_zax(&platform).expect("fetch").url,

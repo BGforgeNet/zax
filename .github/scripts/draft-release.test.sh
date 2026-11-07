@@ -9,11 +9,10 @@ trap 'rm -rf "${scratch}"' EXIT
 
 make_artifacts() {
   mkdir -p artifacts
-  touch artifacts/ZAX-0.8.0-linux-x64.AppImage
-  touch artifacts/ZAX-0.8.0-linux-x64.tar.gz
-  touch artifacts/ZAX-0.8.0-win-x64.exe
-  touch artifacts/ZAX-0.8.0-win-x64.zip
-  touch artifacts/ZAX-0.8.0-mac-x64.zip
+  touch artifacts/ZAX-0.8.0-linux.AppImage
+  touch artifacts/ZAX-0.8.0-linux.tar.gz
+  touch artifacts/ZAX-0.8.0-win.exe
+  touch artifacts/ZAX-0.8.0-mac.zip
 }
 
 gh() {
@@ -42,7 +41,7 @@ run_case() {
 }
 
 run_case new false false
-grep -qx 'release create v0.8.0 --draft --title v0.8.0 --generate-notes artifacts/ZAX-0.8.0-linux-x64.AppImage artifacts/ZAX-0.8.0-linux-x64.tar.gz artifacts/ZAX-0.8.0-mac-x64.zip artifacts/ZAX-0.8.0-win-x64.exe artifacts/ZAX-0.8.0-win-x64.zip' \
+grep -qx 'release create v0.8.0 --draft --title v0.8.0 --generate-notes artifacts/ZAX-0.8.0-linux.AppImage artifacts/ZAX-0.8.0-linux.tar.gz artifacts/ZAX-0.8.0-mac.zip artifacts/ZAX-0.8.0-win.exe' \
   "${scratch}/new/calls"
 
 run_case draft true true

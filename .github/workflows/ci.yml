@@ -198,13 +198,6 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: runner.os == 'Windows'
         with:
-          name: zax-Windows-zip
-          path: release/*.zip
-          if-no-files-found: error
-          retention-days: 7
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: runner.os == 'Windows'
-        with:
           name: zax-Windows-exe
           path: release/*.exe
           if-no-files-found: error
@@ -233,7 +226,7 @@ jobs:
       - if: runner.os == 'macOS'
         run: ./.github/scripts/launch-macos.sh
 
-  # The Windows zip the build uploaded, driven through its own window: the only run of the real shell and webview on
+  # The Windows program the build uploaded, driven through its own window: the only run of the real shell and webview on
   # Windows. Its own job on windows-2022 because on the 2025 image WebView2 never opens its DevTools port to the Edge
   # driver, so no session starts (actions/runner-images#14738); the build stays on the image the release uses.
   drive-windows:
@@ -254,7 +247,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: zax-Windows-zip
+          name: zax-Windows-exe
           path: dist
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -263,7 +256,6 @@ jobs:
       - run: ./.github/scripts/install-drive-tools.sh
         shell: bash
       - run: |
-          7z x -y -bso0 -odist dist/*.zip
-          program=(dist/ZAX-*/zax.exe)
+          program=(dist/ZAX-*.exe)
           ZAX_PROGRAM="${program[0]}" pnpm drive
         shell: bash
