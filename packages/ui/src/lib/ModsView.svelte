@@ -838,7 +838,13 @@
       {#each plan.files as file (file.path)}
         <li>
           <code>{file.path}</code>
-          {#if file.overwrites}<span class="note">replaces the file there; a copy is kept</span>{/if}
+          {#if file.overwrites}
+            <span class="note">
+              {file.path.toLowerCase().endsWith(".ini")
+                ? "merges existing settings; a copy is kept"
+                : "replaces the file there; a copy is kept"}
+            </span>
+          {/if}
         </li>
       {/each}
     </ul>

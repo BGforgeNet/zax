@@ -1052,7 +1052,7 @@ describe("the plan dialog", () => {
       plan: {
         kind: "stacking",
         files: [
-          { path: "mods/fo2tweaks.dat", size: 10, overwrites: false, part: null },
+          { path: "mods/fo2tweaks.dat", size: 10, overwrites: true, part: null },
           { path: "mods/fo2tweaks.ini", size: 2, overwrites: true, part: null },
         ],
         orderLines: ["fo2tweaks.dat"],
@@ -1064,6 +1064,7 @@ describe("the plan dialog", () => {
     const text = view().text();
     expect(text).toContain("mods/fo2tweaks.dat");
     expect(text).toContain("replaces the file there; a copy is kept");
+    expect(text).toContain("merges existing settings; a copy is kept");
     expect(text).toContain("No longer shipped, removed");
     expect(text).toContain("mods/old.dat");
     expect(text).toContain("Load order: fo2tweaks.dat enabled.");

@@ -1,5 +1,9 @@
 # Changelog
 
+### 0.8.1
+
+Mod installation previews now say when existing INI settings will be merged and backed up.
+
 ### 0.8.0
 
 Rewritten. ZAX is now a desktop application rather than a Python program run from a terminal, and it manages
