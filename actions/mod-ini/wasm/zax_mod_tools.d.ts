@@ -8,14 +8,14 @@
  *
  * Throws for a match other than `soft` or `hard`, and rethrows whatever the reader threw.
  */
-export function checkModIni(manifest: Uint8Array, manifest_name: string, match_: string, read: Function): { ok: boolean; said: string[]; complaints: string[] };
+export function checkModIni(manifest: Uint8Array | number[], manifest_name: string, match_: string, read: Function): { ok: boolean; said: string[]; complaints: string[] };
 
 /**
  * # Errors
  *
  * Throws the parser's refusal as an `Error`.
  */
-export function describeManifest(bytes: Uint8Array): string[];
+export function describeManifest(bytes: Uint8Array | number[]): string[];
 
 /**
  * `{ files: [name, bytes][], settings }`, the names being what the settings address.
@@ -24,19 +24,24 @@ export function describeManifest(bytes: Uint8Array): string[];
  *
  * Throws the parser's or the generator's refusal as an `Error`, and rethrows whatever the reader threw.
  */
-export function generateModIni(manifest: Uint8Array, read: Function): { files: [string, Uint8Array][]; settings: number };
+export function generateModIni(manifest: Uint8Array | number[], read: Function): { files: [string, Uint8Array][]; settings: number };
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly checkModIni: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+    readonly checkModIni: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => void;
     readonly describeManifest: (a: number, b: number, c: number) => void;
-    readonly generateModIni: (a: number, b: number, c: number, d: number) => void;
+    readonly generateModIni: (a: number, b: number, c: number, d: any) => void;
     readonly __wbindgen_export: (a: number) => void;
+    readonly __wbindgen_export2: () => number;
+    readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
-    readonly __wbindgen_export2: (a: number, b: number) => number;
-    readonly __wbindgen_export3: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_export3: (a: number, b: number) => number;
+    readonly __wbindgen_export4: (a: number, b: number, c: number) => void;
+    readonly __wbindgen_export5: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_export6: (a: number) => void;
+    readonly __wbindgen_start: () => void;
 }
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;

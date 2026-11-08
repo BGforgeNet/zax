@@ -34,8 +34,8 @@ importers:
         specifier: ^3.23.1
         version: 3.23.1(eslint@10.14.0(jiti@2.7.0)(supports-color@7.2.0))(svelte@5.57.3(@typescript-eslint/types@8.72.1))
       globals:
-        specifier: ^17.13.0
-        version: 17.13.0
+        specifier: ^17.14.0
+        version: 17.14.0
       happy-dom:
         specifier: ^21.0.4
         version: 21.0.4
@@ -1436,8 +1436,8 @@ packages:
     resolution: {integrity: sha512-c/c15i26VrJ4IRt5Z89DnIzCGDn9EcebibhAOjw5ibqEHsE1wLUgkPn9RDmNcUKyU87GeaL633nyJ+pplFR2ZQ==}
     engines: {node: '>=18'}
 
-  globals@17.13.0:
-    resolution: {integrity: sha512-RwMTC61u7hrG3ZJMkZQOK4JLJrKS8QtoTii63EmWvFXHqycY9FObBJQCbsLxSO8kjKhWE5kV1GC+Vb1g3RI0Zg==}
+  globals@17.14.0:
+    resolution: {integrity: sha512-UtdkTVyAJePQv0J2M9Xe4L0ruNSDV314XiIJsADI2Zf40bcdAonE/D/OhAU8AT99oij9mhLByb+NvA3QWZYgCg==}
     engines: {node: '>=18'}
 
   happy-dom@21.0.4:
@@ -1861,8 +1861,8 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  unbash@6.0.2:
-    resolution: {integrity: sha512-UhcFfg9u8OpFPnUqdXSKgbGHwk2iEHaEePfpHylako6i4rpdmfoOgCVBBlou4WugaFfNunIHby01mKssJzVTCA==}
+  unbash@6.0.3:
+    resolution: {integrity: sha512-hRzSpMeM8uYMQkrnIVaVy3f44oLlokglVeEyP5hIQj88z60bKPO9VVbEpGfxChGBh9lBkzuWKOTOzPdfD6KNEA==}
     engines: {node: '>=14'}
 
   undici-types@7.24.6:
@@ -3010,7 +3010,7 @@ snapshots:
 
   globals@16.5.0: {}
 
-  globals@17.13.0: {}
+  globals@17.14.0: {}
 
   happy-dom@21.0.4:
     dependencies:
@@ -3077,7 +3077,7 @@ snapshots:
       smol-toml: 1.9.1
       strip-json-comments: 5.0.3
       tinyglobby: 0.2.17
-      unbash: 6.0.2
+      unbash: 6.0.3
       yaml: 2.9.1
       zod: 4.6.7
 
@@ -3472,7 +3472,7 @@ snapshots:
 
   typescript@6.0.3: {}
 
-  unbash@6.0.2: {}
+  unbash@6.0.3: {}
 
   undici-types@7.24.6: {}
 
@@ -3555,7 +3555,8 @@ time:
   '@types/node@24.19.2': '2026-10-09T18:44:25.189Z'
   '@vitest/coverage-v8@5.0.5': '2026-10-15T14:27:49.006Z'
   eslint-plugin-svelte@3.23.1: '2026-10-09T07:40:06.382Z'
-  globals@17.13.0: '2026-10-01T03:57:11.938Z'
+  eslint@10.14.0: '2026-10-30T14:12:27.179Z'
+  globals@17.14.0: '2026-11-01T11:01:01.622Z'
   happy-dom@21.0.4: '2026-10-20T18:05:53.295Z'
   jiti@2.7.0: '2026-05-05T21:02:47.918Z'
   knip@6.43.0: '2026-10-24T08:32:43.813Z'

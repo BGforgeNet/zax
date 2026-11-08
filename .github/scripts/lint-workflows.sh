@@ -10,12 +10,12 @@ ACTIONLINT_VERSION=1.7.12
 # The digest each project publishes for the exact file fetched below. Both tools reach outside the runner, so
 # both are checked: a tag can be moved, and an index entry can be replaced.
 ACTIONLINT_SHA256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-ZIZMOR_VERSION=1.29.0
+ZIZMOR_VERSION=1.31.1
 # PyPI addresses a file by its own hash, so this URL changes with every release rather than following the
 # version: on a bump, take both from https://pypi.org/pypi/zizmor/<version>/json.
 ZIZMOR_WHEEL=zizmor-${ZIZMOR_VERSION}-py3-none-manylinux_2_28_x86_64.whl
-ZIZMOR_URL=https://files.pythonhosted.org/packages/b4/f0/dfa67018b76bc4f2f50e265e8cbd1293833d1b1de5f3f02fbbb7487ae9c6/${ZIZMOR_WHEEL}
-ZIZMOR_SHA256=587b99c2e1b34575c6c8565c2bfde415ca8bc0310f5589f19bc948c8dea10a20
+ZIZMOR_URL=https://files.pythonhosted.org/packages/7c/f7/ee2c8eedc7bf07f443a41aa12f828c7846fd17bab184c22403afd0cbb137/${ZIZMOR_WHEEL}
+ZIZMOR_SHA256=58e878eb2dbd2c6183c105e1ac28c14f7dd1eca44a783f1fe2a69647d012c410
 
 tools=$(mktemp -d)
 trap 'rm -rf "$tools"' EXIT
