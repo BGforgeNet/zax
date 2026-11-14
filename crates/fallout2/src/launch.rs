@@ -60,10 +60,10 @@ pub fn plan_launch(
     engine_program: Option<&str>,
 ) -> LaunchPlan {
     if let Some(engine) = engine_program {
-        // Prefixed off Windows because a bare name is a PATH lookup there, and this program is in
-        // the install.
+        // Never a bare name: that is a PATH lookup, which never looks in the working directory, and
+        // this program is in the install.
         let program = if os == OperatingSystem::Windows {
-            engine.to_owned()
+            in_install(install, engine)
         } else {
             format!("./{engine}")
         };
@@ -78,7 +78,7 @@ pub fn plan_launch(
 
     if os == OperatingSystem::Windows {
         return LaunchPlan {
-            program: EXECUTABLE.to_owned(),
+            program: in_install(install, EXECUTABLE),
             args: Vec::new(),
             cwd: install.path.clone(),
             env: BTreeMap::new(),
@@ -114,6 +114,12 @@ pub fn plan_launch(
     }
 }
 
+/// A Windows program's full path in the install. Windows looks for a bare name beside ZAX, in the
+/// system folders and on PATH, never in the working directory, so a bare name finds no game.
+fn in_install(install: &Install, program: &str) -> String {
+    format!("{}\\{program}", install.path.trim_end_matches(['\\', '/']))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,14 +138,34 @@ mod tests {
         install
     }
 
+    fn windows_install(path: &str) -> Install {
+        Install::new(path, GameType::Fallout2)
+    }
+
     #[test]
     fn windows_starts_the_game_directly() {
-        let plan = plan_launch(OperatingSystem::Windows, &install(), Some("4.5"), None);
-        assert_eq!(plan.program, EXECUTABLE);
+        let plan = plan_launch(
+            OperatingSystem::Windows,
+            &windows_install(r"C:\Games\Fallout 2"),
+            Some("4.5"),
+            None,
+        );
+        assert_eq!(plan.program, r"C:\Games\Fallout 2\fallout2.exe");
         assert!(plan.args.is_empty());
         assert!(plan.env.is_empty(), "no Wine anywhere on Windows");
         assert_eq!(plan.log, None);
-        assert_eq!(plan.cwd, "/games/f2");
+        assert_eq!(plan.cwd, r"C:\Games\Fallout 2");
+    }
+
+    #[test]
+    fn windows_does_not_double_a_trailing_separator() {
+        let plan = plan_launch(
+            OperatingSystem::Windows,
+            &windows_install(r"D:\"),
+            None,
+            None,
+        );
+        assert_eq!(plan.program, r"D:\fallout2.exe");
     }
 
     #[test]
@@ -212,14 +238,13 @@ mod tests {
     }
 
     #[test]
-    fn an_engine_on_windows_is_not_prefixed() {
-        // A bare name is a PATH lookup off Windows, and this program is in the install.
+    fn an_engine_on_windows_is_named_by_its_full_path() {
         let plan = plan_launch(
             OperatingSystem::Windows,
-            &install(),
+            &windows_install(r"C:\Games\Fallout 2"),
             None,
             Some("fallout2-ce.exe"),
         );
-        assert_eq!(plan.program, "fallout2-ce.exe");
+        assert_eq!(plan.program, r"C:\Games\Fallout 2\fallout2-ce.exe");
     }
 }
