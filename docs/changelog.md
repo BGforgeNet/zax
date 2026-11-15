@@ -1,5 +1,9 @@
 # Changelog
 
+### 0.8.2
+
+Fixed "program not found" when starting the game on Windows with ZAX installed outside the game folder.
+
 ### 0.8.1
 
 Mod installation previews now say when existing INI settings will be merged and backed up.
